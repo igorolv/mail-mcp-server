@@ -100,19 +100,37 @@ English, and register each one in this table.
 
 ## Planned architecture (not implemented yet)
 
-Summary of `docs/plan.md` sections 5–7, so you can keep changes consistent with it:
+Summary of `docs/plan.md` sections 5–7 and the decision log (section 10, decisions П1–П13),
+so you can keep changes consistent with it:
 
-- Java 25, Spring Boot 4, Spring AI MCP server, Gradle 9 with a version catalog — the same stack
-  as the sibling project `redmine-mcp-server`.
+- Java 25, Spring Boot `4.2.0-RC1`, Spring AI `2.1.0-RC1` (the 2.1 line is a deliberate choice;
+  move to `2.1.0` when it is released), Gradle 9 with a version catalog.
 - stdio is the only transport; nothing but JSON-RPC may be written to `System.out`.
 - Layers: `tools/ -> service/ -> source/` (EWS, IMAP), plus `connections/`, `store/`,
   `extraction/`, `index/`, `redaction/`; `api/` records are the MCP wire contract.
 - Several mailboxes from the start: a `connections.json` file outside the repository
   (`%USERPROFILE%\.mail-mcp-server\`), modeled on the sibling project `jdbc-mcp-server`. Each
-  connection has a name, a type (`ews` or `imap`), its own properties and credentials.
+  connection has a name, a type (`ews` or `imap`), an `auth` kind, its own properties and
+  credentials.
+- EWS source: own thin SOAP client on StAX with a pluggable transport — Apache HttpClient 5 with
+  NTLM explicitly registered first, `HttpsURLConnection` as fallback. IMAP source (Gmail,
+  Mail.ru): Eclipse Angus Mail with app passwords; OAuth2 for Gmail later.
+- Read-only at protocol level: an allow-list of 10 EWS read operations; IMAP `EXAMINE` and
+  `BODY.PEEK`; never set flags in the mailbox.
 - Every source delivers messages as MIME (`.eml`), so storage, parsing and attachment extraction
-  are shared.
-- Search: BM25 by default, embeddings optional; Russian morphology is required.
+  are shared. MIME parsing: Apache James Mime4j (streaming), plus POI HSMF/HMEF, jsoup, iCal4j.
+  The extraction pipeline copied from `redmine-mcp-server` must first get one text per file and
+  shared depth and size limits for the whole nesting chain.
+- Message key: a local UUID per connection; the current server address, `Message-ID` and a MIME
+  hash are stored separately.
+- Storage: SQLite per connection for metadata and sync state; originals on disk and never
+  returned to the model; Lucene index (BM25, `RussianAnalyzer`) built from redacted text.
+  Embeddings are not in the MVP.
+- Sensitive-data filter runs both before indexing and on every output; `localPath` given to the
+  model points only to redacted text. Tools are the primary access path; MCP resources are an
+  addition.
+- Implementation order: EWS spike first; the offline pipeline (parse, store, index, redact) on
+  synthetic `.eml` in parallel; IMAP right after EWS works.
 
 Sibling projects used as references (same author, both public on GitHub):
 
