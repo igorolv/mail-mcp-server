@@ -161,8 +161,9 @@ Sibling projects used as references (same author, both public on GitHub):
   English.
 - Host names and logins come from parameters or environment variables, never from hard-coded
   defaults. `scripts/ews-login-check.ps1` uses `MAIL_EWS_SERVER` and `MAIL_EWS_LOGIN`.
-- Known result: EWS sign-in works with **NTLM and a bare login** (no domain part). Basic is not
-  verified yet. Details are in `docs/plan.md`, section 3.2.
+- Known result: EWS sign-in works with **NTLM and a bare login** (no domain part). Basic with a
+  bare login is rejected (`401`); Basic with a domain prefix was not tried and is not needed.
+  Details are in `docs/plan.md`, section 3.2.
 
 The user runs the script like this:
 

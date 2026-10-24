@@ -249,7 +249,7 @@
 
 Проверки, которые может сделать только пользователь (нужен вход):
 
-- Basic в EWS (`scripts/ews-login-check.ps1 -Methods Basic`): если работает, NTLM в Java может
-  не понадобиться.
+- ~~Basic в EWS (`scripts/ews-login-check.ps1 -Methods Basic`): если работает, NTLM в Java может
+  не понадобиться.~~ → 2026-10-24: с логином без домена `401`; остаёмся на NTLM (plan.md 3.2).
 - Gmail и Mail.ru: доступны ли пароли приложений, включён ли IMAP; список `CAPABILITY` после
   первого входа будущим клиентом.
