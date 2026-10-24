@@ -1,0 +1,2 @@
+# Real environment values (hosts, domain, login) stay local
+.local/
