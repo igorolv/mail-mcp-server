@@ -17,6 +17,8 @@ application code, a Gradle build or new tools unless the task explicitly asks fo
 | `CLAUDE.md` | One line, `@AGENTS.md`, so Claude Code loads this file. Keep all rules here, not there |
 | `docs/plan.md` | Main design discussion (in Russian): idea, environment, goals, key ideas, architecture draft, stages, open questions, decision log, discussion log |
 | `docs/research.md` | Research notes (in Russian): access protocols, libraries, existing MCP servers, search engines, redaction tools, what to reuse from sibling projects |
+| `docs/research-tasks/` | Research briefs `RT-NN-*.md` for separate agent sessions, plus `README.md` with shared rules and the result template |
+| `docs/research/` | Research results, one file per brief (in Russian). Created by research sessions |
 | `scripts/ews-login-check.ps1` | Interactive EWS sign-in check (`GetFolder` for `inbox`); run by the user, not by agents |
 | `.gitignore` | Ignores `.local/` |
 | `.local/` | **Ignored by git.** Real environment values (host names, domain, login). May not exist in your checkout |
@@ -29,6 +31,8 @@ Read this file first. Then read only the documents whose `When` matches the task
 |---|---|---|
 | `docs/plan.md` | any design question; recording a finding, decision or next step | the project plan and the full discussion history |
 | `docs/research.md` | comparing protocols, libraries, existing solutions; recording research results | research tables with statuses and conclusions |
+| `docs/research-tasks/README.md` | running a research task `RT-NN`, or writing a new brief | how to start a session, task list, shared rules, result template, self-check |
+| `docs/research-tasks/RT-NN-*.md` | you were given that task | goal, known context, questions, sources, required tables, out of scope, done criteria |
 | `scripts/ews-login-check.ps1` | changing or explaining the EWS sign-in check | the script itself; its help block documents parameters |
 
 When the project grows engineering documents, name them `docs/<topic>-agent.md`, write them in
