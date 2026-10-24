@@ -129,6 +129,19 @@ so you can keep changes consistent with it:
 - Sensitive-data filter runs both before indexing and on every output; `localPath` given to the
   model points only to redacted text. Tools are the primary access path; MCP resources are an
   addition.
+- Every tool, including local search, takes a required `connection`; there is no cross-mailbox
+  call.
+- Synchronization runs only on request, through a dedicated tool with a depth parameter (new
+  only / N days / N more messages back / full history). It starts work in the background of its
+  own server process and returns at once; `indexStatus` reports progress and coverage. All other
+  tools answer immediately from local data and report what is covered. Deletions and moves are
+  applied by the same incremental sync. Attachment text is extracted during sync up to a size
+  limit. Defaults: every real mail folder except Deleted, Junk, Outbox, Drafts and search
+  folders, full history; Gmail syncs All Mail once with labels.
+- Several server processes (different client sessions) share one data directory. All of them
+  read; only the process holding the per-connection lock (OS file lock plus a row in SQLite)
+  syncs and writes the Lucene index. A sign-in failure stops syncing that connection with no
+  retries — repeated attempts with a stale password lock the domain account.
 - Implementation order: EWS spike first; the offline pipeline (parse, store, index, redact) on
   synthetic `.eml` in parallel; IMAP right after EWS works.
 
