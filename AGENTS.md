@@ -52,6 +52,10 @@ English, and register each one in this table.
    | `user`, `user@example.com` | the user's login and corporate address |
    | `user@gmail.com`, `user@mail.ru` | personal mailboxes |
 
+   The same applies to the sibling projects: cite them by local path and commit, not by GitHub
+   URL (the account name equals the login), and write their Java package root as `<org>`
+   (it contains the company name).
+
    The real mapping lives only in `.local/environment.md`, which git ignores. Do not copy values
    out of `.local/`. If you record probe results, put raw details (IP, server name, certificate)
    into `.local/` and only anonymized conclusions into `docs/`. The repository is published on

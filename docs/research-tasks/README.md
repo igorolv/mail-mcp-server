@@ -13,6 +13,14 @@ Read AGENTS.md, then docs/research-tasks/README.md, then docs/research-tasks/RT-
 Do the research task described there and write the result file it names. Do not edit any other file.
 ```
 
+To run it non-interactively with the Codex CLI, pass the prompt on stdin, enable web search,
+limit writes to the repository and switch off MCP servers the task does not need. Use the CLI
+bundled with the Codex desktop app if the npm `codex` is too old for the configured model.
+
+```powershell
+$prompt | codex --search exec -C <repository> -s workspace-write -c 'mcp_servers.<name>.enabled=false' -o <last-message-file> -
+```
+
 ## Task list
 
 | ID | Brief | Result file | Size | Needs | Wave |
@@ -41,6 +49,11 @@ run in parallel. Wave 1 feeds the next design decisions; wave 2 can wait.
    names, URLs and quotes from English sources in their original form.
 3. **No real environment values.** Use the placeholders from `AGENTS.md` (`example.com`,
    `webmail.example.com`, `user`, `user@gmail.com`, `user@mail.ru`). Do not open `.local/`.
+   The sibling projects are cited by **local path and commit** (for example
+   `C:\git\redmine-mcp-server` @ `f62b3e5`), never by their GitHub URL, because the GitHub
+   account name is the user's login. Write their Java package root as `<org>` (for example
+   `src/main/java/<org>/redmine/mcp/`), because it contains the company name. If a catalogue or
+   search result lists the sibling projects themselves, mention them only as "sibling project".
 4. **No sign-ins, no credentials.** Do not connect to any mailbox, do not create accounts, do not
    request API keys or OAuth clients. If a question can only be answered by signing in, say so
    in the section "Что не удалось проверить" and describe what the user should check.
@@ -63,6 +76,15 @@ run in parallel. Wave 1 feeds the next design decisions; wave 2 can wait.
     outside the scope, mention it in one line under "Что ещё стоит изучить" and move on.
 11. **Stop when the brief's "Done when" list is satisfied.** Breadth over polish: a complete
     table with honest gaps beats a polished partial one.
+12. **Plain Russian.** Write ordinary Russian sentences. Keep English only for names that are
+    literally English: API operations, elements, classes, parameters, libraries, quotes. Do not
+    use English jargon as Russian words: write «изменения», not «delta»; «текущий адрес
+    письма», not «locator»; «лимит нагрузки», not «budget». If an English term is needed, give
+    the Russian meaning on first use, for example «бюджет нагрузки (budget)».
+13. **Keep it short.** The section "Кратко" must work on its own: a reader who reads only it
+    knows the main answers and the recommendation. Aim for **300–400 lines** in the whole file
+    (sources excluded). Prefer tables to prose, one example per operation or option, and no
+    repetition of the same fact in several sections — refer back instead ("см. В3").
 
 ## Result file template
 
@@ -117,4 +139,6 @@ if the brief says so.
       explain in "Что не удалось проверить").
 - [ ] Every non-obvious fact has a certainty tag and a numbered source.
 - [ ] No real host names, domains, IPs or logins; no passwords or tokens.
+- [ ] Plain Russian (rule 12); "Кратко" readable on its own; about 300–400 lines without sources
+      (rule 13).
 - [ ] Only the result file was created or changed (`git status` shows nothing else).
