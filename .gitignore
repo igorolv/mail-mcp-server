@@ -1,2 +1,12 @@
 # Real environment values (hosts, domain, login) stay local
 .local/
+
+# Gradle and build output
+.gradle/
+build/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+out/

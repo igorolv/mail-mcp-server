@@ -1,0 +1,19 @@
+spring:
+  main:
+    web-application-type: none
+    banner-mode: off
+  ai:
+    mcp:
+      server:
+        name: mail-mcp-server
+        version: 0.1.0
+        stdio: true
+
+# Top-level server data directory — all local storage is rooted here. Each connection gets its own
+# directory <data-dir>/<connection>/; the shared log is written under <data-dir>/logs/.
+mail-mcp:
+  data-dir: ${MAIL_MCP_DATA_DIR:${user.home}/.mail-mcp-server}
+  # JSON file describing the named mailboxes this server serves — the only place mail servers,
+  # credentials and per-connection settings are configured. Defaults to <data-dir>/connections.json.
+  # A missing or empty file starts the server with no connections; a malformed one fails startup.
+  connections-file: ${MAIL_MCP_CONNECTIONS_FILE:}

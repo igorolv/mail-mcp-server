@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Synthetic FindItem response: IdOnly + DateTimeReceived + IsRead, sorted by DateTimeReceived descending. -->
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Header>
+    <h:ServerVersionInfo MajorVersion="15" MinorVersion="0" MajorBuildNumber="1497" MinorBuildNumber="0" Version="V2_23" xmlns:h="http://schemas.microsoft.com/exchange/services/2006/types" xmlns="http://schemas.microsoft.com/exchange/services/2006/types"/>
+  </s:Header>
+  <s:Body>
+    <m:FindItemResponse xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+      <m:ResponseMessages>
+        <m:FindItemResponseMessage ResponseClass="Success">
+          <m:ResponseCode>NoError</m:ResponseCode>
+          <m:RootFolder IndexedPagingOffset="2" TotalItemsInView="1987" IncludesLastItemInRange="false">
+            <t:Items>
+              <t:Message>
+                <t:ItemId Id="AAMkAD-synthetic-item-1=" ChangeKey="CQAAAB-synthetic-1"/>
+                <t:DateTimeReceived>2026-10-24T18:05:11Z</t:DateTimeReceived>
+                <t:IsRead>false</t:IsRead>
+              </t:Message>
+              <t:MeetingRequest>
+                <t:ItemId Id="AAMkAD-synthetic-item-2=" ChangeKey="CwAAAB-synthetic-2"/>
+                <t:DateTimeReceived>2026-10-24T17:00:00Z</t:DateTimeReceived>
+                <t:IsRead>true</t:IsRead>
+              </t:MeetingRequest>
+            </t:Items>
+          </m:RootFolder>
+        </m:FindItemResponseMessage>
+      </m:ResponseMessages>
+    </m:FindItemResponse>
+  </s:Body>
+</s:Envelope>

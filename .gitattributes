@@ -1,0 +1,8 @@
+# Wrapper scripts must keep their native line endings on every platform.
+/gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary
+
+# Test mail and the XML that embeds it as base64 must stay byte-for-byte.
+*.eml -text
+src/test/resources/ews/*.xml -text

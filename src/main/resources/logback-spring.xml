@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- stdout is the MCP JSON-RPC channel: logs go to stderr and to a rolling file only. -->
+<configuration>
+    <springProperty name="DATA_DIR" source="mail-mcp.data-dir" defaultValue="${user.home}/.mail-mcp-server"/>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${DATA_DIR}/logs/mail-mcp-server.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${DATA_DIR}/logs/mail-mcp-server.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>512MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p --- [%15.15t] [connection=%X{connection:-server}] %-40.40logger{39} : %m%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.err</target>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p --- [%15.15t] [connection=%X{connection:-server}] %-40.40logger{39} : %m%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="STDERR"/>
+    </root>
+
+    <!-- Header and wire logs carry NTLM/Basic Authorization headers and mail content. Keep them off
+         even when the root level is lowered for debugging. -->
+    <logger name="org.apache.hc.client5.http.headers" level="OFF"/>
+    <logger name="org.apache.hc.client5.http.wire" level="OFF"/>
+</configuration>

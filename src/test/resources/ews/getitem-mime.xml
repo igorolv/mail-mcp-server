@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Synthetic GetItem response with IncludeMimeContent=true. The MIME is sample.eml, base64-wrapped at 76 characters like Exchange does. -->
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Header>
+    <h:ServerVersionInfo MajorVersion="15" MinorVersion="0" MajorBuildNumber="1497" MinorBuildNumber="0" Version="V2_23" xmlns:h="http://schemas.microsoft.com/exchange/services/2006/types" xmlns="http://schemas.microsoft.com/exchange/services/2006/types"/>
+  </s:Header>
+  <s:Body>
+    <m:GetItemResponse xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+      <m:ResponseMessages>
+        <m:GetItemResponseMessage ResponseClass="Success">
+          <m:ResponseCode>NoError</m:ResponseCode>
+          <m:Items>
+            <t:Message>
+              <t:MimeContent CharacterSet="UTF-8">RnJvbTogPT9VVEYtOD9CPzBKalFzdEN3MEwwZzBKL1F0ZEdDMFlEUXZ0Q3k/PSA8c2VuZGVyQGV4
+YW1wbGUuY29tPg0KVG86IHVzZXJAZXhhbXBsZS5jb20NClN1YmplY3Q6ID0/VVRGLTg/Qj8wS0hR
+dU5DOTBZTFF0ZEdDMExqUmg5QzEwWUhRdXRDKzBMVWcwTC9RdU5HQjBZelF2TkMrPz0NCkRhdGU6
+IFNhdCwgMjQgT2N0IDIwMjYgMjE6MDU6MTEgKzAzMDANCk1lc3NhZ2UtSUQ6IDxzeW50aGV0aWMt
+MUBleGFtcGxlLmNvbT4NCk1JTUUtVmVyc2lvbjogMS4wDQpDb250ZW50LVR5cGU6IHRleHQvcGxh
+aW47IGNoYXJzZXQ9InV0Zi04Ig0KQ29udGVudC1UcmFuc2Zlci1FbmNvZGluZzogOGJpdA0KDQpT
+eW50aGV0aWMgdGVzdCBtZXNzYWdlLiBObyByZWFsIGRhdGEuDQo=</t:MimeContent>
+              <t:ItemId Id="AAMkAD-synthetic-item-1=" ChangeKey="CQAAAB-synthetic-1"/>
+              <t:IsRead>false</t:IsRead>
+            </t:Message>
+          </m:Items>
+        </m:GetItemResponseMessage>
+      </m:ResponseMessages>
+    </m:GetItemResponse>
+  </s:Body>
+</s:Envelope>

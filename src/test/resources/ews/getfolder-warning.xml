@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Synthetic GetFolder response with ResponseClass="Warning": the payload is still usable. -->
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Body>
+    <m:GetFolderResponse xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+      <m:ResponseMessages>
+        <m:GetFolderResponseMessage ResponseClass="Warning">
+          <m:MessageText>Synthetic warning.</m:MessageText>
+          <m:ResponseCode>ErrorBatchProcessingStopped</m:ResponseCode>
+          <m:Folders>
+            <t:Folder>
+              <t:FolderId Id="AAMkAD-synthetic-inbox=" ChangeKey="AQAAAB-synthetic"/>
+              <t:DisplayName>Inbox</t:DisplayName>
+              <t:TotalCount>5</t:TotalCount>
+              <t:ChildFolderCount>0</t:ChildFolderCount>
+              <t:UnreadCount>1</t:UnreadCount>
+            </t:Folder>
+          </m:Folders>
+        </m:GetFolderResponseMessage>
+      </m:ResponseMessages>
+    </m:GetFolderResponse>
+  </s:Body>
+</s:Envelope>

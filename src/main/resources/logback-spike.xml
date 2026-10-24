@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Logging for the EWS spike, which runs without Spring (EwsSpikeCommand selects this file).
+     stdout carries the spike report; diagnostics go to stderr. -->
+<configuration>
+    <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.err</target>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %5p %-30.30logger{29} : %m%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="WARN">
+        <appender-ref ref="STDERR"/>
+    </root>
+
+    <!-- Header and wire logs carry NTLM/Basic Authorization headers and mail content. -->
+    <logger name="org.apache.hc.client5.http.headers" level="OFF"/>
+    <logger name="org.apache.hc.client5.http.wire" level="OFF"/>
+</configuration>

@@ -1,0 +1,17 @@
+[versions]
+# Spring AI 2.1 line is a deliberate choice (docs/plan.md, decision P6); move to 2.1.0 when released.
+spring-boot = "4.2.0-RC1"
+spring-ai = "2.1.0-RC1"
+# NTLM is deprecated in HttpClient 5 and must be registered explicitly; re-check the EWS transport
+# tests on every upgrade (docs/ews-source-agent.md).
+httpclient5 = "5.6.5"
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version = "1.1.7" }
+
+[libraries]
+spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-ai-mcp-server = { module = "org.springframework.ai:spring-ai-starter-mcp-server", version.ref = "spring-ai" }
+httpclient5 = { module = "org.apache.httpcomponents.client5:httpclient5", version.ref = "httpclient5" }

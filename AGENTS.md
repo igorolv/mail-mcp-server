@@ -5,9 +5,11 @@ This repository will become a local stdio MCP server that lets AI agents read se
 files with extracted text, search mail and attachments through a local index, and filter
 sensitive data before anything reaches the model.
 
-**Current status: design stage.** There is no Java source code, build, or test suite yet. The
-repository holds design discussion documents and one PowerShell probe script. Do not scaffold
-application code, a Gradle build or new tools unless the task explicitly asks for it.
+**Current status: stage 1, EWS spike.** There is a Gradle build, a Spring Boot stdio MCP server
+with one tool (`listConnections`), the connections file with a lazy registry, and a read-only EWS
+client with NTLM plus a spike command the user runs against the real mailbox. IMAP, local
+storage, MIME parsing, search and redaction are still design only (`docs/plan.md`). Add new tools
+or subsystems only when the task asks for them.
 
 ## Repository contents
 
@@ -19,8 +21,15 @@ application code, a Gradle build or new tools unless the task explicitly asks fo
 | `docs/research.md` | Research notes (in Russian): access protocols, libraries, existing MCP servers, search engines, redaction tools, what to reuse from sibling projects |
 | `docs/research-tasks/` | Research briefs `RT-NN-*.md` for separate agent sessions, plus `README.md` with shared rules and the result template |
 | `docs/research/` | Research results, one file per brief (in Russian). Created by research sessions |
+| `docs/*-agent.md` | Engineering documents (in English), see the routing table below |
+| `src/main/java/mail/mcp/` | Server source; layout in `docs/architecture-agent.md` |
+| `src/test/` | Unit tests and synthetic EWS responses (`src/test/resources/ews/`); none needs a network |
+| `build.gradle.kts`, `settings.gradle.kts`, `gradle/` | Gradle build, version catalog `gradle/libs.versions.toml`, wrapper |
+| `gradlew`, `gradlew.bat` | Gradle wrapper scripts |
+| `testdata/` | Synthetic test data sets (MIME, redaction samples, search queries) produced by data tasks RT-11…RT-13; byte-exact (`testdata/.gitattributes`) |
 | `scripts/ews-login-check.ps1` | Interactive EWS sign-in check (`GetFolder` for `inbox`); run by the user, not by agents |
-| `.gitignore` | Ignores `.local/` |
+| `.gitignore` | Ignores `.local/`, Gradle output and IDE files |
+| `.gitattributes` | Line endings of wrapper scripts; keeps `.eml` and EWS fixtures byte-exact |
 | `.local/` | **Ignored by git.** Real environment values (host names, domain, login). May not exist in your checkout |
 
 ## Instruction routing
@@ -33,10 +42,13 @@ Read this file first. Then read only the documents whose `When` matches the task
 | `docs/research.md` | comparing protocols, libraries, existing solutions; recording research results | research tables with statuses and conclusions |
 | `docs/research-tasks/README.md` | running a research task `RT-NN`, or writing a new brief | how to start a session, task list, shared rules, result template, self-check |
 | `docs/research-tasks/RT-NN-*.md` | you were given that task | goal, known context, questions, sources, required tables, out of scope, done criteria |
+| `docs/architecture-agent.md` | locating code, adding a package, changing a dependency, Spring wiring or the stdio transport | what is implemented, tech stack, package layout and layer rules |
+| `docs/build-config-agent.md` | building, running tests, adding a setting, changing the connections file format, running the spike | Gradle commands, `MAIL_MCP_*` settings, `connections.json` keys and validation, spike invocation |
+| `docs/ews-source-agent.md` | changing `source/ews/`, adding an EWS operation, NTLM questions, reading spike output | allow-list, response checks, NTLM transport rules, known risks, spike output format |
 | `scripts/ews-login-check.ps1` | changing or explaining the EWS sign-in check | the script itself; its help block documents parameters |
 
-When the project grows engineering documents, name them `docs/<topic>-agent.md`, write them in
-English, and register each one in this table.
+Name new engineering documents `docs/<topic>-agent.md`, write them in English, and register each
+one in this table.
 
 ## Invariants that apply to every change
 
@@ -98,10 +110,11 @@ English, and register each one in this table.
 - Keep section numbering and internal links (`plan.md 5.7`, `раздел 3.1`) consistent when you
   add or move sections.
 
-## Planned architecture (not implemented yet)
+## Planned architecture
 
 Summary of `docs/plan.md` sections 5–7 and the decision log (section 10, decisions П1–П13),
-so you can keep changes consistent with it:
+so you can keep changes consistent with it. What is already implemented is listed in
+`docs/architecture-agent.md`; the rest is design.
 
 - Java 25, Spring Boot `4.2.0-RC1`, Spring AI `2.1.0-RC1` (the 2.1 line is a deliberate choice;
   move to `2.1.0` when it is released), Gradle 9 with a version catalog.
@@ -152,6 +165,17 @@ Sibling projects used as references (same author, both public on GitHub):
 | `redmine-mcp-server` | `C:\git\redmine-mcp-server` | `AGENTS.md`, `docs/*-agent.md`: layering, attachment extraction pipeline, snapshots, bounded responses |
 | `jdbc-mcp-server` | `C:\git\jdbc-mcp-server` | `docs/connections.md`, package `connection/`: connections file, `${VAR}` placeholders, lazy registry |
 
+## Java code
+
+- The package root is `mail.mcp`. Never use a package, group id or class name that contains the
+  company name or the user's account name (invariant 1).
+- Tests must not sign in to a real mailbox or reach the network; use synthetic responses
+  (`src/test/resources/ews/`) and the fake loopback endpoint of `HttpClient5EwsTransportTest`.
+- Code copied from a sibling project names its source project and commit in the class Javadoc.
+- The EWS spike (`ews-spike` mode of the jar, `ewsSpike` Gradle task) signs in to the real mailbox:
+  only the user runs it. Agents interpret the output the user pastes back
+  (`docs/ews-source-agent.md`).
+
 ## Scripts
 
 - Target **Windows PowerShell 5.1** (`powershell.exe`), which is the user's default shell. Do not
@@ -180,8 +204,9 @@ powershell -ExecutionPolicy Bypass -File scripts\ews-login-check.ps1 -Server web
    ```
 
    The result must be `0`. Also confirm the file has no non-ASCII characters.
-2. **Real values:** if `.local/environment.md` exists, check that none of the real values listed
+2. **Java:** `.\gradlew.bat build` passes (compile, all tests, `bootJar`).
+3. **Real values:** if `.local/environment.md` exists, check that none of the real values listed
    there appear in your diff (`git diff`) or commit message.
-3. **Documents:** check that every path and section reference you wrote exists.
-4. **Commits** (only when asked): English, imperative summary line of at most ~72 characters, a
+4. **Documents:** check that every path and section reference you wrote exists.
+5. **Commits** (only when asked): English, imperative summary line of at most ~72 characters, a
    body that says what changed and why.
