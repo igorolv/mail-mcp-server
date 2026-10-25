@@ -95,5 +95,5 @@ per request. `IsRead` must not change from `false` to `true` (GetItem must not m
 `SIGN-IN REJECTED` with exit code 3 shows the offered schemes. If the password is known to be right
 (the PowerShell check with the same login still works), suspect Extended Protection (see above)
 before trying other login formats — each try is a sign-in attempt. The saved `.eml` is an original: it stays
-in the data directory and is never given to a model (П11). Record anonymized results in plan.md
+in the data directory; agents do not open it. Record anonymized results in plan.md
 3.x; raw details go to `.local/`.

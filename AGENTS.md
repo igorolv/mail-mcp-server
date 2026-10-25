@@ -5,7 +5,7 @@ This repository will become a local stdio MCP server that lets AI agents read se
 files with extracted text, search mail and attachments through a local index, and filter
 sensitive data before anything reaches the model.
 
-**Current status: stage 1, EWS and IMAP spikes.** There is a Gradle build, a Spring Boot stdio MCP server
+**Current status: spikes done, next is step 7.1 of `docs/plan.md`.** There is a Gradle build, a Spring Boot stdio MCP server
 with one tool (`listConnections`), the connections file with a lazy registry, and a read-only EWS
 client with NTLM plus a spike command the user runs against the real mailbox. The user-run EWS
 spike succeeded on 2026-10-25 (see `docs/plan.md` 3.3). A read-only IMAP source on Angus Mail
@@ -132,8 +132,10 @@ changes consistent with it. Section 6 is authoritative where this summary is sho
 - Java 25, Spring Boot `4.2.0-RC1`, Spring AI `2.1.0-RC1` (the 2.1 line is a deliberate choice;
   move to `2.1.0` when it is released), Gradle 9 with a version catalog.
 - stdio is the only transport; nothing but JSON-RPC may be written to `System.out`.
-- Packages (plan.md 6.3): `source/` (`MailSource`, EWS and IMAP implementations), `model/`
-  (one record per file), `mime/`, `convert/`, `store/`, `index/`, `sync/`, `tools/`; `api/` records are the
+- Packages (plan.md 6.3, current state in `docs/architecture-agent.md`): `config/`,
+  `connections/`, `source/` (`MailSource`, EWS and IMAP implementations, OAuth), `model/` (one
+  record per file), `mime/`, `convert/`, `store/`, `index/`, `sync/`, `tools/`, `cli/` (today
+  `spike/`); no `service/` layer; `api/` records are the
   MCP wire contract, `model/` records are not returned directly.
 - Several mailboxes from the start: a `connections.json` file outside the repository
   (`%USERPROFILE%\.mail-mcp-server\`), modeled on the sibling project `jdbc-mcp-server`. Each

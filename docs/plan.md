@@ -3,7 +3,7 @@
 Рабочий документ для обсуждения идеи. Здесь фиксируем цели, решения, открытые вопросы и ход
 обсуждения. Исследование существующих решений и протоколов доступа — в [research.md](research.md).
 
-Статус: **этап 1 — спайки EWS и IMAP Mail.ru подтверждены на реальных ящиках**
+Статус: **спайки EWS и IMAP Mail.ru подтверждены на реальных ящиках**
 (2026-10-25, разделы 3.3–3.4). Есть каркас сервера, список соединений, клиенты EWS и IMAP.
 Подключение личного Gmail отложено пользователем; в его локальной конфигурации только `work`
 и `mailru`. Поддержка Gmail/OAuth2 сохранена, успешный вход в Gmail пока не подтверждён.
@@ -534,16 +534,36 @@ SyncRunner — один запуск на соединение, в фоне, т�
 
 ### 6.3. Пакеты и типы
 
-| Пакет | Что внутри |
-|---|---|
-| `source/` | `MailSource`, `RemoteFolder`, `FolderChanges`, `Downloaded`; реализации в `source/imap/` и `source/ews/` |
-| `model/` | `MessageMeta`, `MailMessage`, `Address`, `AttachmentInfo`, `MessageCard`, `LocalFolder` — каждая запись в своём файле |
-| `mime/` | `MimeReader`: `.eml` → `MailMessage` и потоки частей |
-| `convert/` | `PandocServer` (запуск и вызовы), конвертеры PDF/XLSX/PPTX из redmine-mcp-server |
-| `store/` | `MessageStore`: каталоги писем, `meta.json`, `folders.json`, `sync-status.json` |
-| `index/` | `MailIndex`: поля документа, запись, чтение, пересборка с диска |
-| `sync/` | `SyncRunner` (один запуск), `SyncService` (фон, статус) |
-| `tools/`, `api/` | MCP-инструменты и их записи-ответы; `model/` наружу напрямую не отдаётся |
+Корень — `mail.mcp`. Пакета `service/` нет: инструменты вызывают `sync/`, `store/` и `index/`
+напрямую. Зависимости идут только вниз:
+
+```
+tools/ ──► sync/ ──► source/ (MailSource; ews/, imap/)
+  │          ├─────► mime/, convert/
+  │          └─────► store/, index/
+  └────────────────► store/, index/        (чтение)
+connections/ ──► source/                   (строит MailSource по connections.json)
+model/  — записи, общие для mime/, store/, index/, sync/, tools/
+api/    — записи-ответы MCP;  config/ — Spring;  cli/ — команды пользователя
+```
+
+| Пакет | Что внутри | Есть сейчас | Меняется в шаге |
+|---|---|---|---|
+| `config/` | Spring: `MailMcpProperties`, `ConnectionsConfig`, `McpServerConfig`, `JsonConfig` | да | — |
+| `connections/` | файл соединений и ленивый реестр; `MailConnection` | да | 7.1: `MailConnection` отдаёт `MailSource` вместо двух полей `ews`/`imap`, одно из которых пустое |
+| `source/` | `MailSource`, `RemoteFolder`, `FolderChanges`, `Downloaded` | нет | 7.1 |
+| `source/imap/` | `ImapClient`, `ReadOnlyImapStore`, `ImapSettings`; `ImapMailSource` | клиент есть | 7.1: `ImapMailSource`, одна сессия на запуск |
+| `source/ews/` | `EwsClient`, транспорт, `EwsOperation`; `EwsMailSource` | клиент есть | 7.3: `EwsMailSource` |
+| `source/oauth/`, `source/oauth/google/` | общий OAuth-код и Google OAuth для Gmail | да | — |
+| `model/` | `MessageMeta`, `MailMessage`, `Address`, `AttachmentInfo`, `MessageCard`, `LocalFolder` — каждая запись в своём файле | нет | 7.2 (`MessageMeta`, `LocalFolder`), 7.4 (остальные) |
+| `store/` | `MessageStore`: каталоги писем, `meta.json`, `folders.json`, `sync-status.json` | нет | 7.2 |
+| `index/` | `MailIndex`: поля документа, запись, чтение, пересборка с диска | нет | 7.2, дополняется в 7.4–7.6 |
+| `sync/` | `SyncRunner` (один запуск), `SyncService` (фон, статус) | нет | 7.2, дополняется в 7.4 |
+| `mime/` | `MimeReader`: `.eml` → `MailMessage` и потоки частей | нет | 7.4 |
+| `convert/` | `PandocServer`; конвертеры PDF/XLSX/PPTX из redmine-mcp-server | нет | 7.4 (pandoc), 7.6 (остальные) |
+| `tools/` | `@McpTool`-адаптеры: `ConnectionTools`, `ToolLogger`; новые инструменты | `listConnections` | 7.4–7.6 |
+| `api/` | записи-ответы MCP; `model/` наружу напрямую не отдаётся | `ConnectionInfo`, `ListConnectionsResult` | 7.4–7.6 |
+| `cli/` | команды пользователя без Spring: `ews-spike`, `imap-spike`, `gmail-oauth`, `mail-sync` | как `spike/` | 7.2: пакет `spike/` переименовать в `cli/`, добавить `mail-sync` |
 
 ```java
 public interface MailSource extends AutoCloseable {
@@ -716,7 +736,8 @@ JSON-файлы пишутся во временный и переименовы
 - **Сделать:** интерфейс и записи раздела 6.3; `ImapMailSource` поверх `ImapClient`: `folders()`
   с исключениями 6.6, `changes()` по `UIDVALIDITY` и `UID SEARCH`, `download()` через
   `BODY.PEEK[]`. Сейчас `ImapClient.downloadLastMessage` закрывает сессию после каждого письма —
-  переделать на одну сессию на весь запуск.
+  переделать на одну сессию на весь запуск. `MailConnection` отдаёт `MailSource` (6.3); EWS-
+  соединение до шага 7.3 его не предоставляет. `imap-spike` перевести на `MailSource`.
 - **Готово, когда:** тест на поддельном IMAP-сервере: папки с атрибутами отфильтрованы;
   первый `changes(null)` отдаёт все UID; второй с курсором — только новые; удалённый UID попадает
   в `removed`; смена `UIDVALIDITY` даёт `reset`; при скачивании нескольких писем вход один;
@@ -728,7 +749,8 @@ JSON-файлы пишутся во временный и переименовы
 - **Сделать:** `MessageStore` (каталоги писем, `meta.json`, `folders.json`, `sync-status.json`);
   `MailIndex` с полями из `meta.json` (`key`, `ref`, `folder`, `state`, `error`); `SyncRunner` по
   разделу 6.2 без шагов b–c (письмо остаётся `downloaded`), со сверкой в начале запуска;
-  команда `mail-sync <connection>` в jar, печатает итог по папкам.
+  команда `mail-sync <connection>` в jar, печатает итог по папкам; пакет `spike/` переименовать в
+  `cli/` (6.3).
 - **Готово, когда:** тест на поддельном сервере: первый запуск скачивает все письма, второй —
   ничего, после добавления — одно, после удаления — удаляет каталог и документ; прерванный
   посреди папки запуск при повторе не скачивает уже имеющееся; удалённый каталог `index/`
@@ -1185,3 +1207,13 @@ redmine-mcp-server; вложения хранятся файлами рядом 
 сервере, состояние). Разделы 6 и 7 переписаны: индекс Lucene стал полностью производным и
 пересобирается с диска без сети, в начале запуска синхронизации — сверка диска и индекса,
 HTML-тело переводится pandoc'ом, собственный перевод HTML в текст не нужен.
+
+### 2026-10-25 — сверка документов с кодом
+
+По замечанию пользователя о расхождении структуры пакетов с кодом раздел 6.3 переписан: схема
+зависимостей и таблица всех пакетов — существующих и планируемых — с отметкой, есть ли пакет
+сейчас и в каком шаге меняется. Пакета `service/` нет. Предложено (не решение пользователя):
+переименовать `spike/` в `cli/` в шаге 7.2, когда добавится `mail-sync`; `MailConnection` в
+шаге 7.1 отдаёт `MailSource` вместо двух полей клиентов. `architecture-agent.md` разделён на
+существующие и планируемые пакеты; из инженерных документов и Javadoc убраны «этап 1»,
+ссылки на старые этапы и на обязательный фильтр на выходе.

@@ -6,8 +6,8 @@ Design: plan.md 5.2, 5.6, decisions П3, П4, П8; background: research/RT-04-im
 ## Implemented scope
 
 Angus Mail 2.0.5 with Jakarta Mail API 2.1.5. `ImapClient` lists folders and downloads the last
-message in a selected folder as original MIME. This is stage-1 connectivity code, not sync,
-search or a mail MCP tool. Gmail labels/deduplication, CONDSTORE/QRESYNC and paging are
+message in a selected folder as original MIME. This is connectivity code, not sync, search or a
+mail MCP tool; plan.md step 7.1 builds `ImapMailSource` on it. Gmail labels/deduplication, CONDSTORE/QRESYNC and paging are
 not implemented. Only `listConnections` remains exposed through MCP.
 
 Construction is lazy: `MailConnectionFactory` creates an IMAP client without contacting a server.
@@ -30,8 +30,9 @@ Angus objects stay private: source records contain folder metadata or saved-MIME
   subclass checks `writeCommand` before bytes are written and refuses a second credential exchange,
   including an internal Angus reconnect. No provider object is exposed to callers.
 - Failure closes the client permanently. A download also ends its single-socket session; create
-  another client only as part of an explicit new request. Future sync must revisit this lifecycle
-  with tests for reconnects and failed credentials; never silently reauthenticate.
+  another client only as part of an explicit new request. Step 7.1 (plan.md) changes this to one
+  session for a whole sync run, with tests for reconnects and failed credentials; never silently
+  reauthenticate.
 - Provider exception messages and causes can contain credentials or mail data. `ImapException`
   returns only a fixed error category/message. The spike withholds raw loader errors too.
 - Session debug is off and its debug stream discarded. Angus/Jakarta JUL categories and their
@@ -66,8 +67,10 @@ Folder names are passed as encoded Angus arguments, never interpolated into comm
    is never overwritten. Errors delete the partial file where possible.
 6. Force-close the selected folder's socket (no CLOSE/EXPUNGE), then close the client.
 
-Original MIME is local data, never model output. The future output filter must mediate folder names
-and all mail-derived strings. The spike prints counts rather than folder names or subjects.
+Original MIME is kept on disk as downloaded. Under the 2026-10-25 decisions mail content and
+local paths may reach the model through tools, with an optional output filter later (plan.md 5.4,
+6.8). The spike still prints counts rather than folder names or subjects, so its report can be
+pasted into chat.
 
 ## User-run spike
 

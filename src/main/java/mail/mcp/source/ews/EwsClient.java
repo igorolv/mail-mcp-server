@@ -15,8 +15,8 @@ import java.util.HexFormat;
  * Thin read-only EWS client of one mailbox (decision P1). It builds SOAP requests for allow-listed
  * operations only ({@link EwsOperation}) and parses responses as a stream.
  *
- * <p>Stage 1 covers what the spike needs: {@code GetFolder}, a one-page {@code FindItem} and
- * {@code GetItem} with MIME. Calls are sequential: one request at a time per mailbox (research.md
+ * <p>So far it covers what the spike needs: {@code GetFolder}, a one-page {@code FindItem} and
+ * {@code GetItem} with MIME; step 7.3 of docs/plan.md adds what sync needs. Calls are sequential: one request at a time per mailbox (research.md
  * 1.2, throttling). Errors are never retried here; in particular an
  * {@link EwsAuthenticationException} must reach the caller after a single sign-in attempt.
  */
