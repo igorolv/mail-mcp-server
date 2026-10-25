@@ -15,13 +15,12 @@ import mail.mcp.sync.MessageProcessor;
 import mail.mcp.source.MailSource;
 import mail.mcp.source.ews.EwsAuthenticationException;
 import mail.mcp.source.ews.EwsException;
-import mail.mcp.source.ews.EwsResponseException;
-import mail.mcp.source.ews.EwsSoapFaultException;
 import mail.mcp.source.imap.ImapException;
 import mail.mcp.source.oauth.OAuthException;
 import mail.mcp.store.MessageStore;
-import mail.mcp.sync.FolderProgress;
+import mail.mcp.model.FolderProgress;
 import mail.mcp.sync.SyncRunner;
+import mail.mcp.sync.SyncErrors;
 
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
@@ -93,30 +92,25 @@ public final class MailSyncCommand {
                 });
             }
         } catch (IndexLockedException e) {
-            out.println("RESULT: FAILED (" + e.getMessage() + ")");
+            out.println("RESULT: FAILED (" + SyncErrors.describe(e) + ")");
             return 5;
         } catch (OAuthException e) {
-            out.println("RESULT: FAILED (" + e.getMessage() + ")");
+            out.println("RESULT: FAILED (" + SyncErrors.describe(e) + ")");
             return 2;
         } catch (ImapException e) {
-            out.println("RESULT: FAILED (" + e.getMessage() + ")");
+            out.println("RESULT: FAILED (" + SyncErrors.describe(e) + ")");
             return e.kind() == ImapException.Kind.AUTHENTICATION ? 3 : 4;
         } catch (EwsAuthenticationException e) {
-            out.println("RESULT: FAILED (EWS sign-in rejected; check the connection locally before the next run)");
+            out.println("RESULT: FAILED (" + SyncErrors.describe(e) + ")");
             return 3;
         } catch (EwsException e) {
-            String code = switch (e) {
-                case EwsResponseException response -> response.responseCode();
-                case EwsSoapFaultException fault -> fault.responseCode();
-                default -> null;
-            };
-            out.println("RESULT: FAILED (EWS error: " + (code == null ? e.getClass().getSimpleName() : code) + ")");
+            out.println("RESULT: FAILED (" + SyncErrors.describe(e) + ")");
             return 4;
         } catch (UncheckedIOException e) {
-            out.println("RESULT: FAILED (local storage error; details withheld)");
+            out.println("RESULT: FAILED (" + SyncErrors.describe(e) + ")");
             return 4;
         } catch (RuntimeException e) {
-            out.println("RESULT: FAILED (unexpected local error; details withheld)");
+            out.println("RESULT: FAILED (" + SyncErrors.describe(e) + ")");
             return 1;
         }
         out.println("RESULT: OK (" + done.size() + " folders, "

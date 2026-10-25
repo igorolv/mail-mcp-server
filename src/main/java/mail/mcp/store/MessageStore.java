@@ -1,6 +1,7 @@
 package mail.mcp.store;
 
 import mail.mcp.model.LocalFolder;
+import mail.mcp.model.SyncStatus;
 import mail.mcp.model.MessageMeta;
 import tools.jackson.databind.ObjectMapper;
 
@@ -21,6 +22,7 @@ import java.util.regex.Pattern;
 
 /** Message directories and atomically replaced metadata for one connection; no mailbox access. */
 public final class MessageStore {
+    public static final String SYNC_STATUS_FILE = "sync-status.json";
     public static final String MESSAGE_FILE = "message.eml";
     public static final String META_FILE = "meta.json";
     public static final String BODY_FILE = "body.md";
@@ -48,6 +50,18 @@ public final class MessageStore {
         try { Files.createDirectories(connectionDir); }
         catch (IOException e) { throw new UncheckedIOException(e); }
         writeJson(connectionDir.resolve("folders.json"), new FoldersFile(folders));
+    }
+
+    public Optional<SyncStatus> readSyncStatus() {
+        try {
+            return Optional.of(mapper.readValue(Files.readAllBytes(connectionDir.resolve(SYNC_STATUS_FILE)),
+                    SyncStatus.class));
+        } catch (NoSuchFileException e) { return Optional.empty(); }
+        catch (IOException e) { throw new UncheckedIOException(e); }
+    }
+
+    public void writeSyncStatus(SyncStatus status) {
+        writeJson(connectionDir.resolve(SYNC_STATUS_FILE), status);
     }
 
     public String newKey() { return UUID.randomUUID().toString(); }

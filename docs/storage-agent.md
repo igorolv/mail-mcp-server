@@ -12,6 +12,7 @@ Under `ConnectionDefinition.connectionDir()`:
 ```text
 <connection>/
   folders.json
+  sync-status.json
   messages/<k2>/<key>/
     message.eml
     meta.json
@@ -94,9 +95,9 @@ and conversion failures. Conversion failures are not automatically retried. The 
 `mail-reprocess` command processes every message with metadata and MIME, replacing output and
 index fields; entries without MIME remain unchanged.
 
-Both JSON files are written to a temporary file in the target directory, then moved with
-`ATOMIC_MOVE` and `REPLACE_EXISTING`. Temporary files are cleaned up after a write. File I/O
-failures become `UncheckedIOException`; Jackson exceptions propagate unchanged.
+Metadata, folders and sync status JSON files are written to a temporary file in the target
+directory, then moved with `ATOMIC_MOVE` and `REPLACE_EXISTING`. Temporary files are cleaned up
+after a write. File I/O failures become `UncheckedIOException`; Jackson exceptions propagate unchanged.
 
 ## Lucene catalog and reconciliation
 
@@ -107,6 +108,7 @@ parsed MIME headers/attachment descriptions and saved Markdown:
 | Field | Value | Type |
 |---|---|---|
 | `key` | Local UUID | `StringField`, stored |
+| `keySort` | Local UUID for tie-breaking | `SortedDocValuesField`, not stored |
 | `ref` | `folderKey + "/" + ref` | `StringField`, stored |
 | `folder` | Folder path | `StringField`, stored |
 | `state` | Lowercase state | `StringField`, stored |
@@ -139,6 +141,27 @@ reconciliation restores headers and body from disk before the runner accesses th
 `cli/MailSyncCommand` owns the source and writer, takes the writer lock before the first network
 request and closes the source before the index. `SyncRunner` opens and closes neither; it reports
 cumulative `FolderProgress` after each committed batch and after a folder's cursor is saved (or
-the folder is deleted). It writes no status file. `SyncService` and `sync-status.json` remain
-planned for IT-06, as are tool readers. Search and the Russian analyzer are step 7.5;
+the folder is deleted). `FolderProgress` lives in `model/`. IT-06 adds `SyncService` background
+runs and the read-only `MailIndexReader`; search and the Russian analyzer are step 7.5,
 attachment text is step 7.6.
+
+## Sync status and tool readers
+
+`MessageStore.readSyncStatus` returns an empty Optional without `sync-status.json`;
+`writeSyncStatus` uses the same atomic JSON replacement. Only `SyncRunner`, while its caller
+holds the writer lock, writes production status. It records running before reconciliation,
+latest per-folder progress in first-appearance order, then completed or failed with finishedAt.
+`SyncStatus` contains state, pid, startedAt, finishedAt, folders, error and signInRejected.
+Failures use fixed `SyncErrors.describe` text and authentication failures set signInRejected.
+A final status-write failure is suppressed onto the original exception. A successful explicit
+`mail-sync` clears the rejection flag; MCP starts refuse a persisted rejection. Readers report
+interrupted when a running status belongs to a dead pid and no local run exists. See
+`docs/tools-agent.md` for the wire contract and recovery.
+
+`MailIndexReader.open` never takes a writer lock, returns empty without a committed index and
+opens one snapshot of the latest commit per call. It counts folder messages with a PrefixQuery
+on ref, and pages stored MessageCard fields by date descending (missing dates last), then key.
+New documents have sorted `keySort` doc values; older documents without them still sort by date.
+The separate field preserves compatibility: Lucene cannot change the existing `key` field from
+doc values type NONE to SORTED. The user approved the separate field; no index rebuild is required.
+The writer's NRT lookups remain separate; tools see only committed documents.

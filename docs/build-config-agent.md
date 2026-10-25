@@ -169,7 +169,12 @@ messages. A folder's opaque cursor is saved only after the folder finishes. Mess
 `converted` after MIME parsing, attachment saving and body conversion; download or conversion
 failures get `state=failed` and are not retried. Headers and Markdown are indexed. Pandoc is
 required on `PATH` and checked before the index or mailbox is opened; missing pandoc exits 2.
-There is no background worker or `sync-status.json` yet.
+`SyncRunner` also atomically writes `sync-status.json` before work, after folder progress and
+on completion/failure. A rejected sign-in sets `signInRejected`; MCP `sync` then refuses starts.
+Fix the configuration locally and run `mail-sync <connection>` in a terminal; a successful run
+clears the flag. Restart the MCP server if its startup configuration changed. MCP `sync` runs
+in the background; the CLI remains synchronous with the same output and exit codes.
+See `docs/tools-agent.md` for status fields and cross-process reading.
 
 The first run downloads the whole mailbox and may take a while (EWS uses one `GetItem` per
 message). Run the same command again:

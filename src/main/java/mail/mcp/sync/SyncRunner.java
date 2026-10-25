@@ -2,6 +2,8 @@ package mail.mcp.sync;
 
 import mail.mcp.index.MailIndex;
 import mail.mcp.model.LocalFolder;
+import mail.mcp.model.FolderProgress;
+import mail.mcp.model.SyncStatus;
 import mail.mcp.model.MessageMeta;
 import mail.mcp.model.MessageState;
 import mail.mcp.source.MailSource;
@@ -12,6 +14,7 @@ import java.math.BigInteger;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.function.Consumer;
 
 /** One synchronous run; the caller owns the store, index writer and mailbox session. */
@@ -29,6 +32,29 @@ public final class SyncRunner {
     }
 
     public void run(Consumer<FolderProgress> progress) {
+        Instant startedAt = Instant.now();
+        long pid = ProcessHandle.current().pid();
+        var folders = new LinkedHashMap<String, FolderProgress>();
+        try {
+            store.writeSyncStatus(new SyncStatus("running", pid, startedAt, null, List.of(), null, false));
+            synchronize(p -> {
+                folders.put(p.path(), p);
+                store.writeSyncStatus(new SyncStatus("running", pid, startedAt, null,
+                        List.copyOf(folders.values()), null, false));
+                progress.accept(p);
+            });
+            store.writeSyncStatus(new SyncStatus("completed", pid, startedAt, Instant.now(),
+                    List.copyOf(folders.values()), null, false));
+        } catch (RuntimeException e) {
+            try {
+                store.writeSyncStatus(new SyncStatus("failed", pid, startedAt, Instant.now(),
+                        List.copyOf(folders.values()), SyncErrors.describe(e), SyncErrors.signInRejected(e)));
+            } catch (RuntimeException statusError) { e.addSuppressed(statusError); }
+            throw e;
+        }
+    }
+
+    private void synchronize(Consumer<FolderProgress> progress) {
         for (String key : index.reconcile(store)) {
             var meta = store.readMeta(key).orElseThrow();
             var processed = switch (meta.state()) {

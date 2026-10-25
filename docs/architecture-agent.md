@@ -5,7 +5,7 @@ transport and Spring wiring. The target design is `docs/plan.md` section 6 (pack
 work order is section 7, decisions are in section 10. This file describes what exists now and
 where planned code goes.
 
-## Status (after IT-05, step 7.4 first half)
+## Status (after IT-06, step 7.4 complete)
 
 Implemented: Gradle build, Spring Boot application with the stdio MCP transport, the connections
 file with a lazy registry, the `listConnections` tool, a read-only EWS client (`GetFolder`,
@@ -29,9 +29,12 @@ IT-05 adds MIME reading, decoded attachment files, `body.md` (HTML through sandb
 converted/failed metadata, header/body index fields, and offline `mail-reprocess`.
 See `docs/mime-agent.md`.
 
-Not implemented: background `SyncService`, `sync-status.json` and mail tools (IT-06),
-search/RussianAnalyzer (7.5), attachment text (7.6), and the optional sensitive-data filter.
-The next task is IT-06, the second half of plan.md 7.4.
+IT-06 adds background `SyncService`, shared `sync-status.json`, committed `MailIndexReader`
+and five mail tools: `sync`, `syncStatus`, `listFolders`, `listMessages`, `getMessage`.
+See `docs/tools-agent.md`.
+
+Not implemented: search/RussianAnalyzer (7.5), attachment text (7.6), and the optional
+sensitive-data filter. The next step is IT-07 (search, plan.md 7.5).
 Real `mail-sync` checks are user-run only.
 
 ## Transport and execution
@@ -41,15 +44,15 @@ JSON-RPC channel; use SLF4J instead. `logback-spring.xml` has only `FILE` and `S
 and the HttpClient `headers`/`wire` loggers are `OFF` because they would print `Authorization`
 headers. `McpServerConfig` sets `immediateExecution(true)` on the `McpSyncServer` builder (copied
 from redmine-mcp-server @ `f62b3e5`): tool calls of one session run one at a time, so long work —
-synchronization — must run in the background and return at once (plan.md 6.6).
+synchronization — runs in the background and returns at once (plan.md 6.6).
 `config/McpStdioConcurrencyTest` documents the race; its disabled half passed once with MCP SDK
 2.1.0 on 2026-10-24, which is not yet a reason to drop the setting.
 
 The non-server modes are `ews-spike`, `imap-spike`, `gmail-oauth`, `mail-sync` and `mail-reprocess`: `MailMcpServerApplication.main`
 dispatches to their commands before Spring starts, so the stdio transport is never opened.
 All five select `logback-spike.xml` (stderr only) through the `logback.configurationFile`
-system property. `mail-sync` runs synchronously and prints progress; background synchronization
-through MCP remains planned for IT-06.
+system property. `mail-sync` runs synchronously and prints progress; MCP `sync` starts a daemon
+platform thread through `SyncService` and returns at once.
 
 ## Tech stack and version sources
 
@@ -73,17 +76,16 @@ If you change a dependency, update `libs.versions.toml`, not the build script.
 ## Source layout
 
 The package root is `mail.mcp` (deliberately without a company or account name, see `AGENTS.md`).
-There is no `service/` layer. Dependencies flow downward only; planned packages are in
-brackets:
+There is no `service/` layer. Dependencies flow downward only:
 
 ```
-tools/ ──► [sync/SyncService] ──► sync/ ──► source/ (MailSource; ews/, imap/)
+tools/ ──► sync/SyncService ──► sync/ ──► source/ (MailSource; ews/, imap/)
   │                                ├────► mime/, convert/
   │                                └────► store/, index/
-  └──────────────────► store/, index/          (tool readers planned)
+  └──────────────────► store/, index/          (committed tool readers)
 index/ ──► store/                              (reconciliation)
 connections/ ──► source/                        (builds lazy MailSource session factories)
-model/   — shared disk records; more records planned for step 7.4
+model/   — shared disk and catalog records
 api/     — MCP wire records returned by tools
 config/  — Spring configuration, properties, MCP customizer
 cli/ ──► sync/, connections/, source/, store/, index/  (user-run commands without Spring)
@@ -94,19 +96,19 @@ cli/ ──► sync/, connections/, source/, store/, index/  (user-run commands 
 | Package | Responsibility | What goes here |
 |---|---|---|
 | `MailMcpServerApplication` | Entry point. Empty apart from command dispatch. | Nothing else. |
-| `config/` | Spring wiring. | `MailMcpProperties` (`mail-mcp.*`), `ConnectionsConfig` (loader + registry beans), `McpServerConfig`, `JsonConfig`. |
+| `config/` | Spring wiring. | `MailMcpProperties` (`mail-mcp.*`), `ConnectionsConfig` (loader + registry beans), `McpServerConfig`, `JsonConfig`, `SyncConfig` (`SyncService` with `Pandoc::locate`). |
 | `connections/` | The connections file and the registry. | `ConnectionsFile` (JSON shape), `ConnectionsLoader`, `ConnectionDefinition`, `EnvironmentPlaceholders`, `ConnectionType`, `AuthKind`, `ConnectionRegistry`, `MailConnection`, `MailConnectionFactory`. `MailConnection.openSource()` supplies a fresh lazy IMAP or EWS session, owned by its caller. The EWS spike creates its client directly. |
 | `source/` (root) | Common mailbox session contract. | `MailSource`, `RemoteFolder`, `FolderChanges`, `Downloaded`, `MessageUnavailableException` (GONE/TOO_LARGE leaves the session usable). |
 | `source/ews/` | Read-only EWS source and thin client. | `EwsMailSource`, `EwsClient`, `EwsOperation` (allow-list), `EwsXml` (envelope, parser settings), `EwsResponseReader` (StAX), `EwsTransport` + `HttpClient5EwsTransport`, result records (`EwsFolderNode`, `EwsFolderPage`, `EwsSyncPage`), `Ews*Exception`. See `docs/ews-source-agent.md`. |
 | `source/imap/` | Read-only IMAP source and client. | `ImapMailSource`, `ImapClient` (one session across folders/downloads), `ReadOnlyImapStore` (wire command guard), `ImapSettings`, `ImapFolderInfo`, `FolderUids`, sanitized `ImapException`. See `docs/imap-source-agent.md`. |
 | `source/oauth/` | Provider-independent OAuth components. | `OAuthLoopbackReceiver` and sanitized `OAuthException`. No provider endpoints, settings or provider-specific messages. |
 | `source/oauth/google/` | Google Desktop OAuth and refresh credentials. | All `Google*` classes and the package-private `OAuthJson` helper. Depends on shared `source/oauth/` components. See `docs/gmail-oauth-agent.md`. |
-| `model/` | Shared disk records and lifecycle. | `MessageState`, `MessageMeta`, `LocalFolder`, `MailMessage`, `Address`, `AttachmentInfo`, one type per file. `MessageCard` remains planned for IT-06. |
-| `store/` | Local message directories and metadata. | `MessageStore`: UUID paths, atomic `meta.json` and `folders.json`, listing and deletion. `sync-status.json` remains planned for IT-06. See `docs/storage-agent.md`. |
-| `index/` | Derived Lucene catalog, writer side. | `MailIndex`: metadata, headers and body fields, NRT key/ref lookups, commit and reconciliation through `store/`; `IndexLockedException`. Tool readers remain planned for IT-06. See `docs/storage-agent.md`. |
-| `tools/` | Thin `@McpTool` adapters, Spring `@Service` beans. | `ConnectionTools` (`listConnections`), `ToolLogger`. |
-| `api/` | Stable MCP response records with `@Schema`. | `ConnectionInfo`, `ListConnectionsResult`. Never expose `source/` or `model/` records or settings here. |
-| `sync/` | One synchronization run and local conversion. | `SyncRunner`, `FolderProgress`, `MessageProcessor`, `Processed`: reconcile by state, folders, removals, downloads/conversion in batches of 100, cursor after the folder. Caller owns the source and writer. `SyncService` remains planned for IT-06. |
+| `model/` | Shared disk records and lifecycle. | `MessageState`, `MessageMeta`, `LocalFolder`, `MailMessage`, `Address`, `AttachmentInfo`, `MessageCard`, `FolderProgress`, `SyncStatus`, one type per file. |
+| `store/` | Local message directories and metadata. | `MessageStore`: UUID paths, atomic `meta.json`, `folders.json` and `sync-status.json`, listing and deletion. See `docs/storage-agent.md`. |
+| `index/` | Derived Lucene catalog and committed readers. | `MailIndex`: metadata, headers and body fields, NRT key/ref lookups, commit and reconciliation through `store/`; `IndexLockedException`. `MailIndexReader` reads committed counts and sorted cards without the writer lock. See `docs/storage-agent.md`. |
+| `tools/` | Thin `@McpTool` adapters, Spring `@Service` beans. | `ConnectionTools` (`listConnections`), `SyncTools` (`sync`, `syncStatus`), `MailTools` (`listFolders`, `listMessages`, `getMessage`), `ToolLogger`. |
+| `api/` | Stable MCP response records with `@Schema`. | Discovery, sync start/status, folder/message pages, body chunks and attachment reference records. Never expose `source/` or `model/` records or settings here. |
+| `sync/` | One synchronization run and local conversion. | `SyncRunner`, `MessageProcessor`, `Processed`: reconcile by state, folders, removals, downloads/conversion in batches of 100, cursor after the folder. Caller owns the source and writer. `SyncService` owns background runs, `SyncStart` their immediate result; `SyncErrors` shares fixed CLI/status failure messages. |
 | `cli/` | User-run commands without Spring. | `EwsSpikeCommand`, `ImapSpikeCommand`, `GmailOAuthCommand`, `MailSyncCommand`, `MailReprocessCommand`. Check pandoc before the index or sign-in; source closes before the index. Reprocessing is offline. |
 | `mime/` | Local MIME parsing. | `MimeReader`, `ParsedMessage`: decoded headers, selected body and attachment files, no container expansion. See `docs/mime-agent.md`. |
 | `convert/` | HTML conversion. | `Pandoc`, `PandocException`: sandboxed process per conversion. PDF/XLSX/PPTX converters remain planned for 7.6. |
@@ -119,7 +121,8 @@ needs them and register them above. Attachment converters extend `convert/` in s
 ## Rules for new code
 
 - Every tool takes a required `connection` argument resolved through
-  `ConnectionRegistry.resolve`; there is no default connection and no cross-mailbox call.
+  `ConnectionRegistry` name/definition lookups (source resolution only for sync); there is no
+  default connection and no cross-mailbox call.
 - Tools return `api/` records; secrets, hosts and logins never appear in a tool response. Mail
   content and local paths to message files may be returned (plan.md 6.8).
 - Anything that reaches a mail server goes through `source/`; only allow-listed EWS operations

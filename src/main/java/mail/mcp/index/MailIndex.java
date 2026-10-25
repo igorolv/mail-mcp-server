@@ -7,6 +7,8 @@ import mail.mcp.store.MessageStore;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StoredField;
+import org.apache.lucene.document.SortedDocValuesField;
+import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.document.LongPoint;
@@ -60,6 +62,7 @@ public final class MailIndex implements AutoCloseable {
     public void put(MessageMeta meta, MailMessage message, String body) {
         Document document = new Document();
         document.add(new StringField("key", meta.key(), Field.Store.YES));
+        document.add(new SortedDocValuesField("keySort", new BytesRef(meta.key())));
         document.add(new StringField("ref", meta.folderKey() + "/" + meta.ref(), Field.Store.YES));
         document.add(new StringField("folder", meta.folder(), Field.Store.YES));
         document.add(new StringField("state", meta.state().id(), Field.Store.YES));
@@ -95,8 +98,7 @@ public final class MailIndex implements AutoCloseable {
     }
 
     private static String addresses(List<Address> addresses) {
-        return addresses.stream().map(a -> a.name() == null ? a.address()
-                : a.name() + " <" + a.address() + ">").collect(Collectors.joining(", "));
+        return addresses.stream().map(Address::display).collect(Collectors.joining(", "));
     }
 
     public void delete(String key) {

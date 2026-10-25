@@ -5,7 +5,7 @@ import mail.mcp.index.MailIndex;
 import mail.mcp.source.MessageUnavailableException;
 import mail.mcp.source.RemoteFolder;
 import mail.mcp.store.MessageStore;
-import mail.mcp.sync.FolderProgress;
+import mail.mcp.model.FolderProgress;
 import mail.mcp.sync.SyncRunner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

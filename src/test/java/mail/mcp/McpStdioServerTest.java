@@ -1,5 +1,14 @@
 package mail.mcp;
 
+import mail.mcp.config.JsonConfig;
+import mail.mcp.index.MailIndex;
+import mail.mcp.model.LocalFolder;
+import mail.mcp.model.MessageMeta;
+import mail.mcp.model.MessageState;
+import mail.mcp.store.MessageStore;
+import mail.mcp.sync.MessageProcessor;
+import mail.mcp.convert.Pandoc;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
@@ -42,9 +51,12 @@ class McpStdioServerTest {
                   "work": {"type": "ews", "url": "https://webmail.example.com/EWS/Exchange.asmx",
                            "username": "user", "password": "${MAIL_MCP_STDIO_TEST_PASSWORD}",
                            "description": "Work mail"},
-                  "mailru": {"type": "imap", "host": "imap.mail.ru"}
+                  "mailru": {"type": "imap", "host": "imap.mail.ru"},
+                  "local": {"type": "imap", "host": "mail.example.com", "username": "${MAIL_MCP_STDIO_TEST_USERNAME}",
+                            "password": "${MAIL_MCP_STDIO_TEST_PASSWORD}"}
                 }}
                 """);
+        prepareLocalData(dataDir.resolve("local"));
         Path argFile = dir.resolve("java.args");
         // An argument file keeps the long test classpath off the Windows command line.
         Files.writeString(argFile, "-cp \"" + System.getProperty("java.class.path").replace("\\", "\\\\") + "\"\n");
@@ -54,13 +66,15 @@ class McpStdioServerTest {
                 "@" + argFile, MailMcpServerApplication.class.getName());
         builder.environment().put("MAIL_MCP_DATA_DIR", dataDir.toString());
         builder.environment().put("MAIL_MCP_STDIO_TEST_PASSWORD", SECRET);
+        builder.environment().put("MAIL_MCP_STDIO_TEST_USERNAME", "user@example.com");
         builder.environment().remove("MAIL_MCP_CONNECTIONS_FILE");
         Process server = builder.start();
         ExecutorService io = Executors.newFixedThreadPool(2);
         StringBuilder stderr = new StringBuilder();
         io.submit(() -> drain(server.getErrorStream(), stderr));
 
-        try (BufferedWriter requests = new BufferedWriter(new OutputStreamWriter(server.getOutputStream(), StandardCharsets.UTF_8));
+        try (var liveWriter = MailIndex.openWriter(dataDir.resolve("local"));
+             BufferedWriter requests = new BufferedWriter(new OutputStreamWriter(server.getOutputStream(), StandardCharsets.UTF_8));
              BufferedReader replies = new BufferedReader(new InputStreamReader(server.getInputStream(), StandardCharsets.UTF_8))) {
             List<String> stdout = new ArrayList<>();
 
@@ -76,16 +90,39 @@ class McpStdioServerTest {
             // Not findValues("name"): the output schema has a "name" property object too.
             List<String> toolNames = new ArrayList<>();
             tools.at("/result/tools").forEach(tool -> toolNames.add(tool.get("name").asString()));
-            assertThat(toolNames).containsExactly("listConnections");
+            assertThat(toolNames).containsExactlyInAnyOrder("listConnections", "sync", "syncStatus", "listFolders", "listMessages", "getMessage");
 
             send(requests, "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\","
                     + "\"params\":{\"name\":\"listConnections\",\"arguments\":{}}}");
             JsonNode call = readResponse(io, replies, 3, stdout, stderr);
             JsonNode connections = call.at("/result/structuredContent/connections");
-            assertThat(connections.size()).isEqualTo(2);
+            assertThat(connections.size()).isEqualTo(3);
             assertThat(connections.get(0).get("name").asString()).isEqualTo("work");
             assertThat(connections.get(1).get("name").asString()).isEqualTo("mailru");
             assertThat(connections.get(1).get("configError").asString()).isEqualTo("no 'username'");
+
+            JsonNode folders = call(requests, io, replies, stderr, stdout, 4, "listFolders",
+                    "{\"connection\":\"local\"}");
+            assertThat(folders.at("/folders/0/messages").asInt()).isEqualTo(2);
+            assertThat(folders.at("/folders/0/synced").asBoolean()).isTrue();
+            JsonNode messages = call(requests, io, replies, stderr, stdout, 5, "listMessages",
+                    "{\"connection\":\"local\",\"folder\":\"f1\"}");
+            assertThat(messages.at("/messages").size()).isEqualTo(2);
+            String key = messages.at("/messages/0/key").asString();
+            JsonNode message = call(requests, io, replies, stderr, stdout, 6, "getMessage",
+                    "{\"connection\":\"local\",\"key\":\"" + key + "\",\"maxChars\":10}");
+            assertThat(message.get("body").asString()).hasSize(10);
+            assertThat(message.get("nextOffset").asInt()).isEqualTo(10);
+            assertThat(Path.of(message.get("localPath").asString())).isDirectory();
+            JsonNode status = call(requests, io, replies, stderr, stdout, 7, "syncStatus",
+                    "{\"connection\":\"local\"}");
+            assertThat(status.get("state").asString()).isEqualTo("never");
+            // Verify thrown IllegalArgumentException is an MCP tool error, without a network call.
+            send(requests, "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/call\","
+                    + "\"params\":{\"name\":\"listMessages\",\"arguments\":{\"connection\":\"local\",\"folder\":\"missing\"}}}");
+            JsonNode invalid = readResponse(io, replies, 8, stdout, stderr);
+            assertThat(invalid.at("/result/isError").asBoolean()).isTrue();
+            assertThat(invalid.at("/result/content/0/text").asString()).contains("Unknown folder key");
 
             assertThat(stdout).allSatisfy(line -> assertThat(JSON.readTree(line).get("jsonrpc").asString()).isEqualTo("2.0"));
             assertThat(String.join("\n", stdout)).doesNotContain(SECRET, "webmail.example.com", "imap.mail.ru");
@@ -99,6 +136,32 @@ class McpStdioServerTest {
         assertThat(Files.readString(dataDir.resolve("logs").resolve("mail-mcp-server.log")))
                 .contains("Configured connections: work -> ews/ntlm")
                 .doesNotContain(SECRET);
+    }
+
+    private static void prepareLocalData(Path dir) throws Exception {
+        var store = new MessageStore(dir, new JsonConfig().mailMcpObjectMapper());
+        store.saveFolders(List.of(new LocalFolder("f1", "INBOX", "INBOX", "7")));
+        try (var index = MailIndex.openWriter(dir)) {
+            for (String fixture : List.of("M01-rfc2231-continuations.eml", "M16-unsafe-filenames.eml")) {
+                String key = store.newKey();
+                Files.copy(Path.of("testdata/mime", fixture), store.createMessageDir(key).resolve(MessageStore.MESSAGE_FILE));
+                var meta = new MessageMeta(key, "f1", "INBOX", fixture, 0, null, Instant.now(), MessageState.DOWNLOADED, null);
+                store.writeMeta(meta);
+                var processed = new MessageProcessor(store, new Pandoc("unused")).process(meta);
+                index.put(processed.meta(), processed.message(), processed.body());
+            }
+            index.commit();
+        }
+    }
+
+    private static JsonNode call(BufferedWriter requests, ExecutorService io, BufferedReader replies,
+                                 StringBuilder stderr, List<String> stdout, int id, String name, String arguments)
+            throws Exception {
+        send(requests, "{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"method\":\"tools/call\","
+                + "\"params\":{\"name\":\"" + name + "\",\"arguments\":" + arguments + "}}");
+        JsonNode response = readResponse(io, replies, id, stdout, stderr);
+        assertThat(response.at("/result/isError").asBoolean()).isFalse();
+        return response.at("/result/structuredContent");
     }
 
     private static void send(BufferedWriter requests, String message) throws IOException {

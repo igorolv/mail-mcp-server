@@ -3,6 +3,7 @@ package mail.mcp.sync;
 import mail.mcp.config.JsonConfig;
 import mail.mcp.index.MailIndex;
 import mail.mcp.model.LocalFolder;
+import mail.mcp.model.FolderProgress;
 import mail.mcp.model.MessageState;
 import mail.mcp.source.Downloaded;
 import mail.mcp.source.FolderChanges;
@@ -54,6 +55,41 @@ class SyncRunnerTest {
 
     private static String[] messageRefs(int count) {
         return IntStream.rangeClosed(1, count).mapToObj(String::valueOf).toArray(String[]::new);
+    }
+
+    @Test void statusIsRunningDuringTheRunAndCompletedAfter() {
+        source.putFolder("inbox", "INBOX", "7", messageRefs(101));
+        List<FolderProgress> seen = new ArrayList<>();
+        try (var index = MailIndex.openWriter(connectionDir)) {
+            new SyncRunner(store(), index, source, processor()).run(p -> {
+                seen.add(p);
+                var status = store().readSyncStatus().orElseThrow();
+                assertThat(status.state()).isEqualTo("running");
+                assertThat(status.pid()).isEqualTo(ProcessHandle.current().pid());
+                assertThat(status.finishedAt()).isNull();
+                assertThat(status.folders()).containsExactly(p);
+            });
+        }
+        assertThat(seen).hasSize(2);
+        var status = store().readSyncStatus().orElseThrow();
+        assertThat(status.state()).isEqualTo("completed");
+        assertThat(status.finishedAt()).isAfterOrEqualTo(status.startedAt());
+        assertThat(status.folders()).containsExactly(seen.getLast());
+        assertThat(status.signInRejected()).isFalse();
+    }
+
+    @Test void failureWritesFailedStatusAndRethrows() {
+        source.putFolder("inbox", "INBOX", "7", "1");
+        source.failOnDownload(1);
+        try (var index = MailIndex.openWriter(connectionDir)) {
+            assertThatThrownBy(() -> new SyncRunner(store(), index, source, processor()).run(p -> { }))
+                    .isInstanceOf(ImapException.class);
+        }
+        var status = store().readSyncStatus().orElseThrow();
+        assertThat(status.state()).isEqualTo("failed");
+        assertThat(status.finishedAt()).isAfterOrEqualTo(status.startedAt());
+        assertThat(status.error()).isEqualTo(SyncErrors.describe(new ImapException(ImapException.Kind.CONNECTION)));
+        assertThat(status.signInRejected()).isFalse();
     }
 
     @Test void firstRunDownloadsEverythingAndSecondRunNothing() throws Exception {

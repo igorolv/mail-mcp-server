@@ -1,4 +1,4 @@
-package mail.mcp.sync;
+package mail.mcp.model;
 
 /**
  * Progress of one folder, cumulative within the run.
