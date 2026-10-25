@@ -1,7 +1,7 @@
 # docs/tools-agent.md — MCP tools and background synchronization
 
-IT-06 completes plan.md 7.4. Tools are Spring services returning `api/` records, never `model/`
-records. IT-07 adds search (7.5); IT-08 adds attachment text (7.6), bringing the tool count to eight.
+Eight tools (plan.md 3.7). Tools are Spring services returning `api/` records, never `model/`
+records.
 Only JSON-RPC is written to stdout. Failures are logged through `ToolLogger.failed`
 and rethrown; `IllegalArgumentException` becomes an MCP tool error with its message.
 
@@ -75,7 +75,7 @@ Use offline `mail-reindex` or a requested sync to rebuild from disk.
 
 The 2026-10-26 offline control set processes all 48 synthetic MIME messages and scores
 all 80 queries: recall **79/86 = 0.918605**, **7 false positives**. Q061 now finds S001 through
-`attachmentText` (the CSV attachment). The IT-07 baseline was 78/86 = 0.906977.
+`attachmentText` (the CSV attachment). Before attachment text the baseline was 78/86 = 0.906977.
 The fixtures' redaction proposal is superseded by the deferred filter: raw synthetic text is indexed.
 
 | Category | Expected matches found / expected | False positives |

@@ -4,7 +4,7 @@ package mail.mcp.source.ews;
  * The server rejected the credentials (HTTP 401 after the sign-in handshake).
  *
  * <p>Callers must not retry: every attempt with a wrong or stale password counts toward the domain
- * account lockout policy (docs/plan.md, 5.2). Synchronization stops for the connection until the
+ * account lockout policy (docs/plan.md, 3.1). Synchronization stops for the connection until the
  * configuration changes or the server restarts.
  */
 public class EwsAuthenticationException extends EwsException {

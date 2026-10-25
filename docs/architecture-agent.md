@@ -1,51 +1,35 @@
 # docs/architecture-agent.md — source layout, technology and layer boundaries
 
 Read this when locating code, adding a package, changing a dependency, or changing the server
-transport and Spring wiring. The target design is `docs/plan.md` section 6 (packages: 6.3), the
-work order is section 7, decisions are in section 10. This file describes what exists now and
-where planned code goes.
+transport and Spring wiring. The design summary is `docs/plan.md` section 3 (packages: 3.3),
+possible improvements are in section 4, decisions in section 5. This file describes what exists.
 
-## Status (after IT-08, step 7.6 complete)
+## Status (2026-10-26: draft version complete)
 
-Implemented: Gradle build, Spring Boot application with the stdio MCP transport, the connections
-file with a lazy registry, the `listConnections` tool, a read-only EWS client (`GetFolder`,
-`FindFolder`, `SyncFolderItems`, `FindItem`, `GetItem` with MIME) over Apache HttpClient 5 with NTLM,
-`EwsMailSource` (filtered folder tree, paged changes, MIME downloads), a read-only IMAP client on
-Angus Mail and `ImapMailSource` (filtered folders, UID changes, MIME downloads in one session),
-Gmail Desktop OAuth2 with PKCE and IMAP XOAUTH2, and six user-run commands: `ews-spike`,
-`imap-spike`, `gmail-oauth`, `mail-sync`, `mail-reprocess`, `mail-reindex`. User-run spikes succeeded
-on 2026-10-25 for EWS (plan.md 3.3) and Mail.ru (plan.md 3.4). Gmail is supported but its sign-in
-is unverified; the user deferred it, their local connections are `work` and `mailru`. Synthetic
-RT-11–RT-13 data sets are in `testdata/`. IT-02 adds message directories with atomically written
-`meta.json` and `folders.json`, and a derived Lucene catalog with a single writer and disk
-reconciliation. IT-03 adds `SyncRunner` and the `mail-sync` command: reconcile, synchronize
-folders, remove vanished messages, download MIME and metadata, commit batches and save cursors.
-User-run commands now live in `cli/`. See `docs/storage-agent.md`.
+Implemented and checked on the user's real mailboxes (plan.md section 2):
 
-IT-04 connects EWS to the same runner and `mail-sync`, including recovery from an invalid
-`SyncState` without re-downloading known messages.
+- Gradle build, Spring Boot application with the stdio MCP transport, the connections file with
+  a lazy registry.
+- Read-only EWS client over Apache HttpClient 5 with NTLM (`GetFolder`, `FindFolder`,
+  `SyncFolderItems`, `FindItem`, `GetItem` with MIME) and `EwsMailSource`.
+- Read-only IMAP client on Angus Mail and `ImapMailSource`; Gmail Desktop OAuth2 with PKCE and
+  XOAUTH2 (supported, real sign-in unverified; the user deferred Gmail).
+- Message directories with `meta.json`, `body.md`, attachment files and their `.md`; MIME
+  reading (`docs/mime-agent.md`); a derived Lucene index, schema 3, with Russian/English search
+  (`docs/storage-agent.md`).
+- `SyncRunner`, background `SyncService` and `sync-status.json`.
+- Eight MCP tools (`docs/tools-agent.md`): `listConnections`, `sync`, `syncStatus`,
+  `listFolders`, `listMessages`, `getMessage`, `getAttachment`, `search`.
+- User-run commands in `cli/`: `mail-sync`, `mail-reprocess`, `mail-reindex`, `gmail-oauth`,
+  `ews-spike`, `imap-spike`.
+- Synthetic data sets in `testdata/` (`mime`, `search`, `redaction`); the search control set
+  gives recall 79/86 = 0.919 with 7 false positives.
 
-IT-05 adds MIME reading, decoded attachment files, `body.md` (HTML through sandboxed pandoc),
-converted/failed metadata, header/body index fields, and offline `mail-reprocess`.
-See `docs/mime-agent.md`.
-
-IT-06 adds background `SyncService`, shared `sync-status.json`, committed `MailIndexReader`
-and five mail tools: `sync`, `syncStatus`, `listFolders`, `listMessages`, `getMessage`.
-See `docs/tools-agent.md`.
-
-IT-07 adds `SearchTools.search`, Russian/English analysis, exact address and filename fields,
-filename parts, highlighted body snippets, schema 2 and offline `mail-reindex`.
-The 48-message/80-query control set passes with recall 78/86 and 7 false positives.
-See `docs/tools-agent.md` for category counts and known limits.
-
-IT-08 adds attachment Markdown (pandoc, PDFBox and POI), schema 3 attachment text search,
-`getAttachment` and attachment `textPath`, bringing the tool count to eight. The control set
-now passes with recall 79/86 = 0.918605 and 7 false positives. PDFBox/POI methods
-in `convert/PdfText`, `XlsxText` and `PptxText` are adapted from redmine-mcp-server
+`convert/PdfText`, `XlsxText` and `PptxText` are adapted from redmine-mcp-server
 `extraction/parser/{PdfTextParser,XlsxTextParser,PptxTextParser}.java` at commit `f62b3e5`.
 
-Not implemented: the optional sensitive-data filter (7.7), which awaits user decisions.
-Real `mail-sync` checks are user-run only.
+Not implemented: the sensitive-data filter, MCP resources, threads, flags, embeddings, writing
+mail; see plan.md section 4.
 
 ## Transport and execution
 
@@ -54,7 +38,7 @@ JSON-RPC channel; use SLF4J instead. `logback-spring.xml` has only `FILE` and `S
 and the HttpClient `headers`/`wire` loggers are `OFF` because they would print `Authorization`
 headers. `McpServerConfig` sets `immediateExecution(true)` on the `McpSyncServer` builder (copied
 from redmine-mcp-server @ `f62b3e5`): tool calls of one session run one at a time, so long work —
-synchronization — runs in the background and returns at once (plan.md 6.6).
+synchronization — runs in the background and returns at once (plan.md 3.6).
 `config/McpStdioConcurrencyTest` documents the race; its disabled half passed once with MCP SDK
 2.1.0 on 2026-10-24, which is not yet a reason to drop the setting.
 
@@ -72,18 +56,18 @@ platform thread through `SyncService` and returns at once.
   `2.1.0` when released. MCP Java SDK 2.1.0, Jackson 3 (`tools.jackson`) come transitively.
 - **Apache HttpClient 5.6.5** classic — EWS transport with explicitly registered NTLM (П1).
 - **Eclipse Angus Mail 2.0.5**, **Jakarta Mail API 2.1.5** — IMAP with implicit TLS (П3); also the
-  MIME parser from step 7.4 (plan.md 6.7).
-- **Lucene Core 10.5.2** — derived catalog, NRT lookups and the per-connection write lock (IT-02).
+  MIME parser (plan.md 3.5).
+- **Lucene Core 10.5.2** — derived catalog, NRT lookups and the per-connection write lock.
 - **Lucene analysis-common, queryparser, highlighter 10.5.2** — field analyzers,
-  `SimpleQueryParser` and `UnifiedHighlighter` (IT-07), all on the catalog's version.
-- **PDFBox 3.0.5**, **POI poi-ooxml 5.4.1** — PDF, XLSX and PPTX attachment text (IT-08).
+  `SimpleQueryParser` and `UnifiedHighlighter`, all on the catalog's version.
+- **PDFBox 3.0.5**, **POI poi-ooxml 5.4.1** — PDF, XLSX and PPTX attachment text.
 - StAX from the JDK for SOAP; no generated EWS classes, no `ews-java-api`.
 - **Gradle 9.8.2** wrapper with the version catalog `gradle/libs.versions.toml`.
 
 Pandoc is required on `PATH` for sync/reprocessing/reindexing; `Pandoc` runs one sandboxed process per
 body or supported attachment conversion. PDFBox and POI run in-process, without the sibling
 parser framework. Do not add Mime4j, jsoup, SQLite or any other library the plan
-does not name (plan.md 6.9).
+does not name (plan.md 3.8).
 
 If you change a dependency, update `libs.versions.toml`, not the build script.
 
@@ -138,10 +122,10 @@ needs them and register them above. Attachment converters live in `convert/`.
   `ConnectionRegistry` name/definition lookups (source resolution only for sync); there is no
   default connection and no cross-mailbox call.
 - Tools return `api/` records; secrets, hosts and logins never appear in a tool response. Mail
-  content and local paths to message files may be returned (plan.md 6.8).
+  content and local paths to message files may be returned (plan.md 3.7).
 - Anything that reaches a mail server goes through `source/`; only allow-listed EWS operations
-  exist (`EwsOperation`). Adding one needs a decision in plan.md section 10.
-- Follow plan.md 6.9: no limit budgets, extra databases, diagnostic codes or speculative
+  exist (`EwsOperation`). Adding one needs a decision in plan.md section 5.
+- Follow plan.md 3.8: no limit budgets, extra databases, diagnostic codes or speculative
   safeguards that the step's done criterion does not require.
 - Code copied from sibling projects names its source and commit in the class Javadoc (П5).
 - Keep OAuth provider implementations in `source/oauth/<provider>/`. Shared `source/oauth/`

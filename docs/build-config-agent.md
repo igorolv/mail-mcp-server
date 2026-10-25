@@ -125,12 +125,12 @@ The command class is `cli/EwsSpikeCommand` (`mail.mcp.cli`); `ewsSpike` uses tha
 
 ## The IMAP spike
 
-The Mail.ru user-run spike succeeded on 2026-10-25 (plan.md 3.4); Gmail still needs a successful
+The Mail.ru user-run spike succeeded on 2026-10-25 (plan.md 2.2); Gmail still needs a successful
 check. No real IMAP sign-in has been performed by agents. Add an IMAP entry
 to the existing connections file locally using the schema above. Use the provider's app password;
 fill the file only in your local editor. Agents must not open it or modify an existing secret-bearing
 file to append entries. Do not paste it into chat. Placeholder references are optional; a literal
-password in this owner-only external file is supported by the loader too (plan.md 5.7).
+password in this owner-only external file is supported by the loader too.
 
 ```powershell
 .\gradlew.bat bootJar
@@ -310,6 +310,6 @@ Only the user runs real authorization and sign-in; agents may run `gmail-oauth -
 documents, and `testdata/search/` has 48 messages with 80 control queries. Each directory has an
 English README, JSON expectations and a complete manifest. Russian reports are in
 `docs/research/RT-11-synthetic-mime.md`, `RT-12-redaction-samples.md`, `RT-13-search-queries.md`.
-Helper generators/validators stay under ignored `testdata/.work/`; only data is tracked, per the briefs.
-They are inputs for the parser, index and search tests of plan.md steps 7.4–7.5 and for a later
-optional filter, not implementations of those subsystems.
+Helper generators/validators stay under ignored `testdata/.work/`; only data is tracked.
+They feed `MimeReaderTest` and `SearchControlSetTest`; `testdata/redaction/` waits for the optional
+filter (plan.md section 4, Д6).

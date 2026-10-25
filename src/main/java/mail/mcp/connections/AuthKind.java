@@ -7,9 +7,9 @@ import java.util.Optional;
 /** How a connection signs in: the {@code auth} field of {@code connections.json}. */
 public enum AuthKind {
 
-    /** NTLM over HTTPS; the working method for the Exchange server (docs/plan.md, 3.2). */
+    /** NTLM over HTTPS; the working method for the Exchange server (docs/plan.md, 2.1). */
     NTLM("ntlm", ConnectionType.EWS, true),
-    /** HTTP Basic over HTTPS. Rejected by the Exchange server for a bare login (docs/plan.md, 3.2). */
+    /** HTTP Basic over HTTPS. Rejected by the Exchange server for a bare login (docs/plan.md, 2.1). */
     BASIC("basic", ConnectionType.EWS, true),
     /** IMAP LOGIN with an app password (decision P3). */
     APP_PASSWORD("app-password", ConnectionType.IMAP, true),

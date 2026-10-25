@@ -1,9 +1,7 @@
 # docs/storage-agent.md — message directories and the derived catalog
 
-Storage and catalog implemented in IT-02, synchronization in IT-03 (plan.md 7.2), MIME/body
-processing and header/body index fields in IT-05 (plan.md 7.4, first half), search in IT-07 (7.5),
-attachment text in IT-08 (7.6).
-See `docs/plan.md` 6.2–6.6 for the design.
+Message directories, the derived Lucene index (schema 3), synchronization, MIME/body
+processing, search and attachment text. See `docs/plan.md` 3.2–3.6 for the design.
 `MessageStore` and `MailIndex` take one connection directory; neither contacts a mailbox.
 
 ## Disk layout
@@ -172,9 +170,9 @@ reconciliation restores headers and body from disk before the runner accesses th
 `cli/MailSyncCommand` owns the source and writer, takes the writer lock before the first network
 request and closes the source before the index. `SyncRunner` opens and closes neither; it reports
 cumulative `FolderProgress` after each committed batch and after a folder's cursor is saved (or
-the folder is deleted). `FolderProgress` lives in `model/`. IT-06 adds `SyncService` background
-runs and the read-only `MailIndexReader`; IT-07 adds search and offline `mail-reindex`.
-IT-08 adds attachment text to processing, restore and reprocessing.
+the folder is deleted). `FolderProgress` lives in `model/`. `SyncService` runs the same runner in
+the background; `MailIndexReader` reads the last commit; `mail-reindex` and `mail-reprocess`
+rebuild offline.
 
 ## Sync status and tool readers
 

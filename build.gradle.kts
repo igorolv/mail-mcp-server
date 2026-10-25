@@ -71,7 +71,7 @@ tasks.register<JavaExec>("mailReindex") {
     javaLauncher.set(javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) })
 }
 
-// EWS spike (docs/plan.md, stage 1): signs in to a real mailbox, so only the user runs it.
+// EWS spike (docs/plan.md, 2.1): signs in to a real mailbox, so only the user runs it.
 //   .\gradlew.bat ewsSpike --args="work"
 // The runnable jar has the same mode: java -jar build\libs\mail-mcp-server.jar ews-spike work
 tasks.register<JavaExec>("ewsSpike") {

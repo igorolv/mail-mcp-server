@@ -1,13 +1,13 @@
 package mail.mcp.source.ews;
 
 /**
- * The allow-list of EWS operations this server may send (decision P4, research.md 1.2). All ten only
+ * The allow-list of EWS operations this server may send (decision P4, docs/research/RT-03-ews-operations.md). All ten only
  * read: {@code Create}/{@code Update}/{@code Delete} entries in a sync response describe changes that
  * already happened, they are not commands.
  *
  * <p>The request writer takes the operation element name from this enum, so a write operation such
  * as {@code UpdateItem}, {@code MoveItem} or {@code SendItem} cannot even be expressed. Adding a
- * constant here needs a recorded decision in {@code docs/plan.md} section 10.
+ * constant here needs a recorded decision in {@code docs/plan.md} section 5.
  */
 public enum EwsOperation {
 

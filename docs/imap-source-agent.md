@@ -1,7 +1,7 @@
 # docs/imap-source-agent.md — read-only IMAP source and spike
 
 Read before changing `source/imap/`, authentication, wire commands or the IMAP spike.
-Design: plan.md 5.2, 5.6, decisions П3, П4, П8; background: research/RT-04-imap-gmail-mailru.md.
+Design: plan.md 3.1 and 3.6, decisions П3 and П4; background: research/RT-04-imap-gmail-mailru.md.
 
 ## Implemented scope
 
@@ -13,8 +13,8 @@ across folders. Storage, sync, search and mail MCP tools are not implemented; on
 and paging are not implemented.
 
 `MailConnectionFactory` creates a connection with a supplier; `openSource()` creates a fresh
-`ImapMailSource` without contacting a server. The caller closes the source. EWS connections
-have no `MailSource` until step 7.3, though their standalone client and spike remain available.
+`ImapMailSource` without contacting a server. The caller closes the source. EWS connections get
+an `EwsMailSource` the same way (`docs/ews-source-agent.md`).
 Gmail OAuth2/XOAUTH2 and the user-run `gmail-oauth` command are implemented; setup and token
 lifecycle are in `docs/gmail-oauth-agent.md`. Angus objects stay private.
 
@@ -91,8 +91,8 @@ removed and all present refs added. Cursors and download refs are checked before
 Gmail handling is added.
 
 Original MIME is kept on disk as downloaded. Under the 2026-10-25 decisions mail content and
-local paths may reach the model through tools, with an optional output filter later (plan.md 5.4,
-6.8). The spike still prints counts rather than folder names or subjects, so its report can be
+local paths may reach the model through tools, with an optional output filter later (plan.md 3.1,
+section 4 Д6). The spike still prints counts rather than folder names or subjects, so its report can be
 pasted into chat.
 
 ## User-run spike
@@ -115,17 +115,17 @@ RESULT: OK
 
 Exit codes: 0 success (including an empty inbox), 2 configuration/selection, 3 sign-in rejected,
 4 IMAP/network/message-unavailable/limit/local-save error, 1 unexpected error with details withheld.
-An absent or empty inbox succeeds without a download. Record anonymized user results in plan.md; do not copy local
+An absent or empty inbox succeeds without a download. Record anonymized user results in plan.md section 2; do not copy local
 user paths, addresses or original contents into tracked files.
 
 Verified on 2026-10-25 by a user-run Mail.ru spike: LIST returned 41 folders, EXAMINE and
 BODY.PEEK succeeded, and one MIME original of 25831 bytes was saved. Seen was true both before
-and after, so an unread message was not tested. See plan.md 3.4. An earlier user run rejected
+and after, so an unread message was not tested. See plan.md 2.2. An earlier user run rejected
 sign-in for both Mail.ru and Gmail; the report did not include a provider reason. Gmail still
 has no successful user-run result. Do not infer server extensions from the folder count.
-After step 7.1 a user-run Mail.ru spike on `MailSource` succeeded on 2026-10-25: 39 folders to
+A later user-run Mail.ru spike on `MailSource` succeeded on 2026-10-25: 39 folders to
 sync, one `FETCH 1:N (UID)` for an inbox of about 13 thousand messages, and the highest UID
-downloaded through `RFC822.SIZE` and BODY.PEEK in the same session (plan.md 3.4).
+downloaded through `RFC822.SIZE` and BODY.PEEK in the same session (plan.md 2.2).
 The user deferred Gmail setup on 2026-10-25; their local connections are `work` and `mailru`.
 Gmail and OAuth2 support remain available for later use.
 

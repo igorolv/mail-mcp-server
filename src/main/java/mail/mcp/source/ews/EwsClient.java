@@ -17,8 +17,8 @@ import java.util.List;
  * operations only ({@link EwsOperation}) and parses responses as a stream.
  *
  * <p>Covers folder listing, incremental sync, a one-page {@code FindItem} for the spike and
- * {@code GetItem} with MIME. Calls are sequential: one request at a time per mailbox (research.md
- * 1.2, throttling). Errors are never retried here; in particular an
+ * {@code GetItem} with MIME. Calls are sequential: one request at a time per mailbox
+ * (docs/research/RT-03-ews-operations.md, throttling). Errors are never retried here; in particular an
  * {@link EwsAuthenticationException} must reach the caller after a single sign-in attempt.
  */
 public final class EwsClient implements AutoCloseable {
@@ -159,7 +159,7 @@ public final class EwsClient implements AutoCloseable {
      * {@code GetItem} with {@code IncludeMimeContent}: decodes the MIME of one item into
      * {@code target}. The file is written next to the target first and moved into place only after
      * the whole response was read, so a failed call leaves no partial {@code .eml}. {@code GetItem}
-     * does not mark the item as read (research.md 1.2).
+     * does not mark the item as read (docs/research/RT-03-ews-operations.md).
      */
     public EwsMimeItem getItemMime(String itemId, Path target) {
         if (itemId == null || itemId.isBlank()) {

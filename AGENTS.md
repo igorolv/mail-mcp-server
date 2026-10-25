@@ -1,51 +1,39 @@
 # mail-mcp-server — instructions for agents
 
-This repository will become a local stdio MCP server that lets AI agents read several mailboxes
-(a corporate Exchange server over EWS, Gmail and Mail.ru over IMAP), turn attachments into local
-files with extracted text, search mail and attachments through a local index, and filter
-sensitive data before anything reaches the model.
+A local stdio MCP server that lets AI agents read several mailboxes: a corporate Exchange server
+over EWS, Mail.ru and Gmail over IMAP. It keeps a full local copy of every message (`.eml`,
+metadata, body and attachments with Markdown text), indexes it with Lucene and answers tools from
+local data only. User-facing overview: `README.md`.
 
-**Current status: steps 7.1–7.6 done; step 7.7 of `docs/plan.md` waits for user decisions.** There is a Gradle build, a Spring Boot stdio MCP server
-with eight tools (`listConnections`, `sync`, `syncStatus`, `listFolders`, `listMessages`, `getMessage`, `search`, `getAttachment`; `docs/tools-agent.md`), the connections file with a lazy registry, and a read-only EWS
-client with NTLM plus a spike command the user runs against the real mailbox. The user-run EWS
-spike succeeded on 2026-10-25 (see `docs/plan.md` 3.3). `MailSource` and its IMAP implementation
-on Angus Mail (one session per source) and a user-run spike are ready; Mail.ru sign-in and MIME download succeeded on 2026-10-25
-(see `docs/plan.md` 3.4). Gmail OAuth2 (Desktop PKCE, local refresh tokens, XOAUTH2) is ready for
-a user-run check; real Gmail sign-in is not verified yet. The user deferred connecting their
-Gmail on 2026-10-25; their local configuration contains only `work` and `mailru`. Keep Gmail
-and OAuth2 support available, but do not treat Gmail setup as the next required user action. Synthetic RT-11–RT-13
-data sets are ready. Message directories and the Lucene catalog exist (`docs/storage-agent.md`);
-the user-run `mail-sync` command fills them from IMAP and EWS; two runs each on Mail.ru and the
-work mailbox succeeded on 2026-10-25 (`docs/plan.md` 3.3, 3.4). Messages are parsed into `body.md` and attachment files
-(pandoc required, `docs/mime-agent.md`); the offline `mail-reprocess` command converted both mailboxes on
-2026-10-25. The tools were checked from an MCP client on both mailboxes on 2026-10-26. Search uses the Russian and
-English analyzers of decision П9 (index schema 3, `mail-reindex` rebuilds offline; recall 0.919 on
-`testdata/search`). Attachments get a Markdown text next to the file (pandoc, PDFBox, POI; `docs/mime-agent.md`)
-and are searchable. The sensitive-data filter and the rest of step 7.7 are still design only
-(`docs/plan.md`). An offline MIME pipeline with shared limits (commit `d6534ca`) was reverted on
-2026-10-25 by user decision as over-engineering; do not rebuild it. The architecture was rewritten
-on 2026-10-25 (`docs/plan.md` section 6). Work goes through the steps of section 7 one at a time,
-starting with 7.1; each step lists what to build, when it is done and what not to build.
-Section 6.9 lists what no step may add without a user decision. Add new tools
-or subsystems only when the task asks for them.
+**Current status (2026-10-26): the draft version is complete and checked on the user's real
+mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/plan.md` section 2).
+- Eight MCP tools, background sync, offline reprocessing and reindexing work.
+- Gmail OAuth2 is implemented, but its real sign-in is unverified. The user deferred Gmail, so do
+  not treat Gmail setup as a required next step.
+
+Work now consists of polishing and optional improvements:
+- `docs/plan.md` section 4 lists them (`Д1`, `Д2`, …); the user chooses which to take.
+- Add new tools or subsystems only when the task asks for them.
+- `docs/plan.md` 3.8 lists what no change may add without a user decision.
+- An offline MIME pipeline with shared limits (commit `d6534ca`) was reverted on 2026-10-25 by
+  user decision as over-engineering; do not rebuild it.
 
 ## Repository contents
 
 | Path | What it is |
 |---|---|
+| `README.md` | Project overview for users: features, quickstart, tools, commands, troubleshooting |
 | `AGENTS.md` | This file: rules for agents changing the repository |
 | `CLAUDE.md` | One line, `@AGENTS.md`, so Claude Code loads this file. Keep all rules here, not there |
-| `docs/plan.md` | Main design discussion (in Russian): idea, environment, goals, key ideas, architecture draft, stages, open questions, decision log, discussion log |
-| `docs/research.md` | Research notes (in Russian): access protocols, libraries, existing MCP servers, search engines, redaction tools, what to reuse from sibling projects |
-| `docs/research-tasks/` | Research briefs `RT-NN-*.md` for separate agent sessions, plus `README.md` with shared rules and the result template |
-| `docs/research/` | Research results, one file per brief (in Russian). Created by research sessions |
+| `docs/plan.md` | The plan (in Russian): idea and status, environment facts and real-mailbox results, design summary, possible improvements, current decisions, research index |
+| `docs/research/` | Background research results `RT-NN-*.md` (in Russian), from 2026-10-24; the decisions taken from them are in `docs/plan.md` section 5 |
 | `docs/impl-tasks/` | Implementation briefs `IT-NN-*.md` for separate agent sessions, plus `README.md` with shared rules and the report template |
 | `docs/*-agent.md` | Engineering documents (in English), see the routing table below |
 | `src/main/java/mail/mcp/` | Server source; layout in `docs/architecture-agent.md` |
 | `src/test/` | Unit tests and synthetic EWS responses (`src/test/resources/ews/`); none needs a network |
 | `build.gradle.kts`, `settings.gradle.kts`, `gradle/` | Gradle build, version catalog `gradle/libs.versions.toml`, wrapper |
 | `gradlew`, `gradlew.bat` | Gradle wrapper scripts |
-| `testdata/` | Synthetic test data sets (MIME, redaction samples, search queries) produced by data tasks RT-11…RT-13; byte-exact (`testdata/.gitattributes`) |
+| `testdata/` | Synthetic test data sets (MIME, redaction samples, search queries); byte-exact (`testdata/.gitattributes`) |
 | `scripts/ews-login-check.ps1` | Interactive EWS sign-in check (`GetFolder` for `inbox`); run by the user, not by agents |
 | `.gitignore` | Ignores `.local/`, Gradle output and IDE files |
 | `.gitattributes` | Line endings of wrapper scripts; keeps `.eml` and EWS fixtures byte-exact |
@@ -57,20 +45,18 @@ Read this file first. Then read only the documents whose `When` matches the task
 
 | Document | When | What it holds |
 |---|---|---|
-| `docs/plan.md` | any design question; recording a finding, decision or next step | the project plan and the full discussion history |
-| `docs/research.md` | comparing protocols, libraries, existing solutions; recording research results | research tables with statuses and conclusions |
-| `docs/research-tasks/README.md` | running a research task `RT-NN`, or writing a new brief | how to start a session, task list, shared rules, result template, self-check |
-| `docs/research-tasks/RT-NN-*.md` | you were given that task | goal, known context, questions, sources, required tables, out of scope, done criteria |
-| `docs/impl-tasks/README.md` | implementing a step `IT-NN`, or writing a new implementation brief | how to start a session, task list, shared rules, report template, self-check |
+| `docs/plan.md` | any design question; choosing or recording an improvement; recording a finding or a decision | status, environment facts, design summary, improvements table, decisions, research index |
+| `docs/impl-tasks/README.md` | implementing a brief `IT-NN`, or writing a new implementation brief | how to start a session, task list, shared rules, report template, self-check |
 | `docs/impl-tasks/IT-NN-*.md` | you were given that task | goal, files to read, fixed decisions, types and behavior, named tests, what not to build, files and documents to change |
+| `docs/research/RT-NN-*.md` | working on an improvement whose row in plan.md section 6 names that research | background facts, sources and comparisons; check them against the current code and decisions |
 | `docs/architecture-agent.md` | locating code, adding a package, changing a dependency, Spring wiring or the stdio transport | what is implemented, tech stack, package layout and layer rules |
-| `docs/build-config-agent.md` | building, running tests, adding a setting, changing the connections file format, running the spike | Gradle commands, `MAIL_MCP_*` settings, `connections.json` keys and validation, spike invocation |
-| `docs/ews-source-agent.md` | changing `source/ews/`, adding an EWS operation, NTLM questions, reading spike output | allow-list, response checks, NTLM transport rules, known risks, spike output format |
+| `docs/build-config-agent.md` | building, running tests, adding a setting, changing the connections file format, running a user command | Gradle commands, `MAIL_MCP_*` settings, `connections.json` keys and validation, every jar mode with output and exit codes |
+| `docs/ews-source-agent.md` | changing `source/ews/`, adding an EWS operation, NTLM questions, reading spike output | allow-list, response checks, NTLM transport rules, `EwsMailSource`, known risks, spike output format |
 | `docs/imap-source-agent.md` | changing `source/imap/`, IMAP authentication or reading IMAP spike output | TLS, command allow-list, one sign-in attempt, EXAMINE/PEEK, bounded MIME downloads and spike output |
 | `docs/gmail-oauth-agent.md` | changing `source/oauth/google/`, Gmail OAuth configuration, authorization or refresh | Desktop client setup, PKCE/state/loopback flow, owner-only refresh storage, token endpoint and XOAUTH2 rules |
-| `docs/tools-agent.md` | changing `tools/`, `api/`, `SyncService`, `sync-status.json` or a tool's arguments and bounds | the six tools, local-only reading, status file fields, single writer across processes, sign-in refusal |
-| `docs/mime-agent.md` | changing `mime/` or `convert/`, MIME parsing rules, attachment names, pandoc calls, `mail-reprocess` | Angus properties, body and attachment rules, stored names, sandboxed pandoc, known `testdata/mime` differences |
-| `docs/storage-agent.md` | changing `model/`, `store/` or `index/`, the on-disk layout, `meta.json`, `folders.json` or the Lucene catalog | message directories, write order and atomic writes, index fields, single writer, reconciliation |
+| `docs/tools-agent.md` | changing `tools/`, `api/`, `SyncService`, `sync-status.json` or a tool's arguments and bounds | the eight tools, local-only reading, status file fields, single writer across processes, sign-in refusal, search control-set numbers |
+| `docs/mime-agent.md` | changing `mime/` or `convert/`, MIME parsing rules, attachment names, pandoc calls, attachment text, `mail-reprocess` | Angus properties, body and attachment rules, stored names, sandboxed pandoc, attachment formats, known `testdata/mime` differences |
+| `docs/storage-agent.md` | changing `model/`, `store/` or `index/`, the on-disk layout, `meta.json`, `folders.json` or the Lucene index | message directories, write order and atomic writes, index fields and schema, single writer, reconciliation |
 | `scripts/ews-login-check.ps1` | changing or explaining the EWS sign-in check | the script itself; its help block documents parameters |
 
 Name new engineering documents `docs/<topic>-agent.md`, write them in English, and register each
@@ -103,7 +89,7 @@ one in this table.
    put passwords into files, scripts, command lines, documentation examples, logs or commit
    messages. Scripts that need a password prompt for it interactively
    (`Read-Host -AsSecureString`) and keep it in memory only. In the future server, credentials
-   live only in the connections file outside the repository (see `docs/plan.md`, section 5.7).
+   live only in the connections file outside the repository (`docs/build-config-agent.md`).
 
 3. **Do not sign in to mailboxes yourself.** The mail accounts are real. Every sign-in attempt
    counts toward the domain lockout policy. Credentialed checks are run by the user; you prepare
@@ -112,94 +98,89 @@ one in this table.
 
 4. **Read-only by default.** No script or code may send, move, delete or flag mail, or change
    mailbox settings, unless `docs/plan.md` records a decision that enables that operation.
-   Writing mail is a planned optional feature behind an explicit flag, not part of the MVP.
+   Writing mail is a possible improvement behind an explicit flag (plan.md section 4, Д15).
 
 5. **Do not push or rewrite history unless asked.** Commit only when the task asks for it.
    Never force-push, amend or rebase published commits without an explicit request.
 
-## Working with the discussion documents
+## Working with the plan
 
-- `docs/plan.md` and `docs/research.md` are written **in Russian**. Keep Russian when you edit
-  them. Agent documents (`AGENTS.md`, `docs/*-agent.md`) are written **in English**.
-- Do not delete discussion history. Mark an answered open question by appending
-  `→ *answer (section N)*` or by striking it through; do not remove it.
+- `docs/plan.md` and `docs/research/` are written **in Russian**. Keep Russian when you edit
+  them. Agent documents (`AGENTS.md`, `docs/*-agent.md`, `README.md`) are written **in English**.
+- `docs/plan.md` describes the current state, not the history. Replace outdated statements
+  instead of appending corrections. Git keeps the history; the full discussion up to 2026-10-26 is
+  in the commits before the plan was rewritten.
 - When you record something in `docs/plan.md`:
-  - update the section the finding belongs to (for example 3.x for environment checks);
-  - tick or add the matching checkbox in section 9 "Ближайшие шаги";
-  - add a row to the decision log (section 10) **only for decisions the user made**, not for
-    your own proposals;
-  - add a dated entry to section 11 "Ход обсуждения".
+  - a verified fact or a real-mailbox result goes to section 2, anonymized: numbers only, no
+    folder names, addresses, file names or message content;
+  - a design change goes to section 3;
+  - an improvement's status changes in the section 4 table: ⬜ → 🔨 when work starts, ✅ with
+    the date when accepted, ✖ with a reason when rejected. A new idea is a new row;
+  - section 5 gets a row **only for decisions the user made**; mark your own proposals
+    «Предложено».
+- Delete an implementation brief once it is accepted and recorded, and update the task list in
+  `docs/impl-tasks/README.md`.
 - Always use absolute dates in `YYYY-MM-DD` form, never "today" or "yesterday".
-- In `docs/research.md` keep the status marks: ⬜ not reviewed, 🔍 in progress, ✅ reviewed
-  (conclusion written). A fact you have not verified from a primary source is marked
-  "проверить" (to verify); do not present recollection as fact.
-- Keep section numbering and internal links (`plan.md 5.7`, `раздел 3.1`) consistent when you
-  add or move sections.
+- Mark a fact you have not verified from a primary source "проверить" (to verify); do not
+  present recollection as fact.
+- Keep section numbering and internal links (`plan.md 3.5`, `раздел 2.1`) consistent when you
+  add or move sections. Code comments cite plan sections too.
 
-## Planned architecture
+## Architecture summary
 
-Summary of `docs/plan.md` sections 6–7 and the decision log (section 10), so you can keep
-changes consistent with it. Section 6 is authoritative where this summary is shorter. What is already implemented is listed in
-`docs/architecture-agent.md`; the rest is design.
+This summarizes `docs/plan.md` section 3 and the decisions in section 5, so you can keep changes
+consistent with them. The plan is authoritative where this summary is shorter. What exists in
+code is listed in `docs/architecture-agent.md`.
 
-- Java 25, Spring Boot `4.2.0-RC1`, Spring AI `2.1.0-RC1` (the 2.1 line is a deliberate choice;
-  move to `2.1.0` when it is released), Gradle 9 with a version catalog.
-- stdio is the only transport; nothing but JSON-RPC may be written to `System.out`.
-- Packages (plan.md 6.3, current state in `docs/architecture-agent.md`): `config/`,
-  `connections/`, `source/` (`MailSource`, EWS and IMAP implementations, OAuth), `model/` (one
-  record per file), `mime/`, `convert/`, `store/`, `index/`, `sync/`, `tools/`, `cli/` (today
-  `spike/`); no `service/` layer; `api/` records are the
-  MCP wire contract, `model/` records are not returned directly.
-- Several mailboxes from the start: a `connections.json` file outside the repository
-  (`%USERPROFILE%\.mail-mcp-server\`), modeled on the sibling project `jdbc-mcp-server`. Each
-  connection has a name, a type (`ews` or `imap`), an `auth` kind, its own properties and
-  credentials.
-- EWS source: own thin SOAP client on StAX with a pluggable transport — Apache HttpClient 5 with
-  NTLM explicitly registered first, `HttpsURLConnection` as fallback. IMAP source (Gmail,
-  Mail.ru): Eclipse Angus Mail with app passwords or Gmail OAuth2/XOAUTH2. Initial Gmail OAuth
-  consent is a user-run command, never an MCP tool or an automatic browser flow.
-- Read-only at protocol level: an allow-list of 10 EWS read operations; IMAP `EXAMINE` and
-  `BODY.PEEK`; never set flags in the mailbox.
-- Every source delivers messages as MIME (`.eml`), so storage, parsing and attachment extraction
-  are shared. `.eml` is kept exactly as downloaded. It is parsed with Angus Mail (`MimeMessage`
-  over `SharedFileInputStream`); nested messages, MSG, TNEF and ZIP stay plain attachments in the
-  MVP. No separate parsing process, no shared limit budget.
-- Pandoc is required (user decision 2026-10-25): HTML bodies and DOCX/ODT/RTF/EPUB attachments
-  become Markdown through one `pandoc server` process; PDF, XLSX and PPTX use the PDFBox/POI
-  parsers copied from `redmine-mcp-server`. Without pandoc, sync refuses to start.
-- Message key: a local UUID per connection; the current server address, `Message-ID` and a MIME
-  hash are stored separately.
-- Storage, no SQLite (user decisions 2026-10-25): one directory per message,
-  `<connection>/messages/<k2>/<key>/` with `message.eml`, `meta.json` (folder, server ref,
-  state), `body.md` and `attachments/` (each file plus its `.md`); `folders.json` with an opaque
-  cursor per folder; `sync-status.json`. The disk is the complete copy. One Lucene index per
-  connection (catalog and BM25 search with `RussianAnalyzer`, unfiltered text) is derived and
-  rebuilt from disk without the network. Disk space is not a constraint. Embeddings are not in
-  the MVP.
-- Sensitive-data filter is deferred. Disk and index hold everything as is; the filter will apply
-  only to output sent to the model, and only optionally (user decision 2026-10-25). Tools may
-  return local paths to any file in a message directory. Tools are the primary access path; MCP
-  resources are an addition.
-- Every tool, including local search, takes a required `connection`; there is no cross-mailbox
-  call.
-- Synchronization runs only on request, through a dedicated tool. There is no depth parameter:
-  it always syncs everything, then incrementally (user decision 2026-10-25). It starts work in the background of its
-  own server process and returns at once; `syncStatus` reports progress. All other
-  tools answer immediately from local data and report what is covered. Deletions and moves are
-  applied by the same incremental sync (IMAP `UIDVALIDITY`/UID, EWS `SyncFolderItems`); a move is
-  a delete plus an add. One sign-in per sync run. Folders: every real mail folder except
-  Deleted, Junk, Drafts, Outbox and search folders. Flags and Gmail labels are not synced in the MVP.
-- Several server processes (different client sessions) share one data directory. All of them
-  read; only the process holding the Lucene write lock of a connection syncs it. A sign-in failure stops syncing that connection with no
-  retries — repeated attempts with a stale password lock the domain account.
-- Implementation order: plan.md section 7, steps 7.1–7.7.
+- **Stack:** Java 25, Spring Boot `4.2.0-RC1`, Spring AI `2.1.0-RC1`, Gradle 9 with a version
+  catalog. The 2.1 line is a deliberate choice; move to `2.1.0` when it is released.
+- **Transport:** stdio only; nothing but JSON-RPC may be written to `System.out`.
+- **Packages:** `config/`, `connections/`, `source/` (`MailSource`; `ews/`, `imap/`, `oauth/`,
+  `oauth/google/`), `model/` (one record per file), `mime/`, `convert/`, `store/`, `index/`,
+  `sync/`, `tools/`, `api/`, `cli/`. There is no `service/` layer. `api/` records are the MCP
+  wire contract; `model/` records are not returned directly.
+- **Connections:** a `connections.json` file outside the repository
+  (`%USERPROFILE%\.mail-mcp-server\`), modeled on the sibling project `jdbc-mcp-server`.
+  - Each connection has a name, a type (`ews` or `imap`), an `auth` kind, its own properties and
+    credentials.
+  - Every tool, including search, takes a required `connection`.
+- **Mail sources:**
+  - EWS: own thin SOAP client on StAX over Apache HttpClient 5 with NTLM explicitly registered.
+  - IMAP (Gmail, Mail.ru): Eclipse Angus Mail with app passwords or Gmail OAuth2/XOAUTH2.
+  - Initial Gmail OAuth consent is a user-run command, never an MCP tool.
+- **Read-only at protocol level:** an allow-list of 10 EWS read operations; IMAP `EXAMINE`,
+  `BODY.PEEK` and `CLOSE`, never `SELECT`; never set flags in the mailbox.
+- **MIME:** every source delivers MIME (`.eml`), kept exactly as downloaded and parsed with Angus
+  Mail. Nested messages, MSG, TNEF and ZIP stay plain attachments. There is no separate parsing
+  process and no shared limit budget.
+- **Pandoc is required** (user decision).
+  - One sandboxed `pandoc --sandbox` process per conversion turns HTML bodies and
+    DOCX/ODT/RTF/EPUB/HTML/CSV attachments into Markdown.
+  - PDF, XLSX and PPTX use PDFBox and POI.
+  - Without pandoc, sync and reprocessing refuse to start.
+- **Storage, no SQLite:**
+  - one directory per message, `<connection>/messages/<k2>/<key>/`, with `message.eml`,
+    `meta.json`, `body.md` and `attachments/` (each file plus its `.md`);
+  - `folders.json` with an opaque cursor per folder, and `sync-status.json`;
+  - the disk is the complete copy. One Lucene index per connection (catalog and search, schema
+    version in the commit data) is derived and rebuilt from disk without the network.
+- **No filter yet:** the sensitive-data filter is not implemented. Disk and index hold everything
+  as is; a filter may later apply only to output sent to the model, and only optionally. Tools may
+  return local paths to any file in a message directory.
+- **Synchronization:**
+  - runs only on request: the `sync` tool in the background, or `mail-sync`;
+  - always syncs everything, then incrementally;
+  - one sign-in per run, no retries. After a rejected sign-in the `sync` tool refuses the
+    connection until the user runs `mail-sync`;
+  - several server processes share one data directory; only the holder of the Lucene write lock
+    syncs.
 
 Sibling projects used as references (same author, both public on GitHub):
 
 | Project | Local path | What to look at |
 |---|---|---|
-| `redmine-mcp-server` | `C:\git\redmine-mcp-server` | `AGENTS.md`, `docs/*-agent.md`: layering, attachment extraction pipeline, snapshots, bounded responses |
-| `jdbc-mcp-server` | `C:\git\jdbc-mcp-server` | `docs/connections.md`, package `connection/`: connections file, `${VAR}` placeholders, lazy registry |
+| `redmine-mcp-server` | `C:\git\redmine-mcp-server` | `AGENTS.md`, `docs/*-agent.md`: layering, attachment extraction, bounded responses |
+| `jdbc-mcp-server` | `C:\git\jdbc-mcp-server` | `README.md`, `docs/connections.md`, package `connection/`: connections file, `${VAR}` placeholders, lazy registry |
 
 ## Java code
 
@@ -228,7 +209,7 @@ Sibling projects used as references (same author, both public on GitHub):
   defaults. `scripts/ews-login-check.ps1` uses `MAIL_EWS_SERVER` and `MAIL_EWS_LOGIN`.
 - Known result: EWS sign-in works with **NTLM and a bare login** (no domain part). Basic with a
   bare login is rejected (`401`); Basic with a domain prefix was not tried and is not needed.
-  Details are in `docs/plan.md`, section 3.2.
+  Details are in `docs/plan.md`, section 2.1.
 
 The user runs the script like this:
 

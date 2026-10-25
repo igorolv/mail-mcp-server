@@ -259,7 +259,7 @@ class HttpClient5EwsTransportTest {
         }
     }
 
-    /** The anonymous challenge of the real server (docs/plan.md, 3.1): Negotiate, NTLM and Basic. */
+    /** The anonymous challenge of the real server (docs/plan.md, 2.1): Negotiate, NTLM and Basic. */
     private static void challenge(HttpExchange exchange) throws IOException {
         exchange.getResponseHeaders().add("WWW-Authenticate", "Negotiate");
         exchange.getResponseHeaders().add("WWW-Authenticate", "NTLM");

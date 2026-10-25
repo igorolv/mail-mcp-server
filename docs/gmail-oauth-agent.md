@@ -1,7 +1,7 @@
 # docs/gmail-oauth-agent.md — Gmail Desktop OAuth and IMAP XOAUTH2
 
 Read before changing `source/oauth/google/`, Gmail OAuth configuration or the `gmail-oauth` command.
-Design: plan.md 5.7 and the 2026-10-25 decision to try OAuth2 for Gmail (section 10).
+Design: plan.md 2.2 and the 2026-10-25 decision on Gmail OAuth2 (plan.md section 5).
 No real Gmail OAuth sign-in is verified yet; all agent checks use synthetic inputs and loopback servers.
 The user deferred connecting their Gmail on 2026-10-25 and uses only `work` and `mailru` locally.
 Keep this optional capability; the setup below is for a future explicit Gmail connection request.

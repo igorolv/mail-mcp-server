@@ -48,7 +48,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * {@code auth: ntlm}, Basic for {@code auth: basic}. Negotiate/Kerberos is never tried. Credentials
  * are scoped to the host and port of the EWS URL. A bare login gets no domain, which leaves the domain
  * field of the NTLM message empty and lets the server apply its own domain — the combination that
- * signed in from .NET (docs/plan.md, 3.2).
+ * signed in from .NET (docs/plan.md, 2.1).
  *
  * <p>One client, one connection and one {@link HttpClientContext} per mailbox: NTLM authenticates
  * the TCP connection, and reusing the context keeps the authenticated connection for later

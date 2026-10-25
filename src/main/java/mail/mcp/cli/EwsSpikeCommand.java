@@ -22,7 +22,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
- * The EWS spike (docs/plan.md, section 3.3, decision P8). <b>Run by the user only</b>: it
+ * The EWS spike (docs/plan.md, section 2.1). <b>Run by the user only</b>: it
  * signs in to a real mailbox with the credentials from {@code connections.json}.
  *
  * <pre>
