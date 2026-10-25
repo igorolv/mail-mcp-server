@@ -73,7 +73,7 @@ every HttpClient upgrade.
 
 ## The spike: what it prints and how to read it
 
-`spike/EwsSpikeCommand` (how to run: `docs/build-config-agent.md`) makes three requests and prints
+`cli/EwsSpikeCommand` (how to run: `docs/build-config-agent.md`) makes three requests and prints
 only metadata — no subject, addresses, body, host, login or password:
 
 ```

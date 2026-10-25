@@ -5,23 +5,25 @@ transport and Spring wiring. The target design is `docs/plan.md` section 6 (pack
 work order is section 7, decisions are in section 10. This file describes what exists now and
 where planned code goes.
 
-## Status (after IT-02, first half of step 7.2)
+## Status (after IT-03, step 7.2)
 
 Implemented: Gradle build, Spring Boot application with the stdio MCP transport, the connections
 file with a lazy registry, the `listConnections` tool, a read-only EWS client (`GetFolder`,
 `FindItem`, `GetItem` with MIME) over Apache HttpClient 5 with NTLM, a read-only IMAP client on
 Angus Mail and `ImapMailSource` (filtered folders, UID changes, MIME downloads in one session),
-Gmail Desktop OAuth2 with PKCE and IMAP XOAUTH2, and three user-run commands: `ews-spike`,
-`imap-spike`, `gmail-oauth`. User-run spikes succeeded
+Gmail Desktop OAuth2 with PKCE and IMAP XOAUTH2, and four user-run commands: `ews-spike`,
+`imap-spike`, `gmail-oauth`, `mail-sync`. User-run spikes succeeded
 on 2026-10-25 for EWS (plan.md 3.3) and Mail.ru (plan.md 3.4). Gmail is supported but its sign-in
 is unverified; the user deferred it, their local connections are `work` and `mailru`. Synthetic
 RT-11–RT-13 data sets are in `testdata/`. IT-02 adds message directories with atomically written
 `meta.json` and `folders.json`, and a derived Lucene catalog with a single writer and disk
-reconciliation. See `docs/storage-agent.md`.
+reconciliation. IT-03 adds `SyncRunner` and the `mail-sync` command: reconcile, synchronize
+folders, remove vanished messages, download MIME and metadata, commit batches and save cursors.
+User-run commands now live in `cli/`. See `docs/storage-agent.md`.
 
-Not implemented: `EwsMailSource`, synchronization and `sync-status.json`, MIME parsing, pandoc
-conversion, text indexing, and all mail tools except `listConnections`. The next task is IT-03,
-the second half of plan.md 7.2 (`SyncRunner`, `mail-sync`, `spike/` → `cli/`).
+Not implemented: `EwsMailSource`, background `SyncService` and `sync-status.json` (IT-06), MIME
+parsing, pandoc conversion, text indexing, and all mail tools except `listConnections`.
+The next task is IT-04, the EWS source (plan.md 7.3). Real `mail-sync` checks are user-run only.
 
 ## Transport and execution
 
@@ -34,10 +36,11 @@ synchronization — must run in the background and return at once (plan.md 6.6).
 `config/McpStdioConcurrencyTest` documents the race; its disabled half passed once with MCP SDK
 2.1.0 on 2026-10-24, which is not yet a reason to drop the setting.
 
-The non-server modes are `ews-spike`, `imap-spike` and `gmail-oauth`: `MailMcpServerApplication.main`
+The non-server modes are `ews-spike`, `imap-spike`, `gmail-oauth` and `mail-sync`: `MailMcpServerApplication.main`
 dispatches to their commands before Spring starts, so the stdio transport is never opened.
-All three select `logback-spike.xml` (stderr only) through the `logback.configurationFile`
-system property. Step 7.2 adds `mail-sync` the same way.
+All four select `logback-spike.xml` (stderr only) through the `logback.configurationFile`
+system property. `mail-sync` runs synchronously and prints progress; background synchronization
+through MCP remains planned for IT-06.
 
 ## Tech stack and version sources
 
@@ -65,16 +68,16 @@ There is no `service/` layer. Dependencies flow downward only; planned packages 
 brackets:
 
 ```
-tools/ ──► [sync/] ──► source/ (MailSource; ews/, imap/)
-  │           ├──────► [mime/], [convert/]
-  │           └──────► store/, index/
+tools/ ──► [sync/SyncService] ──► sync/ ──► source/ (MailSource; ews/, imap/)
+  │                                ├────► [mime/], [convert/]
+  │                                └────► store/, index/
   └──────────────────► store/, index/          (tool readers planned)
 index/ ──► store/                              (reconciliation)
 connections/ ──► source/                        (builds lazy MailSource session factories)
 model/   — shared disk records; more records planned for step 7.4
 api/     — MCP wire records returned by tools
 config/  — Spring configuration, properties, MCP customizer
-spike/   — user-run commands without Spring (becomes cli/ in step 7.2)
+cli/ ──► sync/, connections/, source/, store/, index/  (user-run commands without Spring)
 ```
 
 ### Existing packages
@@ -90,11 +93,12 @@ spike/   — user-run commands without Spring (becomes cli/ in step 7.2)
 | `source/oauth/` | Provider-independent OAuth components. | `OAuthLoopbackReceiver` and sanitized `OAuthException`. No provider endpoints, settings or provider-specific messages. |
 | `source/oauth/google/` | Google Desktop OAuth and refresh credentials. | All `Google*` classes and the package-private `OAuthJson` helper. Depends on shared `source/oauth/` components. See `docs/gmail-oauth-agent.md`. |
 | `model/` | Shared disk records and lifecycle. | `MessageState`, `MessageMeta`, `LocalFolder` (IT-02), one type per file. Planned for 7.4: `MailMessage`, `Address`, `AttachmentInfo`, `MessageCard`. |
-| `store/` | Local message directories and metadata. | `MessageStore`: UUID paths, atomic `meta.json` and `folders.json`, listing and deletion. `sync-status.json` remains planned for IT-03. See `docs/storage-agent.md`. |
+| `store/` | Local message directories and metadata. | `MessageStore`: UUID paths, atomic `meta.json` and `folders.json`, listing and deletion. `sync-status.json` remains planned for IT-06. See `docs/storage-agent.md`. |
 | `index/` | Derived Lucene catalog, writer side. | `MailIndex`: metadata fields, NRT key/ref lookups, commit and reconciliation through `store/`; `IndexLockedException`. Text fields and tool readers remain planned for 7.4. See `docs/storage-agent.md`. |
 | `tools/` | Thin `@McpTool` adapters, Spring `@Service` beans. | `ConnectionTools` (`listConnections`), `ToolLogger`. |
 | `api/` | Stable MCP response records with `@Schema`. | `ConnectionInfo`, `ListConnectionsResult`. Never expose `source/` or `model/` records or settings here. |
-| `spike/` | User-run commands without Spring. | `EwsSpikeCommand`, `ImapSpikeCommand`, `GmailOAuthCommand`. Renamed to `cli/` in step 7.2. |
+| `sync/` | One synchronization run. | `SyncRunner`, `FolderProgress`: reconcile, folders, removals, downloads in batches of 100, cursor after the folder. Caller owns the source and writer. `SyncService` (background and status) remains planned for IT-06. |
+| `cli/` | User-run commands without Spring. | `EwsSpikeCommand`, `ImapSpikeCommand`, `GmailOAuthCommand`, `MailSyncCommand`. Opens the sync writer before network access; source closes before the index. |
 
 ### Planned packages
 
@@ -102,8 +106,6 @@ Add a package only in the step that needs it, then move its row to the table abo
 
 | Package | Step | What goes here (plan.md 6.3) |
 |---|---|---|
-| `sync/` | 7.2 | `SyncRunner` (one run), `SyncService` (background, status) |
-| `cli/` | 7.2 | today's `spike/` commands plus `mail-sync` |
 | `mime/` | 7.4 | `MimeReader`: `.eml` → `MailMessage` and part streams |
 | `convert/` | 7.4, 7.6 | `PandocServer` (7.4); PDF/XLSX/PPTX converters copied from redmine-mcp-server (7.6) |
 

@@ -121,6 +121,7 @@ java -jar build\libs\mail-mcp-server.jar ews-spike work
 The connection name may be omitted when exactly one `ews` connection exists. Exit codes: `0`
 success, `2` configuration problem (nothing was sent), `3` sign-in rejected, `4` EWS or network
 error, `1` unexpected. Output format and what to check: `docs/ews-source-agent.md`.
+The command class is `cli/EwsSpikeCommand` (`mail.mcp.cli`); `ewsSpike` uses that main class.
 
 ## The IMAP spike
 
@@ -147,6 +148,55 @@ chosen; it is not a search for the newest Date header.
 The report hides subjects, addresses, credentials and folder names. An empty inbox is successful.
 Exit codes: 0 success, 2 invalid config/selection, 3 sign-in rejected, 4 IMAP/network/limit/local
 save error, 1 unexpected failure. Details: `docs/imap-source-agent.md`.
+The command class is `cli/ImapSpikeCommand` (`mail.mcp.cli`); `imapSpike` uses that main class.
+
+## Mail sync
+
+Run by the user only: `cli/MailSyncCommand` (`mail.mcp.cli`) signs in to one real mailbox.
+The connection name is required. EWS has no `MailSource` until IT-04 and is refused before
+creating an index or contacting the server.
+
+```powershell
+.\gradlew.bat bootJar
+java -jar build\libs\mail-mcp-server.jar mail-sync mailru
+# Alternative: .\gradlew.bat mailSync --args="mailru"
+```
+
+One run uses one lazy source session and one Lucene writer. It takes the writer lock before any
+network request, reconciles disk and index, lists folders, removes vanished folders/messages,
+downloads new messages as `message.eml` and `meta.json`, and commits the index after every 100
+messages. A folder's opaque cursor is saved only after the folder finishes. Messages remain
+`downloaded`; an unavailable message gets metadata with `state=failed` and is not retried.
+There is no MIME parsing, conversion, background worker or `sync-status.json` yet.
+
+The first run downloads the whole mailbox and may take a while. Run the same command again:
+with no new mail it ends with `0 downloaded`. After an interruption, the next run removes
+incomplete directories, restores missing index entries from metadata and resumes without
+downloading messages already stored. Failures end the run without automatic retries.
+
+Output (folder paths are shown; addresses, subjects and credentials are hidden):
+
+```text
+Mail sync (read-only; one sign-in attempt)
+Connection: mailru (imap, app-password; address and credentials hidden)
+  INBOX: 100 downloaded, 0 failed, 0 removed (in progress)
+  INBOX: 120 downloaded, 1 failed, 2 removed
+RESULT: OK (1 folders, 120 downloaded, 1 failed, 2 removed)
+```
+
+A reset adds `, folder reset` to the folder line. Batch lines are cumulative; the result sums
+only completed folder lines, including folders deleted locally. Errors print
+`RESULT: FAILED (<fixed message>)`; configuration and unexpected local details are withheld.
+Lucene may print its `jdk.incubator.vector` warning to stderr.
+
+| Exit | Meaning |
+|---|---|
+| 0 | Success, or `--help` / `-h` |
+| 1 | Unexpected local error; details withheld |
+| 2 | Wrong arguments, invalid configuration/selection, no source yet, or OAuth failure |
+| 3 | IMAP sign-in rejected; no retry |
+| 4 | IMAP/network/protocol or local storage error |
+| 5 | Another process holds the connection's Lucene writer lock; no sign-in |
 
 ## Gmail OAuth2
 
@@ -154,6 +204,7 @@ The user-run `gmail-oauth <connection>` command obtains initial consent through 
 PKCE and a local callback. Detailed Google Cloud setup, the exact JSON entry and security/lifecycle
 rules are in [gmail-oauth-agent.md](gmail-oauth-agent.md). Set `auth: oauth2`, remove the Gmail
 password and add `oauthClientFile`; OAuth is accepted only for `imap.gmail.com:993` with TLS.
+The command class is `cli/GmailOAuthCommand` (`mail.mcp.cli`).
 
 ```powershell
 java -jar build\libs\mail-mcp-server.jar gmail-oauth gmail

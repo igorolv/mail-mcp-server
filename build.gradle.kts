@@ -52,7 +52,7 @@ tasks.register<JavaExec>("ewsSpike") {
     group = "application"
     description = "Runs the EWS spike against one connection from connections.json (run by the user only)"
     classpath = sourceSets.main.get().runtimeClasspath
-    mainClass.set("mail.mcp.spike.EwsSpikeCommand")
+    mainClass.set("mail.mcp.cli.EwsSpikeCommand")
     javaLauncher.set(javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) })
 }
 
@@ -61,6 +61,15 @@ tasks.register<JavaExec>("imapSpike") {
     group = "application"
     description = "Runs the read-only IMAP spike (run by the user only)"
     classpath = sourceSets.main.get().runtimeClasspath
-    mainClass.set("mail.mcp.spike.ImapSpikeCommand")
+    mainClass.set("mail.mcp.cli.ImapSpikeCommand")
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) })
+}
+
+// Signs in to a real mailbox: run by the user only.
+tasks.register<JavaExec>("mailSync") {
+    group = "application"
+    description = "Synchronizes one mailbox into local storage (run by the user only)"
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("mail.mcp.cli.MailSyncCommand")
     javaLauncher.set(javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) })
 }

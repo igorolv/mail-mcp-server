@@ -1,4 +1,4 @@
-package mail.mcp.spike;
+package mail.mcp.cli;
 
 import mail.mcp.config.MailMcpProperties;
 import mail.mcp.connections.MailConnectionFactory;

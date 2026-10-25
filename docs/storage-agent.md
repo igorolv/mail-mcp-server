@@ -1,6 +1,7 @@
 # docs/storage-agent.md — message directories and the derived catalog
 
-Implemented in IT-02 (first half of plan.md 7.2). See `docs/plan.md` 6.2–6.5 for the design.
+Storage and catalog implemented in IT-02, synchronization in IT-03 (plan.md 7.2).
+See `docs/plan.md` 6.2–6.6 for the design.
 `MessageStore` and `MailIndex` take one connection directory; neither contacts a mailbox.
 
 ## Disk layout
@@ -53,12 +54,30 @@ by the configured Jackson 3 mapper and read back as null. Conversion is not impl
 Sync assigns local folder keys. The source owns the opaque cursor; null means no full pass yet.
 A missing folders file returns an empty list. Missing metadata returns an empty `Optional`.
 
+`SyncRunner` matches folders by `remoteId`, preserving a known folder's key and cursor while
+updating its path. New keys are `f<n>`, one above the largest number in the local list before
+vanished folders are dropped, starting at `f1`. A key dropped in an earlier run may be reused.
+Folders are saved in server order before downloads, so even an interrupted first run retains
+their assigned keys. Vanished folders lose every message directory and index document; their
+deletions are committed before the folders list is saved. A reset removes all local messages
+of that folder, even if the source's removed list is incomplete, then downloads the added refs.
+
 ## Write order and failures
 
-The caller creates the message directory, downloads `message.eml`, then writes `meta.json`
-last. `MessageStore` never writes MIME. Without metadata, the directory is incomplete.
+`SyncRunner` creates the message directory, asks `MailSource` to download `message.eml`, then
+writes `meta.json` with `state=downloaded`, size, SHA-256 and download time, and calls
+`MailIndex.put`. `MessageStore` never writes MIME. Without metadata, the directory is incomplete.
 Metadata writes require an existing message directory; saving folders creates the connection
 directory if needed. Constructors perform no I/O.
+
+Within each folder the runner applies removals and commits, then downloads in batches of 100
+messages (including failed ones), committing each batch. It commits again after all downloads,
+then saves the folder's new cursor in `folders.json`. The cursor never advances on a partial
+folder. A `MessageUnavailableException` writes `state=failed`, size 0, null SHA-256 and the
+exception's fixed message, without `message.eml`. Its ref is indexed, so the next run does not
+retry it; normal removals delete failed messages too. Other exceptions propagate without retries
+or cleanup; the next run reconciles before contacting the source. Closing the index commits
+pending entries, including a partial batch with completed metadata.
 
 Both JSON files are written to a temporary file in the target directory, then moved with
 `ATOMIC_MOVE` and `REPLACE_EXISTING`. Temporary files are cleaned up after a write. File I/O
@@ -92,5 +111,8 @@ only for missing index entries; existing indexed entries are left alone. Failed 
 metadata remain valid without MIME. Deleting `index/` loses no source data: open a new writer
 and reconcile to restore the catalog from disk, without the network.
 
-`sync-status.json`, synchronization, MIME parsing, conversion, text fields and tool readers
-remain for later tasks.
+`cli/MailSyncCommand` owns the source and writer, takes the writer lock before the first network
+request and closes the source before the index. `SyncRunner` opens and closes neither; it reports
+cumulative `FolderProgress` after each committed batch and after a folder's cursor is saved (or
+the folder is deleted). It writes no status file. `SyncService` and `sync-status.json` remain
+planned for IT-06; MIME parsing, conversion, text fields and tool readers are also later tasks.

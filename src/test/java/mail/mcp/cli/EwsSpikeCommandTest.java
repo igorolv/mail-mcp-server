@@ -1,4 +1,4 @@
-package mail.mcp.spike;
+package mail.mcp.cli;
 
 import mail.mcp.config.MailMcpProperties;
 import org.junit.jupiter.api.Test;
