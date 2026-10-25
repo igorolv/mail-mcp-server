@@ -16,9 +16,10 @@ Gmail on 2026-10-25; their local configuration contains only `work` and `mailru`
 and OAuth2 support available, but do not treat Gmail setup as the next required user action. Synthetic RT-11–RT-13
 data sets are ready. Local storage, MIME parsing, search and redaction are still design only
 (`docs/plan.md`). An offline MIME pipeline with shared limits (commit `d6534ca`) was reverted on
-2026-10-25 by user decision as over-engineering; do not rebuild it. The storage, object model and
-sync architecture is being re-discussed in `docs/plan.md` section 9; do not implement storage,
-parsing or indexing until that plan is rewritten. Add new tools
+2026-10-25 by user decision as over-engineering; do not rebuild it. The architecture was rewritten
+on 2026-10-25 (`docs/plan.md` section 6). Work goes through the steps of section 7 one at a time,
+starting with 7.1; each step lists what to build, when it is done and what not to build.
+Section 6.9 lists what no step may add without a user decision. Add new tools
 or subsystems only when the task asks for them.
 
 ## Repository contents
@@ -124,15 +125,16 @@ one in this table.
 
 ## Planned architecture
 
-Summary of `docs/plan.md` sections 5–7 and the decision log (section 10, decisions П1–П13),
-so you can keep changes consistent with it. What is already implemented is listed in
+Summary of `docs/plan.md` sections 6–7 and the decision log (section 10), so you can keep
+changes consistent with it. Section 6 is authoritative where this summary is shorter. What is already implemented is listed in
 `docs/architecture-agent.md`; the rest is design.
 
 - Java 25, Spring Boot `4.2.0-RC1`, Spring AI `2.1.0-RC1` (the 2.1 line is a deliberate choice;
   move to `2.1.0` when it is released), Gradle 9 with a version catalog.
 - stdio is the only transport; nothing but JSON-RPC may be written to `System.out`.
-- Layers: `tools/ -> service/ -> source/` (EWS, IMAP), plus `connections/`, `store/`,
-  `extraction/`, `index/`, `redaction/`; `api/` records are the MCP wire contract.
+- Packages (plan.md 6.3): `source/` (`MailSource`, EWS and IMAP implementations), `model/`
+  (one record per file), `mime/`, `store/`, `index/`, `sync/`, `tools/`; `api/` records are the
+  MCP wire contract, `model/` records are not returned directly.
 - Several mailboxes from the start: a `connections.json` file outside the repository
   (`%USERPROFILE%\.mail-mcp-server\`), modeled on the sibling project `jdbc-mcp-server`. Each
   connection has a name, a type (`ews` or `imap`), an `auth` kind, its own properties and
@@ -144,13 +146,15 @@ so you can keep changes consistent with it. What is already implemented is liste
 - Read-only at protocol level: an allow-list of 10 EWS read operations; IMAP `EXAMINE` and
   `BODY.PEEK`; never set flags in the mailbox.
 - Every source delivers messages as MIME (`.eml`), so storage, parsing and attachment extraction
-  are shared. The MIME library is to be chosen again with the object model; there is no separate
-  parsing process and no shared limit budget for the nesting chain (user decision 2026-10-25).
+  are shared. `.eml` is kept exactly as downloaded and is the local source of truth. It is parsed
+  with Angus Mail (`MimeMessage` over `SharedFileInputStream`); nested messages, MSG, TNEF and ZIP
+  stay plain attachments in the MVP. No separate parsing process, no shared limit budget.
 - Message key: a local UUID per connection; the current server address, `Message-ID` and a MIME
   hash are stored separately.
-- Storage: originals on disk as downloaded; Lucene index (BM25, `RussianAnalyzer`) built from
-  the unfiltered text. Whether SQLite is needed for metadata and sync state is an open question
-  (plan.md section 9). Embeddings are not in the MVP.
+- Storage, no SQLite (user decision 2026-10-25): `<connection>/messages/<key>.eml`,
+  `folders.json` with an opaque cursor per folder, `sync-status.json`, and one Lucene index per
+  connection that is both the catalog (server ref, folder, state) and the search index
+  (BM25, `RussianAnalyzer`, unfiltered text). Embeddings are not in the MVP.
 - Sensitive-data filter is deferred. Disk and index hold everything as is; the filter will apply
   only to output sent to the model, and only optionally (user decision 2026-10-25). Tools are the
   primary access path; MCP resources are an addition.
@@ -158,16 +162,15 @@ so you can keep changes consistent with it. What is already implemented is liste
   call.
 - Synchronization runs only on request, through a dedicated tool. There is no depth parameter:
   it always syncs everything, then incrementally (user decision 2026-10-25). It starts work in the background of its
-  own server process and returns at once; `indexStatus` reports progress and coverage. All other
+  own server process and returns at once; `syncStatus` reports progress. All other
   tools answer immediately from local data and report what is covered. Deletions and moves are
-  applied by the same incremental sync. Attachment text is extracted during sync up to a size
-  limit. Defaults: every real mail folder except Deleted, Junk, Outbox, Drafts and search
-  folders, full history; Gmail syncs All Mail once with labels.
+  applied by the same incremental sync (IMAP `UIDVALIDITY`/UID, EWS `SyncFolderItems`); a move is
+  a delete plus an add. One sign-in per sync run. Folders: every real mail folder except
+  Deleted, Junk, Drafts, Outbox and search folders. Flags and Gmail labels are not synced in the MVP.
 - Several server processes (different client sessions) share one data directory. All of them
-  read; only the process holding the per-connection lock (an OS file lock) syncs and writes
-  the Lucene index. A sign-in failure stops syncing that connection with no
+  read; only the process holding the Lucene write lock of a connection syncs it. A sign-in failure stops syncing that connection with no
   retries — repeated attempts with a stale password lock the domain account.
-- Implementation order: to be rewritten in plan.md section 7 as short end-to-end steps.
+- Implementation order: plan.md section 7, steps 7.1–7.7.
 
 Sibling projects used as references (same author, both public on GitHub):
 
