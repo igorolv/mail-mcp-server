@@ -32,6 +32,7 @@ or subsystems only when the task asks for them.
 | `docs/research.md` | Research notes (in Russian): access protocols, libraries, existing MCP servers, search engines, redaction tools, what to reuse from sibling projects |
 | `docs/research-tasks/` | Research briefs `RT-NN-*.md` for separate agent sessions, plus `README.md` with shared rules and the result template |
 | `docs/research/` | Research results, one file per brief (in Russian). Created by research sessions |
+| `docs/impl-tasks/` | Implementation briefs `IT-NN-*.md` for separate agent sessions, plus `README.md` with shared rules and the report template |
 | `docs/*-agent.md` | Engineering documents (in English), see the routing table below |
 | `src/main/java/mail/mcp/` | Server source; layout in `docs/architecture-agent.md` |
 | `src/test/` | Unit tests and synthetic EWS responses (`src/test/resources/ews/`); none needs a network |
@@ -53,6 +54,8 @@ Read this file first. Then read only the documents whose `When` matches the task
 | `docs/research.md` | comparing protocols, libraries, existing solutions; recording research results | research tables with statuses and conclusions |
 | `docs/research-tasks/README.md` | running a research task `RT-NN`, or writing a new brief | how to start a session, task list, shared rules, result template, self-check |
 | `docs/research-tasks/RT-NN-*.md` | you were given that task | goal, known context, questions, sources, required tables, out of scope, done criteria |
+| `docs/impl-tasks/README.md` | implementing a step `IT-NN`, or writing a new implementation brief | how to start a session, task list, shared rules, report template, self-check |
+| `docs/impl-tasks/IT-NN-*.md` | you were given that task | goal, files to read, fixed decisions, types and behavior, named tests, what not to build, files and documents to change |
 | `docs/architecture-agent.md` | locating code, adding a package, changing a dependency, Spring wiring or the stdio transport | what is implemented, tech stack, package layout and layer rules |
 | `docs/build-config-agent.md` | building, running tests, adding a setting, changing the connections file format, running the spike | Gradle commands, `MAIL_MCP_*` settings, `connections.json` keys and validation, spike invocation |
 | `docs/ews-source-agent.md` | changing `source/ews/`, adding an EWS operation, NTLM questions, reading spike output | allow-list, response checks, NTLM transport rules, known risks, spike output format |
