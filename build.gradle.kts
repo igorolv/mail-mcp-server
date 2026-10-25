@@ -23,6 +23,9 @@ dependencies {
     implementation(libs.angus.mail)
     implementation(libs.jakarta.mail)
     implementation(libs.lucene.core)
+    implementation(libs.lucene.analysis.common)
+    implementation(libs.lucene.queryparser)
+    implementation(libs.lucene.highlighter)
 
     testImplementation(libs.spring.boot.starter.test)
 }
@@ -54,6 +57,15 @@ tasks.register<JavaExec>("mailReprocess") {
     description = "Reprocesses one connection's local MIME files without network access"
     classpath = sourceSets.main.get().runtimeClasspath
     mainClass.set("mail.mcp.cli.MailReprocessCommand")
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) })
+}
+
+// Offline rebuild of the derived search index.
+tasks.register<JavaExec>("mailReindex") {
+    group = "application"
+    description = "Rebuilds one connection's local search index without network access"
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("mail.mcp.cli.MailReindexCommand")
     javaLauncher.set(javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) })
 }
 

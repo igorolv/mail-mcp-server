@@ -253,6 +253,38 @@ storage error; 1 unexpected local error. Local error details are withheld. Conve
 one sandboxed pandoc process per HTML body, no retries or timeout; see `docs/mime-agent.md`.
 Pandoc-dependent tests use a shared availability helper and skip when it is absent.
 
+## Reindexing
+
+`cli/MailReindexCommand` rebuilds one connection's index from local disk, without creating a
+source or contacting a mailbox. Pandoc must be on `PATH` and is checked before opening or
+recreating the index: messages still downloaded may need body conversion.
+
+```powershell
+java -jar build\libs\mail-mcp-server.jar mail-reindex work
+java -jar build\libs\mail-mcp-server.jar mail-reindex mailru
+# Alternative: .\gradlew.bat mailReindex --args="work"
+```
+
+No sync or other writer may be running for the same connection. The command forces recreation
+in place, then calls `SyncRunner.restore`: converted messages load headers and saved body.md,
+downloaded messages are processed, failed messages get metadata only. Incomplete directories
+are removed. Originals and converted output remain unchanged for converted messages.
+The index commits every 100 entries and at the end, with commit data `schema=2`.
+Progress goes to the command's output only; server restoration stays silent.
+
+```text
+Mail reindex (offline)
+  1000 messages indexed
+RESULT: OK (1002 messages indexed)
+```
+
+Progress prints every 1,000 entries. The result counts all indexed messages, including failed
+metadata entries. Exit codes: 0 success/help; 2 arguments/configuration/selection or missing
+pandoc; 4 local storage error; 5 connection index locked; 1 unexpected local error.
+The missing-pandoc message is the same as for reprocessing. Local error details are withheld.
+Old-schema indexes also recreate automatically when a writer opens during sync; until then,
+the search tool asks for reindexing. Reader tools never initiate a rebuild.
+
 ## Gmail OAuth2
 
 The user-run `gmail-oauth <connection>` command obtains initial consent through the system browser,

@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 
 /** Derived catalog for one connection, owned by the process holding Lucene's write lock. */
 public final class MailIndex implements AutoCloseable {
+    public static final String SCHEMA = "2";
     private final FSDirectory directory;
     private final IndexWriter writer;
 
@@ -45,11 +46,25 @@ public final class MailIndex implements AutoCloseable {
     }
 
     public static MailIndex openWriter(Path connectionDir) {
+        return openWriter(connectionDir, false);
+    }
+
+    public static MailIndex openWriter(Path connectionDir, boolean recreate) {
         try {
             Path path = Files.createDirectories(connectionDir.resolve("index"));
             FSDirectory directory = FSDirectory.open(path);
             try {
-                return new MailIndex(directory, new IndexWriter(directory, new IndexWriterConfig()));
+                boolean current = false;
+                if (DirectoryReader.indexExists(directory)) {
+                    try (var reader = DirectoryReader.open(directory)) {
+                        current = SCHEMA.equals(reader.getIndexCommit().getUserData().get("schema"));
+                    }
+                }
+                var config = new IndexWriterConfig(MailAnalyzers.analyzer());
+                if (recreate || !current) { config.setOpenMode(IndexWriterConfig.OpenMode.CREATE); }
+                var writer = new IndexWriter(directory, config);
+                writer.setLiveCommitData(Map.of("schema", SCHEMA).entrySet());
+                return new MailIndex(directory, writer);
             } catch (IOException e) {
                 try { directory.close(); }
                 catch (IOException closeError) { e.addSuppressed(closeError); }
@@ -75,9 +90,10 @@ public final class MailIndex implements AutoCloseable {
                 document.add(new NumericDocValuesField("date", date));
             }
             text(document, "subject", message.subject());
-            text(document, "from", addresses(message.from()));
-            text(document, "to", addresses(message.to()));
-            text(document, "cc", addresses(message.cc()));
+            unstoredText(document, "subject_en", message.subject());
+            addresses(document, "from", message.from());
+            addresses(document, "to", message.to());
+            addresses(document, "cc", message.cc());
             if (message.messageId() != null) {
                 document.add(new StringField("messageId", message.messageId(), Field.Store.YES));
             }
@@ -85,10 +101,16 @@ public final class MailIndex implements AutoCloseable {
                 document.add(new StringField("inReplyTo", message.inReplyTo(), Field.Store.YES));
             }
             message.references().forEach(id -> document.add(new StringField("references", id, Field.Store.YES)));
-            text(document, "attachmentNames", message.attachments().stream()
-                    .map(a -> a.name() == null ? a.file() : a.name()).collect(Collectors.joining("\n")));
+            document.add(new StoredField("attachmentNames", message.attachments().stream()
+                    .map(a -> a.name() == null ? a.file() : a.name()).collect(Collectors.joining("\n"))));
+            message.attachments().forEach(a -> {
+                String name = a.name() == null ? a.file() : a.name();
+                unstoredText(document, "attachmentName", name);
+                unstoredText(document, "attachmentFile", name);
+            });
         }
         text(document, "body", body);
+        unstoredText(document, "body_en", body);
         try { writer.updateDocument(new Term("key", meta.key()), document); }
         catch (IOException e) { throw new UncheckedIOException(e); }
     }
@@ -97,8 +119,16 @@ public final class MailIndex implements AutoCloseable {
         if (value != null) { document.add(new TextField(field, value, Field.Store.YES)); }
     }
 
-    private static String addresses(List<Address> addresses) {
-        return addresses.stream().map(Address::display).collect(Collectors.joining(", "));
+    private static void unstoredText(Document document, String field, String value) {
+        if (value != null) { document.add(new TextField(field, value, Field.Store.NO)); }
+    }
+
+    private static void addresses(Document document, String field, List<Address> addresses) {
+        document.add(new StoredField(field, addresses.stream().map(Address::display).collect(Collectors.joining(", "))));
+        addresses.forEach(address -> {
+            unstoredText(document, field + "Address", address.address());
+            unstoredText(document, field + "Name", address.name());
+        });
     }
 
     public void delete(String key) {
@@ -107,7 +137,10 @@ public final class MailIndex implements AutoCloseable {
     }
 
     public void commit() {
-        try { writer.commit(); }
+        try {
+            writer.setLiveCommitData(Map.of("schema", SCHEMA).entrySet());
+            writer.commit();
+        }
         catch (IOException e) { throw new UncheckedIOException(e); }
     }
 

@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 
 /** One synchronous run; the caller owns the store, index writer and mailbox session. */
 public final class SyncRunner {
@@ -54,7 +55,14 @@ public final class SyncRunner {
         }
     }
 
-    private void synchronize(Consumer<FolderProgress> progress) {
+    /** Restores missing catalog entries from disk without accessing a mailbox. */
+    public static void restore(MessageStore store, MailIndex index, MessageProcessor processor) {
+        restore(store, index, processor, count -> { });
+    }
+
+    /** The offline command supplies progress; server reconciliation stays silent. */
+    public static void restore(MessageStore store, MailIndex index, MessageProcessor processor, IntConsumer progress) {
+        int count = 0;
         for (String key : index.reconcile(store)) {
             var meta = store.readMeta(key).orElseThrow();
             var processed = switch (meta.state()) {
@@ -63,8 +71,15 @@ public final class SyncRunner {
                 case FAILED -> new Processed(meta, null, null);
             };
             index.put(processed.meta(), processed.message(), processed.body());
+            count++;
+            if (count % 100 == 0) { index.commit(); }
+            progress.accept(count);
         }
         index.commit();
+    }
+
+    private void synchronize(Consumer<FolderProgress> progress) {
+        restore(store, index, processor);
         var local = store.folders();
         var remote = source.folders();
         BigInteger nextKey = local.stream().map(LocalFolder::key)

@@ -1,7 +1,7 @@
 # docs/storage-agent.md — message directories and the derived catalog
 
 Storage and catalog implemented in IT-02, synchronization in IT-03 (plan.md 7.2), MIME/body
-processing and header/body index fields in IT-05 (plan.md 7.4, first half).
+processing and header/body index fields in IT-05 (plan.md 7.4, first half), search in IT-07 (7.5).
 See `docs/plan.md` 6.2–6.6 for the design.
 `MessageStore` and `MailIndex` take one connection directory; neither contacts a mailbox.
 
@@ -101,8 +101,9 @@ after a write. File I/O failures become `UncheckedIOException`; Jackson exceptio
 
 ## Lucene catalog and reconciliation
 
-`MailIndex.openWriter` creates `index/` and opens the default `IndexWriter` on `FSDirectory`.
-Only `lucene-core 10.5.2` is used, with the default `StandardAnalyzer`. Fields come from metadata,
+`MailIndex.openWriter` creates `index/` and opens an `IndexWriter` on `FSDirectory`, using
+`MailAnalyzers.analyzer()`. Lucene core, analysis-common, queryparser and highlighter use 10.5.2.
+Fields come from metadata,
 parsed MIME headers/attachment descriptions and saved Markdown:
 
 | Field | Value | Type |
@@ -114,11 +115,31 @@ parsed MIME headers/attachment descriptions and saved Markdown:
 | `state` | Lowercase state | `StringField`, stored |
 | `error` | Failure explanation, only when non-null | `StoredField` |
 | `date` | Epoch milliseconds, absent when null | `LongPoint`, `StoredField`, `NumericDocValuesField` |
-| `subject`, `from`, `to`, `cc` | Decoded headers; addresses joined by `, ` as `Name <address>` or `address` | `TextField`, stored |
+| `subject`, `body` | Decoded subject and Markdown body, absent when null | `TextField`, stored |
+| `subject_en`, `body_en` | Same subject and body | `TextField`, not stored |
+| `from`, `to`, `cc` | Display addresses joined by `, ` as `Name <address>` or `address` | `StoredField` only |
+| `fromAddress`, `toAddress`, `ccAddress` | One complete address per value | `TextField`, not stored |
+| `fromName`, `toName`, `ccName` | One non-null display name per value | `TextField`, not stored |
 | `messageId`, `inReplyTo` | Header value, absent when null | `StringField`, stored |
 | `references` | One field per reference ID | `StringField`, stored |
-| `body` | Markdown, absent when null | `TextField`, stored |
-| `attachmentNames` | Decoded names, or stored filenames when unnamed, joined by newline | `TextField`, stored |
+| `attachmentNames` | Decoded names, or stored filenames when unnamed, joined by newline | `StoredField` only |
+| `attachmentName`, `attachmentFile` | One decoded name per attachment, falling back to its stored filename | `TextField`, not stored |
+
+`MailAnalyzers` builds one shared `PerFieldAnalyzerWrapper`. The default is `RussianAnalyzer`.
+The `_en` fields use `EnglishAnalyzer` with both English and Russian default stop words.
+Address fields and `attachmentFile` use `KeywordTokenizer` and `LowerCaseFilter`, preserving
+complete addresses and filenames. `attachmentName` uses `PatternTokenizer("[^\\p{L}\\p{N}]+", -1)`,
+`LowerCaseFilter` and Snowball's `RussianStemmer`, splitting underscores and punctuation.
+Attachment contents are not indexed until step 7.6.
+
+Every commit, including closing the writer, carries user data `schema=2` (`MailIndex.SCHEMA`).
+Opening an existing index with another schema or no schema uses `OpenMode.CREATE`, rebuilding
+in place. `openWriter(dir, true)` always recreates it. No second generation is kept.
+The next `SyncRunner.restore` reconciles every missing entry from disk before network access:
+converted entries load MIME headers and saved Markdown, downloaded entries are processed,
+and failed entries get metadata only. It commits every 100 restored entries and at the end.
+`mail-reindex <connection>` runs this restoration offline with recreation forced; it checks
+pandoc before taking the writer lock because downloaded messages may need conversion.
 
 `put` replaces by key; `delete` removes by key. `keys` and `folderRefs` open and close an NRT
 reader of the writer, so pending changes are visible before commit. Folder lookup uses the
@@ -133,7 +154,7 @@ Other Lucene I/O failures become `UncheckedIOException`.
 disk, and returns sorted keys with metadata missing from the index. It does not index or
 commit them itself. `SyncRunner` processes downloaded entries, loads converted entries using
 MIME headers and saved `body.md` without writes, and indexes failed entries with null headers
-and body. It commits once after this loop. Existing index entries are left alone. Failed
+and body. Existing index entries are left alone. Failed
 messages with metadata remain valid without MIME. Deleting `index/` loses no source data:
 reconciliation restores headers and body from disk before the runner accesses the source.
 `mail-reprocess` also restores processed entries offline, without sign-in.
@@ -142,8 +163,8 @@ reconciliation restores headers and body from disk before the runner accesses th
 request and closes the source before the index. `SyncRunner` opens and closes neither; it reports
 cumulative `FolderProgress` after each committed batch and after a folder's cursor is saved (or
 the folder is deleted). `FolderProgress` lives in `model/`. IT-06 adds `SyncService` background
-runs and the read-only `MailIndexReader`; search and the Russian analyzer are step 7.5,
-attachment text is step 7.6.
+runs and the read-only `MailIndexReader`; IT-07 adds search and offline `mail-reindex`.
+Attachment text is step 7.6.
 
 ## Sync status and tool readers
 
@@ -161,7 +182,11 @@ interrupted when a running status belongs to a dead pid and no local run exists.
 `MailIndexReader.open` never takes a writer lock, returns empty without a committed index and
 opens one snapshot of the latest commit per call. It counts folder messages with a PrefixQuery
 on ref, and pages stored MessageCard fields by date descending (missing dates last), then key.
-New documents have sorted `keySort` doc values; older documents without them still sort by date.
-The separate field preserves compatibility: Lucene cannot change the existing `key` field from
-doc values type NONE to SORTED. The user approved the separate field; no index rebuild is required.
+New documents have sorted `keySort` doc values; documents without them still sort by date.
+The separate field preserves the `key` field's doc values type NONE.
+`current()` checks commit schema; search tools reject old schemas until a rebuild.
+Search uses equal-weight field groups, required words and phrases through `SimpleQueryParser`,
+an optional folder ref prefix FILTER, exact counts and score descending/key ascending sorting.
+`UnifiedHighlighter` reanalyzes stored `body`, combining matches from `body_en` on the same text;
+the formatter uses `**` around matches and `… ` between passages. Missing bodies yield null.
 The writer's NRT lookups remain separate; tools see only committed documents.

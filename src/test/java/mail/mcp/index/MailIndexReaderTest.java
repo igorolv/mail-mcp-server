@@ -24,6 +24,59 @@ class MailIndexReaderTest {
                         List.of(new AttachmentInfo("1__a", "a", "text/plain", 1, null, false))), null);
     }
 
+    @Test void searchFiltersByFolderAndPages() {
+        try (var writer = MailIndex.openWriter(dir)) {
+            put(writer, "b", "f1", null);
+            put(writer, "a", "f1", null);
+            put(writer, "c", "f10", null);
+            writer.commit();
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                var first = reader.search("subjects", SearchField.SUBJECT, "f1", 0, 1);
+                assertThat(first.total()).isEqualTo(2);
+                assertThat(first.hits()).extracting(hit -> hit.card().key()).containsExactly("a");
+                assertThat(first.hits().getFirst().score()).isPositive().isFinite();
+                assertThat(first.hits().getFirst().card()).isEqualTo(reader.cards("f1", 0, 1).getFirst());
+                var next = reader.search("subjects", SearchField.SUBJECT, "f1", 1, 1);
+                assertThat(next.hits()).extracting(hit -> hit.card().key()).containsExactly("b");
+                assertThat(reader.search("subjects", SearchField.ANY, null, 0, 20).total()).isEqualTo(3);
+                assertThat(reader.search("subjects", SearchField.ANY, "f1", Integer.MAX_VALUE, 20).hits()).isEmpty();
+            }
+        }
+    }
+
+    @Test void stopWordOnlyQueryFindsNothing() {
+        try (var writer = MailIndex.openWriter(dir)) {
+            put(writer, "a", "f1", null);
+            writer.commit();
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                assertThat(reader.search("и в на", SearchField.ANY, null, 0, 20).total()).isZero();
+                assertThat(reader.search("the and", SearchField.BODY, null, 0, 20).hits()).isEmpty();
+            }
+        }
+    }
+
+    @Test void snippetMarksTheMatch() {
+        try (var writer = MailIndex.openWriter(dir)) {
+            writer.put(new MessageMeta("a", "f1", "INBOX", "a", 0, null, Instant.now(), MessageState.CONVERTED, null),
+                    null, "Обсудим договоры поставки. Reporting results.");
+            writer.commit();
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                assertThat(reader.search("договорами", SearchField.BODY, null, 0, 20).hits().getFirst().snippet())
+                        .contains("**договоры**");
+                assertThat(reader.search("reports", SearchField.BODY, null, 0, 20).hits().getFirst().snippet())
+                        .contains("**Reporting**");
+            }
+        }
+    }
+
+    @Test void oldSchemaIsNotCurrent() throws Exception {
+        try (var directory = org.apache.lucene.store.FSDirectory.open(dir.resolve("index"));
+             var writer = new org.apache.lucene.index.IndexWriter(directory, new org.apache.lucene.index.IndexWriterConfig())) {
+            writer.commit();
+        }
+        try (var reader = MailIndexReader.open(dir).orElseThrow()) { assertThat(reader.current()).isFalse(); }
+    }
+
     @Test void noIndexIsEmpty() {
         assertThat(MailIndexReader.open(dir)).isEmpty();
         assertThat(dir.resolve("index")).doesNotExist();
@@ -75,6 +128,7 @@ class MailIndexReaderTest {
                 document.add(new org.apache.lucene.document.NumericDocValuesField("date", date));
                 writer.addDocument(document);
             }
+            writer.setLiveCommitData(java.util.Map.of("schema", MailIndex.SCHEMA).entrySet());
             writer.commit();
         }
         try (var writer = MailIndex.openWriter(dir)) {

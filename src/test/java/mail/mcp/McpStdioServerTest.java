@@ -90,7 +90,7 @@ class McpStdioServerTest {
             // Not findValues("name"): the output schema has a "name" property object too.
             List<String> toolNames = new ArrayList<>();
             tools.at("/result/tools").forEach(tool -> toolNames.add(tool.get("name").asString()));
-            assertThat(toolNames).containsExactlyInAnyOrder("listConnections", "sync", "syncStatus", "listFolders", "listMessages", "getMessage");
+            assertThat(toolNames).containsExactlyInAnyOrder("listConnections", "sync", "syncStatus", "listFolders", "listMessages", "getMessage", "search");
 
             send(requests, "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\","
                     + "\"params\":{\"name\":\"listConnections\",\"arguments\":{}}}");
@@ -123,6 +123,12 @@ class McpStdioServerTest {
             JsonNode invalid = readResponse(io, replies, 8, stdout, stderr);
             assertThat(invalid.at("/result/isError").asBoolean()).isTrue();
             assertThat(invalid.at("/result/content/0/text").asString()).contains("Unknown folder key");
+
+            JsonNode search = call(requests, io, replies, stderr, stdout, 9, "search",
+                    "{\"connection\":\"local\",\"query\":\"sender@example.com\",\"field\":\"from\"}");
+            assertThat(search.get("total").asInt()).isEqualTo(2);
+            assertThat(search.at("/hits/0/folder").asString()).isEqualTo("f1");
+            assertThat(Path.of(search.at("/hits/0/localPath").asString())).isDirectory();
 
             assertThat(stdout).allSatisfy(line -> assertThat(JSON.readTree(line).get("jsonrpc").asString()).isEqualTo("2.0"));
             assertThat(String.join("\n", stdout)).doesNotContain(SECRET, "webmail.example.com", "imap.mail.ru");

@@ -21,3 +21,6 @@ httpclient5 = { module = "org.apache.httpcomponents.client5:httpclient5", versio
 angus-mail = { module = "org.eclipse.angus:angus-mail", version.ref = "angus-mail" }
 jakarta-mail = { module = "jakarta.mail:jakarta.mail-api", version.ref = "jakarta-mail" }
 lucene-core = { module = "org.apache.lucene:lucene-core", version.ref = "lucene" }
+lucene-analysis-common = { module = "org.apache.lucene:lucene-analysis-common", version.ref = "lucene" }
+lucene-queryparser = { module = "org.apache.lucene:lucene-queryparser", version.ref = "lucene" }
+lucene-highlighter = { module = "org.apache.lucene:lucene-highlighter", version.ref = "lucene" }

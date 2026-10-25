@@ -1,7 +1,8 @@
 # docs/tools-agent.md — MCP tools and background synchronization
 
 IT-06 completes plan.md 7.4. Tools are Spring services returning `api/` records, never `model/`
-records. Only JSON-RPC is written to stdout. Failures are logged through `ToolLogger.failed`
+records. IT-07 adds search (7.5), bringing the tool count to seven.
+Only JSON-RPC is written to stdout. Failures are logged through `ToolLogger.failed`
 and rethrown; `IllegalArgumentException` becomes an MCP tool error with its message.
 
 ## Tools
@@ -14,6 +15,7 @@ and rethrown; `IllegalArgumentException` becomes an MCP tool error with its mess
 | `listFolders` | Required `connection` | Stored folder keys and paths, committed catalog counts and `synced` (cursor exists), in stored order. No index means zero counts. |
 | `listMessages` | Required `connection`, `folder`; optional `offset`, `limit` | Folder cards sorted by descending date (undated last), then key; total, offset, optional nextOffset. Offset defaults to 0; limit to 50, capped at 200. Unknown folder is an error. |
 | `getMessage` | Required `connection`, `key`; optional `offset`, `maxChars` | Metadata, MIME headers, body.md chunk, bodyLength, optional nextOffset and attachment file paths. Offset defaults to 0; maxChars to 20,000, capped at 100,000. Invalid/nonexistent UUID is an error. |
+| `search` | Required `connection`, `query`; optional `field`, `folder`, `offset`, `limit` | Local cards with BM25 score and body snippet, sorted by score descending then key. Exact total, offset and optional nextOffset. Query must be nonblank and at most 1,000 characters. Offset defaults to 0; limit to 20, capped at 100. Unknown field/folder is an error. No index means zero hits. |
 
 Offsets must be nonnegative and sizes positive; invalid values raise `IllegalArgumentException`.
 Offsets at or beyond the end yield an empty page/chunk with no nextOffset. Body offsets and
@@ -28,8 +30,60 @@ Coverage can be incomplete during synchronization: check `listFolders.synced` fo
 completed folder pass and `syncStatus` for current progress. A committed catalog can lag files
 being processed. `MailIndexReader` opens the latest commit once per call.
 
-All tools advertise read-only and non-destructive hints. `sync` is not idempotent. Search,
-attachment text, MCP resources, mail flags and mail writing are not implemented here.
+All tools advertise read-only and non-destructive hints. `sync` is not idempotent.
+Attachment text, MCP resources, mail flags and mail writing are not implemented here.
+
+## Search
+
+`SearchTools.search` returns `SearchResult(connection, query, field, folder, total, offset,
+nextOffset, hits)`. Each `SearchHitInfo` includes key, folder key, date, displayed from, subject,
+hasAttachments, state, score, snippet and the absolute message directory `localPath`.
+Snippets use Markdown `**matches**` and `… ` between passages; absent bodies yield null.
+The stored body is reanalyzed by `UnifiedHighlighter`, including English-field matches.
+
+| Field group | Index fields |
+|---|---|
+| `any` (default) | All fields below |
+| `subject` | `subject`, `subject_en` |
+| `body` | `body`, `body_en` |
+| `from` | `fromAddress`, `fromName` |
+| `to` | `toAddress`, `toName`, `ccAddress`, `ccName` |
+| `attachmentName` | `attachmentName`, `attachmentFile` |
+
+Every word is required, quoted text is a phrase, and stop-word-only queries return nothing.
+`SimpleQueryParser` enables phrase and whitespace operators; fuzzy/wildcard syntax is disabled.
+Russian and English word forms match; full addresses must be complete. Filenames match whole
+or by component. Search has no source or pandoc access; `listFolders.synced` shows coverage.
+An old schema raises `IllegalStateException` with:
+`The index was built by an older version; run 'mail-reindex <connection>' in a terminal or start a sync to rebuild it`.
+Use offline `mail-reindex` or a requested sync to rebuild from disk.
+
+The 2026-10-26 offline control baseline processes all 48 synthetic MIME messages and scores
+all 80 queries: recall **78/86 = 0.906977**, **7 false positives**. Q061 is counted as an
+expected miss because its `attachmentText` field is deferred to IT-08, not exposed by this tool.
+The fixtures' redaction proposal is superseded by the deferred filter: raw synthetic text is indexed.
+
+| Category | Expected matches found / expected | False positives |
+|---|---|---|
+| ru-noun-forms | 16/16 | 0 |
+| ru-irregular | 0/7 | 0 |
+| ru-verb-adj | 5/5 | 0 |
+| ru-yo | 3/3 | 0 |
+| ru-names | 5/5 | 3 |
+| en-forms | 17/17 | 0 |
+| mixed-lang | 5/5 | 0 |
+| address | 4/4 | 0 |
+| filename | 7/8 | 0 |
+| identifier | 5/5 | 0 |
+| precision | 6/6 | 2 |
+| stopwords-phrase | 3/3 | 0 |
+| case | 2/2 | 0 |
+| redacted | 0/0 | 2 |
+
+Misses: Q011:S010, Q012:S009, Q012:S011, Q013:S010, Q014:S013, Q015:S015, Q016:S017,
+Q061:S001. Wrong matches: Q025:S024, Q028:S025, Q029:S024, Q067:S037, Q068:S041,
+Q079:S047, Q080:S048. Snowball misses irregular Russian forms and conflates some names;
+precision collisions and raw synthetic secret matches remain accepted limitations.
 
 ## Status file and writer ownership
 

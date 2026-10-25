@@ -38,6 +38,37 @@ class MailIndexTest {
         store.writeMeta(meta);
     }
 
+    @Test void oldSchemaIsRecreatedOnOpen() throws Exception {
+        try (var directory = FSDirectory.open(connectionDir.resolve("index"));
+             var writer = new org.apache.lucene.index.IndexWriter(directory, new org.apache.lucene.index.IndexWriterConfig())) {
+            var doc = new org.apache.lucene.document.Document();
+            doc.add(new org.apache.lucene.document.StringField("key", "old", org.apache.lucene.document.Field.Store.YES));
+            writer.addDocument(doc);
+            writer.commit();
+        }
+        try (var index = MailIndex.openWriter(connectionDir)) { assertThat(index.keys()).isEmpty(); }
+        try (var reader = MailIndexReader.open(connectionDir).orElseThrow()) { assertThat(reader.current()).isTrue(); }
+    }
+
+    @Test void recreateFlagEmptiesTheIndex() {
+        try (var index = MailIndex.openWriter(connectionDir)) { index.put(meta("a", "f1", "101"), null, null); }
+        try (var index = MailIndex.openWriter(connectionDir, true)) { assertThat(index.keys()).isEmpty(); }
+        try (var reader = MailIndexReader.open(connectionDir).orElseThrow()) { assertThat(reader.current()).isTrue(); }
+    }
+
+    @Test void addressIsAnExactTerm() {
+        var message = new mail.mcp.model.MailMessage("Subject",
+                java.util.List.of(new mail.mcp.model.Address("Name", "ivan.testov@example.com")),
+                null, null, null, null, null, null, null);
+        try (var index = MailIndex.openWriter(connectionDir)) { index.put(meta("a", "f1", "101"), message, null); }
+        try (var reader = MailIndexReader.open(connectionDir).orElseThrow()) {
+            assertThat(reader.search("IVAN.TESTOV@EXAMPLE.COM", SearchField.FROM, null, 0, 20).total()).isEqualTo(1);
+            assertThat(reader.search("ivan.testov", SearchField.FROM, null, 0, 20).total()).isZero();
+            assertThat(reader.search("example.com", SearchField.FROM, null, 0, 20).total()).isZero();
+            assertThat(reader.search("Name", SearchField.FROM, null, 0, 20).hits().getFirst().snippet()).isNull();
+        }
+    }
+
     @Test void putReplacesByKeyAndDeleteRemoves() {
         var store = store();
         String key = store.newKey();
