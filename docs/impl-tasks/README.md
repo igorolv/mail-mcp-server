@@ -39,7 +39,7 @@ check the diff against the brief before the next brief is written.
 | IT-05 | 7.4, first half | [MIME reading, attachments, `body.md`, reprocessing](IT-05-mime-and-body.md) | accepted 2026-10-25 |
 | IT-06 | 7.4, second half | [Background sync and the first mail tools](IT-06-sync-and-read-tools.md) | accepted 2026-10-26 |
 | IT-07 | 7.5 | [Search](IT-07-search.md) | accepted 2026-10-26 |
-| IT-08 | 7.6 | attachment text | not written |
+| IT-08 | 7.6 | [Attachment text](IT-08-attachment-text.md) | ready |
 
 ## Rules for every task
 
