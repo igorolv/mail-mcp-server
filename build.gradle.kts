@@ -43,6 +43,18 @@ tasks.withType<JavaCompile> {
 
 tasks.test {
     useJUnitPlatform()
+    systemProperty("mail.mime.decodefilename", "true")
+    systemProperty("mail.mime.parameters.strict", "false")
+    systemProperty("mail.mime.base64.ignoreerrors", "true")
+}
+
+// Offline conversion of messages already on disk; never signs in.
+tasks.register<JavaExec>("mailReprocess") {
+    group = "application"
+    description = "Reprocesses one connection's local MIME files without network access"
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("mail.mcp.cli.MailReprocessCommand")
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) })
 }
 
 // EWS spike (docs/plan.md, stage 1): signs in to a real mailbox, so only the user runs it.

@@ -23,6 +23,8 @@ import java.util.regex.Pattern;
 public final class MessageStore {
     public static final String MESSAGE_FILE = "message.eml";
     public static final String META_FILE = "meta.json";
+    public static final String BODY_FILE = "body.md";
+    public static final String ATTACHMENTS_DIR = "attachments";
 
     private static final Pattern KEY = Pattern.compile(
             "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");

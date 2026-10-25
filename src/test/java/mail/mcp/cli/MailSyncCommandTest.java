@@ -34,7 +34,7 @@ class MailSyncCommandTest {
 
     private int run(MailConnectionFactory factory, String... args) {
         return MailSyncCommand.run(args, new MailMcpProperties(temp.toString(), null),
-                new PrintStream(output, true, StandardCharsets.UTF_8), factory,
+                new PrintStream(output, true, StandardCharsets.UTF_8), factory, () -> new mail.mcp.convert.Pandoc("pandoc"),
                 key -> "SYNTHETIC_TEST_CREDENTIAL");
     }
 
@@ -113,6 +113,16 @@ class MailSyncCommandTest {
         assertThat(source.changesCalls).isZero();
         assertThat(source.downloadCalls).isZero();
         assertThat(output()).contains("RESULT: FAILED (Connection is being synchronized by another process)");
+    }
+
+    @Test void missingPandocStopsBeforeSignIn() throws Exception {
+        imapConnection();
+        assertThat(MailSyncCommand.run(new String[]{"test"}, new MailMcpProperties(temp.toString(), null),
+                new PrintStream(output, true, StandardCharsets.UTF_8), neverConnect,
+                () -> { throw new mail.mcp.convert.PandocException("pandoc not found on PATH"); },
+                key -> "SYNTHETIC_TEST_CREDENTIAL")).isEqualTo(2);
+        assertThat(output()).contains("RESULT: FAILED (pandoc not found; install pandoc and put it on PATH)");
+        assertThat(temp.resolve("test/index")).doesNotExist();
     }
 
     @Test void successfulRunPrintsFoldersAndTotals() throws Exception {

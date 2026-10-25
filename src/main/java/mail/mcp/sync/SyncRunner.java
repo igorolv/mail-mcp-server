@@ -19,15 +19,26 @@ public final class SyncRunner {
     private final MessageStore store;
     private final MailIndex index;
     private final MailSource source;
+    private final MessageProcessor processor;
 
-    public SyncRunner(MessageStore store, MailIndex index, MailSource source) {
+    public SyncRunner(MessageStore store, MailIndex index, MailSource source, MessageProcessor processor) {
         this.store = store;
         this.index = index;
         this.source = source;
+        this.processor = processor;
     }
 
     public void run(Consumer<FolderProgress> progress) {
-        index.reconcile(store);
+        for (String key : index.reconcile(store)) {
+            var meta = store.readMeta(key).orElseThrow();
+            var processed = switch (meta.state()) {
+                case DOWNLOADED -> processor.process(meta);
+                case CONVERTED -> processor.load(meta);
+                case FAILED -> new Processed(meta, null, null);
+            };
+            index.put(processed.meta(), processed.message(), processed.body());
+        }
+        index.commit();
         var local = store.folders();
         var remote = source.folders();
         BigInteger nextKey = local.stream().map(LocalFolder::key)
@@ -83,14 +94,16 @@ public final class SyncRunner {
                     var mime = source.download(remote.get(i), ref, dir.resolve(MessageStore.MESSAGE_FILE));
                     meta = new MessageMeta(key, folder.key(), folder.path(), ref, mime.size(), mime.sha256(),
                             Instant.now(), MessageState.DOWNLOADED, null);
-                    downloaded++;
                 } catch (MessageUnavailableException e) {
                     meta = new MessageMeta(key, folder.key(), folder.path(), ref, 0, null,
                             Instant.now(), MessageState.FAILED, e.getMessage());
-                    failed++;
                 }
                 store.writeMeta(meta);
-                index.put(meta);
+                var processed = meta.state() == MessageState.DOWNLOADED
+                        ? processor.process(meta) : new Processed(meta, null, null);
+                index.put(processed.meta(), processed.message(), processed.body());
+                if (processed.meta().state() == MessageState.CONVERTED) { downloaded++; }
+                else { failed++; }
                 if ((downloaded + failed) % 100 == 0) {
                     index.commit();
                     progress.accept(new FolderProgress(folder.path(), downloaded, failed, removed,

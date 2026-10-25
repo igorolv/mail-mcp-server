@@ -36,10 +36,14 @@ class SyncRunnerTest {
         return new MessageStore(connectionDir, new JsonConfig().mailMcpObjectMapper());
     }
 
+    private MessageProcessor processor() {
+        return new MessageProcessor(store(), new mail.mcp.convert.Pandoc("pandoc"));
+    }
+
     private List<FolderProgress> run() {
         List<FolderProgress> progress = new ArrayList<>();
         try (var index = MailIndex.openWriter(connectionDir)) {
-            new SyncRunner(store(), index, source).run(progress::add);
+            new SyncRunner(store(), index, source, processor()).run(progress::add);
         }
         return progress;
     }
@@ -80,7 +84,7 @@ class SyncRunnerTest {
                 assertThat(meta.sha256()).isEqualTo(HexFormat.of().formatHex(
                         MessageDigest.getInstance("SHA-256").digest(bytes)));
                 assertThat(meta.downloadedAt()).isBetween(before, after);
-                assertThat(meta.state()).isEqualTo(MessageState.DOWNLOADED);
+                assertThat(meta.state()).isEqualTo(MessageState.CONVERTED);
                 assertThat(meta.error()).isNull();
             }
         }
@@ -135,7 +139,7 @@ class SyncRunnerTest {
         };
         List<FolderProgress> progress = new ArrayList<>();
         try (var index = MailIndex.openWriter(connectionDir)) {
-            new SyncRunner(store(), index, resetSource).run(progress::add);
+            new SyncRunner(store(), index, resetSource, processor()).run(progress::add);
         }
         assertThat(progress).containsExactly(new FolderProgress("INBOX", 2, 0, 2, true, true));
         assertThat(source.downloadCalls).isEqualTo(2);
@@ -197,7 +201,7 @@ class SyncRunnerTest {
         source.failOnDownload(150);
         List<FolderProgress> progress = new ArrayList<>();
         try (var index = MailIndex.openWriter(connectionDir)) {
-            assertThatThrownBy(() -> new SyncRunner(store(), index, source).run(progress::add))
+            assertThatThrownBy(() -> new SyncRunner(store(), index, source, processor()).run(progress::add))
                     .isInstanceOf(ImapException.class)
                     .hasMessage(new ImapException(ImapException.Kind.CONNECTION).getMessage());
             assertThat(index.folderRefs("f1")).hasSize(149);
@@ -252,5 +256,45 @@ class SyncRunnerTest {
         assertThat(store().folders()).containsExactly(new LocalFolder("f1", "id", "New", "7"));
         assertThat(refs("f1")).isEqualTo(originalRefs);
         assertThat(source.downloadCalls).isZero();
+    }
+
+    @Test void downloadedMessageWithoutIndexEntryIsProcessedOnReconcile() throws Exception {
+        var store = store();
+        store.saveFolders(List.of(new LocalFolder("f1", "inbox", "INBOX", "7")));
+        String key = store.newKey();
+        var dir = store.createMessageDir(key);
+        Files.write(dir.resolve(MessageStore.MESSAGE_FILE), FakeMailSource.mime("1"));
+        var meta = new mail.mcp.model.MessageMeta(key, "f1", "INBOX", "1", 12, "a".repeat(64),
+                Instant.now(), MessageState.DOWNLOADED, null);
+        store.writeMeta(meta);
+        source.putFolder("inbox", "INBOX", "7", "1");
+        run();
+        assertThat(source.downloadCalls).isZero();
+        assertThat(store.readMeta(key).orElseThrow().state()).isEqualTo(MessageState.CONVERTED);
+        assertThat(Files.readString(dir.resolve(MessageStore.BODY_FILE))).isEqualTo("Message 1\r\n");
+        assertThat(refs("f1")).containsEntry("1", key);
+    }
+
+    @Test void indexRebuildRestoresHeaderFields() throws Exception {
+        source.putFolder("inbox", "INBOX", "7", "1");
+        run();
+        String key = refs("f1").get("1");
+        Path body = store().messageDir(key).resolve(MessageStore.BODY_FILE);
+        Files.writeString(body, "Saved Markdown rather than reparsed text");
+        Path indexDir = connectionDir.resolve("index").toAbsolutePath().normalize();
+        assertThat(indexDir.getParent()).isEqualTo(connectionDir.toAbsolutePath().normalize());
+        try (var paths = Files.walk(indexDir)) {
+            for (var path : paths.sorted(Comparator.reverseOrder()).toList()) { Files.delete(path); }
+        }
+        source.resetCounts();
+        run();
+        assertThat(source.downloadCalls).isZero();
+        try (var directory = org.apache.lucene.store.FSDirectory.open(indexDir);
+             var reader = org.apache.lucene.index.DirectoryReader.open(directory)) {
+            var document = reader.storedFields().document(0);
+            assertThat(document.get("subject")).isEqualTo("Synthetic message");
+            assertThat(document.get("body")).isEqualTo(Files.readString(body));
+            assertThat(document.get("state")).isEqualTo("converted");
+        }
     }
 }

@@ -36,7 +36,7 @@ check the diff against the brief before the next brief is written.
 | IT-02 | 7.2, first half | [Message directories and the Lucene catalog](IT-02-store-and-catalog.md) | accepted 2026-10-25 |
 | IT-03 | 7.2, second half | [`SyncRunner` and the `mail-sync` command](IT-03-sync-runner.md) | accepted 2026-10-25 |
 | IT-04 | 7.3 | [`EwsMailSource`](IT-04-ews-source.md) | accepted 2026-10-25 |
-| IT-05 | 7.4, first half | [MIME reading, attachments, `body.md`, reprocessing](IT-05-mime-and-body.md) | ready |
+| IT-05 | 7.4, first half | [MIME reading, attachments, `body.md`, reprocessing](IT-05-mime-and-body.md) | accepted 2026-10-25 |
 | IT-06 | 7.4, second half | tools `sync`, `syncStatus`, `listFolders`, `listMessages`, `getMessage` | not written |
 | IT-07 | 7.5 | search | not written |
 | IT-08 | 7.6 | attachment text | not written |

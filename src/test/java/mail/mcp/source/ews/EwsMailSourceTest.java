@@ -230,7 +230,7 @@ class EwsMailSourceTest {
         var store = new MessageStore(temp, new JsonConfig().mailMcpObjectMapper());
         List<FolderProgress> progress = new ArrayList<>();
         try (var index = MailIndex.openWriter(temp); var source = new EwsMailSource(new EwsClient(first))) {
-            new SyncRunner(store, index, source).run(progress::add);
+            new SyncRunner(store, index, source, new mail.mcp.sync.MessageProcessor(store, new mail.mcp.convert.Pandoc("pandoc"))).run(progress::add);
             assertThat(index.folderRefs("f1")).containsOnlyKeys("AAMkSYNTH-b", "AAMkSYNTH-a");
         }
         assertThat(progress).containsExactly(new FolderProgress("Входящие", 2, 0, 0, false, true));
@@ -246,7 +246,7 @@ class EwsMailSourceTest {
                 .answer(FIND_FOLDER, "findfolder-inbox.xml").answer(SYNC_FOLDER_ITEMS, "sync-empty.xml");
         progress.clear();
         try (var index = MailIndex.openWriter(temp); var source = new EwsMailSource(new EwsClient(second))) {
-            new SyncRunner(store, index, source).run(progress::add);
+            new SyncRunner(store, index, source, new mail.mcp.sync.MessageProcessor(store, new mail.mcp.convert.Pandoc("pandoc"))).run(progress::add);
             assertThat(index.folderRefs("f1")).containsOnlyKeys("AAMkSYNTH-b", "AAMkSYNTH-a");
         }
         assertThat(progress).containsExactly(new FolderProgress("Входящие", 0, 0, 0, false, true));

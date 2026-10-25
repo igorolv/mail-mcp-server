@@ -166,8 +166,10 @@ One run uses one lazy source session and one Lucene writer. It takes the writer 
 network request, reconciles disk and index, lists folders, removes vanished folders/messages,
 downloads new messages as `message.eml` and `meta.json`, and commits the index after every 100
 messages. A folder's opaque cursor is saved only after the folder finishes. Messages remain
-`downloaded`; an unavailable message gets metadata with `state=failed` and is not retried.
-There is no MIME parsing, conversion, background worker or `sync-status.json` yet.
+`converted` after MIME parsing, attachment saving and body conversion; download or conversion
+failures get `state=failed` and are not retried. Headers and Markdown are indexed. Pandoc is
+required on `PATH` and checked before the index or mailbox is opened; missing pandoc exits 2.
+There is no background worker or `sync-status.json` yet.
 
 The first run downloads the whole mailbox and may take a while (EWS uses one `GetItem` per
 message). Run the same command again:
@@ -204,10 +206,47 @@ it is the exception's simple class name. No EWS failure is retried, including `E
 |---|---|
 | 0 | Success, or `--help` / `-h` |
 | 1 | Unexpected local error; details withheld |
-| 2 | Wrong arguments, invalid configuration/selection, or OAuth failure |
+| 2 | Wrong arguments, invalid configuration/selection, missing pandoc, or OAuth failure |
 | 3 | IMAP or EWS sign-in rejected; no retry |
 | 4 | IMAP/EWS/network/protocol or local storage error |
 | 5 | Another process holds the connection's Lucene writer lock; no sign-in |
+
+## Reprocessing
+
+`cli/MailReprocessCommand` converts local messages offline and never constructs a mailbox
+connection or signs in. Pandoc is required on `PATH` even for plain text messages; there is
+no path setting or fallback. It is checked after configuration/selection and before the
+Lucene writer is opened. Both commands print this failure and exit 2 if the check fails:
+
+```text
+RESULT: FAILED (pandoc not found; install pandoc and put it on PATH)
+```
+
+```powershell
+java -jar build\libs\mail-mcp-server.jar mail-reprocess mailru
+java -jar build\libs\mail-mcp-server.jar mail-reprocess work
+# Alternative: .\gradlew.bat mailReprocess --args="mailru"
+```
+
+The command processes sorted message keys with both metadata and `message.eml`, including
+previous conversion failures. Download failures without MIME and incomplete directories stay
+unchanged. Old `body.md` and `attachments/` are replaced, metadata becomes converted/failed,
+and the index entry is replaced. Commit every 100 processed messages and at the end. Progress
+prints every 1,000 messages. Before the result, distinct failure reasons are printed in
+descending count order (ties by reason):
+
+```text
+Mail reprocess (offline)
+  1000 messages processed
+  failed: MIME parsing failed (MessagingException): 2
+RESULT: OK (1002 messages, 1000 converted, 2 failed)
+```
+
+Exit codes: 0 completed (even with per-message conversion failures) or help; 2 invalid
+arguments/configuration/selection or missing pandoc; 5 connection index locked; 4 local
+storage error; 1 unexpected local error. Local error details are withheld. Conversion uses
+one sandboxed pandoc process per HTML body, no retries or timeout; see `docs/mime-agent.md`.
+Pandoc-dependent tests use a shared availability helper and skip when it is absent.
 
 ## Gmail OAuth2
 
