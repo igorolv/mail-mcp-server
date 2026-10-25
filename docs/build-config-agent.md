@@ -37,7 +37,7 @@ Bound from `mail-mcp.*` in `application.yml` into `config/MailMcpProperties`:
 
 To add a setting: add a component to `MailMcpProperties` (or a nested record), a line under
 `mail-mcp:` in `application.yml` with a `MAIL_MCP_*` override, and a row to this table. Code that
-runs without Spring (the spike) reads the same variables through
+runs without Spring (the user-run commands) reads the same variables through
 `MailMcpProperties.fromEnvironment`. Never hard-code `~/.mail-mcp-server`; use
 `resolvedDataDir()`. Tests use `@TempDir`, never the developer's home directory.
 
@@ -108,47 +108,10 @@ This protects against accidents, not against a process running as the same user.
 masked in `toString` of `EwsSettings` and `ImapSettings`, never logged and never returned by a tool.
 Agents must not open the user's real connections file.
 
-## The EWS spike
-
-Run by the user, never by an agent: it signs in to the real mailbox.
-
-```powershell
-.\gradlew.bat bootJar
-java -jar build\libs\mail-mcp-server.jar ews-spike work
-# or: .\gradlew.bat ewsSpike --args="work"
-```
-
-The connection name may be omitted when exactly one `ews` connection exists. Exit codes: `0`
-success, `2` configuration problem (nothing was sent), `3` sign-in rejected, `4` EWS or network
-error, `1` unexpected. Output format and what to check: `docs/ews-source-agent.md`.
-The command class is `cli/EwsSpikeCommand` (`mail.mcp.cli`); `ewsSpike` uses that main class.
-
-## The IMAP spike
-
-The Mail.ru user-run spike succeeded on 2026-10-25 (plan.md 2.2); Gmail still needs a successful
-check. No real IMAP sign-in has been performed by agents. Add an IMAP entry
-to the existing connections file locally using the schema above. Use the provider's app password;
-fill the file only in your local editor. Agents must not open it or modify an existing secret-bearing
-file to append entries. Do not paste it into chat. Placeholder references are optional; a literal
-password in this owner-only external file is supported by the loader too.
-
-```powershell
-.\gradlew.bat bootJar
-java -jar build\libs\mail-mcp-server.jar imap-spike gmail
-java -jar build\libs\mail-mcp-server.jar imap-spike mailru
-# Alternative for one chosen connection: .\gradlew.bat imapSpike --args="gmail"
-```
-
-Run only the connection you have configured; a sign-in rejection stops the client without a retry.
-The spike uses one `MailSource` session in three steps: LIST the folders to sync, EXAMINE INBOX
-and list its UIDs with the UIDVALIDITY cursor, then download the highest UID with BODY.PEEK.
-There is no per-download \Seen comparison; the command guard and offline tests verify read-only
-behavior. It saves original MIME under `<data-dir>\<connection>\spike\`. The highest UID is
-chosen; it is not a search for the newest Date header.
-The report hides subjects, addresses, credentials and folder names. An empty inbox is successful.
-Exit codes: 0 success, 2 invalid config/selection, 3 sign-in rejected, 4 IMAP/network/limit/local
-save error, 1 unexpected failure. Details: `docs/imap-source-agent.md`.
-The command class is `cli/ImapSpikeCommand` (`mail.mcp.cli`); `imapSpike` uses that main class.
+Add or edit entries only in your local editor; agents must not modify an existing secret-bearing
+file to append connections. Do not paste it into chat. For IMAP app-password authentication,
+use the provider's app password. Placeholder references are optional; a literal password in this
+owner-only external file is supported by the loader too.
 
 ## Mail sync
 
@@ -295,7 +258,7 @@ The command class is `cli/GmailOAuthCommand` (`mail.mcp.cli`).
 
 ```powershell
 java -jar build\libs\mail-mcp-server.jar gmail-oauth gmail
-java -jar build\libs\mail-mcp-server.jar imap-spike gmail
+java -jar build\libs\mail-mcp-server.jar mail-sync gmail
 ```
 
 No app password is needed. Google Cloud must have a Desktop OAuth client, appropriate consent and

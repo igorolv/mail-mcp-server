@@ -11,7 +11,7 @@ Implemented and checked on the user's real mailboxes (plan.md section 2):
 - Gradle build, Spring Boot application with the stdio MCP transport, the connections file with
   a lazy registry.
 - Read-only EWS client over Apache HttpClient 5 with NTLM (`GetFolder`, `FindFolder`,
-  `SyncFolderItems`, `FindItem`, `GetItem` with MIME) and `EwsMailSource`.
+  `SyncFolderItems`, `GetItem` with MIME) and `EwsMailSource`.
 - Read-only IMAP client on Angus Mail and `ImapMailSource`; Gmail Desktop OAuth2 with PKCE and
   XOAUTH2 (supported, real sign-in unverified; the user deferred Gmail).
 - Message directories with `meta.json`, `body.md`, attachment files and their `.md`; MIME
@@ -20,8 +20,7 @@ Implemented and checked on the user's real mailboxes (plan.md section 2):
 - `SyncRunner`, background `SyncService` and `sync-status.json`.
 - Eight MCP tools (`docs/tools-agent.md`): `listConnections`, `sync`, `syncStatus`,
   `listFolders`, `listMessages`, `getMessage`, `getAttachment`, `search`.
-- User-run commands in `cli/`: `mail-sync`, `mail-reprocess`, `mail-reindex`, `gmail-oauth`,
-  `ews-spike`, `imap-spike`.
+- User-run commands in `cli/`: `mail-sync`, `mail-reprocess`, `mail-reindex`, `gmail-oauth`.
 - Synthetic data sets in `testdata/` (`mime`, `search`, `redaction`); the search control set
   gives recall 79/86 = 0.919 with 7 false positives.
 
@@ -36,16 +35,17 @@ mail; see plan.md section 4.
 `spring.main.web-application-type: none` keeps the server on stdio only. `System.out` is the
 JSON-RPC channel; use SLF4J instead. `logback-spring.xml` has only `FILE` and `STDERR` appenders,
 and the HttpClient `headers`/`wire` loggers are `OFF` because they would print `Authorization`
-headers. `McpServerConfig` sets `immediateExecution(true)` on the `McpSyncServer` builder (copied
+headers. Both logging configurations keep the Angus/Jakarta Mail loggers off and log only errors
+from PDFBox and FontBox. `McpServerConfig` sets `immediateExecution(true)` on the `McpSyncServer` builder (copied
 from redmine-mcp-server @ `f62b3e5`): tool calls of one session run one at a time, so long work —
 synchronization — runs in the background and returns at once (plan.md 3.6).
 `config/McpStdioConcurrencyTest` documents the race; its disabled half passed once with MCP SDK
 2.1.0 on 2026-10-24, which is not yet a reason to drop the setting.
 
-The non-server modes are `ews-spike`, `imap-spike`, `gmail-oauth`, `mail-sync`, `mail-reprocess`
+The non-server modes are `gmail-oauth`, `mail-sync`, `mail-reprocess`
 and `mail-reindex`: `MailMcpServerApplication.main`
 dispatches to their commands before Spring starts, so the stdio transport is never opened.
-All six select `logback-spike.xml` (stderr only) through the `logback.configurationFile`
+All four select `logback-cli.xml` (stderr only) through the `logback.configurationFile`
 system property. `mail-sync` runs synchronously and prints progress; MCP `sync` starts a daemon
 platform thread through `SyncService` and returns at once.
 
@@ -95,7 +95,7 @@ cli/ ──► sync/, connections/, source/, store/, index/  (user-run commands 
 |---|---|---|
 | `MailMcpServerApplication` | Entry point. Empty apart from command dispatch. | Nothing else. |
 | `config/` | Spring wiring. | `MailMcpProperties` (`mail-mcp.*`), `ConnectionsConfig` (loader + registry beans), `McpServerConfig`, `JsonConfig`, `SyncConfig` (`SyncService` with `Pandoc::locate`). |
-| `connections/` | The connections file and the registry. | `ConnectionsFile` (JSON shape), `ConnectionsLoader`, `ConnectionDefinition`, `EnvironmentPlaceholders`, `ConnectionType`, `AuthKind`, `ConnectionRegistry`, `MailConnection`, `MailConnectionFactory`. `MailConnection.openSource()` supplies a fresh lazy IMAP or EWS session, owned by its caller. The EWS spike creates its client directly. |
+| `connections/` | The connections file and the registry. | `ConnectionsFile` (JSON shape), `ConnectionsLoader`, `ConnectionDefinition`, `EnvironmentPlaceholders`, `ConnectionType`, `AuthKind`, `ConnectionRegistry`, `MailConnection`, `MailConnectionFactory`. `MailConnection.openSource()` supplies a fresh lazy IMAP or EWS session, owned by its caller. |
 | `source/` (root) | Common mailbox session contract. | `MailSource`, `RemoteFolder`, `FolderChanges`, `Downloaded`, `MessageUnavailableException` (GONE/TOO_LARGE leaves the session usable). |
 | `source/ews/` | Read-only EWS source and thin client. | `EwsMailSource`, `EwsClient`, `EwsOperation` (allow-list), `EwsXml` (envelope, parser settings), `EwsResponseReader` (StAX), `EwsTransport` + `HttpClient5EwsTransport`, result records (`EwsFolderNode`, `EwsFolderPage`, `EwsSyncPage`), `Ews*Exception`. See `docs/ews-source-agent.md`. |
 | `source/imap/` | Read-only IMAP source and client. | `ImapMailSource`, `ImapClient` (one session across folders/downloads), `ReadOnlyImapStore` (wire command guard), `ImapSettings`, `ImapFolderInfo`, `FolderUids`, sanitized `ImapException`. See `docs/imap-source-agent.md`. |
@@ -107,7 +107,7 @@ cli/ ──► sync/, connections/, source/, store/, index/  (user-run commands 
 | `tools/` | Thin `@McpTool` adapters, Spring `@Service` beans. | `ConnectionTools` (`listConnections`), `SyncTools` (`sync`, `syncStatus`), `MailTools` (`listFolders`, `listMessages`, `getMessage`), `SearchTools` (`search`), `ToolLogger`. |
 | `api/` | Stable MCP response records with `@Schema`. | Discovery, sync start/status, folder/message pages, body chunks, attachment references, `SearchResult` and `SearchHitInfo`. Never expose `source/` or `model/` records or settings here. |
 | `sync/` | One synchronization run and local conversion. | `SyncRunner`, `MessageProcessor`, `Processed`: reconcile by state, folders, removals, downloads/conversion in batches of 100, cursor after the folder. Caller owns the source and writer. `SyncService` owns background runs, `SyncStart` their immediate result; `SyncErrors` shares fixed CLI/status failure messages. |
-| `cli/` | User-run commands without Spring. | `EwsSpikeCommand`, `ImapSpikeCommand`, `GmailOAuthCommand`, `MailSyncCommand`, `MailReprocessCommand`, `MailReindexCommand`. Check pandoc before the index or sign-in; source closes before the index. Reprocessing and reindexing are offline. |
+| `cli/` | User-run commands without Spring. | `GmailOAuthCommand`, `MailSyncCommand`, `MailReprocessCommand`, `MailReindexCommand`. Check pandoc before the index or sign-in; source closes before the index. Reprocessing and reindexing are offline. |
 | `mime/` | Local MIME parsing. | `MimeReader`, `ParsedMessage`: decoded headers, selected body and attachment files, no container expansion. See `docs/mime-agent.md`. |
 | `convert/` | Body and attachment text. | `Pandoc`, `PandocException`: sandboxed process per conversion; `AttachmentText` dispatches formats, `PdfText`, `XlsxText`, `PptxText` adapt sibling extraction methods. |
 
@@ -133,5 +133,5 @@ needs them and register them above. Attachment converters live in `convert/`.
   new provider package when it is implemented; do not introduce an unused provider framework.
 
 Resources: `application.yml` (defaults and env overrides), `logback-spring.xml`,
-`logback-spike.xml`. Tests mirror the main packages; synthetic EWS responses live in
+`logback-cli.xml`. Tests mirror the main packages; synthetic EWS responses live in
 `src/test/resources/ews/`, mail fixtures in `testdata/`.

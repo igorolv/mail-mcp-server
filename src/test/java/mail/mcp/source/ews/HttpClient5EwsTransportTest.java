@@ -212,7 +212,7 @@ class HttpClient5EwsTransportTest {
     @Test
     void getItemMimeSavesTheDecodedEml(@TempDir Path dir) throws Exception {
         finalBody = EwsResponseReaderTest.fixtureBytes("getitem-mime.xml");
-        Path target = dir.resolve("work").resolve("spike").resolve("newest.eml");
+        Path target = dir.resolve("work").resolve("messages").resolve("message.eml");
 
         EwsMimeItem mime;
         try (EwsClient client = new EwsClient(new HttpClient5EwsTransport(settings(AuthKind.NTLM, null)))) {

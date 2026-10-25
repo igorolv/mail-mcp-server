@@ -21,7 +21,7 @@ public final class GmailOAuthCommand {
 
     public static int run(String[] args) {
         if (System.getProperty("logback.configurationFile") == null) {
-            System.setProperty("logback.configurationFile", "logback-spike.xml");
+            System.setProperty("logback.configurationFile", "logback-cli.xml");
         }
         PrintStream out = System.out;
         if (args.length != 1 || args[0].equals("--help") || args[0].equals("-h")) {
@@ -43,7 +43,7 @@ public final class GmailOAuthCommand {
             new GoogleOAuthFlow(new GoogleTokenHttpClient()).authorize(selected.imap().oauth2(),
                     selected.imap().username(), GmailOAuthCommand::openBrowser);
             out.println("RESULT: OK (refresh token saved with owner-only access; no secrets printed)");
-            out.println("Next: java -jar build\\libs\\mail-mcp-server.jar imap-spike " + selected.name());
+            out.println("Next: java -jar build\\libs\\mail-mcp-server.jar mail-sync " + selected.name());
             return 0;
         } catch (OAuthException e) {
             out.println("RESULT: FAILED (" + e.getMessage() + ")");

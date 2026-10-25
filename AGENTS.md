@@ -34,7 +34,6 @@ Work now consists of polishing and optional improvements:
 | `build.gradle.kts`, `settings.gradle.kts`, `gradle/` | Gradle build, version catalog `gradle/libs.versions.toml`, wrapper |
 | `gradlew`, `gradlew.bat` | Gradle wrapper scripts |
 | `testdata/` | Synthetic test data sets (MIME, redaction samples, search queries); byte-exact (`testdata/.gitattributes`) |
-| `scripts/ews-login-check.ps1` | Interactive EWS sign-in check (`GetFolder` for `inbox`); run by the user, not by agents |
 | `.gitignore` | Ignores `.local/`, Gradle output and IDE files |
 | `.gitattributes` | Line endings of wrapper scripts; keeps `.eml` and EWS fixtures byte-exact |
 | `.local/` | **Ignored by git.** Real environment values (host names, domain, login). May not exist in your checkout |
@@ -51,13 +50,12 @@ Read this file first. Then read only the documents whose `When` matches the task
 | `docs/research/RT-NN-*.md` | working on an improvement whose row in plan.md section 6 names that research | background facts, sources and comparisons; check them against the current code and decisions |
 | `docs/architecture-agent.md` | locating code, adding a package, changing a dependency, Spring wiring or the stdio transport | what is implemented, tech stack, package layout and layer rules |
 | `docs/build-config-agent.md` | building, running tests, adding a setting, changing the connections file format, running a user command | Gradle commands, `MAIL_MCP_*` settings, `connections.json` keys and validation, every jar mode with output and exit codes |
-| `docs/ews-source-agent.md` | changing `source/ews/`, adding an EWS operation, NTLM questions, reading spike output | allow-list, response checks, NTLM transport rules, `EwsMailSource`, known risks, spike output format |
-| `docs/imap-source-agent.md` | changing `source/imap/`, IMAP authentication or reading IMAP spike output | TLS, command allow-list, one sign-in attempt, EXAMINE/PEEK, bounded MIME downloads and spike output |
+| `docs/ews-source-agent.md` | changing `source/ews/`, adding an EWS operation, NTLM questions | allow-list, response checks, NTLM transport rules, `EwsMailSource`, known risks |
+| `docs/imap-source-agent.md` | changing `source/imap/` or IMAP authentication | TLS, command allow-list, one sign-in attempt, EXAMINE/PEEK, bounded MIME downloads |
 | `docs/gmail-oauth-agent.md` | changing `source/oauth/google/`, Gmail OAuth configuration, authorization or refresh | Desktop client setup, PKCE/state/loopback flow, owner-only refresh storage, token endpoint and XOAUTH2 rules |
 | `docs/tools-agent.md` | changing `tools/`, `api/`, `SyncService`, `sync-status.json` or a tool's arguments and bounds | the eight tools, local-only reading, status file fields, single writer across processes, sign-in refusal, search control-set numbers |
 | `docs/mime-agent.md` | changing `mime/` or `convert/`, MIME parsing rules, attachment names, pandoc calls, attachment text, `mail-reprocess` | Angus properties, body and attachment rules, stored names, sandboxed pandoc, attachment formats, known `testdata/mime` differences |
 | `docs/storage-agent.md` | changing `model/`, `store/` or `index/`, the on-disk layout, `meta.json`, `folders.json` or the Lucene index | message directories, write order and atomic writes, index fields and schema, single writer, reconciliation |
-| `scripts/ews-login-check.ps1` | changing or explaining the EWS sign-in check | the script itself; its help block documents parameters |
 
 Name new engineering documents `docs/<topic>-agent.md`, write them in English, and register each
 one in this table.
@@ -190,10 +188,8 @@ Sibling projects used as references (same author, both public on GitHub):
   (`src/test/resources/ews/`) and the fake loopback endpoints of `HttpClient5EwsTransportTest`
   and `ImapClientTest`.
 - Code copied from a sibling project names its source project and commit in the class Javadoc.
-- The EWS spike (`ews-spike` mode of the jar, `ewsSpike` Gradle task) signs in to the real mailbox:
-  only the user runs it. Agents interpret the output the user pastes back
-  (`docs/ews-source-agent.md`).
-- The IMAP spike (`imap-spike` mode, `imapSpike` Gradle task) is also run only by the user.
+- The `mail-sync` command signs in to a real mailbox, so only the user runs it. Agents interpret
+  the output the user pastes back (`docs/build-config-agent.md`).
   Never open the real connections file or saved original messages; use synthetic files for checks.
 - The `gmail-oauth` command opens a browser and exchanges a real authorization code. Only the
   user runs it. Agents must not open downloaded OAuth client JSON or token files.
@@ -206,23 +202,17 @@ Sibling projects used as references (same author, both public on GitHub):
   the ANSI code page, so Cyrillic text in a script becomes garbage. Write script messages in
   English.
 - Host names and logins come from parameters or environment variables, never from hard-coded
-  defaults. `scripts/ews-login-check.ps1` uses `MAIL_EWS_SERVER` and `MAIL_EWS_LOGIN`.
+  defaults.
 - Known result: EWS sign-in works with **NTLM and a bare login** (no domain part). Basic with a
   bare login is rejected (`401`); Basic with a domain prefix was not tried and is not needed.
   Details are in `docs/plan.md`, section 2.1.
-
-The user runs the script like this:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\ews-login-check.ps1 -Server webmail.example.com -Logins user -Methods NTLM
-```
 
 ## Verification before you finish
 
 1. **Scripts:** parse-check every changed `.ps1` without running it:
 
    ```powershell
-   $errors = $null; [void][System.Management.Automation.Language.Parser]::ParseFile("$PWD\scripts\ews-login-check.ps1", [ref]$null, [ref]$errors); $errors.Count
+   $errors = $null; [void][System.Management.Automation.Language.Parser]::ParseFile("$PWD\path\to\script.ps1", [ref]$null, [ref]$errors); $errors.Count
    ```
 
    The result must be `0`. Also confirm the file has no non-ASCII characters.

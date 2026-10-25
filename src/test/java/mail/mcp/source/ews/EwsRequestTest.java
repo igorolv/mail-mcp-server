@@ -57,22 +57,6 @@ class EwsRequestTest {
     }
 
     @Test
-    void findItemAsksForTheNewestItemsFirst() {
-        RecordingTransport transport = new RecordingTransport();
-
-        try (EwsClient client = new EwsClient(transport)) {
-            client.findNewestItems(DistinguishedFolder.INBOX, 1);
-        } catch (UnsupportedOperationException expected) {
-            // the recording transport does not answer
-        }
-
-        assertThat(transport.lastRequest())
-                .contains("<m:FindItem Traversal=\"Shallow\">")
-                .contains("MaxEntriesReturned=\"1\"")
-                .contains("<t:FieldOrder Order=\"Descending\"><t:FieldURI FieldURI=\"item:DateTimeReceived\"");
-    }
-
-    @Test
     void getItemRequestsMimeAndEscapesTheItemId(@TempDir Path dir) {
         RecordingTransport transport = new RecordingTransport();
 

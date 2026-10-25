@@ -65,6 +65,9 @@ match may show leading body text.
 | `attachmentName` | `attachmentName`, `attachmentFile` |
 | `attachmentText` | `attachmentText`, `attachmentText_en` |
 
+A query consisting of one full address excludes `fromName`, `toName` and `ccName`; all other
+fields in the chosen group still apply, including body text for `any`.
+
 Every word is required, quoted text is a phrase, and stop-word-only queries return nothing.
 `SimpleQueryParser` enables phrase and whitespace operators; fuzzy/wildcard syntax is disabled.
 Russian and English word forms match; full addresses must be complete. Filenames match whole

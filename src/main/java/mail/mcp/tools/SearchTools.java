@@ -32,7 +32,8 @@ public class SearchTools {
             "attachment text), subject, body, from, to (including cc), attachmentName, attachmentText (text " +
             "extracted from DOCX, ODT, RTF, EPUB, HTML, CSV, PDF, XLSX, PPTX and plain-text attachments up to " +
             "20 MiB). Every word is required; \"...\" means a phrase. Russian and English word forms are matched; " +
-            "full addresses must be complete; file names match whole or by parts split at non-letters. " +
+            "full addresses must be complete; a query that is a single full address is matched against " +
+            "addresses only, not display names; file names match whole or by parts split at non-letters. " +
             "Results use local data only; listFolders.synced shows coverage. limit defaults to 20, capped at 100. " +
             "Use nextOffset to page. snippet always comes from the body and marks body matches with **; for a " +
             "match in attachment text only, read the attachments with getAttachment. localPath points at files " +

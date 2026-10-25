@@ -16,7 +16,7 @@ import java.util.List;
  * Thin read-only EWS client of one mailbox (decision P1). It builds SOAP requests for allow-listed
  * operations only ({@link EwsOperation}) and parses responses as a stream.
  *
- * <p>Covers folder listing, incremental sync, a one-page {@code FindItem} for the spike and
+ * <p>Covers folder listing, incremental sync and
  * {@code GetItem} with MIME. Calls are sequential: one request at a time per mailbox
  * (docs/research/RT-03-ews-operations.md, throttling). Errors are never retried here; in particular an
  * {@link EwsAuthenticationException} must reach the caller after a single sign-in attempt.
@@ -119,40 +119,6 @@ public final class EwsClient implements AutoCloseable {
             w.writeEndElement();
         });
         return transport.exchange(EwsOperation.SYNC_FOLDER_ITEMS, request, EwsResponseReader::readSyncPage);
-    }
-
-    /**
-     * The newest items of a folder: one {@code FindItem} page sorted by {@code DateTimeReceived}
-     * descending, with ids, receive time and {@code IsRead}.
-     */
-    public EwsItemPage findNewestItems(DistinguishedFolder folder, int maxEntries) {
-        if (maxEntries < 1 || maxEntries > 1000) {
-            throw new IllegalArgumentException("maxEntries must be 1..1000, got " + maxEntries);
-        }
-        byte[] request = EwsXml.envelope(EwsOperation.FIND_ITEM, w -> {
-            w.writeAttribute("Traversal", "Shallow");
-            w.writeStartElement("m", "ItemShape", EwsXml.MESSAGES_NS);
-            EwsXml.typesElement(w, "BaseShape", "IdOnly");
-            w.writeStartElement("t", "AdditionalProperties", EwsXml.TYPES_NS);
-            EwsXml.fieldUri(w, "item:DateTimeReceived");
-            EwsXml.fieldUri(w, "message:IsRead");
-            w.writeEndElement();
-            w.writeEndElement();
-            w.writeEmptyElement("m", "IndexedPageItemView", EwsXml.MESSAGES_NS);
-            w.writeAttribute("MaxEntriesReturned", Integer.toString(maxEntries));
-            w.writeAttribute("Offset", "0");
-            w.writeAttribute("BasePoint", "Beginning");
-            w.writeStartElement("m", "SortOrder", EwsXml.MESSAGES_NS);
-            w.writeStartElement("t", "FieldOrder", EwsXml.TYPES_NS);
-            w.writeAttribute("Order", "Descending");
-            EwsXml.fieldUri(w, "item:DateTimeReceived");
-            w.writeEndElement();
-            w.writeEndElement();
-            w.writeStartElement("m", "ParentFolderIds", EwsXml.MESSAGES_NS);
-            EwsXml.distinguishedFolderId(w, folder);
-            w.writeEndElement();
-        });
-        return transport.exchange(EwsOperation.FIND_ITEM, request, EwsResponseReader::readItemPage);
     }
 
     /**

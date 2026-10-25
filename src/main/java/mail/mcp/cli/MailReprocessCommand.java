@@ -31,7 +31,7 @@ public final class MailReprocessCommand {
     public static int run(String[] args) {
         MimeReader.configureAngus();
         if (System.getProperty("logback.configurationFile") == null) {
-            System.setProperty("logback.configurationFile", "logback-spike.xml");
+            System.setProperty("logback.configurationFile", "logback-cli.xml");
         }
         try {
             return run(args, MailMcpProperties.fromEnvironment(System::getenv), System.out,

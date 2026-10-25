@@ -17,7 +17,7 @@ import java.util.Map;
  * are created on first use, one lock per connection, so a slow or unreachable mail server never
  * blocks a call to another one. A failed creation is not cached: the next call tries again. Creating
  * a connection does not sign in; the "no retry after a rejected sign-in" rule belongs to the code
- * that talks to the server (synchronization, the spike).
+ * that talks to the server (synchronization).
  *
  * <p>Copied from jdbc-mcp-server {@code connection/ConnectionRegistry} @ {@code c2c4362} with mail
  * types.

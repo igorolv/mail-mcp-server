@@ -27,8 +27,8 @@ public record MailMcpProperties(String dataDir, String connectionsFile) {
     public static final String CONNECTIONS_FILE_ENV = "MAIL_MCP_CONNECTIONS_FILE";
 
     /**
-     * Settings read straight from the environment, for code that runs without Spring (the EWS
-     * spike). Mirrors the {@code mail-mcp.*} block of {@code application.yml}.
+     * Settings read straight from the environment, for user-run commands without Spring.
+     * Mirrors the {@code mail-mcp.*} block of {@code application.yml}.
      */
     public static MailMcpProperties fromEnvironment(UnaryOperator<String> env) {
         return new MailMcpProperties(env.apply(DATA_DIR_ENV), env.apply(CONNECTIONS_FILE_ENV));

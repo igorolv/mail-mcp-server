@@ -1,7 +1,7 @@
-# docs/ews-source-agent.md — EWS client, NTLM transport and the spike
+# docs/ews-source-agent.md — EWS client and NTLM transport
 
-Read this before changing anything in `source/ews/`, adding an EWS operation, or interpreting the
-output of the EWS spike. Background: plan.md 2.1 (server facts), decisions П1 and П4,
+Read this before changing anything in `source/ews/` or adding an EWS operation.
+Background: plan.md 2.1 (server facts), decisions П1 and П4,
 research RT-02 (client and NTLM) and RT-03 (operations).
 
 ## Shape
@@ -22,7 +22,6 @@ EwsClient ──builds request (EwsXml.envelope)──> EwsTransport.exchange(op
   mismatch is a protocol error), `findFolders(root, offset)` (deep `FindFolder`, pages of 1000,
   names, classes and parent ids), `syncFolderItems(folderId, syncState)` (IdOnly,
   `MaxChangesReturned=512`, `SyncScope=NormalItems`; null state is omitted),
-  `findNewestItems(folder, max)` (one `FindItem` page sorted by `DateTimeReceived` descending),
   `getItemMime(itemId, target)` (`GetItem` with `IncludeMimeContent`; writes `<target>.part`, moves
   it into place after the whole response was read, and returns size and SHA-256).
 
@@ -94,7 +93,7 @@ when Exchange throttles it; a later user-run sync resumes using known refs and s
 - An exec interceptor counts requests on the wire (`requestCount()`), including handshake legs: a
   first NTLM call costs 3 requests (anonymous, Type 1, Type 3).
 
-Verified on 2026-10-25 by a user-run spike against the real mailbox: `GetFolder`, `FindItem` and
+Verified on 2026-10-25 by a user-run check against the real mailbox: `GetFolder`, `FindItem` and
 `GetItem` with MIME succeeded, with 3 HTTP requests after the first operation and 5 total.
 The authenticated connection was reused. `IsRead` was `true` both before and after the download;
 this run did not test an unread message. See plan.md 2.1. The fallback is not needed for this
@@ -109,30 +108,3 @@ not implemented yet.
 a fake endpoint on `127.0.0.1` with a synthetic Type 2 challenge: the Type 3 message carries user
 `user`, an empty domain and an NTLMv2 response; a rejected Type 3 is not retried. Re-run it after
 every HttpClient upgrade.
-
-## The spike: what it prints and how to read it
-
-`cli/EwsSpikeCommand` (how to run: `docs/build-config-agent.md`) makes three requests and prints
-only metadata — no subject, addresses, body, host, login or password:
-
-```
-Step 1/3 GetFolder inbox: OK in <ms> ms, HTTP requests so far: 3
-  folder: "<localized inbox name>", class IPF.Note, total <n>, unread <n>, subfolders <n>
-Step 2/3 FindItem newest inbox item: OK in <ms> ms, items in view: <n>
-  newest item: received <ISO time>, IsRead <bool>
-Step 3/3 GetItem with MIME: OK in <ms> ms
-  MIME: <bytes> bytes, SHA-256 <hex>
-  IsRead after GetItem: <bool> (before: <bool>)
-  saved to: <data-dir>\<connection>\spike\inbox-newest-<time>.eml
-HTTP requests in total: <n>
-RESULT: OK
-```
-
-Reading the result: `requests so far: 3` after step 1 means the NTLM handshake ran once; a total of
-5 means the authenticated connection was reused, larger numbers mean the server re-authenticated
-per request. `IsRead` must not change from `false` to `true` (GetItem must not mark mail read).
-`SIGN-IN REJECTED` with exit code 3 shows the offered schemes. If the password is known to be right
-(the PowerShell check with the same login still works), suspect Extended Protection (see above)
-before trying other login formats — each try is a sign-in attempt. The saved `.eml` is an original: it stays
-in the data directory; agents do not open it. Record anonymized results in plan.md
-section 2; raw details go to `.local/`.

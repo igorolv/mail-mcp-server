@@ -29,9 +29,11 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /** Read-only snapshot of the last committed catalog; never takes the writer lock. */
 public final class MailIndexReader implements AutoCloseable {
+    private static final Pattern FULL_ADDRESS = Pattern.compile("[^\\s\"@]+@[^\\s\"@]+\\.[^\\s\"@]+");
     private final FSDirectory directory;
     private final DirectoryReader reader;
     private final IndexSearcher searcher;
@@ -74,8 +76,11 @@ public final class MailIndexReader implements AutoCloseable {
     public SearchResults search(String query, SearchField field, String folderKey, int offset, int limit) {
         if (offset < 0 || limit < 1) { throw new IllegalArgumentException("Invalid offset or limit"); }
         // Phrase and whitespace syntax only; fuzzy and wildcard operators are not enabled.
+        boolean fullAddress = isFullAddress(query);
         var parser = new SimpleQueryParser(MailAnalyzers.analyzer(),
-                field.fields().stream().collect(Collectors.toMap(name -> name, name -> 1.0f)),
+                field.fields().stream()
+                        .filter(name -> !fullAddress || !Set.of("fromName", "toName", "ccName").contains(name))
+                        .collect(Collectors.toMap(name -> name, name -> 1.0f)),
                 SimpleQueryParser.PHRASE_OPERATOR | SimpleQueryParser.WHITESPACE_OPERATOR);
         parser.setDefaultOperator(BooleanClause.Occur.MUST);
         var parsed = parser.parse(query);
@@ -121,6 +126,10 @@ public final class MailIndexReader implements AutoCloseable {
             }
             return List.copyOf(cards);
         } catch (IOException e) { throw new UncheckedIOException(e); }
+    }
+
+    private static boolean isFullAddress(String query) {
+        return FULL_ADDRESS.matcher(query.strip()).matches();
     }
 
     private static MessageCard card(Document doc) {

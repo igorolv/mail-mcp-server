@@ -45,6 +45,38 @@ class MailIndexReaderTest {
         }
     }
 
+    @Test void fullAddressQueryIgnoresDisplayNames() {
+        try (var writer = MailIndex.openWriter(dir)) {
+            writer.put(new MessageMeta("a", "f1", "INBOX", "a", 0, null, Instant.now(), MessageState.CONVERTED, null),
+                    new MailMessage("Subject", List.of(new Address("alice@example.org", "mallory@example.net")),
+                            null, null, null, null, null, null, List.of()), null, null);
+            writer.put(new MessageMeta("b", "f1", "INBOX", "b", 0, null, Instant.now(), MessageState.CONVERTED, null),
+                    new MailMessage("Subject", List.of(new Address("Alice", "alice@example.org")),
+                            null, null, null, null, null, null, List.of()), null, null);
+            writer.commit();
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                for (var field : List.of(SearchField.FROM, SearchField.ANY)) {
+                    assertThat(reader.search("alice@example.org", field, null, 0, 20).hits())
+                            .extracting(hit -> hit.card().key()).containsExactly("b");
+                }
+                assertThat(reader.search("alice", SearchField.FROM, null, 0, 20).hits())
+                        .extracting(hit -> hit.card().key()).containsExactlyInAnyOrder("a", "b");
+            }
+        }
+    }
+
+    @Test void fullAddressQueryStillFindsTheAddressInTheBody() {
+        try (var writer = MailIndex.openWriter(dir)) {
+            writer.put(new MessageMeta("a", "f1", "INBOX", "a", 0, null, Instant.now(), MessageState.CONVERTED, null),
+                    null, "Contact alice@example.org for details.", null);
+            writer.commit();
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                assertThat(reader.search("alice@example.org", SearchField.ANY, null, 0, 20).hits())
+                        .extracting(hit -> hit.card().key()).containsExactly("a");
+            }
+        }
+    }
+
     @Test void searchFiltersByFolderAndPages() {
         try (var writer = MailIndex.openWriter(dir)) {
             put(writer, "b", "f1", null);

@@ -162,7 +162,6 @@ The same jar has user-run modes; none of them starts the MCP transport.
 | `mail-reprocess <connection>` | Offline: parses every stored message again, rewrites `body.md` and attachment text, reindexes |
 | `mail-reindex <connection>` | Offline: rebuilds the index from disk |
 | `gmail-oauth <connection>` | Gets the first Gmail OAuth2 consent in the browser and stores the refresh token |
-| `ews-spike`, `imap-spike` | Diagnostics: sign in once and fetch one message |
 
 Exit codes:
 
@@ -259,5 +258,5 @@ skipped when it is not installed.
   the jar open on Windows. Stop the server in the client, build, then reconnect.
 - **`search` says the index was built by an older version.** Run
   `mail-reindex <connection>` (offline) or start a sync.
-- **PDFBox `WARN` lines during `mail-reprocess`.** They report damaged but readable PDFs and go to
-  stderr. The text is still extracted.
+- **Damaged but readable PDFs.** Text extraction still runs; PDFBox and FontBox log only errors
+  to keep command reports readable.

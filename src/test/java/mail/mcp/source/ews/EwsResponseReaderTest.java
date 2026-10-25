@@ -51,26 +51,6 @@ class EwsResponseReaderTest {
     }
 
     @Test
-    void findItemReadsEveryItemTypeInServerOrder() throws Exception {
-        EwsItemPage page = EwsResponseReader.readItemPage(fixture("finditem-newest.xml"));
-
-        assertThat(page.totalItemsInView()).isEqualTo(1987);
-        assertThat(page.includesLastItemInRange()).isFalse();
-        assertThat(page.items()).containsExactly(
-                new EwsItemRef("AAMkAD-synthetic-item-1=", "CQAAAB-synthetic-1", "2026-10-24T18:05:11Z", false),
-                new EwsItemRef("AAMkAD-synthetic-item-2=", "CwAAAB-synthetic-2", "2026-10-24T17:00:00Z", true));
-    }
-
-    @Test
-    void findItemOnAnEmptyFolderReturnsNoItems() throws Exception {
-        EwsItemPage page = EwsResponseReader.readItemPage(fixture("finditem-empty.xml"));
-
-        assertThat(page.items()).isEmpty();
-        assertThat(page.totalItemsInView()).isZero();
-        assertThat(page.includesLastItemInRange()).isTrue();
-    }
-
-    @Test
     void getItemDecodesWrappedBase64MimeByteForByte() throws Exception {
         ByteArrayOutputStream mime = new ByteArrayOutputStream();
 

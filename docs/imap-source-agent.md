@@ -1,6 +1,6 @@
-# docs/imap-source-agent.md — read-only IMAP source and spike
+# docs/imap-source-agent.md — read-only IMAP source
 
-Read before changing `source/imap/`, authentication, wire commands or the IMAP spike.
+Read before changing `source/imap/`, authentication or wire commands.
 Design: plan.md 3.1 and 3.6, decisions П3 and П4; background: research/RT-04-imap-gmail-mailru.md.
 
 ## Implemented scope
@@ -8,8 +8,8 @@ Design: plan.md 3.1 and 3.6, decisions П3 and П4; background: research/RT-04-i
 Angus Mail 2.0.5 with Jakarta Mail API 2.1.5. `ImapMailSource` implements `MailSource` on top
 of `ImapClient`: filtered mail folders, changes by UIDVALIDITY and folder UIDs, and original
 MIME downloads by UID. One source owns one lazy session for any number of queries and downloads
-across folders. Storage, sync, search and mail MCP tools are not implemented; only
-`listConnections` remains exposed through MCP. Gmail labels/deduplication, CONDSTORE/QRESYNC
+across folders. `mail-sync` uses the same `SyncRunner`, store and catalog as EWS; MCP tools read
+the local copy (`docs/tools-agent.md`). Gmail labels/deduplication, CONDSTORE/QRESYNC
 and paging are not implemented.
 
 `MailConnectionFactory` creates a connection with a supplier; `openSource()` creates a fresh
@@ -39,7 +39,7 @@ lifecycle are in `docs/gmail-oauth-agent.md`. Angus objects stay private.
   before Angus requests a store connection. Closing the source closes the client and store,
   including the selected folder.
 - Provider exception messages and causes can contain credentials or mail data. `ImapException`
-  returns only a fixed error category/message. The spike withholds raw loader errors too.
+  returns only a fixed error category/message. `mail-sync` withholds raw loader errors too.
 - Session debug is off and its debug stream discarded. Angus/Jakarta JUL categories and their
   Logback counterparts are disabled to prevent protocol/authentication logging.
 
@@ -92,42 +92,15 @@ Gmail handling is added.
 
 Original MIME is kept on disk as downloaded. Under the 2026-10-25 decisions mail content and
 local paths may reach the model through tools, with an optional output filter later (plan.md 3.1,
-section 4 Д6). The spike still prints counts rather than folder names or subjects, so its report can be
-pasted into chat.
+section 4 Д6). `mail-sync` prints folder paths and counts; anonymize folder paths before sharing
+its output. Only the user runs it; agents never open the real connections file or saved originals.
 
-## User-run spike
-
-See build-config-agent.md for connection examples and commands. `imap-spike [connection]` selects
-the only IMAP connection when its name is omitted; multiple IMAP connections require a name.
-Only the user runs credentialed probes. Never read the real connections file or saved original.
-
-Expected report:
-
-```text
-IMAP spike (read-only: LIST, EXAMINE, BODY.PEEK; one sign-in attempt)
-Connection: gmail (imap, app-password; address and credentials hidden)
-Step 1/3 LIST: OK, folders to sync: <n> (names hidden)
-Step 2/3 EXAMINE inbox: OK, messages: <n>, cursor (UIDVALIDITY): <cursor>
-Step 3/3 BODY.PEEK last message: OK, <bytes> bytes, SHA-256 <hex>
-  saved to: <data-dir>\gmail\spike\inbox-last-<time>.eml
-RESULT: OK
-```
-
-Exit codes: 0 success (including an empty inbox), 2 configuration/selection, 3 sign-in rejected,
-4 IMAP/network/message-unavailable/limit/local-save error, 1 unexpected error with details withheld.
-An absent or empty inbox succeeds without a download. Record anonymized user results in plan.md section 2; do not copy local
-user paths, addresses or original contents into tracked files.
-
-Verified on 2026-10-25 by a user-run Mail.ru spike: LIST returned 41 folders, EXAMINE and
-BODY.PEEK succeeded, and one MIME original of 25831 bytes was saved. Seen was true both before
-and after, so an unread message was not tested. See plan.md 2.2. An earlier user run rejected
-sign-in for both Mail.ru and Gmail; the report did not include a provider reason. Gmail still
-has no successful user-run result. Do not infer server extensions from the folder count.
-A later user-run Mail.ru spike on `MailSource` succeeded on 2026-10-25: 39 folders to
-sync, one `FETCH 1:N (UID)` for an inbox of about 13 thousand messages, and the highest UID
-downloaded through `RFC822.SIZE` and BODY.PEEK in the same session (plan.md 2.2).
-The user deferred Gmail setup on 2026-10-25; their local connections are `work` and `mailru`.
-Gmail and OAuth2 support remain available for later use.
+Verified by user-run Mail.ru checks on 2026-10-25: LIST returned 41 folders and a 25831-byte
+MIME download succeeded with EXAMINE and BODY.PEEK. A later check through `MailSource` listed
+39 sync folders, enumerated about 13 thousand inbox UIDs and downloaded the highest UID in
+one session. The downloaded message was already read; unread behavior was not tested.
+See plan.md 2.2. Gmail has no successful user-run result; the user deferred its setup on
+2026-10-25. Gmail and OAuth2 support remain available for later use.
 
 ## Offline verification and primary references
 
@@ -137,8 +110,7 @@ no fallback after rejection, EXAMINE/CLOSE folder switching, UID listing, filter
 removed refs, UIDVALIDITY resets, input validation before commands, exact MIME and SHA-256,
 BODY.PEEK only, missing UIDs, declared and streamed size limits, continued use after unavailable
 messages, partial cleanup, existing-target preservation, command rejection and lazy factories.
-`ImapSpikeCommandTest` verifies invalid configuration/selection stops before client creation and
-raw configuration values do not enter the report. All tests are part of `gradlew.bat build`.
+All tests are part of `gradlew.bat build`.
 
 Angus 2.0.5 sources inspected on 2026-10-25:
 

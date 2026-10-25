@@ -188,52 +188,6 @@ final class EwsResponseReader {
         return id;
     }
 
-    /** One {@code FindItem} page. */
-    static EwsItemPage readItemPage(InputStream in) throws XMLStreamException, IOException {
-        List<ItemFields> items = new ArrayList<>();
-        Integer[] totalItemsInView = {null};
-        boolean[] includesLast = {false};
-        read(EwsOperation.FIND_ITEM, in, r -> {
-            if (EwsXml.MESSAGES_NS.equals(r.getNamespaceURI()) && "RootFolder".equals(r.getLocalName())) {
-                String total = r.getAttributeValue(null, "TotalItemsInView");
-                totalItemsInView[0] = total == null ? null : parseInt(total, "TotalItemsInView");
-                includesLast[0] = Boolean.parseBoolean(r.getAttributeValue(null, "IncludesLastItemInRange"));
-                return;
-            }
-            if (!EwsXml.TYPES_NS.equals(r.getNamespaceURI())) {
-                return;
-            }
-            switch (r.getLocalName()) {
-                case "ItemId" -> {
-                    ItemFields item = new ItemFields();
-                    item.id = r.getAttributeValue(null, "Id");
-                    item.changeKey = r.getAttributeValue(null, "ChangeKey");
-                    items.add(item);
-                }
-                case "DateTimeReceived" -> {
-                    if (!items.isEmpty()) {
-                        items.getLast().dateTimeReceived = r.getElementText();
-                    }
-                }
-                case "IsRead" -> {
-                    if (!items.isEmpty()) {
-                        items.getLast().read = parseBoolean(r.getElementText(), "IsRead");
-                    }
-                }
-                default -> {
-                }
-            }
-        });
-        List<EwsItemRef> refs = new ArrayList<>(items.size());
-        for (ItemFields item : items) {
-            if (item.id == null) {
-                throw new EwsProtocolException("FindItem response has an ItemId without Id");
-            }
-            refs.add(new EwsItemRef(item.id, item.changeKey, item.dateTimeReceived, item.read));
-        }
-        return new EwsItemPage(List.copyOf(refs), totalItemsInView[0], includesLast[0]);
-    }
-
     /**
      * {@code GetItem} with {@code IncludeMimeContent} for one item. The base64 MIME is decoded into
      * {@code mimeOut} chunk by chunk.
@@ -424,13 +378,6 @@ final class EwsResponseReader {
         Integer totalCount;
         Integer unreadCount;
         Integer childFolderCount;
-    }
-
-    private static final class ItemFields {
-        String id;
-        String changeKey;
-        String dateTimeReceived;
-        Boolean read;
     }
 
     static final class MimeFields {

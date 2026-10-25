@@ -27,7 +27,7 @@ authorization code, client JSON or token file in chat, and never read the real c
    Keep the existing EWS/Mail.ru entries. Remove Gmail's old password field.
 6. Run `gmail-oauth gmail` using the built jar. The command opens the system browser; select the
    same mailbox as the configured username and review/approve the consent request.
-7. After `RESULT: OK`, run `imap-spike gmail`. No rebuild is required when only credentials change.
+7. After `RESULT: OK`, run `mail-sync gmail`. No rebuild is required when only credentials change.
 
 Google requires a broad mail scope for IMAP, including permissions beyond reading. The server still
 enforces read-only commands at the IMAP protocol boundary; authorization itself does not narrow the scope.
@@ -57,7 +57,7 @@ OAuth does not require an app password, but Google can still request verificatio
 ```powershell
 .\gradlew.bat bootJar
 java -jar build\libs\mail-mcp-server.jar gmail-oauth gmail
-java -jar build\libs\mail-mcp-server.jar imap-spike gmail
+java -jar build\libs\mail-mcp-server.jar mail-sync gmail
 ```
 
 The downloaded client file should also be readable only by the owner, like connections.json:
@@ -67,7 +67,7 @@ icacls "$env:USERPROFILE\.mail-mcp-server\google-oauth-client.json" /inheritance
 ```
 
 Only `gmail-oauth --help` is safe for agents to run against the normal environment. Never launch the
-real authorization command, browser flow, token refresh or IMAP spike on behalf of the user.
+real authorization command, browser flow, token refresh or mail sync on behalf of the user.
 
 ## Configuration and lifecycle
 

@@ -34,4 +34,7 @@
     <logger name="org.apache.hc.client5.http.wire" level="OFF"/>
     <logger name="org.eclipse.angus.mail" level="OFF"/>
     <logger name="jakarta.mail" level="OFF"/>
+    <!-- Damaged but readable PDFs produce warnings; their text is still extracted. -->
+    <logger name="org.apache.pdfbox" level="ERROR"/>
+    <logger name="org.apache.fontbox" level="ERROR"/>
 </configuration>

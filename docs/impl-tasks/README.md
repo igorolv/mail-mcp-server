@@ -111,14 +111,9 @@ The reviewer checks; it does not fix. Work through every point and report what y
 
 ## Task list
 
-| ID | Improvement | Brief | Status |
-|---|---|---|---|
-| IT-09 | Д1 | [Quieter PDFBox logs](IT-09-quiet-pdfbox-logs.md) | ready |
-| IT-10 | Д2 | [Exact address search](IT-10-exact-address-search.md) | ready |
-| IT-11 | Д17 | [Remove the spikes](IT-11-remove-spikes.md) | ready |
-
-Run them in this order, each from a clean working tree. IT-11 changes `README.md` and
-`AGENTS.md`, so record IT-09 and IT-10 first. Numbering continues from IT-12.
+No open briefs. IT-09…IT-11 were accepted and recorded on 2026-10-26 in `docs/plan.md`
+section 4 (Д1, Д2, Д17). The real-mailbox check for Д2 is still pending. Numbering continues
+from IT-12.
 
 ## Rules for every implementation session
 
