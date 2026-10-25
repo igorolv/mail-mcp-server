@@ -1,0 +1,255 @@
+{
+  "detector": "D14",
+  "title": "Токены GitHub",
+  "source": "docs/research/RT-08-redaction-detectors.md, D14",
+  "cases": [
+    {
+      "id": "D14-P01",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "provider-shape",
+        "deliberately-invalid-checksum"
+      ],
+      "text": "Архив: ghp_XuSke2BQxPmAOjh4Hh908hfZA05eIP000000",
+      "expected": [
+        {
+          "detector": "D14",
+          "match": "ghp_XuSke2BQxPmAOjh4Hh908hfZA05eIP000000",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "CRC32 payload не ноль; хвост 000000 задаёт неверную сумму. Проверка провайдером не выполнялась."
+    },
+    {
+      "id": "D14-P02",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "provider-shape",
+        "deliberately-invalid-checksum"
+      ],
+      "text": "Archived: ghp_tb3QUmV0OAKKr46g3KVuEjhWSU4fuD000000",
+      "expected": [
+        {
+          "detector": "D14",
+          "match": "ghp_tb3QUmV0OAKKr46g3KVuEjhWSU4fuD000000",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "CRC32 payload не ноль; хвост 000000 задаёт неверную сумму. Проверка провайдером не выполнялась."
+    },
+    {
+      "id": "D14-P03",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "provider-shape",
+        "deliberately-invalid-checksum"
+      ],
+      "text": "Архив: ghp_fpduKGqBapIBlDqcXXlSocc0Dlb4Pl000000",
+      "expected": [
+        {
+          "detector": "D14",
+          "match": "ghp_fpduKGqBapIBlDqcXXlSocc0Dlb4Pl000000",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "CRC32 payload не ноль; хвост 000000 задаёт неверную сумму. Проверка провайдером не выполнялась."
+    },
+    {
+      "id": "D14-P04",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "provider-shape",
+        "deliberately-invalid-checksum"
+      ],
+      "text": "Archived: ghp_wsF3chR2CNfyADc76GBt4DhQFi1MxF000000",
+      "expected": [
+        {
+          "detector": "D14",
+          "match": "ghp_wsF3chR2CNfyADc76GBt4DhQFi1MxF000000",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "CRC32 payload не ноль; хвост 000000 задаёт неверную сумму. Проверка провайдером не выполнялась."
+    },
+    {
+      "id": "D14-P05",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "provider-shape",
+        "deliberately-invalid-checksum"
+      ],
+      "text": "Архив: ghp_3qmiXUg1vkkNoiLRU6OMz06ihzQEPe000000",
+      "expected": [
+        {
+          "detector": "D14",
+          "match": "ghp_3qmiXUg1vkkNoiLRU6OMz06ihzQEPe000000",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "CRC32 payload не ноль; хвост 000000 задаёт неверную сумму. Проверка провайдером не выполнялась."
+    },
+    {
+      "id": "D14-P06",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "provider-shape",
+        "deliberately-invalid-checksum"
+      ],
+      "text": "Archived: ghp_XxEtKhW2VhWm1jnLvAvU3pKHQ53RwA000000",
+      "expected": [
+        {
+          "detector": "D14",
+          "match": "ghp_XxEtKhW2VhWm1jnLvAvU3pKHQ53RwA000000",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "CRC32 payload не ноль; хвост 000000 задаёт неверную сумму. Проверка провайдером не выполнялась."
+    },
+    {
+      "id": "D14-P07",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "provider-shape",
+        "deliberately-invalid-checksum"
+      ],
+      "text": "Архив: ghp_P31cDbVtkoo3OeORgt8uD6lrXI9PEO000000",
+      "expected": [
+        {
+          "detector": "D14",
+          "match": "ghp_P31cDbVtkoo3OeORgt8uD6lrXI9PEO000000",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "CRC32 payload не ноль; хвост 000000 задаёт неверную сумму. Проверка провайдером не выполнялась."
+    },
+    {
+      "id": "D14-P08",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "provider-shape",
+        "deliberately-invalid-checksum"
+      ],
+      "text": "Archived: github_pat_it7RlbuPM9GG47ZBsVo44a_HpfWaRBGrtBEgUAIHGvBNbEYk2g3WmLlOHd8sqEhKgJc5vLJJiYQz000000",
+      "expected": [
+        {
+          "detector": "D14",
+          "match": "github_pat_it7RlbuPM9GG47ZBsVo44a_HpfWaRBGrtBEgUAIHGvBNbEYk2g3WmLlOHd8sqEhKgJc5vLJJiYQz000000",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "Проверить: алгоритм суммы fine-grained формата отдельно не подтверждён. Значение случайное, не выпускалось GitHub."
+    },
+    {
+      "id": "D14-N01",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "ghp_short",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D14-N02",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "github_pat_short",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D14-N03",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "GitHub authentication disabled.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D14-N04",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "${GITHUB_VALUE}",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D14-N05",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "ghp_FH6UL7wpUdKJqLzJuIAenTbWLxKDq4Q8LOU",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D14-N06",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "ghp_BWCder2coCkJ52NIC58Ld1PGazfjO6JrRAOwL",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D14-N07",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "xghp_HJLAQbG0xybu4E3IwoWnbm7hKuxxEea1nwgfx",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D14-N08",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Commit 7af291a400fff5375d24347b5c4f6f92cbbcda10621ea2001a3a31e69a62a732",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    }
+  ]
+}

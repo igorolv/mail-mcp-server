@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Logging for the EWS spike, which runs without Spring (EwsSpikeCommand selects this file).
+<!-- Logging for the EWS and IMAP spikes, which run without Spring.
      stdout carries the spike report; diagnostics go to stderr. -->
 <configuration>
     <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
@@ -16,4 +16,6 @@
     <!-- Header and wire logs carry NTLM/Basic Authorization headers and mail content. -->
     <logger name="org.apache.hc.client5.http.headers" level="OFF"/>
     <logger name="org.apache.hc.client5.http.wire" level="OFF"/>
+    <logger name="org.eclipse.angus.mail" level="OFF"/>
+    <logger name="jakarta.mail" level="OFF"/>
 </configuration>

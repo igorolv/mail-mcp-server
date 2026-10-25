@@ -1,0 +1,191 @@
+{
+  "id": "M19",
+  "status": "limit_exceeded",
+  "headers": {
+    "subject": "Учебный макет M19",
+    "from": [
+      {
+        "name": "Synthetic Author",
+        "address": "sender@example.com"
+      }
+    ],
+    "to": [
+      {
+        "name": null,
+        "address": "reader@example.org"
+      }
+    ],
+    "date": "2026-03-12T10:15:00+03:00",
+    "messageId": "<m19.synthetic@example.com>"
+  },
+  "body": {
+    "selectedPart": "1",
+    "contentType": "text/plain",
+    "charsetDeclared": "utf-8",
+    "charsetActual": "utf-8",
+    "textContains": [
+      "Проект макета"
+    ],
+    "textNotContains": []
+  },
+  "parts": [
+    {
+      "path": "1",
+      "contentType": "text/plain",
+      "disposition": null,
+      "filenameRaw": null,
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 108,
+      "sha256": "cb2187e018c8030b27a9a1e61872faf0cdd4bca74fffe74229e7baea451704bb",
+      "status": "ok",
+      "children": []
+    },
+    {
+      "path": "2",
+      "contentType": "message/rfc822",
+      "disposition": "attachment",
+      "filenameRaw": "attachment; filename=\"level-1.eml\"",
+      "filenameDecoded": "level-1.eml",
+      "contentId": null,
+      "size": 3391,
+      "sha256": "cb944c81f025bfa2177d6bd01863c2542fbdf0809a24ce48b98e260afe404774",
+      "status": "ok",
+      "children": [
+        {
+          "path": "2.1",
+          "contentType": "text/plain",
+          "disposition": null,
+          "filenameRaw": null,
+          "filenameDecoded": null,
+          "contentId": null,
+          "size": 32,
+          "sha256": "ecc769158a796f4bac20d93dd46fee755f67bddd8c45da1952c1f65da90124dc",
+          "status": "ok",
+          "children": []
+        },
+        {
+          "path": "2.2",
+          "contentType": "message/rfc822",
+          "disposition": "attachment",
+          "filenameRaw": "attachment; filename=\"level-2.eml\"",
+          "filenameDecoded": "level-2.eml",
+          "contentId": null,
+          "size": 2794,
+          "sha256": "0cd56814df36fe9fe8dab20859271fbf392f5d030d2c3685f279e17c91d2fae3",
+          "status": "ok",
+          "children": [
+            {
+              "path": "2.2.1",
+              "contentType": "text/plain",
+              "disposition": null,
+              "filenameRaw": null,
+              "filenameDecoded": null,
+              "contentId": null,
+              "size": 32,
+              "sha256": "0831729cb3a8ee58fdbbf613f9c18dcd14a615b0aba943ebb2c893258a3219d5",
+              "status": "ok",
+              "children": []
+            },
+            {
+              "path": "2.2.2",
+              "contentType": "message/rfc822",
+              "disposition": "attachment",
+              "filenameRaw": "attachment; filename=\"level-3.eml\"",
+              "filenameDecoded": "level-3.eml",
+              "contentId": null,
+              "size": 2197,
+              "sha256": "3b9070455660d3a8c525ae9b6d6d7330cf890f3bc0a0f28937e918ed2d537c45",
+              "status": "ok",
+              "children": [
+                {
+                  "path": "2.2.2.1",
+                  "contentType": "text/plain",
+                  "disposition": null,
+                  "filenameRaw": null,
+                  "filenameDecoded": null,
+                  "contentId": null,
+                  "size": 32,
+                  "sha256": "eb2858b46fe8200c1d49239c3a8e4bb45801313a1871e18dccc4a5c59dbf2662",
+                  "status": "ok",
+                  "children": []
+                },
+                {
+                  "path": "2.2.2.2",
+                  "contentType": "message/rfc822",
+                  "disposition": "attachment",
+                  "filenameRaw": "attachment; filename=\"level-4.eml\"",
+                  "filenameDecoded": "level-4.eml",
+                  "contentId": null,
+                  "size": 1600,
+                  "sha256": "89649d1e5634824ea2c62303aa73d044cdf51bdc9f156abd7014c9e1a8664158",
+                  "status": "ok",
+                  "children": [
+                    {
+                      "path": "2.2.2.2.1",
+                      "contentType": "text/plain",
+                      "disposition": null,
+                      "filenameRaw": null,
+                      "filenameDecoded": null,
+                      "contentId": null,
+                      "size": 32,
+                      "sha256": "4457295ab8d8a9af9fcc2dbcb5856f3e3f2953430c57e306c9294fab91250c7d",
+                      "status": "ok",
+                      "children": []
+                    },
+                    {
+                      "path": "2.2.2.2.2",
+                      "contentType": "message/rfc822",
+                      "disposition": "attachment",
+                      "filenameRaw": "attachment; filename=\"level-5.eml\"",
+                      "filenameDecoded": "level-5.eml",
+                      "contentId": null,
+                      "size": 1003,
+                      "sha256": "9230ca52d9030e61f5acf346336f8b685caf213937be0e2ad14da468f0da8c33",
+                      "status": "ok",
+                      "children": [
+                        {
+                          "path": "2.2.2.2.2.1",
+                          "contentType": "text/plain",
+                          "disposition": null,
+                          "filenameRaw": null,
+                          "filenameDecoded": null,
+                          "contentId": null,
+                          "size": 32,
+                          "sha256": "938873e6d2d32b8b668a09e75e244ef9a2e05bf752661ab0dd602662d9790a29",
+                          "status": "ok",
+                          "children": []
+                        },
+                        {
+                          "path": "2.2.2.2.2.2",
+                          "contentType": "message/rfc822",
+                          "disposition": "attachment",
+                          "filenameRaw": "attachment; filename=\"level-6.eml\"",
+                          "filenameDecoded": "level-6.eml",
+                          "contentId": null,
+                          "size": 406,
+                          "sha256": "fa49d9d06b05012a0d461a25740e97a81bd849ead8311946bce6102278fcaaad",
+                          "status": "limit_exceeded",
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "warnings": [
+    "container-depth-limit"
+  ],
+  "notes": "Шесть переходов message/rfc822, корень=0. Остановиться перед входом на глубину 6.",
+  "limits": {
+    "maxContainerDepth": 5,
+    "rootDepth": 0
+  },
+  "stoppedAtPart": "2.2.2.2.2.2"
+}

@@ -42,7 +42,7 @@ class ConnectionToolsTest {
 
         assertThat(result.connections()).containsExactly(
                 new ConnectionInfo("work", "Work mail", "ews", "ntlm", true, true, false, null),
-                new ConnectionInfo("gmail", null, "imap", "app-password", false, false, false, null),
+                new ConnectionInfo("gmail", null, "imap", "app-password", true, false, false, null),
                 new ConnectionInfo("broken", null, "ews", null, true, false, false,
                         "auth 'kerberos' is not valid for type 'ews' (expected one of: ntlm, basic)"));
         String json = MAPPER.writeValueAsString(result);

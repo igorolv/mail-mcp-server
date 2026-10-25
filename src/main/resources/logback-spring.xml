@@ -32,4 +32,6 @@
          even when the root level is lowered for debugging. -->
     <logger name="org.apache.hc.client5.http.headers" level="OFF"/>
     <logger name="org.apache.hc.client5.http.wire" level="OFF"/>
+    <logger name="org.eclipse.angus.mail" level="OFF"/>
+    <logger name="jakarta.mail" level="OFF"/>
 </configuration>

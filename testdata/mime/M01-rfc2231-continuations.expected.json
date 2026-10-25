@@ -1,0 +1,59 @@
+{
+  "id": "M01",
+  "status": "ok",
+  "headers": {
+    "subject": "Учебный макет M01",
+    "from": [
+      {
+        "name": "Synthetic Author",
+        "address": "sender@example.com"
+      }
+    ],
+    "to": [
+      {
+        "name": null,
+        "address": "reader@example.org"
+      }
+    ],
+    "date": "2026-03-12T10:15:00+03:00",
+    "messageId": "<m01.synthetic@example.com>"
+  },
+  "body": {
+    "selectedPart": "1",
+    "contentType": "text/plain",
+    "charsetDeclared": "utf-8",
+    "charsetActual": "utf-8",
+    "textContains": [
+      "Проект макета"
+    ],
+    "textNotContains": []
+  },
+  "parts": [
+    {
+      "path": "1",
+      "contentType": "text/plain",
+      "disposition": null,
+      "filenameRaw": null,
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 108,
+      "sha256": "cb2187e018c8030b27a9a1e61872faf0cdd4bca74fffe74229e7baea451704bb",
+      "status": "ok",
+      "children": []
+    },
+    {
+      "path": "2",
+      "contentType": "text/plain",
+      "disposition": "attachment",
+      "filenameRaw": "attachment; filename*0*=utf-8''%D0%94%D0%BE%D0%B3%D0%BE%D0%B2%D0%BE%D1%80%20%D0%BF%D0%BE%D1%81%D1%82%D0;\r\n filename*1*=%B0%D0%B2%D0%BA%D0%B8%20%D0%B4%D0%BB%D1%8F%20%D1%83%D1%87%D0%B5%D0%B1%D0; filename*2*=%BD%D0%BE%D0%B3%D0%BE%20%D0%BC%D0%B0%D0%BA%D0%B5%D1%82%D0%B0.txt",
+      "filenameDecoded": "Договор поставки для учебного макета.txt",
+      "contentId": null,
+      "size": 73,
+      "sha256": "70322d10242343004aec3e34aa1349ea7db3654954385d686547d751cdd7257a",
+      "status": "ok",
+      "children": []
+    }
+  ],
+  "warnings": [],
+  "notes": "RFC 2231 собирается до декодирования."
+}

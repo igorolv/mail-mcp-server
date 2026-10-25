@@ -1,0 +1,110 @@
+{
+  "id": "M09",
+  "status": "ok",
+  "headers": {
+    "subject": "Учебный макет M09",
+    "from": [
+      {
+        "name": "Synthetic Author",
+        "address": "sender@example.com"
+      }
+    ],
+    "to": [
+      {
+        "name": null,
+        "address": "reader@example.org"
+      }
+    ],
+    "date": "2026-03-12T10:15:00+03:00",
+    "messageId": "<m09.synthetic@example.com>"
+  },
+  "body": {
+    "selectedPart": "1",
+    "contentType": "text/plain",
+    "charsetDeclared": "utf-8",
+    "charsetActual": "utf-8",
+    "textContains": [
+      "Проект макета"
+    ],
+    "textNotContains": []
+  },
+  "parts": [
+    {
+      "path": "1",
+      "contentType": "text/plain",
+      "disposition": null,
+      "filenameRaw": null,
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 108,
+      "sha256": "cb2187e018c8030b27a9a1e61872faf0cdd4bca74fffe74229e7baea451704bb",
+      "status": "ok",
+      "children": []
+    },
+    {
+      "path": "2",
+      "contentType": "message/rfc822",
+      "disposition": "attachment",
+      "filenameRaw": "attachment; filename=\"forwarded.eml\"",
+      "filenameDecoded": "forwarded.eml",
+      "contentId": null,
+      "size": 6278,
+      "sha256": "1bc3abfabb058375d1558f86d3d38012af287e6e4370b6bcb8c79afe1a788e6f",
+      "status": "ok",
+      "children": [
+        {
+          "path": "2.1",
+          "contentType": "text/plain",
+          "disposition": null,
+          "filenameRaw": null,
+          "filenameDecoded": null,
+          "contentId": null,
+          "size": 45,
+          "sha256": "d98f35891ea341b1b07e517d7aeaab169bc9c11045875d372be6dc92294bbc23",
+          "status": "ok",
+          "children": []
+        },
+        {
+          "path": "2.2",
+          "contentType": "application/vnd.ms-outlook",
+          "disposition": "attachment",
+          "filenameRaw": "attachment; filename*=utf-8''nested.msg",
+          "filenameDecoded": "nested.msg",
+          "contentId": null,
+          "size": 4096,
+          "sha256": "a435849d4e45ef0686d84fde7c5eb91c90a15360862c6bca84017f0742ee43ae",
+          "status": "ok",
+          "children": [
+            {
+              "path": "2.2.1",
+              "contentType": "application/zip",
+              "disposition": "attachment",
+              "filenameRaw": null,
+              "filenameDecoded": "package.zip",
+              "contentId": null,
+              "size": 172,
+              "sha256": "a6e020b0a188a5e4211b918b78d9f2b44741fe953ddfbd3fc3cd36b11b658409",
+              "status": "ok",
+              "children": [
+                {
+                  "path": "2.2.1.1",
+                  "contentType": "text/plain",
+                  "disposition": "attachment",
+                  "filenameRaw": null,
+                  "filenameDecoded": "layout.txt",
+                  "contentId": null,
+                  "size": 52,
+                  "sha256": "8249de765f1e2e4c18c6de95a1d116814743abd6a4936678b02b3eb1c2e6a2b3",
+                  "status": "ok",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "warnings": [],
+  "notes": "Настоящий CFB/MSG с потоками MAPI. Прочитан POI HSMF 5.4.1; вложенный ZIP совпал побайтно."
+}

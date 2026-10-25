@@ -1,0 +1,11 @@
+From: Author 31 <author31@example.com>
+To: planning@example.net
+Subject: Sending update
+Date: Fri, 13 Mar 2026 10:15:00 +0300
+Message-ID: <s031.synthetic@example.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
+MIME-Version: 1.0
+
+U2VuZGluZyB0aGUgcGFja2FnZSB0b21vcnJvdy4NClRoZSBjb3VyaWVyIGNvbmZpcm1lZCBwaWNr
+dXAuDQpQbGVhc2UgcHJlcGFyZSB0aGUgbGFiZWwuDQo=

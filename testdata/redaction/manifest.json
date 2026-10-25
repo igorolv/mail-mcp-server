@@ -1,0 +1,171 @@
+{
+  "set": "redaction",
+  "created": "2026-10-25",
+  "brief": "docs/research-tasks/RT-12-redaction-samples.md",
+  "files": [
+    "D01-password.json",
+    "D03-wifi-password.json",
+    "D05-otp.json",
+    "D08-uri-userinfo.json",
+    "D09-basic-auth.json",
+    "D10-bearer.json",
+    "D11-jwt-jwe.json",
+    "D12-pem-private-key.json",
+    "D14-github-token.json",
+    "D18-api-key.json",
+    "D20-connection-string.json",
+    "D22-passport.json",
+    "D23-snils.json",
+    "D25-inn12.json",
+    "D28-card.json",
+    "README.md",
+    "mixed/X01-synthetic-handover.expected.json",
+    "mixed/X01-synthetic-handover.txt",
+    "mixed/X02-synthetic-handover.expected.json",
+    "mixed/X02-synthetic-handover.txt",
+    "mixed/X03-synthetic-handover.expected.json",
+    "mixed/X03-synthetic-handover.txt",
+    "mixed/X04-synthetic-handover.expected.json",
+    "mixed/X04-synthetic-handover.txt",
+    "mixed/X05-synthetic-handover.expected.json",
+    "mixed/X05-synthetic-handover.txt",
+    "mixed/X06-synthetic-handover.expected.json",
+    "mixed/X06-synthetic-handover.txt",
+    "mixed/X07-synthetic-handover.expected.json",
+    "mixed/X07-synthetic-handover.txt",
+    "mixed/X08-synthetic-handover.expected.json",
+    "mixed/X08-synthetic-handover.txt",
+    "manifest.json"
+  ],
+  "counts": {
+    "D01": {
+      "positive": 11,
+      "negative": 8
+    },
+    "D03": {
+      "positive": 8,
+      "negative": 8
+    },
+    "D05": {
+      "positive": 8,
+      "negative": 8
+    },
+    "D08": {
+      "positive": 8,
+      "negative": 8
+    },
+    "D09": {
+      "positive": 8,
+      "negative": 8
+    },
+    "D10": {
+      "positive": 9,
+      "negative": 8
+    },
+    "D11": {
+      "positive": 9,
+      "negative": 8
+    },
+    "D12": {
+      "positive": 8,
+      "negative": 8
+    },
+    "D14": {
+      "positive": 8,
+      "negative": 8
+    },
+    "D18": {
+      "positive": 11,
+      "negative": 8
+    },
+    "D20": {
+      "positive": 9,
+      "negative": 8
+    },
+    "D22": {
+      "positive": 8,
+      "negative": 8
+    },
+    "D23": {
+      "positive": 10,
+      "negative": 9
+    },
+    "D25": {
+      "positive": 9,
+      "negative": 9
+    },
+    "D28": {
+      "positive": 9,
+      "negative": 9
+    }
+  },
+  "mixedDocuments": 8,
+  "sha256": {
+    "D01-password.json": "4bb48b4dd79f57e7ce96cd802e8cb5efc899f8973654d2d6417b81549c3c57a9",
+    "D03-wifi-password.json": "a7f9cffa9462dd0ce8083288b0bca296430731e9f32c5a817152edcb8dc46a0f",
+    "D05-otp.json": "4f184f53838f610ff5c6b6e1ca556b7ccc5ac4acd1ab72f79cddffca4286d1c0",
+    "D08-uri-userinfo.json": "45977e88634907950dbded17587eb25af9095a4e5ffcbb7bb74689cd4e7d782e",
+    "D09-basic-auth.json": "8b226d0e2e490d3f7db0d2015cf3b2e8e697dbb19b3164f7256d546ff3aa2a8d",
+    "D10-bearer.json": "8e49df63d6e926b75471d0b603ba66d72b7b6618ddd859d147b74956a69ac20b",
+    "D11-jwt-jwe.json": "da0ea28124b46acb5705271bb6a1bfd2208edc5901109a80967f7597bd2418d2",
+    "D12-pem-private-key.json": "2cf8f082cf9576ffc36affd6f27ad825ffa612721d763eb8174b6a882f2df9c1",
+    "D14-github-token.json": "abfe1020e1477eb654d441a9cba5bac97990abbcf6c6110bf0395e1d26acac6c",
+    "D18-api-key.json": "470482a8e4192450ea28831c368ea2be4574d6880a2895425715a510021c24cd",
+    "D20-connection-string.json": "1cb9c9489941526c4595bac658de78c03cea5ec685be02f3e4f259e56d961121",
+    "D22-passport.json": "e0002ea75d04c84dffa9f8a44a2a4e0c52c14b1573de7e5f0868743bcb58a63f",
+    "D23-snils.json": "8ed029f41b25e5a4d34105d5bf7066b63bc4184f5c26935c007b0e331fcc4801",
+    "D25-inn12.json": "eb93109e4f16f10cebcaa79c106457d9bb84f44a7c8338dac50a1e8bd6fa215f",
+    "D28-card.json": "7d7c86cdab11e4c683bc4d4fd7544b0505392b79eeb9e8bbc1440b9852bbbeb1",
+    "README.md": "e79178d39c6a3e2fa60017d6985162dc12de64c52247240c38833058f77a2e70",
+    "mixed/X01-synthetic-handover.expected.json": "1745d4c3f33c679a637a794850e16e15e6b887cc40ef8ad5aa9af503bf192753",
+    "mixed/X01-synthetic-handover.txt": "aa840e4bf82c511b2d2ab9bbf7552b59eb414580b0a6210235d3efa046888c84",
+    "mixed/X02-synthetic-handover.expected.json": "1c95998bf8954be9abe1c87b9a3312ca4d3480ef02eb2ff73356d6ba454a9848",
+    "mixed/X02-synthetic-handover.txt": "2159dee260c77620786ef2e2eb071cf7a6e1ac541e8010363d8e3bf97c70fbb4",
+    "mixed/X03-synthetic-handover.expected.json": "04c0eb0bc678195f8bf5db3fb234c2880932dd0ea97840ca718b14a7a7c96b52",
+    "mixed/X03-synthetic-handover.txt": "df855dae895aec4cced8a78685d61ec1acf1155fec343332fc78cc0ad9a705e9",
+    "mixed/X04-synthetic-handover.expected.json": "668209c2212fde77211bc8f2ebc4c89088b5ad26d66c4a09eb6d3d8f6d4ad584",
+    "mixed/X04-synthetic-handover.txt": "0b6402315736c99d5fe1507cd9cae3a0c5b8ee2e685d7d43ababb62f3d0178e7",
+    "mixed/X05-synthetic-handover.expected.json": "07a2f259c053e4ef8eddc05703ce0c0bc9e410178f6d7a4b650207e04bdd1f15",
+    "mixed/X05-synthetic-handover.txt": "bce20ef6d4ea7a2a7fd8bd5491ceda9c61557374b8b7d8b0cfe6f719620fc583",
+    "mixed/X06-synthetic-handover.expected.json": "76ea4501a139455d7d07e045c4441502b94c1a5f978d24c4c49c6ea154578bfc",
+    "mixed/X06-synthetic-handover.txt": "69cfe7cd067962441daa08b41580ed65e9de7748388fa5cb72a8716d810840d0",
+    "mixed/X07-synthetic-handover.expected.json": "719339f853ce15c4f7874304b95ed11ab3952000841998ccf491119c6e0afe5d",
+    "mixed/X07-synthetic-handover.txt": "35bfef307916c9df355916291e039aa1bbedb5c681290a9aa3e88e6f47ac360d",
+    "mixed/X08-synthetic-handover.expected.json": "a4d69c6aa24c03a4fa91b6fd59e1c6edd68c076696057e348a1a72cc819b268a",
+    "mixed/X08-synthetic-handover.txt": "d051c497ff81ed471e8a65e78c8ef0befc2590425b808bdbb9802c13dc9dc710"
+  },
+  "sizes": {
+    "D01-password.json": 7641,
+    "D03-wifi-password.json": 7179,
+    "D05-otp.json": 5789,
+    "D08-uri-userinfo.json": 6383,
+    "D09-basic-auth.json": 6384,
+    "D10-bearer.json": 7063,
+    "D11-jwt-jwe.json": 8701,
+    "D12-pem-private-key.json": 8939,
+    "D14-github-token.json": 7761,
+    "D18-api-key.json": 7524,
+    "D20-connection-string.json": 8476,
+    "D22-passport.json": 5908,
+    "D23-snils.json": 7357,
+    "D25-inn12.json": 6887,
+    "D28-card.json": 6947,
+    "README.md": 3434,
+    "mixed/X01-synthetic-handover.expected.json": 1422,
+    "mixed/X01-synthetic-handover.txt": 693,
+    "mixed/X02-synthetic-handover.expected.json": 1669,
+    "mixed/X02-synthetic-handover.txt": 680,
+    "mixed/X03-synthetic-handover.expected.json": 1293,
+    "mixed/X03-synthetic-handover.txt": 568,
+    "mixed/X04-synthetic-handover.expected.json": 1718,
+    "mixed/X04-synthetic-handover.txt": 862,
+    "mixed/X05-synthetic-handover.expected.json": 1520,
+    "mixed/X05-synthetic-handover.txt": 789,
+    "mixed/X06-synthetic-handover.expected.json": 1525,
+    "mixed/X06-synthetic-handover.txt": 667,
+    "mixed/X07-synthetic-handover.expected.json": 1337,
+    "mixed/X07-synthetic-handover.txt": 612,
+    "mixed/X08-synthetic-handover.expected.json": 1529,
+    "mixed/X08-synthetic-handover.txt": 673
+  }
+}

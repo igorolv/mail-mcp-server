@@ -1,0 +1,14 @@
+Тема: учебная передача 8
+Коллеги, ниже только выдуманные данные.
+Они не выданы ни одним сервисом.
+Система | Состояние
+Учебный стенд | готов
+Authorization: Bearer fictionBearerEIX8KNvDT3kxbH7UwS8mLx
+Код подтверждения: 23082.
+Wi-Fi password: "WifiFiction_ZaSYt7Cd1p"; SSID: TrainingNet
+Проверка завершена.
+> Предыдущее сообщение:
+> Authorization: Bearer fictionBearerEIX8KNvDT3kxbH7UwS8mLx
+> Заказ: AB-2026-42
+Адрес поддержки: training@example.com
+Спасибо, команда макета.

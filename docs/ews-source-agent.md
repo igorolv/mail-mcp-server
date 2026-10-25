@@ -55,6 +55,12 @@ string in memory.
 - An exec interceptor counts requests on the wire (`requestCount()`), including handshake legs: a
   first NTLM call costs 3 requests (anonymous, Type 1, Type 3).
 
+Verified on 2026-10-25 by a user-run spike against the real mailbox: `GetFolder`, `FindItem` and
+`GetItem` with MIME succeeded, with 3 HTTP requests after the first operation and 5 total.
+The authenticated connection was reused. `IsRead` was `true` both before and after the download;
+this run did not test an unread message. See plan.md 3.3. The fallback is not needed for this
+tested connection.
+
 Known risk (RT-02): HttpClient's NTLM engine sends no channel binding. If the server enforces
 Extended Protection for Authentication, the handshake fails with 401 although the password is
 right. The fallback is a second `EwsTransport` on a buffered `HttpsURLConnection` (Windows SSPI) —

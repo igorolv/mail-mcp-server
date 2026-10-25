@@ -1,0 +1,263 @@
+{
+  "detector": "D09",
+  "title": "HTTP Basic",
+  "source": "docs/research/RT-08-redaction-detectors.md, D09",
+  "cases": [
+    {
+      "id": "D09-P01",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "header",
+        "base64",
+        "boundary"
+      ],
+      "text": "Authorization: Basic ZmljdGlvbjA6TmV2ZXJMaXZlaEZWcXhVVUtwbWs=",
+      "expected": [
+        {
+          "detector": "D09",
+          "match": "ZmljdGlvbjA6TmV2ZXJMaXZlaEZWcXhVVUtwbWs=",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D09-P02",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "header",
+        "base64",
+        "boundary"
+      ],
+      "text": "authorization: basic ZmljdGlvbjE6TmV2ZXJMaXZlcDc0RGkwN0RIVXo=",
+      "expected": [
+        {
+          "detector": "D09",
+          "match": "ZmljdGlvbjE6TmV2ZXJMaXZlcDc0RGkwN0RIVXo=",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D09-P03",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "header",
+        "base64",
+        "boundary"
+      ],
+      "text": "> Authorization: Basic ZmljdGlvbjI6TmV2ZXJMaXZlcGJ1Qnc5QWpwS3M=",
+      "expected": [
+        {
+          "detector": "D09",
+          "match": "ZmljdGlvbjI6TmV2ZXJMaXZlcGJ1Qnc5QWpwS3M=",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D09-P04",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "header",
+        "base64",
+        "boundary"
+      ],
+      "text": "Заголовок\tAuthorization: Basic ZmljdGlvbjM6TmV2ZXJMaXZla3llbFlSQzU0V2M=",
+      "expected": [
+        {
+          "detector": "D09",
+          "match": "ZmljdGlvbjM6TmV2ZXJMaXZla3llbFlSQzU0V2M=",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D09-P05",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "header",
+        "base64",
+        "boundary"
+      ],
+      "text": "Header | Authorization: Basic ZmljdGlvbjQ6TmV2ZXJMaXZlWGRhWUdjOHJMOFQ= | synthetic",
+      "expected": [
+        {
+          "detector": "D09",
+          "match": "ZmljdGlvbjQ6TmV2ZXJMaXZlWGRhWUdjOHJMOFQ=",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D09-P06",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "header",
+        "base64",
+        "boundary"
+      ],
+      "text": "\"Authorization\": \"Basic ZmljdGlvbjU6TmV2ZXJMaXZlOGNvT2I2YU5kSkw=\"",
+      "expected": [
+        {
+          "detector": "D09",
+          "match": "ZmljdGlvbjU6TmV2ZXJMaXZlOGNvT2I2YU5kSkw=",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D09-P07",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "header",
+        "base64",
+        "boundary"
+      ],
+      "text": "Authorization: Basic ZmljdGlvbjY6TmV2ZXJMaXZlZHNQWGlmYXlyOUo=\nAccept: text/plain",
+      "expected": [
+        {
+          "detector": "D09",
+          "match": "ZmljdGlvbjY6TmV2ZXJMaXZlZHNQWGlmYXlyOUo=",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D09-P08",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "header",
+        "base64",
+        "boundary"
+      ],
+      "text": "Заголовок: Authorization: Basic ZmljdGlvbjc6TmV2ZXJMaXZlUmVaQUNHYlVqcE4=",
+      "expected": [
+        {
+          "detector": "D09",
+          "match": "ZmljdGlvbjc6TmV2ZXJMaXZlUmVaQUNHYlVqcE4=",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D09-N01",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Authorization: Basic !!!",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D09-N02",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Authorization: Basic Tk9fQ09MT05fSEVSRQ==",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D09-N03",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Authorization: Basic",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D09-N04",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Basic authentication disabled.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D09-N05",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Authorization: Basic ${BASIC_VALUE}",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D09-N06",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Image: UE5HX09OTFlfRklDVElPTg==",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D09-N07",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Header: None",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D09-N08",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Basic version 2.1.0",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    }
+  ]
+}

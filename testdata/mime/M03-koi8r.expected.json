@@ -1,0 +1,47 @@
+{
+  "id": "M03",
+  "status": "ok",
+  "headers": {
+    "subject": "Старая кодировка макета",
+    "from": [
+      {
+        "name": "Synthetic Author",
+        "address": "sender@example.com"
+      }
+    ],
+    "to": [
+      {
+        "name": null,
+        "address": "reader@example.org"
+      }
+    ],
+    "date": "2026-03-12T10:15:00+03:00",
+    "messageId": "<m03.synthetic@example.com>"
+  },
+  "body": {
+    "selectedPart": "1",
+    "contentType": "text/plain",
+    "charsetDeclared": "koi8-r",
+    "charsetActual": "koi8-r",
+    "textContains": [
+      "Проверка старой кодировки"
+    ],
+    "textNotContains": []
+  },
+  "parts": [
+    {
+      "path": "1",
+      "contentType": "text/plain",
+      "disposition": null,
+      "filenameRaw": null,
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 46,
+      "sha256": "38943a6ab181517e4e41e0c1a28f84d76dc5fc5769596da76cd540c1d1eebc7f",
+      "status": "ok",
+      "children": []
+    }
+  ],
+  "warnings": [],
+  "notes": ""
+}

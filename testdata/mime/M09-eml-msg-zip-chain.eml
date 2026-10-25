@@ -1,0 +1,110 @@
+From: Synthetic Author <sender@example.com>
+To: reader@example.org
+Subject: =?utf-8?b?0KPRh9C10LHQvdGL0Lkg0LzQsNC60LXRgiBNMDk=?=
+Date: Thu, 12 Mar 2026 10:15:00 +0300
+Message-ID: <m09.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="synthetic_boundary_07"
+
+--synthetic_boundary_07
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+0J/RgNC+0LXQutGCINC80LDQutC10YLQsCDQstC+INCy0LvQvtC20LXQvdC40LguCtCf0YDQvtCy
+0LXRgNGM0YLQtSDRgNCw0YHQv9C+0LvQvtC20LXQvdC40LUg0YLQsNCx0LvQuNGG0Ysu
+--synthetic_boundary_07
+Content-Type: message/rfc822
+Content-Disposition: attachment; filename="forwarded.eml"
+
+From: Synthetic Author <sender@example.com>
+To: reader@example.org
+Subject: =?utf-8?b?0KPRh9C10LHQvdGL0Lkg0LzQsNC60LXRgiBNMDktaW5uZXI=?=
+Date: Thu, 12 Mar 2026 10:15:00 +0300
+Message-ID: <m09-inner.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="synthetic_boundary_06"
+
+--synthetic_boundary_06
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+0J/QtdGA0LXRgdGL0LvQsNGOINGD0YfQtdCx0L3Ri9C5INC/0LDQutC10YIu
+--synthetic_boundary_06
+Content-Type: application/vnd.ms-outlook
+Content-Disposition: attachment; filename*=utf-8''nested.msg
+Content-Transfer-Encoding: base64
+
+0M8R4KGxGuEAAAAAAAAAAAAAAAAAAAAAOwADAP7/CQAGAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAA
+EAAAAgAAAAEAAAD+////AAAAAAEAAAD/////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////9S
+AG8AbwB0ACAARQBuAHQAcgB5AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAFgAFAf//////////AwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAMAAACAAwAAAAAAAF8AXwBzAHUAYgBzAHQAZwAxAC4AMABfADAAMAAxAEEAMAAwADEARgAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAqAAIB////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAABIAAAAAAAAAXwBfAHMAdQBiAHMAdABnADEALgAwAF8AMAAwADMA
+NwAwADAAMQBGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACoAAgEBAAAA//////////8AAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAMgAAAAAAAABfAF8AcwB1AGIAcwB0AGcA
+MQAuADAAXwAxADAAMAAwADAAMAAxAEYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKgACAQIAAAAE
+AAAA/////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAABQAAAAAAAAAAUA
+AAD9/////v///wQAAAD+////BgAAAP7/////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////v//
+//7///8DAAAA/v///wUAAAD+/////v////7////+////CgAAAAsAAAD+////DQAAAP7/////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////9JAFAA
+TQAuAE4AbwB0AGUAAAD/////////////////////////////////////////////////////////
+////UwB5AG4AdABoAGUAdABpAGMAIABuAGUAcwB0AGUAZAAgAG0AZQBzAHMAYQBnAGUAAAD/////
+/////////////04AZQBzAHQAZQBkACAAcABhAGMAawBhAGcAZQAgAGYAbwByACAAdABoAGUAIAB0
+AHIAYQBpAG4AaQBuAGcAIABsAGEAeQBvAHUAdAAuAAAA////////////////////////////////
+////////////////////////////////AAAAAAAAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAAAAAAf
+ABoABgAAABIAAAAAAAAAHwA3AAYAAAAyAAAAAAAAAB8AABAGAAAAUAAAAAAAAAD/////////////
+//////////////////////////////////////////////////9wAGEAYwBrAGEAZwBlAC4AegBp
+AHAAAAD/////////////////////////////////////////////////////cABhAGMAawBhAGcA
+ZQAuAHoAaQBwAAAA/////////////////////////////////////////////////////2EAcABw
+AGwAaQBjAGEAdABpAG8AbgAvAHoAaQBwAAAA////////////////////////////////////////
+//9QSwMEFAAAAAgA4FFsXOt2T3k2AAAANAAAAAoAAABsYXlvdXQudHh0BcHBCYAwEADBVq4Ca4wn
+4sMybCAGAomQHnY7cobHi87L8maGSedzN4PG8jAtjKBaPBk06vYDUEsBAhQAFAAAAAgA4FFsXOt2
+T3k2AAAANAAAAAoAAAAAAAAAAAAAAIABAAAAAGxheW91dC50eHRQSwUGAAAAAAEAAQA4AAAAXgAA
+AAAA//////////////////////////8AAAAAAAAAAAMABTcGAAAAAQAAAAAAAAAfAAQ3BgAAABgA
+AAAAAAAAHwAHNwYAAAAYAAAAAAAAAB8ADjcGAAAAIAAAAAAAAAACAQE3BgAAAKwAAAAAAAAA////
+/////////////////////////////////////////////////wAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXwBfAHAA
+cgBvAHAAZQByAHQAaQBlAHMAXwB2AGUAcgBzAGkAbwBuADEALgAwAAAAAAAAAAAAAAAAAAAAAAAA
+ADAAAgH/////BQAAAP////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAA
+UAAAAAAAAABfAF8AYQB0AHQAYQBjAGgAXwB2AGUAcgBzAGkAbwBuADEALgAwAF8AIwAwADAAMAAw
+ADAAMAAwADAAAAAAAAAAPAABAf//////////BwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAF8AXwBzAHUAYgBzAHQAZwAxAC4AMABfADMANwAwADQAMAAw
+ADEARgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqAAIBCQAAAP//////////AAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABgAAABgAAAAAAAAAXwBfAHMAdQBiAHMAdABnADEALgAw
+AF8AMwA3ADAANwAwADAAMQBGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACoAAgEGAAAACAAAAP//
+//8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHAAAAGAAAAAAAAABfAF8AcwB1
+AGIAcwB0AGcAMQAuADAAXwAzADcAMABFADAAMAAxAEYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+KgACAf////8KAAAA/////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAg
+AAAAAAAAAF8AXwBzAHUAYgBzAHQAZwAxAC4AMABfADMANwAwADEAMAAxADAAMgAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAqAAIB////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAACQAAAKwAAAAAAAAAXwBfAHAAcgBvAHAAZQByAHQAaQBlAHMAXwB2AGUAcgBzAGkA
+bwBuADEALgAwAAAAAAAAAAAAAAAAAAAAAAAAADAAAgH///////////////8AAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAWAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==
+--synthetic_boundary_06--
+--synthetic_boundary_07--

@@ -1,0 +1,263 @@
+{
+  "detector": "D08",
+  "title": "Учётные данные URI",
+  "source": "docs/research/RT-08-redaction-detectors.md, D08",
+  "cases": [
+    {
+      "id": "D08-P01",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "uri",
+        "percent-encoding",
+        "boundary"
+      ],
+      "text": "Откройте https://fiction0:Pass%3A800rB1PRx@portal.example.com/path.",
+      "expected": [
+        {
+          "detector": "D08",
+          "match": "fiction0:Pass%3A800rB1PRx",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D08-P02",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "uri",
+        "percent-encoding",
+        "boundary"
+      ],
+      "text": "Endpoint = \"https://fiction1:Pass%3ATVZEvIhbK@portal.example.com/path\"",
+      "expected": [
+        {
+          "detector": "D08",
+          "match": "fiction1:Pass%3ATVZEvIhbK",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D08-P03",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "uri",
+        "percent-encoding",
+        "boundary"
+      ],
+      "text": "> https://fiction2:Pass%3A9O3zQyOOC@portal.example.com/path",
+      "expected": [
+        {
+          "detector": "D08",
+          "match": "fiction2:Pass%3A9O3zQyOOC",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D08-P04",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "uri",
+        "percent-encoding",
+        "boundary"
+      ],
+      "text": "URI\thttps://fiction3:Pass%3AfIy3UG42k@portal.example.com/path",
+      "expected": [
+        {
+          "detector": "D08",
+          "match": "fiction3:Pass%3AfIy3UG42k",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D08-P05",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "uri",
+        "percent-encoding",
+        "boundary"
+      ],
+      "text": "Ссылка: (https://fiction4:Pass%3AL1CfWo2KO@portal.example.com/path)",
+      "expected": [
+        {
+          "detector": "D08",
+          "match": "fiction4:Pass%3AL1CfWo2KO",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D08-P06",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "uri",
+        "percent-encoding",
+        "boundary"
+      ],
+      "text": "<endpoint>https://fiction5:Pass%3AQHYKKegvL@portal.example.com/path</endpoint>",
+      "expected": [
+        {
+          "detector": "D08",
+          "match": "fiction5:Pass%3AQHYKKegvL",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D08-P07",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "uri",
+        "percent-encoding",
+        "boundary"
+      ],
+      "text": "Адрес | https://fiction6:Pass%3AJkgFPBYtl@portal.example.com/path | стенд",
+      "expected": [
+        {
+          "detector": "D08",
+          "match": "fiction6:Pass%3AJkgFPBYtl",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D08-P08",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "uri",
+        "percent-encoding",
+        "boundary"
+      ],
+      "text": "Endpoint: https://fiction7:Pass%3AUStt83h5a@portal.example.com/path",
+      "expected": [
+        {
+          "detector": "D08",
+          "match": "fiction7:Pass%3AUStt83h5a",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D08-N01",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "https://portal.example.com/path",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D08-N02",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "mailto:person@example.org",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D08-N03",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Адрес: person@example.com",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D08-N04",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "https://portal.example.com:443/path",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D08-N05",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "https://portal.example.com/path@segment",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D08-N06",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "https://portal.example.com/?to=person@example.net",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D08-N07",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "URI not configured.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D08-N08",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "https://portal.example.com/#fragment",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    }
+  ]
+}

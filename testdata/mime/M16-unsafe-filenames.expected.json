@@ -1,0 +1,141 @@
+{
+  "id": "M16",
+  "status": "ok",
+  "headers": {
+    "subject": "Учебный макет M16",
+    "from": [
+      {
+        "name": "Synthetic Author",
+        "address": "sender@example.com"
+      }
+    ],
+    "to": [
+      {
+        "name": null,
+        "address": "reader@example.org"
+      }
+    ],
+    "date": "2026-03-12T10:15:00+03:00",
+    "messageId": "<m16.synthetic@example.com>"
+  },
+  "body": {
+    "selectedPart": "1",
+    "contentType": "text/plain",
+    "charsetDeclared": "utf-8",
+    "charsetActual": "utf-8",
+    "textContains": [
+      "Проект макета"
+    ],
+    "textNotContains": []
+  },
+  "parts": [
+    {
+      "path": "1",
+      "contentType": "text/plain",
+      "disposition": null,
+      "filenameRaw": null,
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 108,
+      "sha256": "cb2187e018c8030b27a9a1e61872faf0cdd4bca74fffe74229e7baea451704bb",
+      "status": "ok",
+      "children": []
+    },
+    {
+      "path": "2",
+      "contentType": "text/plain",
+      "disposition": "attachment",
+      "filenameRaw": "attachment; filename*=utf-8''..%5C..%5Cevil.txt",
+      "filenameDecoded": "..\\..\\evil.txt",
+      "contentId": null,
+      "size": 73,
+      "sha256": "70322d10242343004aec3e34aa1349ea7db3654954385d686547d751cdd7257a",
+      "status": "ok",
+      "children": [],
+      "storedFilename": "part-2.txt"
+    },
+    {
+      "path": "3",
+      "contentType": "text/plain",
+      "disposition": "attachment",
+      "filenameRaw": "attachment; filename*=utf-8''/etc/passwd",
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 73,
+      "sha256": "70322d10242343004aec3e34aa1349ea7db3654954385d686547d751cdd7257a",
+      "status": "ok",
+      "children": [],
+      "storedFilename": "part-3.txt"
+    },
+    {
+      "path": "4",
+      "contentType": "text/plain",
+      "disposition": "attachment",
+      "filenameRaw": "attachment; filename*=utf-8''CON.txt",
+      "filenameDecoded": "CON.txt",
+      "contentId": null,
+      "size": 73,
+      "sha256": "70322d10242343004aec3e34aa1349ea7db3654954385d686547d751cdd7257a",
+      "status": "ok",
+      "children": [],
+      "storedFilename": "part-4.txt"
+    },
+    {
+      "path": "5",
+      "contentType": "text/plain",
+      "disposition": "attachment",
+      "filenameRaw": "attachment; filename*=utf-8''report.txt%3Ahidden",
+      "filenameDecoded": "report.txt:hidden",
+      "contentId": null,
+      "size": 73,
+      "sha256": "70322d10242343004aec3e34aa1349ea7db3654954385d686547d751cdd7257a",
+      "status": "ok",
+      "children": [],
+      "storedFilename": "part-5.txt"
+    },
+    {
+      "path": "6",
+      "contentType": "text/plain",
+      "disposition": "attachment",
+      "filenameRaw": "attachment; filename*=utf-8''control%01name.txt",
+      "filenameDecoded": "control\u0001name.txt",
+      "contentId": null,
+      "size": 73,
+      "sha256": "70322d10242343004aec3e34aa1349ea7db3654954385d686547d751cdd7257a",
+      "status": "ok",
+      "children": [],
+      "storedFilename": "part-6.txt"
+    },
+    {
+      "path": "7",
+      "contentType": "text/plain",
+      "disposition": "attachment",
+      "filenameRaw": "attachment; filename*=utf-8''Report.txt",
+      "filenameDecoded": "Report.txt",
+      "contentId": null,
+      "size": 73,
+      "sha256": "70322d10242343004aec3e34aa1349ea7db3654954385d686547d751cdd7257a",
+      "status": "ok",
+      "children": [],
+      "storedFilename": "part-7.txt"
+    },
+    {
+      "path": "8",
+      "contentType": "text/plain",
+      "disposition": "attachment",
+      "filenameRaw": "attachment; filename*=utf-8''report.TXT",
+      "filenameDecoded": "report.TXT",
+      "contentId": null,
+      "size": 73,
+      "sha256": "70322d10242343004aec3e34aa1349ea7db3654954385d686547d751cdd7257a",
+      "status": "ok",
+      "children": [],
+      "storedFilename": "part-8.txt"
+    }
+  ],
+  "warnings": [
+    "unsafe-filename",
+    "case-collision"
+  ],
+  "notes": "Имена для отображения сохраняются, внутренние имена не являются путями отправителя."
+}

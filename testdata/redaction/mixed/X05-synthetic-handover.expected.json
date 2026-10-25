@@ -1,0 +1,32 @@
+{
+  "id": "X05",
+  "file": "X05-synthetic-handover.txt",
+  "expected": [
+    {
+      "detector": "D14",
+      "match": "ghp_XuSke2BQxPmAOjh4Hh908hfZA05eIP000000",
+      "occurrence": 1,
+      "confidence": "high"
+    },
+    {
+      "detector": "D14",
+      "match": "ghp_XuSke2BQxPmAOjh4Hh908hfZA05eIP000000",
+      "occurrence": 2,
+      "confidence": "high"
+    },
+    {
+      "detector": "D12",
+      "match": "-----BEGIN RSA PRIVATE KEY-----\nTk9UX0FfREVSX0tFWV9Pb0dRZWVWWXRmYTM4dHphTjJzaXhQ\nRWZoMXE1eXpZNkJyVjlOOGd4bkE1VTI4MFZ2SjdrUw==\n-----END RSA PRIVATE KEY-----",
+      "occurrence": 1,
+      "confidence": "high"
+    },
+    {
+      "detector": "D18",
+      "match": "FictionApi_unTFDoJEOHB81el1655semeP",
+      "occurrence": 1,
+      "confidence": "high"
+    }
+  ],
+  "redactedText": "Тема: учебная передача 5\nКоллеги, ниже только выдуманные данные.\nОни не выданы ни одним сервисом.\nСистема | Состояние\nУчебный стенд | готов\nАрхив: [скрыто:D14]\nУчебный блок:\n[скрыто:D12]\nAPI key: \"[скрыто:D18]\"\nПроверка завершена.\n> Предыдущее сообщение:\n> Архив: [скрыто:D14]\n> Заказ: AB-2026-42\nАдрес поддержки: training@example.com\nСпасибо, команда макета.\n",
+  "note": "Overlaps merge by union; largest finding chooses marker, equal lengths choose lowest detector ID."
+}

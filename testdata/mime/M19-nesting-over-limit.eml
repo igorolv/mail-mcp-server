@@ -1,0 +1,120 @@
+From: Synthetic Author <sender@example.com>
+To: reader@example.org
+Subject: =?utf-8?b?0KPRh9C10LHQvdGL0Lkg0LzQsNC60LXRgiBNMTk=?=
+Date: Thu, 12 Mar 2026 10:15:00 +0300
+Message-ID: <m19.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="synthetic_boundary_17"
+
+--synthetic_boundary_17
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+0J/RgNC+0LXQutGCINC80LDQutC10YLQsCDQstC+INCy0LvQvtC20LXQvdC40LguCtCf0YDQvtCy
+0LXRgNGM0YLQtSDRgNCw0YHQv9C+0LvQvtC20LXQvdC40LUg0YLQsNCx0LvQuNGG0Ysu
+--synthetic_boundary_17
+Content-Type: message/rfc822
+Content-Disposition: attachment; filename="level-1.eml"
+
+From: Synthetic Author <sender@example.com>
+To: reader@example.org
+Subject: =?utf-8?b?0KPRh9C10LHQvdGL0Lkg0LzQsNC60LXRgiBkZWVwLTE=?=
+Date: Thu, 12 Mar 2026 10:15:00 +0300
+Message-ID: <deep-1.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="synthetic_boundary_16"
+
+--synthetic_boundary_16
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+0KPRh9C10LHQvdGL0Lkg0YPRgNC+0LLQtdC90YwgMS4=
+--synthetic_boundary_16
+Content-Type: message/rfc822
+Content-Disposition: attachment; filename="level-2.eml"
+
+From: Synthetic Author <sender@example.com>
+To: reader@example.org
+Subject: =?utf-8?b?0KPRh9C10LHQvdGL0Lkg0LzQsNC60LXRgiBkZWVwLTI=?=
+Date: Thu, 12 Mar 2026 10:15:00 +0300
+Message-ID: <deep-2.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="synthetic_boundary_15"
+
+--synthetic_boundary_15
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+0KPRh9C10LHQvdGL0Lkg0YPRgNC+0LLQtdC90YwgMi4=
+--synthetic_boundary_15
+Content-Type: message/rfc822
+Content-Disposition: attachment; filename="level-3.eml"
+
+From: Synthetic Author <sender@example.com>
+To: reader@example.org
+Subject: =?utf-8?b?0KPRh9C10LHQvdGL0Lkg0LzQsNC60LXRgiBkZWVwLTM=?=
+Date: Thu, 12 Mar 2026 10:15:00 +0300
+Message-ID: <deep-3.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="synthetic_boundary_14"
+
+--synthetic_boundary_14
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+0KPRh9C10LHQvdGL0Lkg0YPRgNC+0LLQtdC90YwgMy4=
+--synthetic_boundary_14
+Content-Type: message/rfc822
+Content-Disposition: attachment; filename="level-4.eml"
+
+From: Synthetic Author <sender@example.com>
+To: reader@example.org
+Subject: =?utf-8?b?0KPRh9C10LHQvdGL0Lkg0LzQsNC60LXRgiBkZWVwLTQ=?=
+Date: Thu, 12 Mar 2026 10:15:00 +0300
+Message-ID: <deep-4.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="synthetic_boundary_13"
+
+--synthetic_boundary_13
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+0KPRh9C10LHQvdGL0Lkg0YPRgNC+0LLQtdC90YwgNC4=
+--synthetic_boundary_13
+Content-Type: message/rfc822
+Content-Disposition: attachment; filename="level-5.eml"
+
+From: Synthetic Author <sender@example.com>
+To: reader@example.org
+Subject: =?utf-8?b?0KPRh9C10LHQvdGL0Lkg0LzQsNC60LXRgiBkZWVwLTU=?=
+Date: Thu, 12 Mar 2026 10:15:00 +0300
+Message-ID: <deep-5.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="synthetic_boundary_12"
+
+--synthetic_boundary_12
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+0KPRh9C10LHQvdGL0Lkg0YPRgNC+0LLQtdC90YwgNS4=
+--synthetic_boundary_12
+Content-Type: message/rfc822
+Content-Disposition: attachment; filename="level-6.eml"
+
+From: Synthetic Author <sender@example.com>
+To: reader@example.org
+Subject: =?utf-8?b?0KPRh9C10LHQvdGL0Lkg0LzQsNC60LXRgiBkZWVwLTY=?=
+Date: Thu, 12 Mar 2026 10:15:00 +0300
+Message-ID: <deep-6.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+0JrQvtC90LXRh9C90YvQuSDRg9GA0L7QstC10L3RjCDRg9GH0LXQsdC90L7Qs9C+INCy0LvQvtC2
+0LXQvdC40Y8u
+--synthetic_boundary_12--
+--synthetic_boundary_13--
+--synthetic_boundary_14--
+--synthetic_boundary_15--
+--synthetic_boundary_16--
+--synthetic_boundary_17--

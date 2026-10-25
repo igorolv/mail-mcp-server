@@ -1,0 +1,305 @@
+{
+  "detector": "D25",
+  "title": "ИНН физического лица",
+  "source": "docs/research/RT-08-redaction-detectors.md, D25",
+  "cases": [
+    {
+      "id": "D25-P01",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "ИНН-12: 002918877470.",
+      "expected": [
+        {
+          "detector": "D25",
+          "match": "002918877470",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D25-P02",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "Personal INN = \"007328950140\"",
+      "expected": [
+        {
+          "detector": "D25",
+          "match": "007328950140",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D25-P03",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "> ИНН-12: 007072291489",
+      "expected": [
+        {
+          "detector": "D25",
+          "match": "007072291489",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D25-P04",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "Personal INN\t007585763659",
+      "expected": [
+        {
+          "detector": "D25",
+          "match": "007585763659",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D25-P05",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "ИНН-12 | 000937739954 | дата | март",
+      "expected": [
+        {
+          "detector": "D25",
+          "match": "000937739954",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D25-P06",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "Personal INN: «003592953300»",
+      "expected": [
+        {
+          "detector": "D25",
+          "match": "003592953300",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D25-P07",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "unlabelled",
+        "boundary"
+      ],
+      "text": "002027934650",
+      "expected": [
+        {
+          "detector": "D25",
+          "match": "002027934650",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D25-P08",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "Personal INN: 008214197479; owner: Example",
+      "expected": [
+        {
+          "detector": "D25",
+          "match": "008214197479",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D25-P09",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "disputed",
+        "label"
+      ],
+      "text": "ИНН-12: 001734434639",
+      "expected": [
+        {
+          "detector": "D25",
+          "match": "001734434639",
+          "occurrence": 1,
+          "confidence": "low"
+        }
+      ],
+      "note": "Явная метка при неверной сумме: скрытие пока предложено, не утверждено.",
+      "checksum": "invalid"
+    },
+    {
+      "id": "D25-N01",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "unlabelled"
+      ],
+      "text": "001734434639",
+      "expected": [],
+      "note": "Неверная сумма без метки.",
+      "checksum": "invalid"
+    },
+    {
+      "id": "D25-N02",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "ИНН: ************",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D25-N03",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "INN omitted.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D25-N04",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "ИНН-12: 123",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D25-N05",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "${INN_VALUE}",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D25-N06",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Заказ AB-2026-42",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D25-N07",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Дата: 2026-03-12",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D25-N08",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "ИНН: [скрыто]",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D25-N09",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Налоговый номер не требуется.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    }
+  ]
+}

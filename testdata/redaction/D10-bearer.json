@@ -1,0 +1,288 @@
+{
+  "detector": "D10",
+  "title": "HTTP Bearer",
+  "source": "docs/research/RT-08-redaction-detectors.md, D10",
+  "cases": [
+    {
+      "id": "D10-P01",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "header",
+        "boundary",
+        "unquoted"
+      ],
+      "text": "Authorization: Bearer fictionBearerEIX8KNvDT3kxbH7UwS8mLx",
+      "expected": [
+        {
+          "detector": "D10",
+          "match": "fictionBearerEIX8KNvDT3kxbH7UwS8mLx",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D10-P02",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "header",
+        "boundary",
+        "unquoted"
+      ],
+      "text": "authorization: bearer fictionBearer6c8a1as9FsCb8Vvbd914zF",
+      "expected": [
+        {
+          "detector": "D10",
+          "match": "fictionBearer6c8a1as9FsCb8Vvbd914zF",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D10-P03",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "header",
+        "boundary",
+        "unquoted"
+      ],
+      "text": "> Authorization: Bearer fictionBearerXIZYaUKh8DXm4YIAgVYGr0",
+      "expected": [
+        {
+          "detector": "D10",
+          "match": "fictionBearerXIZYaUKh8DXm4YIAgVYGr0",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D10-P04",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "header",
+        "boundary",
+        "unquoted"
+      ],
+      "text": "Заголовок\tAuthorization: Bearer fictionBearer7hUnpyF00H1q30o9y90McO",
+      "expected": [
+        {
+          "detector": "D10",
+          "match": "fictionBearer7hUnpyF00H1q30o9y90McO",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D10-P05",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "header",
+        "boundary",
+        "unquoted"
+      ],
+      "text": "Header | Authorization: Bearer fictionBearerOVkm8ZOPwR0p1P6eASVneu | synthetic",
+      "expected": [
+        {
+          "detector": "D10",
+          "match": "fictionBearerOVkm8ZOPwR0p1P6eASVneu",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D10-P06",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "header",
+        "boundary",
+        "quotes"
+      ],
+      "text": "\"Authorization\": \"Bearer fictionBearerqJ0Mn5cGQFSeq4PVOreGnO\"",
+      "expected": [
+        {
+          "detector": "D10",
+          "match": "fictionBearerqJ0Mn5cGQFSeq4PVOreGnO",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D10-P07",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "header",
+        "boundary",
+        "unquoted"
+      ],
+      "text": "Authorization: Bearer fictionBearerd3To5uW0aad6eyBVliqz4A\nAccept: text/plain",
+      "expected": [
+        {
+          "detector": "D10",
+          "match": "fictionBearerd3To5uW0aad6eyBVliqz4A",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D10-P08",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "header",
+        "boundary",
+        "unquoted"
+      ],
+      "text": "Заголовок: Authorization: Bearer fictionBearerjpMOr9FYQYHdVX0SoEyqJa",
+      "expected": [
+        {
+          "detector": "D10",
+          "match": "fictionBearerjpMOr9FYQYHdVX0SoEyqJa",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D10-P09",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "jwt",
+        "overlap"
+      ],
+      "text": "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmaWN0aW9uIn0.Tk9UX0FfUkVBTF9TSUdOQVRVUkU",
+      "expected": [
+        {
+          "detector": "D10",
+          "match": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmaWN0aW9uIn0.Tk9UX0FfUkVBTF9TSUdOQVRVUkU",
+          "occurrence": 1,
+          "confidence": "high"
+        },
+        {
+          "detector": "D11",
+          "match": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmaWN0aW9uIn0.Tk9UX0FfUkVBTF9TSUdOQVRVUkU",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D10-N01",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Authorization: Bearer",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D10-N02",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Bearer token is not required.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D10-N03",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Authorization: Bearer ${BEARER_VALUE}",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D10-N04",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Authorization: Bearer ********",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D10-N05",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Scheme: Digest",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D10-N06",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Authorization header omitted.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D10-N07",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Header: None",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D10-N08",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Bearer mode disabled.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    }
+  ]
+}

@@ -3,6 +3,7 @@ package mail.mcp.connections;
 import mail.mcp.config.MailMcpProperties;
 import mail.mcp.source.ews.EwsSettings;
 import mail.mcp.source.imap.ImapSettings;
+import mail.mcp.source.oauth.google.GoogleOAuthSettings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.DeserializationFeature;
@@ -49,7 +50,7 @@ public final class ConnectionsLoader {
             .map(component -> component.getName())
             .toList();
     private static final Set<String> EWS_ONLY_KEYS = Set.of("url", "domain", "connectTimeoutSeconds", "readTimeoutSeconds");
-    private static final Set<String> IMAP_ONLY_KEYS = Set.of("host", "port", "tls");
+    private static final Set<String> IMAP_ONLY_KEYS = Set.of("host", "port", "tls", "oauthClientFile");
 
     private ConnectionsLoader() {
     }
@@ -148,6 +149,7 @@ public final class ConnectionsLoader {
         String username = blankToNull(EnvironmentPlaceholders.resolve(entry.username(), field + ".username", env));
         String password = EnvironmentPlaceholders.resolve(entry.password(), field + ".password", env);
         String domain = blankToNull(EnvironmentPlaceholders.resolve(entry.domain(), field + ".domain", env));
+        String oauthClientFile = blankToNull(EnvironmentPlaceholders.resolve(entry.oauthClientFile(), field + ".oauthClientFile", env));
 
         Common common = new Common(name, description, connectionDir);
         if (typeText == null) {
@@ -172,14 +174,14 @@ public final class ConnectionsLoader {
         if (username == null) {
             return common.unusable(type, auth, "no 'username'");
         }
-        if (password == null || password.isEmpty()) {
+        if (auth != AuthKind.OAUTH2 && (password == null || password.isEmpty())) {
             return common.unusable(type, auth, "no 'password'");
         }
 
         return switch (type) {
             case EWS -> defineEws(common, auth, url, username, password, domain,
                     entry.connectTimeoutSeconds(), entry.readTimeoutSeconds());
-            case IMAP -> defineImap(common, auth, host, entry.port(), entry.tls(), username, password);
+            case IMAP -> defineImap(common, auth, host, entry.port(), entry.tls(), username, password, oauthClientFile);
         };
     }
 
@@ -211,7 +213,7 @@ public final class ConnectionsLoader {
     }
 
     private static ConnectionDefinition defineImap(Common common, AuthKind auth, String host, Integer port,
-                                                   Boolean tls, String username, String password) {
+                                                   Boolean tls, String username, String password, String oauthClientFile) {
         if (host == null) {
             return common.unusable(ConnectionType.IMAP, auth, "no 'host' (e.g. imap.gmail.com)");
         }
@@ -223,7 +225,28 @@ public final class ConnectionsLoader {
             return common.unusable(ConnectionType.IMAP, auth,
                     "plain IMAP is not supported; set 'tls' to true (port 993)");
         }
-        ImapSettings imap = new ImapSettings(host.trim(), effectivePort, true, auth, username, password);
+        GoogleOAuthSettings oauth = null;
+        if (auth == AuthKind.OAUTH2) {
+            if (!host.trim().equalsIgnoreCase("imap.gmail.com") || effectivePort != 993) {
+                return common.unusable(ConnectionType.IMAP, auth, "oauth2 is supported only for imap.gmail.com:993");
+            }
+            if (oauthClientFile == null) {
+                return common.unusable(ConnectionType.IMAP, auth, "no 'oauthClientFile' (Google Desktop client JSON)");
+            }
+            if (!username.contains("@")) {
+                return common.unusable(ConnectionType.IMAP, auth, "oauth2 requires a full mailbox address as 'username'");
+            }
+            try {
+                String path = oauthClientFile.trim();
+                if (path.startsWith("~")) { path = System.getProperty("user.home") + path.substring(1); }
+                oauth = new GoogleOAuthSettings(Path.of(path).toAbsolutePath().normalize(),
+                        common.connectionDir.resolve("oauth/google-tokens.json").toAbsolutePath().normalize());
+            } catch (java.nio.file.InvalidPathException e) {
+                return common.unusable(ConnectionType.IMAP, auth, "'oauthClientFile' is not a valid local path");
+            }
+            password = null; // OAuth never falls back to an app/account password.
+        }
+        ImapSettings imap = new ImapSettings(host.trim(), effectivePort, true, auth, username, password, oauth);
         return new ConnectionDefinition(common.name, common.description, ConnectionType.IMAP, auth, null, imap,
                 common.connectionDir, null);
     }

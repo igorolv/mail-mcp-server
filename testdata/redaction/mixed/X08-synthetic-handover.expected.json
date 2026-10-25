@@ -1,0 +1,38 @@
+{
+  "id": "X08",
+  "file": "X08-synthetic-handover.txt",
+  "expected": [
+    {
+      "detector": "D10",
+      "match": "fictionBearerEIX8KNvDT3kxbH7UwS8mLx",
+      "occurrence": 1,
+      "confidence": "high"
+    },
+    {
+      "detector": "D10",
+      "match": "fictionBearerEIX8KNvDT3kxbH7UwS8mLx",
+      "occurrence": 2,
+      "confidence": "high"
+    },
+    {
+      "detector": "D05",
+      "match": "23082",
+      "occurrence": 1,
+      "confidence": "high"
+    },
+    {
+      "detector": "D03",
+      "match": "WifiFiction_ZaSYt7Cd1p",
+      "occurrence": 1,
+      "confidence": "high"
+    },
+    {
+      "detector": "D01",
+      "match": "WifiFiction_ZaSYt7Cd1p",
+      "occurrence": 1,
+      "confidence": "high"
+    }
+  ],
+  "redactedText": "Тема: учебная передача 8\nКоллеги, ниже только выдуманные данные.\nОни не выданы ни одним сервисом.\nСистема | Состояние\nУчебный стенд | готов\nAuthorization: Bearer [скрыто:D10]\nКод подтверждения: [скрыто:D05].\nWi-Fi password: \"[скрыто:D01]\"; SSID: TrainingNet\nПроверка завершена.\n> Предыдущее сообщение:\n> Authorization: Bearer [скрыто:D10]\n> Заказ: AB-2026-42\nАдрес поддержки: training@example.com\nСпасибо, команда макета.\n",
+  "note": "Overlaps merge by union; largest finding chooses marker, equal lengths choose lowest detector ID."
+}

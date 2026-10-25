@@ -1,0 +1,1621 @@
+{
+  "set": "search",
+  "brief": "docs/research-tasks/RT-13-search-queries.md",
+  "created": "2026-10-25",
+  "queries": [
+    {
+      "id": "Q001",
+      "query": "договорами",
+      "lang": "ru",
+      "category": "ru-noun-forms",
+      "field": "body",
+      "expected": [
+        "S001",
+        "S002"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S001": "договор",
+        "S002": "договорами"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q002",
+      "query": "договором",
+      "lang": "ru",
+      "category": "ru-noun-forms",
+      "field": "body",
+      "expected": [
+        "S001",
+        "S002"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S001": "договора",
+        "S002": "договором"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q003",
+      "query": "договор",
+      "lang": "ru",
+      "category": "ru-noun-forms",
+      "field": "body",
+      "expected": [
+        "S002"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S002": "договорами"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q004",
+      "query": "счетов",
+      "lang": "ru",
+      "category": "ru-noun-forms",
+      "field": "body",
+      "expected": [
+        "S003",
+        "S004"
+      ],
+      "mustNotMatch": [
+        "S036"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S003": "Счёт",
+        "S004": "счетов"
+      },
+      "nearMissEvidence": {
+        "S036": "Версия"
+      }
+    },
+    {
+      "id": "Q005",
+      "query": "счета",
+      "lang": "ru",
+      "category": "ru-noun-forms",
+      "field": "body",
+      "expected": [
+        "S004"
+      ],
+      "mustNotMatch": [
+        "S036"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S004": "счетов"
+      },
+      "nearMissEvidence": {
+        "S036": "Версия"
+      }
+    },
+    {
+      "id": "Q006",
+      "query": "планами",
+      "lang": "ru",
+      "category": "ru-noun-forms",
+      "field": "body",
+      "expected": [
+        "S005",
+        "S006"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S005": "план",
+        "S006": "планами"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q007",
+      "query": "план",
+      "lang": "ru",
+      "category": "ru-noun-forms",
+      "field": "body",
+      "expected": [
+        "S006"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S006": "планами"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q008",
+      "query": "встречи",
+      "lang": "ru",
+      "category": "ru-noun-forms",
+      "field": "body",
+      "expected": [
+        "S007",
+        "S008"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S007": "встречу",
+        "S008": "встречи"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q009",
+      "query": "встреча",
+      "lang": "ru",
+      "category": "ru-noun-forms",
+      "field": "body",
+      "expected": [
+        "S008"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S008": "встреч"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q010",
+      "query": "плана",
+      "lang": "ru",
+      "category": "ru-noun-forms",
+      "field": "body",
+      "expected": [
+        "S005",
+        "S006"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S005": "плана",
+        "S006": "планами"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q011",
+      "query": "письмо",
+      "lang": "ru",
+      "category": "ru-irregular",
+      "field": "body",
+      "expected": [
+        "S010"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "miss",
+      "basis": "[код] RT-06 В2 для письмо/писем; [предположение] для остальных меняющихся основ.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S010": "писем"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q012",
+      "query": "писем",
+      "lang": "ru",
+      "category": "ru-irregular",
+      "field": "body",
+      "expected": [
+        "S009",
+        "S011"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "miss",
+      "basis": "[код] RT-06 В2 для письмо/писем; [предположение] для остальных меняющихся основ.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S009": "письмо",
+        "S011": "письмами"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q013",
+      "query": "письмами",
+      "lang": "ru",
+      "category": "ru-irregular",
+      "field": "body",
+      "expected": [
+        "S010"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "miss",
+      "basis": "[код] RT-06 В2 для письмо/писем; [предположение] для остальных меняющихся основ.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S010": "писем"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q014",
+      "query": "человек",
+      "lang": "ru",
+      "category": "ru-irregular",
+      "field": "body",
+      "expected": [
+        "S013"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "miss",
+      "basis": "[код] RT-06 В2 для письмо/писем; [предположение] для остальных меняющихся основ.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S013": "Люди"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q015",
+      "query": "ребёнок",
+      "lang": "ru",
+      "category": "ru-irregular",
+      "field": "body",
+      "expected": [
+        "S015"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "miss",
+      "basis": "[код] RT-06 В2 для письмо/писем; [предположение] для остальных меняющихся основ.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S015": "Дети"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q016",
+      "query": "год",
+      "lang": "ru",
+      "category": "ru-irregular",
+      "field": "body",
+      "expected": [
+        "S017"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "miss",
+      "basis": "[код] RT-06 В2 для письмо/писем; [предположение] для остальных меняющихся основ.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S017": "лет"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q017",
+      "query": "отправлю",
+      "lang": "ru",
+      "category": "ru-verb-adj",
+      "field": "body",
+      "expected": [
+        "S018"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S018": "отправил"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q018",
+      "query": "отправлено",
+      "lang": "ru",
+      "category": "ru-verb-adj",
+      "field": "body",
+      "expected": [
+        "S018"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S018": "отправлен"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q019",
+      "query": "согласован",
+      "lang": "ru",
+      "category": "ru-verb-adj",
+      "field": "body",
+      "expected": [
+        "S019"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S019": "Согласование"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q020",
+      "query": "согласование",
+      "lang": "ru",
+      "category": "ru-verb-adj",
+      "field": "body",
+      "expected": [
+        "S019"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S019": "согласованный"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q021",
+      "query": "срочный",
+      "lang": "ru",
+      "category": "ru-verb-adj",
+      "field": "body",
+      "expected": [
+        "S020"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S020": "срочно"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q022",
+      "query": "счет",
+      "lang": "ru",
+      "category": "ru-yo",
+      "field": "body",
+      "expected": [
+        "S003"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S003": "Счёт"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q023",
+      "query": "отчет",
+      "lang": "ru",
+      "category": "ru-yo",
+      "field": "body",
+      "expected": [
+        "S021"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S021": "Отчёт"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q024",
+      "query": "отчёт",
+      "lang": "ru",
+      "category": "ru-yo",
+      "field": "body",
+      "expected": [
+        "S021"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S021": "отчет"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q025",
+      "query": "Тестову",
+      "lang": "ru",
+      "category": "ru-names",
+      "field": "body",
+      "expected": [
+        "S022"
+      ],
+      "mustNotMatch": [
+        "S024"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S022": "Тестовым"
+      },
+      "nearMissEvidence": {
+        "S024": "Анна"
+      }
+    },
+    {
+      "id": "Q026",
+      "query": "Тестовым",
+      "lang": "ru",
+      "category": "ru-names",
+      "field": "body",
+      "expected": [
+        "S022"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S022": "Тестову"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q027",
+      "query": "Тестова",
+      "lang": "ru",
+      "category": "ru-names",
+      "field": "body",
+      "expected": [
+        "S023"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S023": "Тестовой"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q028",
+      "query": "Анна",
+      "lang": "ru",
+      "category": "ru-names",
+      "field": "body",
+      "expected": [
+        "S024"
+      ],
+      "mustNotMatch": [
+        "S025"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S024": "Анна"
+      },
+      "nearMissEvidence": {
+        "S025": "Аня"
+      }
+    },
+    {
+      "id": "Q029",
+      "query": "Аня",
+      "lang": "ru",
+      "category": "ru-names",
+      "field": "body",
+      "expected": [
+        "S025"
+      ],
+      "mustNotMatch": [
+        "S024"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S025": "Аня"
+      },
+      "nearMissEvidence": {
+        "S024": "Анна"
+      }
+    },
+    {
+      "id": "Q030",
+      "query": "report",
+      "lang": "en",
+      "category": "en-forms",
+      "field": "body",
+      "expected": [
+        "S026",
+        "S027"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S026": "Reports",
+        "S027": "Reporting"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q031",
+      "query": "reports",
+      "lang": "en",
+      "category": "en-forms",
+      "field": "body",
+      "expected": [
+        "S026"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S026": "report"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q032",
+      "query": "reporting",
+      "lang": "en",
+      "category": "en-forms",
+      "field": "body",
+      "expected": [
+        "S026"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S026": "Reports"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q033",
+      "query": "meeting",
+      "lang": "en",
+      "category": "en-forms",
+      "field": "body",
+      "expected": [
+        "S028"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S028": "meetings"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q034",
+      "query": "meetings",
+      "lang": "en",
+      "category": "en-forms",
+      "field": "body",
+      "expected": [
+        "S028"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S028": "meeting"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q035",
+      "query": "invoice",
+      "lang": "en",
+      "category": "en-forms",
+      "field": "body",
+      "expected": [
+        "S029"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S029": "Invoices"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q036",
+      "query": "invoices",
+      "lang": "en",
+      "category": "en-forms",
+      "field": "body",
+      "expected": [
+        "S029"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S029": "invoice"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q037",
+      "query": "send",
+      "lang": "en",
+      "category": "en-forms",
+      "field": "body",
+      "expected": [
+        "S030"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S030": "sent"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q038",
+      "query": "sent",
+      "lang": "en",
+      "category": "en-forms",
+      "field": "body",
+      "expected": [
+        "S030"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S030": "send"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q039",
+      "query": "sending",
+      "lang": "en",
+      "category": "en-forms",
+      "field": "body",
+      "expected": [
+        "S030",
+        "S031"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S030": "send",
+        "S031": "Sending"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q040",
+      "query": "planned",
+      "lang": "en",
+      "category": "en-forms",
+      "field": "body",
+      "expected": [
+        "S028"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S028": "planned"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q041",
+      "query": "review",
+      "lang": "en",
+      "category": "en-forms",
+      "field": "body",
+      "expected": [
+        "S026"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S026": "review"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q042",
+      "query": "schedules",
+      "lang": "en",
+      "category": "en-forms",
+      "field": "body",
+      "expected": [
+        "S027"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S027": "schedule"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q043",
+      "query": "packages",
+      "lang": "en",
+      "category": "en-forms",
+      "field": "body",
+      "expected": [
+        "S031"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S031": "package"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q044",
+      "query": "labels",
+      "lang": "en",
+      "category": "en-forms",
+      "field": "body",
+      "expected": [
+        "S031"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S031": "label"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q045",
+      "query": "релиз deploy",
+      "lang": "mixed",
+      "category": "mixed-lang",
+      "field": "body",
+      "expected": [
+        "S032"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S032": "Релиз готов к deploy"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q046",
+      "query": "обновите Jira",
+      "lang": "mixed",
+      "category": "mixed-lang",
+      "field": "body",
+      "expected": [
+        "S032"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S032": "Обновите Jira"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q047",
+      "query": "проверка release",
+      "lang": "mixed",
+      "category": "mixed-lang",
+      "field": "body",
+      "expected": [
+        "S033"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S033": "Проверка release"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q048",
+      "query": "review макета",
+      "lang": "mixed",
+      "category": "mixed-lang",
+      "field": "body",
+      "expected": [
+        "S033"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S033": "review макета"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q049",
+      "query": "Wi-Fi переговорной",
+      "lang": "mixed",
+      "category": "mixed-lang",
+      "field": "body",
+      "expected": [
+        "S034"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S034": "Wi-Fi проверен в переговорной"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q050",
+      "query": "ivan.testov@example.com",
+      "lang": "technical",
+      "category": "address",
+      "field": "from",
+      "expected": [
+        "S022"
+      ],
+      "mustNotMatch": [
+        "S023"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S022": "ivan.testov@example.com"
+      },
+      "nearMissEvidence": {
+        "S023": "anna.testova@example.org"
+      }
+    },
+    {
+      "id": "Q051",
+      "query": "anna.testova@example.org",
+      "lang": "technical",
+      "category": "address",
+      "field": "from",
+      "expected": [
+        "S023"
+      ],
+      "mustNotMatch": [
+        "S022"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S023": "anna.testova@example.org"
+      },
+      "nearMissEvidence": {
+        "S022": "ivan.testov@example.com"
+      }
+    },
+    {
+      "id": "Q052",
+      "query": "ivan.testov",
+      "lang": "technical",
+      "category": "address",
+      "field": "from",
+      "expected": [],
+      "mustNotMatch": [
+        "S022"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {},
+      "nearMissEvidence": {
+        "S022": "ivan.testov@example.com"
+      }
+    },
+    {
+      "id": "Q053",
+      "query": "example.com",
+      "lang": "technical",
+      "category": "address",
+      "field": "from",
+      "expected": [],
+      "mustNotMatch": [
+        "S022"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {},
+      "nearMissEvidence": {
+        "S022": "ivan.testov@example.com"
+      }
+    },
+    {
+      "id": "Q054",
+      "query": "Иван Тестов",
+      "lang": "ru",
+      "category": "address",
+      "field": "from",
+      "expected": [
+        "S022"
+      ],
+      "mustNotMatch": [
+        "S023"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S022": "Иван Тестов"
+      },
+      "nearMissEvidence": {
+        "S023": "Анна Тестова"
+      }
+    },
+    {
+      "id": "Q055",
+      "query": "planning@example.net",
+      "lang": "technical",
+      "category": "address",
+      "field": "to",
+      "expected": [
+        "S001"
+      ],
+      "mustNotMatch": [
+        "S002"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S001": "planning@example.net"
+      },
+      "nearMissEvidence": {
+        "S002": "review@example.org"
+      }
+    },
+    {
+      "id": "Q056",
+      "query": "Договор_поставки_№15-2026.txt",
+      "lang": "technical",
+      "category": "filename",
+      "field": "attachmentName",
+      "expected": [
+        "S001"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S001": "Договор_поставки_№15-2026.txt"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q057",
+      "query": "договорами",
+      "lang": "technical",
+      "category": "filename",
+      "field": "attachmentName",
+      "expected": [
+        "S001"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S001": "Договор"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q058",
+      "query": "txt",
+      "lang": "technical",
+      "category": "filename",
+      "field": "attachmentName",
+      "expected": [
+        "S001",
+        "S010"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S001": ".txt",
+        "S010": ".txt"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q059",
+      "query": "2026",
+      "lang": "technical",
+      "category": "filename",
+      "field": "attachmentName",
+      "expected": [
+        "S001",
+        "S005"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S001": "2026",
+        "S005": "2026"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q060",
+      "query": "План_переезда_2026.csv",
+      "lang": "technical",
+      "category": "filename",
+      "field": "attachmentName",
+      "expected": [
+        "S005"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S005": "План_переезда_2026.csv"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q061",
+      "query": "упаковка",
+      "lang": "technical",
+      "category": "filename",
+      "field": "attachmentText",
+      "expected": [
+        "S001"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S001": "упаковку"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q062",
+      "query": "Д-2026/015",
+      "lang": "technical",
+      "category": "identifier",
+      "field": "body",
+      "expected": [
+        "S035"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S035": "Д-2026/015"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q063",
+      "query": "INC-4512",
+      "lang": "technical",
+      "category": "identifier",
+      "field": "body",
+      "expected": [
+        "S036"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S036": "INC-4512"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q064",
+      "query": "ООО",
+      "lang": "technical",
+      "category": "identifier",
+      "field": "body",
+      "expected": [
+        "S035"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S035": "ООО"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q065",
+      "query": "НДС",
+      "lang": "technical",
+      "category": "identifier",
+      "field": "body",
+      "expected": [
+        "S035"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S035": "НДС"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q066",
+      "query": "2.1.0",
+      "lang": "technical",
+      "category": "identifier",
+      "field": "body",
+      "expected": [
+        "S036"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S036": "2.1.0"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q067",
+      "query": "договор",
+      "lang": "ru",
+      "category": "precision",
+      "field": "body",
+      "expected": [
+        "S001"
+      ],
+      "mustNotMatch": [
+        "S037"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S001": "договор"
+      },
+      "nearMissEvidence": {
+        "S037": "договориться"
+      }
+    },
+    {
+      "id": "Q068",
+      "query": "машина",
+      "lang": "ru",
+      "category": "precision",
+      "field": "body",
+      "expected": [
+        "S040"
+      ],
+      "mustNotMatch": [
+        "S041"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S040": "Машина"
+      },
+      "nearMissEvidence": {
+        "S041": "Машинный"
+      }
+    },
+    {
+      "id": "Q069",
+      "query": "лес",
+      "lang": "ru",
+      "category": "precision",
+      "field": "body",
+      "expected": [
+        "S042"
+      ],
+      "mustNotMatch": [
+        "S043"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S042": "Лес"
+      },
+      "nearMissEvidence": {
+        "S043": "Лестница"
+      }
+    },
+    {
+      "id": "Q070",
+      "query": "вина исполнителя",
+      "lang": "ru",
+      "category": "precision",
+      "field": "body",
+      "expected": [
+        "S039"
+      ],
+      "mustNotMatch": [
+        "S038"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S039": "вина исполнителя"
+      },
+      "nearMissEvidence": {
+        "S038": "Вина из винограда"
+      }
+    },
+    {
+      "id": "Q071",
+      "query": "план",
+      "lang": "ru",
+      "category": "precision",
+      "field": "body",
+      "expected": [
+        "S005"
+      ],
+      "mustNotMatch": [
+        "S028"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S005": "план"
+      },
+      "nearMissEvidence": {
+        "S028": "planned"
+      }
+    },
+    {
+      "id": "Q072",
+      "query": "счёт",
+      "lang": "ru",
+      "category": "precision",
+      "field": "body",
+      "expected": [
+        "S003"
+      ],
+      "mustNotMatch": [
+        "S030"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S003": "Счёт"
+      },
+      "nearMissEvidence": {
+        "S030": "send"
+      }
+    },
+    {
+      "id": "Q073",
+      "query": "и в на",
+      "lang": "ru",
+      "category": "stopwords-phrase",
+      "field": "body",
+      "expected": [],
+      "mustNotMatch": [
+        "S046"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {},
+      "nearMissEvidence": {
+        "S046": "И в на"
+      }
+    },
+    {
+      "id": "Q074",
+      "query": "\"красный макет\"",
+      "lang": "ru",
+      "category": "stopwords-phrase",
+      "field": "body",
+      "expected": [
+        "S044"
+      ],
+      "mustNotMatch": [
+        "S045"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S044": "Красный макет"
+      },
+      "nearMissEvidence": {
+        "S045": "Макет красный"
+      }
+    },
+    {
+      "id": "Q075",
+      "query": "\"макет красный\"",
+      "lang": "ru",
+      "category": "stopwords-phrase",
+      "field": "body",
+      "expected": [
+        "S045"
+      ],
+      "mustNotMatch": [
+        "S044"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S045": "Макет красный"
+      },
+      "nearMissEvidence": {
+        "S044": "Красный макет"
+      }
+    },
+    {
+      "id": "Q076",
+      "query": "\"поставка нового макета\"",
+      "lang": "ru",
+      "category": "stopwords-phrase",
+      "field": "body",
+      "expected": [
+        "S044"
+      ],
+      "mustNotMatch": [
+        "S045"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S044": "Поставка нового макета"
+      },
+      "nearMissEvidence": {
+        "S045": "Нового макета поставка"
+      }
+    },
+    {
+      "id": "Q077",
+      "query": "ДОГОВОР",
+      "lang": "ru",
+      "category": "case",
+      "field": "body",
+      "expected": [
+        "S001"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S001": "договор"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q078",
+      "query": "rEpOrTs",
+      "lang": "en",
+      "category": "case",
+      "field": "body",
+      "expected": [
+        "S026"
+      ],
+      "mustNotMatch": [],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {
+        "S026": "Reports"
+      },
+      "nearMissEvidence": {}
+    },
+    {
+      "id": "Q079",
+      "query": "SYNTHETIC_ONLY_FICTION_47x",
+      "lang": "technical",
+      "category": "redacted",
+      "field": "body",
+      "expected": [],
+      "mustNotMatch": [
+        "S047"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {},
+      "nearMissEvidence": {
+        "S047": "SYNTHETIC_ONLY_FICTION_47x"
+      }
+    },
+    {
+      "id": "Q080",
+      "query": "00 00 000042",
+      "lang": "technical",
+      "category": "redacted",
+      "field": "body",
+      "expected": [],
+      "mustNotMatch": [
+        "S048"
+      ],
+      "rankFirst": null,
+      "snowball": "unknown",
+      "basis": "[предположение] Ручная языковая разметка; поведение анализатора не измерялось.",
+      "note": "Only listed expected/mustNotMatch messages are scored.",
+      "evidence": {},
+      "nearMissEvidence": {
+        "S048": "00 00 000042"
+      }
+    }
+  ]
+}

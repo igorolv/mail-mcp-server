@@ -1,0 +1,263 @@
+{
+  "detector": "D05",
+  "title": "Коды подтверждения",
+  "source": "docs/research/RT-08-redaction-detectors.md, D05",
+  "cases": [
+    {
+      "id": "D05-P01",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "label",
+        "boundary",
+        "quotes"
+      ],
+      "text": "Код подтверждения: 23082.",
+      "expected": [
+        {
+          "detector": "D05",
+          "match": "23082",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D05-P02",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "label",
+        "boundary",
+        "quotes"
+      ],
+      "text": "Verification code = \"684282\"",
+      "expected": [
+        {
+          "detector": "D05",
+          "match": "684282",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D05-P03",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "label",
+        "boundary",
+        "quotes"
+      ],
+      "text": "OTP: `4932794917`",
+      "expected": [
+        {
+          "detector": "D05",
+          "match": "4932794917",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D05-P04",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "label",
+        "boundary",
+        "quotes"
+      ],
+      "text": "Одноразовый код: «7319728»",
+      "expected": [
+        {
+          "detector": "D05",
+          "match": "7319728",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D05-P05",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "label",
+        "boundary",
+        "quotes"
+      ],
+      "text": "> OTP: 5693955",
+      "expected": [
+        {
+          "detector": "D05",
+          "match": "5693955",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D05-P06",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "label",
+        "boundary",
+        "table"
+      ],
+      "text": "Код подтверждения\t77617",
+      "expected": [
+        {
+          "detector": "D05",
+          "match": "77617",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D05-P07",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "label",
+        "boundary",
+        "table"
+      ],
+      "text": "OTP | 53066676 | expires | March",
+      "expected": [
+        {
+          "detector": "D05",
+          "match": "53066676",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D05-P08",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "label",
+        "boundary",
+        "quotes"
+      ],
+      "text": "<otp>084770589</otp>",
+      "expected": [
+        {
+          "detector": "D05",
+          "match": "084770589",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D05-N01",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Заказ: 123456",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D05-N02",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Invoice 654321",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D05-N03",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "OTP: 123",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D05-N04",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Код подтверждения: 12345678901",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D05-N05",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "OTP=${TRAINING_OTP}",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D05-N06",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Код подтверждения отправлен отдельно.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D05-N07",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Version 2.1.0",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D05-N08",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Срок: 2026-03-12",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    }
+  ]
+}

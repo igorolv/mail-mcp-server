@@ -1,0 +1,76 @@
+{
+  "id": "M11",
+  "status": "ok",
+  "headers": {
+    "subject": "Учебный макет M11",
+    "from": [
+      {
+        "name": "Synthetic Author",
+        "address": "sender@example.com"
+      }
+    ],
+    "to": [
+      {
+        "name": null,
+        "address": "reader@example.org"
+      }
+    ],
+    "date": "2026-03-12T10:15:00+03:00",
+    "messageId": "<m11.synthetic@example.com>"
+  },
+  "body": {
+    "selectedPart": "1",
+    "contentType": "text/plain",
+    "charsetDeclared": "utf-8",
+    "charsetActual": "utf-8",
+    "textContains": [
+      "Проект макета"
+    ],
+    "textNotContains": []
+  },
+  "parts": [
+    {
+      "path": "1",
+      "contentType": "text/plain",
+      "disposition": null,
+      "filenameRaw": null,
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 108,
+      "sha256": "cb2187e018c8030b27a9a1e61872faf0cdd4bca74fffe74229e7baea451704bb",
+      "status": "ok",
+      "children": []
+    },
+    {
+      "path": "2",
+      "contentType": "text/calendar",
+      "disposition": "attachment",
+      "filenameRaw": "attachment; filename*=utf-8''meeting.ics",
+      "filenameDecoded": "meeting.ics",
+      "contentId": null,
+      "size": 759,
+      "sha256": "089e922c3f844375816c44784a85cb92459df7e4fa1af851a7b6d7ba3a9651a5",
+      "status": "ok",
+      "children": []
+    }
+  ],
+  "warnings": [],
+  "notes": "RRULE не разворачивается; ATTACH не загружается; VALARM не исполняется.",
+  "calendar": {
+    "method": "REQUEST",
+    "uid": "layout-20260312@example.com",
+    "summary": "Обсуждение учебного макета",
+    "dtstart": {
+      "value": "2026-03-12T10:15:00",
+      "tzid": "Europe/Moscow"
+    },
+    "rrule": "FREQ=WEEKLY;COUNT=3",
+    "organizer": "organizer@example.com",
+    "attendees": [
+      "attendee@example.org"
+    ]
+  },
+  "remoteResources": [
+    "https://example.com/layout.txt"
+  ]
+}

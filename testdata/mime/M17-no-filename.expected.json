@@ -1,0 +1,62 @@
+{
+  "id": "M17",
+  "status": "ok",
+  "headers": {
+    "subject": "Учебный макет M17",
+    "from": [
+      {
+        "name": "Synthetic Author",
+        "address": "sender@example.com"
+      }
+    ],
+    "to": [
+      {
+        "name": null,
+        "address": "reader@example.org"
+      }
+    ],
+    "date": "2026-03-12T10:15:00+03:00",
+    "messageId": "<m17.synthetic@example.com>"
+  },
+  "body": {
+    "selectedPart": "1",
+    "contentType": "text/plain",
+    "charsetDeclared": "utf-8",
+    "charsetActual": "utf-8",
+    "textContains": [
+      "Проект макета"
+    ],
+    "textNotContains": []
+  },
+  "parts": [
+    {
+      "path": "1",
+      "contentType": "text/plain",
+      "disposition": null,
+      "filenameRaw": null,
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 108,
+      "sha256": "cb2187e018c8030b27a9a1e61872faf0cdd4bca74fffe74229e7baea451704bb",
+      "status": "ok",
+      "children": []
+    },
+    {
+      "path": "2",
+      "contentType": "text/plain",
+      "disposition": "attachment",
+      "filenameRaw": "attachment",
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 73,
+      "sha256": "70322d10242343004aec3e34aa1349ea7db3654954385d686547d751cdd7257a",
+      "status": "ok",
+      "children": [],
+      "storedFilename": "part-2.txt"
+    }
+  ],
+  "warnings": [
+    "filename-missing"
+  ],
+  "notes": ""
+}

@@ -1,0 +1,19 @@
+From: Synthetic Author <sender@example.com>
+To: reader@example.org
+Subject: =?utf-8?b?0KPRh9C10LHQvdGL0Lkg0LzQsNC60LXRgiBNMDU=?=
+Date: Thu, 12 Mar 2026 10:15:00 +0300
+Message-ID: <m05.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="synthetic_boundary_03"
+
+--synthetic_boundary_03
+Content-Type: text/plain; charset=iso-8859-1
+Content-Transfer-Encoding: base64
+
+z/Do6+7m5e0g7ODq5fIg5Ov/IO/w7uLl8OroLg==
+--synthetic_boundary_03
+Content-Type: text/plain
+Content-Transfer-Encoding: base64
+
+wvLu8OD/IPfg8fL8IOHl5yDs5fLq6CDq7uTo8O7i6ugu
+--synthetic_boundary_03--

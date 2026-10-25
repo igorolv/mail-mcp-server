@@ -1,0 +1,47 @@
+{
+  "id": "M04",
+  "status": "ok",
+  "headers": {
+    "subject": "Учебный макет в старой кодировке",
+    "from": [
+      {
+        "name": "Иван Тестов",
+        "address": "sender@example.com"
+      }
+    ],
+    "to": [
+      {
+        "name": null,
+        "address": "reader@example.org"
+      }
+    ],
+    "date": "2026-03-12T10:15:00+03:00",
+    "messageId": "<m04.synthetic@example.com>"
+  },
+  "body": {
+    "selectedPart": "1",
+    "contentType": "text/plain",
+    "charsetDeclared": "windows-1251",
+    "charsetActual": "windows-1251",
+    "textContains": [
+      "Макет передан"
+    ],
+    "textNotContains": []
+  },
+  "parts": [
+    {
+      "path": "1",
+      "contentType": "text/plain",
+      "disposition": null,
+      "filenameRaw": null,
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 27,
+      "sha256": "5d7323022e7602aad3755b6b72fa7d4cf4bd8e8b3b16d1a0738c2cd18f7ec09a",
+      "status": "ok",
+      "children": []
+    }
+  ],
+  "warnings": [],
+  "notes": ""
+}

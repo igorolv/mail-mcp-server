@@ -1,0 +1,324 @@
+{
+  "detector": "D23",
+  "title": "СНИЛС",
+  "source": "docs/research/RT-08-redaction-detectors.md, D23",
+  "cases": [
+    {
+      "id": "D23-P01",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "СНИЛС: 599-363-279 67.",
+      "expected": [
+        {
+          "detector": "D23",
+          "match": "599-363-279 67",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D23-P02",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "SNILS = \"265-064-089 71\"",
+      "expected": [
+        {
+          "detector": "D23",
+          "match": "265-064-089 71",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D23-P03",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "> СНИЛС: 636-028-642 89",
+      "expected": [
+        {
+          "detector": "D23",
+          "match": "636-028-642 89",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D23-P04",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "SNILS\t790-734-756 43",
+      "expected": [
+        {
+          "detector": "D23",
+          "match": "790-734-756 43",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D23-P05",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "СНИЛС | 540-764-233 79 | дата | март",
+      "expected": [
+        {
+          "detector": "D23",
+          "match": "540-764-233 79",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D23-P06",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "SNILS: «493-774-437 45»",
+      "expected": [
+        {
+          "detector": "D23",
+          "match": "493-774-437 45",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D23-P07",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "unlabelled",
+        "boundary"
+      ],
+      "text": "104-500-507 89",
+      "expected": [
+        {
+          "detector": "D23",
+          "match": "104-500-507 89",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D23-P08",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "SNILS: 262-839-710 00; owner: Example",
+      "expected": [
+        {
+          "detector": "D23",
+          "match": "262-839-710 00",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D23-P09",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "disputed",
+        "label"
+      ],
+      "text": "СНИЛС: 701-815-034 53",
+      "expected": [
+        {
+          "detector": "D23",
+          "match": "701-815-034 53",
+          "occurrence": 1,
+          "confidence": "low"
+        }
+      ],
+      "note": "Явная метка при неверной сумме: скрытие пока предложено, не утверждено.",
+      "checksum": "invalid"
+    },
+    {
+      "id": "D23-N01",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "unlabelled"
+      ],
+      "text": "701-815-034 53",
+      "expected": [],
+      "note": "Неверная сумма без метки.",
+      "checksum": "invalid"
+    },
+    {
+      "id": "D23-P10",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "historical-range",
+        "label"
+      ],
+      "text": "СНИЛС: 000-001-123 45",
+      "expected": [
+        {
+          "detector": "D23",
+          "match": "000-001-123 45",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "Номер ниже 001-001-998; сумма не применяется, явная метка скрывается."
+    },
+    {
+      "id": "D23-N02",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "СНИЛС: ***********",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D23-N03",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "СНИЛС не требуется.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D23-N04",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "SNILS omitted.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D23-N05",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "123-456-78 90",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D23-N06",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "${SNILS_VALUE}",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D23-N07",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "СНИЛС: 12",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D23-N08",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Invoice 7654321",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D23-N09",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "СНИЛС: [скрыто]",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    }
+  ]
+}

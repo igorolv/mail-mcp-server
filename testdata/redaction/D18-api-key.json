@@ -1,0 +1,323 @@
+{
+  "detector": "D18",
+  "title": "Общие ключи API",
+  "source": "docs/research/RT-08-redaction-detectors.md, D18",
+  "cases": [
+    {
+      "id": "D18-P01",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "label",
+        "config",
+        "boundary"
+      ],
+      "text": "API key: \"FictionApi_unTFDoJEOHB81el1655semeP\"",
+      "expected": [
+        {
+          "detector": "D18",
+          "match": "FictionApi_unTFDoJEOHB81el1655semeP",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D18-P02",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "label",
+        "config",
+        "boundary"
+      ],
+      "text": "api_key=FictionApi_jZoVOcMvNkX771TH797ARzQB",
+      "expected": [
+        {
+          "detector": "D18",
+          "match": "FictionApi_jZoVOcMvNkX771TH797ARzQB",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D18-P03",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "label",
+        "config",
+        "boundary"
+      ],
+      "text": "secret: «FictionApi_ckHBWJWBVHBJqolNBIhU42Xo»",
+      "expected": [
+        {
+          "detector": "D18",
+          "match": "FictionApi_ckHBWJWBVHBJqolNBIhU42Xo",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D18-P04",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "label",
+        "config",
+        "boundary"
+      ],
+      "text": "token = `FictionApi_m3uvaiRnvWY8RvHf84xvWA30`",
+      "expected": [
+        {
+          "detector": "D18",
+          "match": "FictionApi_m3uvaiRnvWY8RvHf84xvWA30",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D18-P05",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "label",
+        "config",
+        "boundary"
+      ],
+      "text": "> secret: FictionApi_36vdum6aMVFJKTX5kLizn1BD",
+      "expected": [
+        {
+          "detector": "D18",
+          "match": "FictionApi_36vdum6aMVFJKTX5kLizn1BD",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D18-P06",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "label",
+        "config",
+        "table"
+      ],
+      "text": "API_KEY\tFictionApi_2q691mRvNwY4MLdXliBC1MKP",
+      "expected": [
+        {
+          "detector": "D18",
+          "match": "FictionApi_2q691mRvNwY4MLdXliBC1MKP",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D18-P07",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "label",
+        "config",
+        "table"
+      ],
+      "text": "token | FictionApi_ALN9K3MqWtVyW3gbARnYsT2t | expires | March",
+      "expected": [
+        {
+          "detector": "D18",
+          "match": "FictionApi_ALN9K3MqWtVyW3gbARnYsT2t",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D18-P08",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "label",
+        "config",
+        "boundary"
+      ],
+      "text": "<secret>FictionApi_Afx0uJSS2nYjzdZ7YueUDRl8</secret>",
+      "expected": [
+        {
+          "detector": "D18",
+          "match": "FictionApi_Afx0uJSS2nYjzdZ7YueUDRl8",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D18-P09",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "ini",
+        "config",
+        "boundary"
+      ],
+      "text": "[training]\napi_key=ApiFiction_eEzO28nOEYkNzkj7XpMC",
+      "expected": [
+        {
+          "detector": "D18",
+          "match": "ApiFiction_eEzO28nOEYkNzkj7XpMC",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D18-P10",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "json",
+        "config",
+        "boundary"
+      ],
+      "text": "{\"secret\":\"ApiFiction_AXBAPNQgw75WCrYjdz9W\",\"project\":\"training\"}",
+      "expected": [
+        {
+          "detector": "D18",
+          "match": "ApiFiction_AXBAPNQgw75WCrYjdz9W",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D18-P11",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "yaml",
+        "config",
+        "boundary"
+      ],
+      "text": "api_key: \"ApiFiction_uborN59vXLpUwZBDxTft\"\nproject: training",
+      "expected": [
+        {
+          "detector": "D18",
+          "match": "ApiFiction_uborN59vXLpUwZBDxTft",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D18-N01",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "API documentation is ready.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D18-N02",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "api_key=${API_VALUE}",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D18-N03",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "secret: ********",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D18-N04",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "token: [скрыто]",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D18-N05",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Token is not required.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D18-N06",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "api_key=\"\"",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D18-N07",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "UUID: 4c5cd668-58a5-4557-bf42-e07114b28713",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D18-N08",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "SHA256: 3fd83fddcdb06f7edadf9979e238afa8517bd387516dfac0bb370693074ac236",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "id": "M08",
+  "status": "ok",
+  "headers": {
+    "subject": "Учебный макет M08",
+    "from": [
+      {
+        "name": "Synthetic Author",
+        "address": "sender@example.com"
+      }
+    ],
+    "to": [
+      {
+        "name": null,
+        "address": "reader@example.org"
+      }
+    ],
+    "date": "2026-03-12T10:15:00+03:00",
+    "messageId": "<m08.synthetic@example.com>"
+  },
+  "body": {
+    "selectedPart": "1",
+    "contentType": "text/html",
+    "charsetDeclared": "utf-8",
+    "charsetActual": "utf-8",
+    "textContains": [
+      "Макет с изображениями."
+    ],
+    "textNotContains": [
+      "<html",
+      "display:none"
+    ]
+  },
+  "parts": [
+    {
+      "path": "1",
+      "contentType": "text/html",
+      "disposition": null,
+      "filenameRaw": null,
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 138,
+      "sha256": "8bda78ee72fdd7bede7bd8a934cf0dc7c3017e9fd3458fedc01627d415870c6d",
+      "status": "ok",
+      "children": []
+    },
+    {
+      "path": "2",
+      "contentType": "image/png",
+      "disposition": "inline",
+      "filenameRaw": "inline; filename*=utf-8''image-1.png",
+      "filenameDecoded": "image-1.png",
+      "contentId": "red@example.com",
+      "size": 69,
+      "sha256": "b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640",
+      "status": "ok",
+      "children": []
+    },
+    {
+      "path": "3",
+      "contentType": "image/png",
+      "disposition": "inline",
+      "filenameRaw": "inline; filename*=utf-8''image-2.png",
+      "filenameDecoded": "image-2.png",
+      "contentId": "green@example.com",
+      "size": 69,
+      "sha256": "64abf93fb4c16b4258aa6eff5660a6b97b013a1b9c0cc877fcceb14c6764680f",
+      "status": "ok",
+      "children": []
+    },
+    {
+      "path": "4",
+      "contentType": "image/png",
+      "disposition": "attachment",
+      "filenameRaw": "attachment; filename*=utf-8''image-3.png",
+      "filenameDecoded": "image-3.png",
+      "contentId": "extra@example.com",
+      "size": 69,
+      "sha256": "fce481932ea5d07a91c7991c09fdadb4bf78f9b4cc8f927188384231f9d12679",
+      "status": "ok",
+      "children": []
+    }
+  ],
+  "warnings": [],
+  "notes": "Части 2,3 — inline; 4 — отдельное вложение без ссылки.",
+  "remoteResources": [],
+  "cidMap": {
+    "red@example.com": "2",
+    "green@example.com": "3"
+  }
+}

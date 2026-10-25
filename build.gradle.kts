@@ -20,6 +20,8 @@ dependencies {
     implementation(libs.spring.boot.starter)
     implementation(libs.spring.ai.mcp.server)
     implementation(libs.httpclient5)
+    implementation(libs.angus.mail)
+    implementation(libs.jakarta.mail)
 
     testImplementation(libs.spring.boot.starter.test)
 }
@@ -50,5 +52,14 @@ tasks.register<JavaExec>("ewsSpike") {
     description = "Runs the EWS spike against one connection from connections.json (run by the user only)"
     classpath = sourceSets.main.get().runtimeClasspath
     mainClass.set("mail.mcp.spike.EwsSpikeCommand")
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) })
+}
+
+// Signs in to a real mailbox: run by the user only.
+tasks.register<JavaExec>("imapSpike") {
+    group = "application"
+    description = "Runs the read-only IMAP spike (run by the user only)"
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("mail.mcp.spike.ImapSpikeCommand")
     javaLauncher.set(javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) })
 }

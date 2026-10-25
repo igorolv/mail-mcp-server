@@ -1,0 +1,26 @@
+From: Synthetic Author <sender@example.com>
+To: reader@example.org
+Subject: =?utf-8?b?0KPRh9C10LHQvdGL0Lkg0LzQsNC60LXRgiBNMTA=?=
+Date: Thu, 12 Mar 2026 10:15:00 +0300
+Message-ID: <m10.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="synthetic_boundary_08"
+
+--synthetic_boundary_08
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+0J/RgNC+0LXQutGCINC80LDQutC10YLQsCDQstC+INCy0LvQvtC20LXQvdC40LguCtCf0YDQvtCy
+0LXRgNGM0YLQtSDRgNCw0YHQv9C+0LvQvtC20LXQvdC40LUg0YLQsNCx0LvQuNGG0Ysu
+--synthetic_boundary_08
+Content-Type: application/ms-tnef
+Content-Disposition: attachment; filename*=utf-8''winmail.dat
+Content-Transfer-Encoding: base64
+
+eJ8+IgEAAQaQCAAEAAAAAAABAAEAAQeQBgAIAAAA4wQAAAAAAADnAAEDkAYAWAAAAAEAAAACAQkQ
+AQAAAEgAAABEAAAAOAAAAE1FTEEAAAAAe1xydGYxXGFuc2kgU3ludGhldGljIFJURiBib2R5IGZv
+ciB0aGUgdHJhaW5pbmcgbGF5b3V0Ln2+FgICkAYADgAAAAEA/////wAAAAAAAAAA/QMCD4AGACoA
+AADQo9GH0LXQsdC90L7QtSDQstC70L7QttC10L3QuNC1INC40LcgVE5FRi57GwIFkAYAbAAAAAEA
+AAAfAAc3AQAAAFoAAAAUBDsEOAQ9BD0EPgQ1BCAAOAQ8BE8EIAAyBDsEPgQ2BDUEPQQ4BE8EIAA0
+BDsETwQgAEMERwQ1BDEEPQQ+BDMEPgQgAD8EOARBBEwEPAQwBC4AdAB4AHQAAAAAAI4L
+--synthetic_boundary_08--

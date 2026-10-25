@@ -1,0 +1,29 @@
+From: Author 2 <author2@example.com>
+To: review@example.org
+Subject: =?utf-8?b?0KDQsNCx0L7RgtCwINGBINC00L7Qs9C+0LLQvtGA0LDQvNC4?=
+Date: Wed, 04 Mar 2026 10:15:00 +0300
+Message-ID: <s002.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="===============5743957195569812978=="
+
+--===============5743957195569812978==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
+
+0J/RgNC40LvQvtC20LXQvdCwINGC0LDQsdC70LjRhtCwINGBINC00L7Qs9C+0LLQvtGA0LDQvNC4
+Lg0K0KHQvtCz0LvQsNGB0YPQudGC0LUg0LTQvtCz0L7QstC+0YDQvtC8INCy0YvQsdGA0LDQvdC9
+0YPRjiDQv9C+0YHRgtCw0LLQutGDLg0K0J7QsdGB0YPQtNC40Lwg0LfQsNC80LXRh9Cw0L3QuNGP
+Lg0K
+
+--===============5743957195569812978==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment;
+ filename*0*=utf-8''%D0%9F%D1%80%D0%B8%D0%BB%D0%BE%D0%B6%D0%B5%D0%BD%D0%B8;
+ filename*1*=%D0%B5_02-2026.txt
+MIME-Version: 1.0
+
+0J/RgNC40LvQvtC20LXQvdC40LUg0Log0LfQsNC/0LjRgdC4IFMwMDIuDQrQodCy0L7QtNC90YvQ
+tSDQtNCw0L3QvdGL0LUg0LTQu9GPINC/0YDQvtCy0LXRgNC60LguDQo=
+
+--===============5743957195569812978==--

@@ -1,0 +1,59 @@
+{
+  "id": "M06",
+  "status": "ok",
+  "headers": {
+    "subject": "Учебный макет M06",
+    "from": [
+      {
+        "name": "Synthetic Author",
+        "address": "sender@example.com"
+      }
+    ],
+    "to": [
+      {
+        "name": null,
+        "address": "reader@example.org"
+      }
+    ],
+    "date": "2026-03-12T10:15:00+03:00",
+    "messageId": "<m06.synthetic@example.com>"
+  },
+  "body": {
+    "selectedPart": "1",
+    "contentType": "text/plain",
+    "charsetDeclared": "utf-8",
+    "charsetActual": "utf-8",
+    "textContains": [
+      "Макет согласован в обычном тексте."
+    ],
+    "textNotContains": []
+  },
+  "parts": [
+    {
+      "path": "1",
+      "contentType": "text/plain",
+      "disposition": null,
+      "filenameRaw": null,
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 63,
+      "sha256": "c51a7a4281d0c97c7a0de4bb19e5bde6897d68731fd7f17f4f24a7be840fde51",
+      "status": "ok",
+      "children": []
+    },
+    {
+      "path": "2",
+      "contentType": "text/html",
+      "disposition": null,
+      "filenameRaw": null,
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 116,
+      "sha256": "c53c9df71755ef61beeb9c045220642b3c04251cd5d780a6481d5ef88544f602",
+      "status": "ok",
+      "children": []
+    }
+  ],
+  "warnings": [],
+  "notes": "Одно тело: plain. HTML не дублирует текст."
+}

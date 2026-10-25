@@ -1,0 +1,29 @@
+From: Synthetic Author <sender@example.com>
+To: reader@example.org
+Subject: =?utf-8?b?0KPRh9C10LHQvdGL0Lkg0LzQsNC60LXRgiBNMDI=?=
+Date: Thu, 12 Mar 2026 10:15:00 +0300
+Message-ID: <m02.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="synthetic_boundary_02"
+
+--synthetic_boundary_02
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+0J/RgNC+0LXQutGCINC80LDQutC10YLQsCDQstC+INCy0LvQvtC20LXQvdC40LguCtCf0YDQvtCy
+0LXRgNGM0YLQtSDRgNCw0YHQv9C+0LvQvtC20LXQvdC40LUg0YLQsNCx0LvQuNGG0Ysu
+--synthetic_boundary_02
+Content-Type: text/plain; name="=?utf-8?b?0KPRh9C10LHQvdCw0Y8g0YHRhdC10LzQsC50eHQ=?="
+Content-Disposition: attachment; filename="=?utf-8?b?0KPRh9C10LHQvdCw0Y8g0YHRhdC10LzQsC50eHQ=?="
+Content-Transfer-Encoding: base64
+
+0KPRh9C10LHQvdC+0LUg0LLQu9C+0LbQtdC90LjQtS4g0J/RgNC+0LLQtdGA0LrQsCDQuNC80LXQ
+vdC4INGE0LDQudC70LAuCg==
+--synthetic_boundary_02
+Content-Type: text/plain; name="other-name.txt"
+Content-Disposition: attachment; filename="chosen-name.txt"
+Content-Transfer-Encoding: base64
+
+0KPRh9C10LHQvdC+0LUg0LLQu9C+0LbQtdC90LjQtS4g0J/RgNC+0LLQtdGA0LrQsCDQuNC80LXQ
+vdC4INGE0LDQudC70LAuCg==
+--synthetic_boundary_02--

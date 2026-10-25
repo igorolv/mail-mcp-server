@@ -1,0 +1,84 @@
+{
+  "id": "M10",
+  "status": "ok",
+  "headers": {
+    "subject": "Учебный макет M10",
+    "from": [
+      {
+        "name": "Synthetic Author",
+        "address": "sender@example.com"
+      }
+    ],
+    "to": [
+      {
+        "name": null,
+        "address": "reader@example.org"
+      }
+    ],
+    "date": "2026-03-12T10:15:00+03:00",
+    "messageId": "<m10.synthetic@example.com>"
+  },
+  "body": {
+    "selectedPart": "1",
+    "contentType": "text/plain",
+    "charsetDeclared": "utf-8",
+    "charsetActual": "utf-8",
+    "textContains": [
+      "Проект макета"
+    ],
+    "textNotContains": []
+  },
+  "parts": [
+    {
+      "path": "1",
+      "contentType": "text/plain",
+      "disposition": null,
+      "filenameRaw": null,
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 108,
+      "sha256": "cb2187e018c8030b27a9a1e61872faf0cdd4bca74fffe74229e7baea451704bb",
+      "status": "ok",
+      "children": []
+    },
+    {
+      "path": "2",
+      "contentType": "application/ms-tnef",
+      "disposition": "attachment",
+      "filenameRaw": "attachment; filename*=utf-8''winmail.dat",
+      "filenameDecoded": "winmail.dat",
+      "contentId": null,
+      "size": 336,
+      "sha256": "98b199df7d0af9735bac6033bf2b4352be069717563830ef33fe268be875a170",
+      "status": "ok",
+      "children": [
+        {
+          "path": "2.1",
+          "contentType": "text/rtf",
+          "disposition": "attachment",
+          "filenameRaw": null,
+          "filenameDecoded": null,
+          "contentId": null,
+          "size": 56,
+          "sha256": "27f50317cf782a24477ef4fa10bb0282897e9a185c49e0302fe00caaa8e96467",
+          "status": "ok",
+          "children": []
+        },
+        {
+          "path": "2.2",
+          "contentType": "text/plain",
+          "disposition": "attachment",
+          "filenameRaw": null,
+          "filenameDecoded": "Длинное имя вложения для учебного письма.txt",
+          "contentId": null,
+          "size": 42,
+          "sha256": "fbc28a0427b821c53873b3d386a14cf0e03f6f6e94aabccb1955ee139c41b96a",
+          "status": "ok",
+          "children": []
+        }
+      ]
+    }
+  ],
+  "warnings": [],
+  "notes": "TNEF собран вручную по MS-OXTNEF: уровни, атрибуты, суммы; RTF MELA и Unicode имя проверены POI HMEF 5.4.1."
+}

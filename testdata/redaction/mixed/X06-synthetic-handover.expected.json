@@ -1,0 +1,38 @@
+{
+  "id": "X06",
+  "file": "X06-synthetic-handover.txt",
+  "expected": [
+    {
+      "detector": "D28",
+      "match": "9999 9986 2914 1440",
+      "occurrence": 1,
+      "confidence": "high"
+    },
+    {
+      "detector": "D28",
+      "match": "9999 9986 2914 1440",
+      "occurrence": 2,
+      "confidence": "high"
+    },
+    {
+      "detector": "D01",
+      "match": "FictionOnly_0oS8QmK4u9HtV",
+      "occurrence": 1,
+      "confidence": "high"
+    },
+    {
+      "detector": "D20",
+      "match": "ConnFiction_GZhYAae9Oxk3",
+      "occurrence": 1,
+      "confidence": "high"
+    },
+    {
+      "detector": "D01",
+      "match": "ConnFiction_GZhYAae9Oxk3",
+      "occurrence": 1,
+      "confidence": "high"
+    }
+  ],
+  "redactedText": "Тема: учебная передача 6\nКоллеги, ниже только выдуманные данные.\nОни не выданы ни одним сервисом.\nСистема | Состояние\nУчебный стенд | готов\nКарта: [скрыто:D28].\nПароль: \"[скрыто:D01]\"; логин: test\njdbc:postgresql://db.example.com/training?user=test&password=[скрыто:D01]\nПроверка завершена.\n> Предыдущее сообщение:\n> Карта: [скрыто:D28].\n> Заказ: AB-2026-42\nАдрес поддержки: training@example.com\nСпасибо, команда макета.\n",
+  "note": "Overlaps merge by union; largest finding chooses marker, equal lengths choose lowest detector ID."
+}

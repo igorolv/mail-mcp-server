@@ -1,0 +1,18 @@
+Тема: учебная передача 5
+Коллеги, ниже только выдуманные данные.
+Они не выданы ни одним сервисом.
+Система | Состояние
+Учебный стенд | готов
+Архив: ghp_XuSke2BQxPmAOjh4Hh908hfZA05eIP000000
+Учебный блок:
+-----BEGIN RSA PRIVATE KEY-----
+Tk9UX0FfREVSX0tFWV9Pb0dRZWVWWXRmYTM4dHphTjJzaXhQ
+RWZoMXE1eXpZNkJyVjlOOGd4bkE1VTI4MFZ2SjdrUw==
+-----END RSA PRIVATE KEY-----
+API key: "FictionApi_unTFDoJEOHB81el1655semeP"
+Проверка завершена.
+> Предыдущее сообщение:
+> Архив: ghp_XuSke2BQxPmAOjh4Hh908hfZA05eIP000000
+> Заказ: AB-2026-42
+Адрес поддержки: training@example.com
+Спасибо, команда макета.

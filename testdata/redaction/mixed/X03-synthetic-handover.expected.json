@@ -1,0 +1,32 @@
+{
+  "id": "X03",
+  "file": "X03-synthetic-handover.txt",
+  "expected": [
+    {
+      "detector": "D22",
+      "match": "79 33 268580",
+      "occurrence": 1,
+      "confidence": "high"
+    },
+    {
+      "detector": "D22",
+      "match": "79 33 268580",
+      "occurrence": 2,
+      "confidence": "high"
+    },
+    {
+      "detector": "D23",
+      "match": "599-363-279 67",
+      "occurrence": 1,
+      "confidence": "high"
+    },
+    {
+      "detector": "D25",
+      "match": "002918877470",
+      "occurrence": 1,
+      "confidence": "high"
+    }
+  ],
+  "redactedText": "Тема: учебная передача 3\nКоллеги, ниже только выдуманные данные.\nОни не выданы ни одним сервисом.\nСистема | Состояние\nУчебный стенд | готов\nПаспорт: [скрыто:D22].\nСНИЛС: [скрыто:D23].\nИНН-12: [скрыто:D25].\nПроверка завершена.\n> Предыдущее сообщение:\n> Паспорт: [скрыто:D22].\n> Заказ: AB-2026-42\nАдрес поддержки: training@example.com\nСпасибо, команда макета.\n",
+  "note": "Overlaps merge by union; largest finding chooses marker, equal lengths choose lowest detector ID."
+}

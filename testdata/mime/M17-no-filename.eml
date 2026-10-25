@@ -1,0 +1,22 @@
+From: Synthetic Author <sender@example.com>
+To: reader@example.org
+Subject: =?utf-8?b?0KPRh9C10LHQvdGL0Lkg0LzQsNC60LXRgiBNMTc=?=
+Date: Thu, 12 Mar 2026 10:15:00 +0300
+Message-ID: <m17.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="synthetic_boundary_11"
+
+--synthetic_boundary_11
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+0J/RgNC+0LXQutGCINC80LDQutC10YLQsCDQstC+INCy0LvQvtC20LXQvdC40LguCtCf0YDQvtCy
+0LXRgNGM0YLQtSDRgNCw0YHQv9C+0LvQvtC20LXQvdC40LUg0YLQsNCx0LvQuNGG0Ysu
+--synthetic_boundary_11
+Content-Type: text/plain
+Content-Disposition: attachment
+Content-Transfer-Encoding: base64
+
+0KPRh9C10LHQvdC+0LUg0LLQu9C+0LbQtdC90LjQtS4g0J/RgNC+0LLQtdGA0LrQsCDQuNC80LXQ
+vdC4INGE0LDQudC70LAuCg==
+--synthetic_boundary_11--

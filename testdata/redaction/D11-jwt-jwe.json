@@ -1,0 +1,275 @@
+{
+  "detector": "D11",
+  "title": "JWT и JWE",
+  "source": "docs/research/RT-08-redaction-detectors.md, D11",
+  "cases": [
+    {
+      "id": "D11-P01",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "jws",
+        "base64url"
+      ],
+      "text": "Сохранённая строка: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInN5bnRoZXRpYyI6dHJ1ZX0.eyJzdWIiOiAiZmljdGlvbjAiLCAiaXNzIjogImh0dHBzOi8vZXhhbXBsZS5jb20ifQ.Y243WXR1TXMxdElBTHJteGxzUTd6RXlt",
+      "expected": [
+        {
+          "detector": "D11",
+          "match": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInN5bnRoZXRpYyI6dHJ1ZX0.eyJzdWIiOiAiZmljdGlvbjAiLCAiaXNzIjogImh0dHBzOi8vZXhhbXBsZS5jb20ifQ.Y243WXR1TXMxdElBTHJteGxzUTd6RXlt",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D11-P02",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "jws",
+        "base64url"
+      ],
+      "text": "Archived value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInN5bnRoZXRpYyI6dHJ1ZX0.eyJzdWIiOiAiZmljdGlvbjEiLCAiaXNzIjogImh0dHBzOi8vZXhhbXBsZS5jb20ifQ.QmlDc2NnZnBUMWZ3THA0OU51RG5YQTd0",
+      "expected": [
+        {
+          "detector": "D11",
+          "match": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInN5bnRoZXRpYyI6dHJ1ZX0.eyJzdWIiOiAiZmljdGlvbjEiLCAiaXNzIjogImh0dHBzOi8vZXhhbXBsZS5jb20ifQ.QmlDc2NnZnBUMWZ3THA0OU51RG5YQTd0",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D11-P03",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "jwe",
+        "base64url"
+      ],
+      "text": "JWE: eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIiwic3ludGhldGljIjp0cnVlfQ.Y1dwQno4VXo.MjFaVUFQbWY3MHdL.N1JTMk41Y0w2RnR1dEdKR3NweTQ.bzdNYkowTVBwTnlOQ05tRA",
+      "expected": [
+        {
+          "detector": "D11",
+          "match": "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIiwic3ludGhldGljIjp0cnVlfQ.Y1dwQno4VXo.MjFaVUFQbWY3MHdL.N1JTMk41Y0w2RnR1dEdKR3NweTQ.bzdNYkowTVBwTnlOQ05tRA",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D11-P04",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "jws",
+        "base64url"
+      ],
+      "text": "> JWT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInN5bnRoZXRpYyI6dHJ1ZX0.eyJzdWIiOiAiZmljdGlvbjMiLCAiaXNzIjogImh0dHBzOi8vZXhhbXBsZS5jb20ifQ.R092OGswVTgzY2pDQnVoeFZlQ0Z5QUZC",
+      "expected": [
+        {
+          "detector": "D11",
+          "match": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInN5bnRoZXRpYyI6dHJ1ZX0.eyJzdWIiOiAiZmljdGlvbjMiLCAiaXNzIjogImh0dHBzOi8vZXhhbXBsZS5jb20ifQ.R092OGswVTgzY2pDQnVoeFZlQ0Z5QUZC",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D11-P05",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "jws",
+        "base64url"
+      ],
+      "text": "Подпись: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInN5bnRoZXRpYyI6dHJ1ZX0.eyJzdWIiOiAiZmljdGlvbjQiLCAiaXNzIjogImh0dHBzOi8vZXhhbXBsZS5jb20ifQ.amNXdEVaSHdWZVF5eEpaVTVHWWFRdVdR",
+      "expected": [
+        {
+          "detector": "D11",
+          "match": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInN5bnRoZXRpYyI6dHJ1ZX0.eyJzdWIiOiAiZmljdGlvbjQiLCAiaXNzIjogImh0dHBzOi8vZXhhbXBsZS5jb20ifQ.amNXdEVaSHdWZVF5eEpaVTVHWWFRdVdR",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D11-P06",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "jwe",
+        "base64url"
+      ],
+      "text": "Envelope: eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIiwic3ludGhldGljIjp0cnVlfQ.VGZXWUo1V1E.UTJIaVlDR0FOSnB2.YTNjY1YweGlkRjNFcDdEMVBaSWw.TmlVbm1IMUtoTWozdm9ycw",
+      "expected": [
+        {
+          "detector": "D11",
+          "match": "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIiwic3ludGhldGljIjp0cnVlfQ.VGZXWUo1V1E.UTJIaVlDR0FOSnB2.YTNjY1YweGlkRjNFcDdEMVBaSWw.TmlVbm1IMUtoTWozdm9ycw",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D11-P07",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "jws",
+        "base64url"
+      ],
+      "text": "JWT\teyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInN5bnRoZXRpYyI6dHJ1ZX0.eyJzdWIiOiAiZmljdGlvbjYiLCAiaXNzIjogImh0dHBzOi8vZXhhbXBsZS5jb20ifQ.OHpWTGJvcDExUW5Da2hoV2FtaVdpc1pL",
+      "expected": [
+        {
+          "detector": "D11",
+          "match": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInN5bnRoZXRpYyI6dHJ1ZX0.eyJzdWIiOiAiZmljdGlvbjYiLCAiaXNzIjogImh0dHBzOi8vZXhhbXBsZS5jb20ifQ.OHpWTGJvcDExUW5Da2hoV2FtaVdpc1pL",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D11-P08",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "jws",
+        "base64url"
+      ],
+      "text": "Value | eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInN5bnRoZXRpYyI6dHJ1ZX0.eyJzdWIiOiAiZmljdGlvbjciLCAiaXNzIjogImh0dHBzOi8vZXhhbXBsZS5jb20ifQ.NlFCaTBjMmJWaUNjTXlVM0JkRVI4dGxV",
+      "expected": [
+        {
+          "detector": "D11",
+          "match": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInN5bnRoZXRpYyI6dHJ1ZX0.eyJzdWIiOiAiZmljdGlvbjciLCAiaXNzIjogImh0dHBzOi8vZXhhbXBsZS5jb20ifQ.NlFCaTBjMmJWaUNjTXlVM0JkRVI4dGxV",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D11-P09",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "wrapped-token",
+        "line-break",
+        "disputed"
+      ],
+      "text": "Учебная строка, перенесённая клиентом:\neyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmaWN0aW\n 9uV3JhcHBlZCJ9.RVFPTjdjeUVmdXhZT2c4aVJ5ZzZKbXZ6Vm96TUgz",
+      "expected": [
+        {
+          "detector": "D11",
+          "match": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmaWN0aW\n 9uV3JhcHBlZCJ9.RVFPTjdjeUVmdXhZT2c4aVJ5ZzZKbXZ6Vm96TUgz",
+          "occurrence": 1,
+          "confidence": "low"
+        }
+      ],
+      "note": "Границы токена после переноса неоднозначны. Скрытие целой сложенной строки — предложение до выбора политики."
+    },
+    {
+      "id": "D11-N01",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "abc.def.ghi",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D11-N02",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "bm90IGpzb24.dmFsdWU.dmFsdWU",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D11-N03",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "1.2.3",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D11-N04",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "JWT not configured.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D11-N05",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "JWE has five segments.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D11-N06",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "eyJhbGciOiJIUzI1NiJ9",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D11-N07",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "value.with.four.parts",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D11-N08",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "${JWT_VALUE}",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    }
+  ]
+}

@@ -1,0 +1,352 @@
+{
+  "set": "mime",
+  "brief": "docs/research-tasks/RT-11-synthetic-mime.md",
+  "created": "2026-10-25",
+  "cases": [
+    {
+      "id": "M01",
+      "file": "M01-rfc2231-continuations.eml",
+      "expected": "M01-rfc2231-continuations.expected.json",
+      "title": "rfc2231-continuations",
+      "covers": [
+        "rfc2231-continuations"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "9d72775f24601aacd09971e23b628b5659c21981aa7bc55440284ecb8862a224",
+      "generated": true
+    },
+    {
+      "id": "M02",
+      "file": "M02-encoded-word-filename.eml",
+      "expected": "M02-encoded-word-filename.expected.json",
+      "title": "encoded-word-filename",
+      "covers": [
+        "encoded-word-filename"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "759801ff6641bf21f84ef6087a8969eeef3d817e11931a140b624b77bb7a415a",
+      "generated": true
+    },
+    {
+      "id": "M03",
+      "file": "M03-koi8r.eml",
+      "expected": "M03-koi8r.expected.json",
+      "title": "koi8r",
+      "covers": [
+        "koi8r"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "7171b15a55db9a015674c851de2f4ac3d2723407a8cad1a219ae5ee434c67e25",
+      "generated": true
+    },
+    {
+      "id": "M04",
+      "file": "M04-windows-1251.eml",
+      "expected": "M04-windows-1251.expected.json",
+      "title": "windows-1251",
+      "covers": [
+        "windows-1251"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "63226dea67a707be76a51ec253ff8f529a5ceb5f940a8c3c3896672e544182a2",
+      "generated": true
+    },
+    {
+      "id": "M05",
+      "file": "M05-mislabelled-charset.eml",
+      "expected": "M05-mislabelled-charset.expected.json",
+      "title": "mislabelled-charset",
+      "covers": [
+        "mislabelled-charset"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "ffe65a5e0e45c0535b2e9f0c2435fdb71c8c9ace16560c139cbb0b307efb243b",
+      "generated": true
+    },
+    {
+      "id": "M06",
+      "file": "M06-plain-and-html.eml",
+      "expected": "M06-plain-and-html.expected.json",
+      "title": "plain-and-html",
+      "covers": [
+        "plain-and-html"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "f511eaf4c38d8f7ee0f05c34632c646d8e8caadfa2fd7a9668d7a8d04d5a0542",
+      "generated": true
+    },
+    {
+      "id": "M07",
+      "file": "M07-html-only.eml",
+      "expected": "M07-html-only.expected.json",
+      "title": "html-only",
+      "covers": [
+        "html-only"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "87542f4629c1f12ec157f809ee950eaacf5ed3f834579ff91039bfd5a49ffeb2",
+      "generated": true
+    },
+    {
+      "id": "M08",
+      "file": "M08-cid-inline-images.eml",
+      "expected": "M08-cid-inline-images.expected.json",
+      "title": "cid-inline-images",
+      "covers": [
+        "cid-inline-images"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "6dfde4bbef96262104e99e9b5c9ccec4ffcef6b9c3d98bbd8e20d06e405c8f40",
+      "generated": true
+    },
+    {
+      "id": "M09",
+      "file": "M09-eml-msg-zip-chain.eml",
+      "expected": "M09-eml-msg-zip-chain.expected.json",
+      "title": "eml-msg-zip-chain",
+      "covers": [
+        "eml-msg-zip-chain"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "be6e4d6e2aef2981fb738f6fa7fc1baca6a48bb6f614c2e984a9ca431cfbcc4f",
+      "generated": true,
+      "containerSteps": [
+        {
+          "kind": "EML",
+          "generated": true
+        },
+        {
+          "kind": "MSG",
+          "generated": true
+        },
+        {
+          "kind": "ZIP",
+          "generated": true
+        },
+        {
+          "kind": "TXT",
+          "generated": true
+        }
+      ]
+    },
+    {
+      "id": "M10",
+      "file": "M10-tnef-winmail.eml",
+      "expected": "M10-tnef-winmail.expected.json",
+      "title": "tnef-winmail",
+      "covers": [
+        "tnef-winmail"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "b406475f2232e6751aefe9d9905737554f978ee318af1e2074c779b9f9efab06",
+      "generated": true
+    },
+    {
+      "id": "M11",
+      "file": "M11-ics-tzid.eml",
+      "expected": "M11-ics-tzid.expected.json",
+      "title": "ics-tzid",
+      "covers": [
+        "ics-tzid"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "630078d02df1756a4f55e943ef42970138207777a732591fbfb7220bac7fad15",
+      "generated": true
+    },
+    {
+      "id": "M12",
+      "file": "M12-smime-signed.eml",
+      "expected": "M12-smime-signed.expected.json",
+      "title": "smime-signed",
+      "covers": [
+        "smime-signed"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "da76c989804c63f990240820adacc20952ea1755bba9b0890488aa8352789ff8",
+      "generated": true
+    },
+    {
+      "id": "M13",
+      "file": "M13-smime-encrypted.eml",
+      "expected": "M13-smime-encrypted.expected.json",
+      "title": "smime-encrypted",
+      "covers": [
+        "smime-encrypted"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "edd36533b93557411fcb1b7916c41253eb7fdb38a65604490826f9ba754ca379",
+      "generated": true
+    },
+    {
+      "id": "M14",
+      "file": "M14-broken-boundary.eml",
+      "expected": "M14-broken-boundary.expected.json",
+      "title": "broken-boundary",
+      "covers": [
+        "broken-boundary"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "806411d653c25caf1b9afc1e0c2c112febf58bfddf0d9011a197d353a643505c",
+      "generated": true
+    },
+    {
+      "id": "M15",
+      "file": "M15-smime-opaque-signed.eml",
+      "expected": "M15-smime-opaque-signed.expected.json",
+      "title": "smime-opaque-signed",
+      "covers": [
+        "smime-opaque-signed"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "85192711e59ff1ba23daa426adb24489b2ad69fcf136fda94854839931ef9802",
+      "generated": true
+    },
+    {
+      "id": "M16",
+      "file": "M16-unsafe-filenames.eml",
+      "expected": "M16-unsafe-filenames.expected.json",
+      "title": "unsafe-filenames",
+      "covers": [
+        "unsafe-filenames"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "645e921bcd6ca359b2cf81e32d766c911fa50a369fee9ca8e94abeeb51f18b2c",
+      "generated": true
+    },
+    {
+      "id": "M17",
+      "file": "M17-no-filename.eml",
+      "expected": "M17-no-filename.expected.json",
+      "title": "no-filename",
+      "covers": [
+        "no-filename"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "d3ac5b865dd382f6e1bdcc38f6e04d145f53b4156999eca56349b803cefee092",
+      "generated": true
+    },
+    {
+      "id": "M18",
+      "file": "M18-split-encoded-word.eml",
+      "expected": "M18-split-encoded-word.expected.json",
+      "title": "split-encoded-word",
+      "covers": [
+        "split-encoded-word"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "06d3f254b17292fb3a6a3983be56a46d83a26f0993eb1566ab746eda1a87a018",
+      "generated": true
+    },
+    {
+      "id": "M19",
+      "file": "M19-nesting-over-limit.eml",
+      "expected": "M19-nesting-over-limit.expected.json",
+      "title": "nesting-over-limit",
+      "covers": [
+        "nesting-over-limit"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "96400babe81ab90db9bd9b693a111090be7be90e1b00baaa8fefdb7d0fbb5139",
+      "generated": true
+    },
+    {
+      "id": "M20",
+      "file": "M20-bad-headers.eml",
+      "expected": "M20-bad-headers.expected.json",
+      "title": "bad-headers",
+      "covers": [
+        "bad-headers"
+      ],
+      "source": "docs/research/RT-09-mime-attachments.md, В2/В4/В5",
+      "sha256": "1b7461b2efe4da7ff20da5efdb4ca25700376316ba5fa5ce21d7e697cfb5a70a",
+      "generated": true
+    }
+  ],
+  "files": [
+    "M01-rfc2231-continuations.eml",
+    "M01-rfc2231-continuations.expected.json",
+    "M02-encoded-word-filename.eml",
+    "M02-encoded-word-filename.expected.json",
+    "M03-koi8r.eml",
+    "M03-koi8r.expected.json",
+    "M04-windows-1251.eml",
+    "M04-windows-1251.expected.json",
+    "M05-mislabelled-charset.eml",
+    "M05-mislabelled-charset.expected.json",
+    "M06-plain-and-html.eml",
+    "M06-plain-and-html.expected.json",
+    "M07-html-only.eml",
+    "M07-html-only.expected.json",
+    "M08-cid-inline-images.eml",
+    "M08-cid-inline-images.expected.json",
+    "M09-eml-msg-zip-chain.eml",
+    "M09-eml-msg-zip-chain.expected.json",
+    "M10-tnef-winmail.eml",
+    "M10-tnef-winmail.expected.json",
+    "M11-ics-tzid.eml",
+    "M11-ics-tzid.expected.json",
+    "M12-smime-signed.eml",
+    "M12-smime-signed.expected.json",
+    "M13-smime-encrypted.eml",
+    "M13-smime-encrypted.expected.json",
+    "M14-broken-boundary.eml",
+    "M14-broken-boundary.expected.json",
+    "M15-smime-opaque-signed.eml",
+    "M15-smime-opaque-signed.expected.json",
+    "M16-unsafe-filenames.eml",
+    "M16-unsafe-filenames.expected.json",
+    "M17-no-filename.eml",
+    "M17-no-filename.expected.json",
+    "M18-split-encoded-word.eml",
+    "M18-split-encoded-word.expected.json",
+    "M19-nesting-over-limit.eml",
+    "M19-nesting-over-limit.expected.json",
+    "M20-bad-headers.eml",
+    "M20-bad-headers.expected.json",
+    "README.md",
+    "manifest.json"
+  ],
+  "sha256": {
+    "M01-rfc2231-continuations.eml": "9d72775f24601aacd09971e23b628b5659c21981aa7bc55440284ecb8862a224",
+    "M01-rfc2231-continuations.expected.json": "97b00f4a16d4a2a967bb05a4a49c14a7348d627d0b642a565b12f4dad88faa6c",
+    "M02-encoded-word-filename.eml": "759801ff6641bf21f84ef6087a8969eeef3d817e11931a140b624b77bb7a415a",
+    "M02-encoded-word-filename.expected.json": "9aa9b401502bf6b2b19569c239f6c4d5dafb210e8bd2d256d12ac07943001ba5",
+    "M03-koi8r.eml": "7171b15a55db9a015674c851de2f4ac3d2723407a8cad1a219ae5ee434c67e25",
+    "M03-koi8r.expected.json": "fe11e04484b7dc279f6ee2618cce1b09957e95117850828706d3129309df59ae",
+    "M04-windows-1251.eml": "63226dea67a707be76a51ec253ff8f529a5ceb5f940a8c3c3896672e544182a2",
+    "M04-windows-1251.expected.json": "3d34cda9edd6a3df5712624882457e6b9ea55702a72be86f09c37e862f8d8cad",
+    "M05-mislabelled-charset.eml": "ffe65a5e0e45c0535b2e9f0c2435fdb71c8c9ace16560c139cbb0b307efb243b",
+    "M05-mislabelled-charset.expected.json": "0918c0fdbb8585bdd3f4da85f647d3564389d92c64c184ab527d454c88ba5b1c",
+    "M06-plain-and-html.eml": "f511eaf4c38d8f7ee0f05c34632c646d8e8caadfa2fd7a9668d7a8d04d5a0542",
+    "M06-plain-and-html.expected.json": "14cc1b2d9ca7f98c53943d7bf06eb7a94e12b362e5a1b8038ad4916c500435d2",
+    "M07-html-only.eml": "87542f4629c1f12ec157f809ee950eaacf5ed3f834579ff91039bfd5a49ffeb2",
+    "M07-html-only.expected.json": "7f3c0e723e1b78b0adfd6f9f70f933e32286daf6200db45fd0facb3ac88f14c8",
+    "M08-cid-inline-images.eml": "6dfde4bbef96262104e99e9b5c9ccec4ffcef6b9c3d98bbd8e20d06e405c8f40",
+    "M08-cid-inline-images.expected.json": "9997cc080830917e8f0184f59e6c38d030ac1ca6c5de5cb5a1ed9ec5961e223e",
+    "M09-eml-msg-zip-chain.eml": "be6e4d6e2aef2981fb738f6fa7fc1baca6a48bb6f614c2e984a9ca431cfbcc4f",
+    "M09-eml-msg-zip-chain.expected.json": "b7549b434366e2dfd2a6bb580bcc53d0f8f924c877b83b8dfd53fd028f50f5dc",
+    "M10-tnef-winmail.eml": "b406475f2232e6751aefe9d9905737554f978ee318af1e2074c779b9f9efab06",
+    "M10-tnef-winmail.expected.json": "ad0a38d9189cb593140dcc7ab44ee232b2822024b55dcf109e909d54627ded69",
+    "M11-ics-tzid.eml": "630078d02df1756a4f55e943ef42970138207777a732591fbfb7220bac7fad15",
+    "M11-ics-tzid.expected.json": "eb4e60ccf5a725171424cff6ce8b927d062cbc2b409ddc831ccd997f3628748d",
+    "M12-smime-signed.eml": "da76c989804c63f990240820adacc20952ea1755bba9b0890488aa8352789ff8",
+    "M12-smime-signed.expected.json": "5ec8ab8c61bdd05b67ff4687e91996f87d2067afae19facb528a05e28248dbca",
+    "M13-smime-encrypted.eml": "edd36533b93557411fcb1b7916c41253eb7fdb38a65604490826f9ba754ca379",
+    "M13-smime-encrypted.expected.json": "0f8f6f783ae65372eaf422ac62dff10013669014b6949b7dfe921404d2de8087",
+    "M14-broken-boundary.eml": "806411d653c25caf1b9afc1e0c2c112febf58bfddf0d9011a197d353a643505c",
+    "M14-broken-boundary.expected.json": "fbc993800f9cf38054182b298960c80b53dab51b04846fb309223c122f20c40b",
+    "M15-smime-opaque-signed.eml": "85192711e59ff1ba23daa426adb24489b2ad69fcf136fda94854839931ef9802",
+    "M15-smime-opaque-signed.expected.json": "29f36fe68888f95df26707c1d11d3b22b5437c09a499efb81cb566899fe89240",
+    "M16-unsafe-filenames.eml": "645e921bcd6ca359b2cf81e32d766c911fa50a369fee9ca8e94abeeb51f18b2c",
+    "M16-unsafe-filenames.expected.json": "7305b362e144441f77716414c85546c3d3d322b804c34d8516681f39bc70ebd8",
+    "M17-no-filename.eml": "d3ac5b865dd382f6e1bdcc38f6e04d145f53b4156999eca56349b803cefee092",
+    "M17-no-filename.expected.json": "4b40413a2aeb77879dfbeee20c8e71286405da8a577c8198f86a14c05c0b3cd4",
+    "M18-split-encoded-word.eml": "06d3f254b17292fb3a6a3983be56a46d83a26f0993eb1566ab746eda1a87a018",
+    "M18-split-encoded-word.expected.json": "6967fdf7f19ae86941e9b8bf0e66d23d178bb100325f70488a5cd7ba143e3458",
+    "M19-nesting-over-limit.eml": "96400babe81ab90db9bd9b693a111090be7be90e1b00baaa8fefdb7d0fbb5139",
+    "M19-nesting-over-limit.expected.json": "e33c432e3cf9d4c27d49175cd2260c602e70241b2aca35088c87dc4ec64f5411",
+    "M20-bad-headers.eml": "1b7461b2efe4da7ff20da5efdb4ca25700376316ba5fa5ce21d7e697cfb5a70a",
+    "M20-bad-headers.expected.json": "4fa1cbd4961f0fb50e922e7b125dbd3ff18b86913585d5bf2e56e2025c5f897b",
+    "README.md": "ae1f0c43fb867137096518cb3d966207553de0380df27e4dce7f4a68cb3a8b3c"
+  }
+}

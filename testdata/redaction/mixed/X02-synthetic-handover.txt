@@ -1,0 +1,14 @@
+Тема: учебная передача 2
+Коллеги, ниже только выдуманные данные.
+Они не выданы ни одним сервисом.
+Система | Состояние
+Учебный стенд | готов
+Wi-Fi password: "WifiFiction_ZaSYt7Cd1p"; SSID: TrainingNet
+API key: "FictionApi_unTFDoJEOHB81el1655semeP"
+Authorization: Bearer fictionBearerEIX8KNvDT3kxbH7UwS8mLx
+Проверка завершена.
+> Предыдущее сообщение:
+> Wi-Fi password: "WifiFiction_ZaSYt7Cd1p"; SSID: TrainingNet
+> Заказ: AB-2026-42
+Адрес поддержки: training@example.com
+Спасибо, команда макета.

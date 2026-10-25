@@ -1,0 +1,341 @@
+{
+  "detector": "D20",
+  "title": "Строки подключения",
+  "source": "docs/research/RT-08-redaction-detectors.md, D20",
+  "cases": [
+    {
+      "id": "D20-P01",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "jdbc",
+        "next-field",
+        "overlap"
+      ],
+      "text": "jdbc:postgresql://db.example.com/training?user=test&password=ConnFiction_GZhYAae9Oxk3",
+      "expected": [
+        {
+          "detector": "D20",
+          "match": "ConnFiction_GZhYAae9Oxk3",
+          "occurrence": 1,
+          "confidence": "high"
+        },
+        {
+          "detector": "D01",
+          "match": "ConnFiction_GZhYAae9Oxk3",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D20-P02",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "ado-net",
+        "quotes",
+        "boundary",
+        "overlap"
+      ],
+      "text": "Server=db.example.com;Database=training;User ID=test;Password=\"ConnFiction_ILlvPE1a2Eu7\";Encrypt=true",
+      "expected": [
+        {
+          "detector": "D20",
+          "match": "ConnFiction_ILlvPE1a2Eu7",
+          "occurrence": 1,
+          "confidence": "high"
+        },
+        {
+          "detector": "D01",
+          "match": "ConnFiction_ILlvPE1a2Eu7",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D20-P03",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "jdbc",
+        "next-field",
+        "overlap"
+      ],
+      "text": "jdbc:postgresql://db.example.com/training?user=test&password=ConnFiction_EQ5MWepL3geH",
+      "expected": [
+        {
+          "detector": "D20",
+          "match": "ConnFiction_EQ5MWepL3geH",
+          "occurrence": 1,
+          "confidence": "high"
+        },
+        {
+          "detector": "D01",
+          "match": "ConnFiction_EQ5MWepL3geH",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D20-P04",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "ado-net",
+        "quotes",
+        "boundary",
+        "overlap"
+      ],
+      "text": "Server=db.example.com;Database=training;User ID=test;Password=\"ConnFiction_hIO6UplbuQdX\";Encrypt=true",
+      "expected": [
+        {
+          "detector": "D20",
+          "match": "ConnFiction_hIO6UplbuQdX",
+          "occurrence": 1,
+          "confidence": "high"
+        },
+        {
+          "detector": "D01",
+          "match": "ConnFiction_hIO6UplbuQdX",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D20-P05",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "jdbc",
+        "next-field",
+        "overlap"
+      ],
+      "text": "jdbc:postgresql://db.example.com/training?user=test&password=ConnFiction_8L1946OOBLpI",
+      "expected": [
+        {
+          "detector": "D20",
+          "match": "ConnFiction_8L1946OOBLpI",
+          "occurrence": 1,
+          "confidence": "high"
+        },
+        {
+          "detector": "D01",
+          "match": "ConnFiction_8L1946OOBLpI",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D20-P06",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "ado-net",
+        "quotes",
+        "boundary",
+        "overlap"
+      ],
+      "text": "Server=db.example.com;Database=training;User ID=test;Password=\"ConnFiction_PO1n6bVdmnsS\";Encrypt=true",
+      "expected": [
+        {
+          "detector": "D20",
+          "match": "ConnFiction_PO1n6bVdmnsS",
+          "occurrence": 1,
+          "confidence": "high"
+        },
+        {
+          "detector": "D01",
+          "match": "ConnFiction_PO1n6bVdmnsS",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D20-P07",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "jdbc",
+        "next-field",
+        "overlap"
+      ],
+      "text": "jdbc:postgresql://db.example.com/training?user=test&password=ConnFiction_xiMitPe1YA3i",
+      "expected": [
+        {
+          "detector": "D20",
+          "match": "ConnFiction_xiMitPe1YA3i",
+          "occurrence": 1,
+          "confidence": "high"
+        },
+        {
+          "detector": "D01",
+          "match": "ConnFiction_xiMitPe1YA3i",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D20-P08",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "ado-net",
+        "quotes",
+        "boundary",
+        "overlap"
+      ],
+      "text": "Server=db.example.com;Database=training;User ID=test;Password=\"ConnFiction_loogPFRKzrpq\";Encrypt=true",
+      "expected": [
+        {
+          "detector": "D20",
+          "match": "ConnFiction_loogPFRKzrpq",
+          "occurrence": 1,
+          "confidence": "high"
+        },
+        {
+          "detector": "D01",
+          "match": "ConnFiction_loogPFRKzrpq",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D20-P09",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "jdbc",
+        "uri",
+        "overlap"
+      ],
+      "text": "jdbc:postgresql://fiction:CGkHVbAHvFAautiHBrxF@db.example.com/training",
+      "expected": [
+        {
+          "detector": "D20",
+          "match": "fiction:CGkHVbAHvFAautiHBrxF",
+          "occurrence": 1,
+          "confidence": "high"
+        },
+        {
+          "detector": "D08",
+          "match": "fiction:CGkHVbAHvFAautiHBrxF",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D20-N01",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "jdbc:postgresql://db.example.com/training?user=test",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D20-N02",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Server=db.example.com;Integrated Security=true",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D20-N03",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Database=training;Encrypt=true",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D20-N04",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "JDBC driver version 2.1.0",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D20-N05",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Connection string omitted.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D20-N06",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Host=db.example.com;Port=5432",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D20-N07",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "jdbc:postgresql://db.example.com/training?ssl=true",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D20-N08",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Server=db.example.com;Password=${DB_VALUE}",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "id": "M14",
+  "status": "partial",
+  "headers": {
+    "subject": "Учебный макет M14",
+    "from": [
+      {
+        "name": "Synthetic Author",
+        "address": "sender@example.com"
+      }
+    ],
+    "to": [
+      {
+        "name": null,
+        "address": "reader@example.org"
+      }
+    ],
+    "date": "2026-03-12T10:15:00+03:00",
+    "messageId": "<m14.synthetic@example.com>"
+  },
+  "body": {
+    "selectedPart": "1",
+    "contentType": "text/plain",
+    "charsetDeclared": "utf-8",
+    "charsetActual": "utf-8",
+    "textContains": [
+      "Первая часть сохранилась."
+    ],
+    "textNotContains": []
+  },
+  "parts": [
+    {
+      "path": "1",
+      "contentType": "text/plain",
+      "disposition": null,
+      "filenameRaw": null,
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 47,
+      "sha256": "07a41f313fb550d2159ad831aac9d0c694bb35b1959e057d79d1a6ed7f20f857",
+      "status": "ok",
+      "children": []
+    },
+    {
+      "path": "2",
+      "contentType": "application/octet-stream",
+      "disposition": "attachment",
+      "filenameRaw": "attachment; filename=\"truncated.bin\"",
+      "filenameDecoded": "truncated.bin",
+      "contentId": null,
+      "size": 5,
+      "sha256": "185f8db32271fe25f561a6fc938b2e264306ec304eda518007d1764826381969",
+      "status": "partial",
+      "children": []
+    }
+  ],
+  "warnings": [
+    "boundary-not-closed",
+    "base64-truncated"
+  ],
+  "notes": "Закрывающая граница отсутствует, Base64 без завершающего padding; мягкий разбор ограничен лимитами."
+}

@@ -34,6 +34,7 @@ public record ConnectionsFile(
      * @param domain               EWS NTLM domain; leave out for a bare login
      * @param connectTimeoutSeconds EWS connect timeout, 15 by default
      * @param readTimeoutSeconds   EWS read timeout, 120 by default
+     * @param oauthClientFile      Google Desktop client JSON path, required for Gmail OAuth2
      */
     public record Entry(
             String type,
@@ -47,7 +48,8 @@ public record ConnectionsFile(
             String password,
             String domain,
             Integer connectTimeoutSeconds,
-            Integer readTimeoutSeconds
+            Integer readTimeoutSeconds,
+            String oauthClientFile
     ) {
     }
 }

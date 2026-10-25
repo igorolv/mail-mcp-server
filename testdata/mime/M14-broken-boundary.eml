@@ -1,0 +1,19 @@
+From: Synthetic Author <sender@example.com>
+To: reader@example.org
+Subject: =?utf-8?b?0KPRh9C10LHQvdGL0Lkg0LzQsNC60LXRgiBNMTQ=?=
+Date: Thu, 12 Mar 2026 10:15:00 +0300
+Message-ID: <m14.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="unfinished"
+
+--unfinished
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+0J/QtdGA0LLQsNGPINGH0LDRgdGC0Ywg0YHQvtGF0YDQsNC90LjQu9Cw0YHRjC4=
+--unfinished
+Content-Type: application/octet-stream
+Content-Disposition: attachment; filename="truncated.bin"
+Content-Transfer-Encoding: base64
+
+SGVsbG8

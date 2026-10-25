@@ -111,7 +111,7 @@ class ConnectionsLoaderTest {
         assertThat(gmail.imap().host()).isEqualTo("imap.gmail.com");
         assertThat(gmail.imap().port()).isEqualTo(993);
         assertThat(gmail.imap().password()).isEqualTo("gmail-secret");
-        assertThat(gmail.sourceImplemented()).isFalse();
+        assertThat(gmail.sourceImplemented()).isTrue();
     }
 
     @Test
@@ -241,8 +241,8 @@ class ConnectionsLoaderTest {
         assertThat(loadOne("{\"type\": \"pop3\"}").configError()).contains("unknown type 'pop3'");
         assertThat(loadOne("{\"type\": \"ews\", \"auth\": \"app-password\", " + ews + "}").configError())
                 .contains("auth 'app-password' is not valid for type 'ews'").contains("ntlm, basic");
-        assertThat(loadOne("{\"type\": \"imap\", \"auth\": \"oauth2\", \"host\": \"imap.gmail.com\"}").configError())
-                .contains("'oauth2' is not supported yet");
+        assertThat(loadOne("{\"type\": \"imap\", \"auth\": \"oauth2\", \"host\": \"imap.gmail.com\", \"username\": \"user@gmail.com\"}").configError())
+                .contains("no 'oauthClientFile'");
         assertThat(loadOne("{\"type\": \"ews\", \"username\": \"user\", \"password\": \"p\"}").configError())
                 .contains("no 'url'");
         assertThat(loadOne("{\"type\": \"ews\", \"url\": \"http://webmail.example.com/EWS/Exchange.asmx\", "
@@ -261,6 +261,22 @@ class ConnectionsLoaderTest {
         assertThat(loadOne("{\"type\": \"imap\", \"host\": \"imap.mail.ru\", \"port\": 70000, "
                 + "\"username\": \"u\", \"password\": \"p\"}").configError())
                 .contains("'port' must be");
+    }
+
+    @Test
+    void oauthConfigurationIsLazyPasswordlessAndRestrictedToGmailTls() throws IOException {
+        var definition = loadOne("""
+                {"type":"imap","auth":"oauth2","host":"imap.gmail.com","username":"user@gmail.com",
+                 "oauthClientFile":"~/nonexistent-google-desktop-client.json"}
+                """);
+        assertThat(definition.usable()).isTrue();
+        assertThat(definition.imap().password()).isNull();
+        assertThat(definition.imap().oauth2().clientFile()).isAbsolute();
+        assertThat(definition.imap().oauth2().tokenFile().toString()).endsWith(Path.of("oauth", "google-tokens.json").toString());
+        assertThat(loadOne("""
+                {"type":"imap","auth":"oauth2","host":"imap.mail.ru","username":"user@mail.ru",
+                 "oauthClientFile":"~/client.json"}
+                """).configError()).contains("only for imap.gmail.com:993");
     }
 
     @Test

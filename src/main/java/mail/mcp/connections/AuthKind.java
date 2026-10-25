@@ -13,8 +13,8 @@ public enum AuthKind {
     BASIC("basic", ConnectionType.EWS, true),
     /** IMAP LOGIN with an app password (decision P3). */
     APP_PASSWORD("app-password", ConnectionType.IMAP, true),
-    /** IMAP XOAUTH2. Planned for Gmail later (decision P3); not supported yet. */
-    OAUTH2("oauth2", ConnectionType.IMAP, false);
+    /** Gmail IMAP XOAUTH2 with a local refresh token (decision P3). */
+    OAUTH2("oauth2", ConnectionType.IMAP, true);
 
     private final String id;
     private final ConnectionType type;

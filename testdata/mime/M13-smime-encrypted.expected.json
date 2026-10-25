@@ -1,0 +1,49 @@
+{
+  "id": "M13",
+  "status": "encrypted",
+  "headers": {
+    "subject": "Учебный макет M13",
+    "from": [
+      {
+        "name": "Synthetic Author",
+        "address": "sender@example.com"
+      }
+    ],
+    "to": [
+      {
+        "name": null,
+        "address": "reader@example.org"
+      }
+    ],
+    "date": "2026-03-12T10:15:00+03:00",
+    "messageId": "<m13.synthetic@example.com>"
+  },
+  "body": {
+    "selectedPart": null,
+    "contentType": null,
+    "charsetDeclared": null,
+    "charsetActual": null,
+    "textContains": [],
+    "textNotContains": []
+  },
+  "parts": [
+    {
+      "path": "1",
+      "contentType": "application/pkcs7-mime",
+      "disposition": "attachment",
+      "filenameRaw": "attachment; filename=\"smime.p7m\"",
+      "filenameDecoded": "smime.p7m",
+      "contentId": null,
+      "size": 606,
+      "sha256": "f5bfd290539a8eb4e49d973dbc2261d68a4430ea4485b9fd919149f6891ca1fa",
+      "status": "ok",
+      "children": []
+    }
+  ],
+  "warnings": [],
+  "notes": "OpenSSL 3.0.3: CMS проверен/расшифрован только собственным учебным ключом; рабочий парсер этого не делает.",
+  "smime": {
+    "kind": "encrypted",
+    "cmsValid": true
+  }
+}

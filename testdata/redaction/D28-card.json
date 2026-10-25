@@ -1,0 +1,305 @@
+{
+  "detector": "D28",
+  "title": "Номер карты",
+  "source": "docs/research/RT-08-redaction-detectors.md, D28",
+  "cases": [
+    {
+      "id": "D28-P01",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "Карта: 9999 9986 2914 1440.",
+      "expected": [
+        {
+          "detector": "D28",
+          "match": "9999 9986 2914 1440",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D28-P02",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "Card number = \"9999993203737556\"",
+      "expected": [
+        {
+          "detector": "D28",
+          "match": "9999993203737556",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D28-P03",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "> Карта: 9999998183915775",
+      "expected": [
+        {
+          "detector": "D28",
+          "match": "9999998183915775",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D28-P04",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "Card number\t9999 9977 2446 8799",
+      "expected": [
+        {
+          "detector": "D28",
+          "match": "9999 9977 2446 8799",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D28-P05",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "Карта | 9999990840581132 | дата | март",
+      "expected": [
+        {
+          "detector": "D28",
+          "match": "9999990840581132",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D28-P06",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "Card number: «9999995134879365»",
+      "expected": [
+        {
+          "detector": "D28",
+          "match": "9999995134879365",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D28-P07",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "unlabelled",
+        "boundary"
+      ],
+      "text": "9999 9906 2027 9006",
+      "expected": [
+        {
+          "detector": "D28",
+          "match": "9999 9906 2027 9006",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D28-P08",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "checksum",
+        "label",
+        "boundary"
+      ],
+      "text": "Card number: 9999999646375763; owner: Example",
+      "expected": [
+        {
+          "detector": "D28",
+          "match": "9999999646375763",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "",
+      "checksum": "valid"
+    },
+    {
+      "id": "D28-P09",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "disputed",
+        "label"
+      ],
+      "text": "Карта: 9999993665994621",
+      "expected": [
+        {
+          "detector": "D28",
+          "match": "9999993665994621",
+          "occurrence": 1,
+          "confidence": "low"
+        }
+      ],
+      "note": "Явная метка при неверной сумме: скрытие пока предложено, не утверждено.",
+      "checksum": "invalid"
+    },
+    {
+      "id": "D28-N01",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "checksum",
+        "unlabelled"
+      ],
+      "text": "9999993665994621",
+      "expected": [],
+      "note": "Неверная сумма без метки.",
+      "checksum": "invalid"
+    },
+    {
+      "id": "D28-N02",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Карта: **** 1234",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D28-N03",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Card is not required.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D28-N04",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "PAN=${CARD_VALUE}",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D28-N05",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Card: [скрыто]",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D28-N06",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Order AB-2026-42",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D28-N07",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Версия 2.1.0",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D28-N08",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Карта: 123",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D28-N09",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Reference 99999957704276779999",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    }
+  ]
+}

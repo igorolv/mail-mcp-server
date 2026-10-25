@@ -1,0 +1,772 @@
+{
+  "set": "search",
+  "created": "2026-10-25",
+  "messages": [
+    {
+      "id": "S001",
+      "file": "corpus/S001-synthetic.eml",
+      "subject": "Договор поставки",
+      "from": "Author 1 <author1@example.com>",
+      "to": "planning@example.net",
+      "body": "Отправляю договор поставки.\nНужна проверка условий договора.\nЖду ответ до пятницы.",
+      "attachments": [
+        {
+          "name": "Договор_поставки_№15-2026.txt",
+          "text": "Комплект поставки утверждён.\nПроверьте упаковку."
+        }
+      ],
+      "sha256": "5154b8a4b341dfe7ec3951f5311de3f5ba887b662e614864ee32fa94e1df8108",
+      "terms": [
+        "Договор поставки"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S002",
+      "file": "corpus/S002-synthetic.eml",
+      "subject": "Работа с договорами",
+      "from": "Author 2 <author2@example.com>",
+      "to": "review@example.org",
+      "body": "Приложена таблица с договорами.\nСогласуйте договором выбранную поставку.\nОбсудим замечания.",
+      "attachments": [
+        {
+          "name": "Приложение_02-2026.txt",
+          "text": "Приложение к записи S002.\nСводные данные для проверки."
+        }
+      ],
+      "sha256": "33e0f4b74c359ccfdd058d19147c81e57002a806402dcb30b93d4a48fe662b9b",
+      "terms": [
+        "Работа с договорами"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S003",
+      "file": "corpus/S003-synthetic.eml",
+      "subject": "Получение счета",
+      "from": "Author 3 <author3@example.com>",
+      "to": "planning@example.net",
+      "body": "Счёт выставлен.\nПроверили счета и сумму.\nПлатёж запланирован.",
+      "attachments": [
+        {
+          "name": "Приложение_03-2026.txt",
+          "text": "Приложение к записи S003.\nСводные данные для проверки."
+        }
+      ],
+      "sha256": "8ff3745d6b90439b0fdd0463d3bd7114e62f1cde4bdb480db4db091884cb9ed1",
+      "terms": [
+        "Получение счета"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S004",
+      "file": "corpus/S004-synthetic.eml",
+      "subject": "Сверка счетов",
+      "from": "Author 4 <author4@example.com>",
+      "to": "review@example.org",
+      "body": "Нужны копии счетов.\nОтдельно приложен счет за доставку.\nСпасибо за сверку.",
+      "attachments": [
+        {
+          "name": "Приложение_04-2026.txt",
+          "text": "Приложение к записи S004.\nСводные данные для проверки."
+        }
+      ],
+      "sha256": "2f1e7151be1a658ab29f76bb2caccb6673165a338e71f386168cd9086c3233cc",
+      "terms": [
+        "Сверка счетов"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S005",
+      "file": "corpus/S005-synthetic.eml",
+      "subject": "План переезда",
+      "from": "Author 5 <author5@example.com>",
+      "to": "planning@example.net",
+      "body": "Обсудили план и этапы переезда.\nЗавтра утверждение плана.\nСроки в таблице.",
+      "attachments": [
+        {
+          "name": "План_переезда_2026.csv",
+          "text": "этап,срок\nподготовка,март"
+        }
+      ],
+      "sha256": "3367b5333247031f9fb8117fbc08274d0643a8d4d8c70dd8ea4fd3cd114f3dac",
+      "terms": [
+        "План переезда"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S006",
+      "file": "corpus/S006-synthetic.eml",
+      "subject": "Работа над планами",
+      "from": "Author 6 <author6@example.com>",
+      "to": "review@example.org",
+      "body": "Сравнили варианты с планами помещений.\nВыберите удобный вариант.\nПодготовим схему.",
+      "attachments": [
+        {
+          "name": "Приложение_06-2026.txt",
+          "text": "Приложение к записи S006.\nСводные данные для проверки."
+        }
+      ],
+      "sha256": "041e918e2008d0bb91fd6681fdb28f870e32e656c471e368c40a4b9babd80b02",
+      "terms": [
+        "Работа над планами"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S007",
+      "file": "corpus/S007-synthetic.eml",
+      "subject": "Встреча команды",
+      "from": "Author 7 <author7@example.com>",
+      "to": "planning@example.net",
+      "body": "Проведём встречу команды.\nВстреча посвящена переезду.\nПовестка во вложении.",
+      "attachments": [
+        {
+          "name": "Приложение_07-2026.txt",
+          "text": "Приложение к записи S007.\nСводные данные для проверки."
+        }
+      ],
+      "sha256": "28c1b2a6d4174030bdb3a50172ae939f8510a854db8ea5729afc14163d2f72a3",
+      "terms": [
+        "Встреча команды"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S008",
+      "file": "corpus/S008-synthetic.eml",
+      "subject": "Итоги встречи",
+      "from": "Author 8 <author8@example.com>",
+      "to": "review@example.org",
+      "body": "Результаты встречи согласованы.\nРасписание встреч приложено.\nСледующая дата определена.",
+      "attachments": [
+        {
+          "name": "Приложение_08-2026.txt",
+          "text": "Приложение к записи S008.\nСводные данные для проверки."
+        }
+      ],
+      "sha256": "8c2aba3f3b8cd6759566671a16fd6edc8b4b212e258ab02a371cb1ee901f4a93",
+      "terms": [
+        "Итоги встречи"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S009",
+      "file": "corpus/S009-synthetic.eml",
+      "subject": "Архив переписки",
+      "from": "Author 9 <author9@example.com>",
+      "to": "planning@example.net",
+      "body": "Сохранено письмо и приложения.\nАрхив доступен локально.\nМожно приступить к сверке.",
+      "attachments": [
+        {
+          "name": "Приложение_09-2026.txt",
+          "text": "Приложение к записи S009.\nСводные данные для проверки."
+        }
+      ],
+      "sha256": "4196adcc8c0ed14ac701c28c8e9abda8042d3247d253af1f2d340e9157254664",
+      "terms": [
+        "Архив переписки"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S010",
+      "file": "corpus/S010-synthetic.eml",
+      "subject": "Разбор переписки",
+      "from": "Author 10 <author10@example.com>",
+      "to": "review@example.org",
+      "body": "Копии писем лежат в архиве.\nОни относятся к поставке.\nПросьба проверить комплектность.",
+      "attachments": [
+        {
+          "name": "REPORT_March_2026.txt",
+          "text": "Приложение к записи S010.\nСводные данные для проверки."
+        }
+      ],
+      "sha256": "ca2a6292395d936a3134d4361a7684a714bb839e2ab8e6f5ddb47e08ae883c37",
+      "terms": [
+        "Разбор переписки"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S011",
+      "file": "corpus/S011-synthetic.eml",
+      "subject": "Обмен сообщениями",
+      "from": "Author 11 <author11@example.com>",
+      "to": "planning@example.net",
+      "body": "Работа с письмами завершена.\nАрхив собран.\nСпасибо за помощь.",
+      "attachments": [
+        {
+          "name": "Приложение_11-2026.txt",
+          "text": "Приложение к записи S011.\nСводные данные для проверки."
+        }
+      ],
+      "sha256": "729286794a559a463e829430086f21d7a6afff1c41d1d32bf7df1b92b537e510",
+      "terms": [
+        "Обмен сообщениями"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S012",
+      "file": "corpus/S012-synthetic.eml",
+      "subject": "Персонал",
+      "from": "Author 12 <author12@example.com>",
+      "to": "review@example.org",
+      "body": "Один человек дежурит у входа.\nОн встречает курьера.\nОстальная команда в офисе.",
+      "attachments": [
+        {
+          "name": "Приложение_12-2026.txt",
+          "text": "Приложение к записи S012.\nСводные данные для проверки."
+        }
+      ],
+      "sha256": "b67768a62bdfa20b05a3a01901d4b8ba00ab64e3c0683066c1e4f375ab8f2d9b",
+      "terms": [
+        "Персонал"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S013",
+      "file": "corpus/S013-synthetic.eml",
+      "subject": "Команда",
+      "from": "Author 13 <author13@example.com>",
+      "to": "planning@example.net",
+      "body": "Люди готовы к переезду.\nВсе получили расписание.\nОборудование упаковано.",
+      "attachments": [
+        {
+          "name": "Приложение_13-2026.txt",
+          "text": "Приложение к записи S013.\nСводные данные для проверки."
+        }
+      ],
+      "sha256": "b93249777ed33ba7686de8886c63d6a9b14c0ae2a3f52d1ce7d8c0e64456720f",
+      "terms": [
+        "Команда"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S014",
+      "file": "corpus/S014-synthetic.eml",
+      "subject": "Семейный день",
+      "from": "Author 14 <author14@example.com>",
+      "to": "review@example.org",
+      "body": "Ребёнок сотрудника посетил выставку.\nПодготовили открытки.\nМероприятие завершено.",
+      "attachments": [
+        {
+          "name": "Приложение_14-2026.txt",
+          "text": "Приложение к записи S014.\nСводные данные для проверки."
+        }
+      ],
+      "sha256": "199915c57132c24c8dce394fce29ab0ca657eb3577c15865cca3fd266e1558c9",
+      "terms": [
+        "Семейный день"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S015",
+      "file": "corpus/S015-synthetic.eml",
+      "subject": "Экскурсия",
+      "from": "Author 15 <author15@example.com>",
+      "to": "planning@example.net",
+      "body": "Дети посетили макет офиса.\nИм показали переговорную.\nЭкскурсия завершена.",
+      "attachments": [
+        {
+          "name": "Приложение_15-2026.txt",
+          "text": "Приложение к записи S015.\nСводные данные для проверки."
+        }
+      ],
+      "sha256": "8a3426bda3e46e52cde30d3d746318a768986a7c9ca40a87245674c2133392d5",
+      "terms": [
+        "Экскурсия"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S016",
+      "file": "corpus/S016-synthetic.eml",
+      "subject": "Период работ",
+      "from": "Author 16 <author16@example.com>",
+      "to": "review@example.org",
+      "body": "Год прошёл без задержек.\nГодовой график утверждён.\nПодготовим следующий этап.",
+      "attachments": [
+        {
+          "name": "Приложение_16-2026.txt",
+          "text": "Приложение к записи S016.\nСводные данные для проверки."
+        }
+      ],
+      "sha256": "27c97b493b1f95804a156338a63f903fe32acd5f2060461d7af8735c7ed7939f",
+      "terms": [
+        "Период работ"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S017",
+      "file": "corpus/S017-synthetic.eml",
+      "subject": "История работ",
+      "from": "Author 17 <author17@example.com>",
+      "to": "planning@example.net",
+      "body": "Несколько лет ведём журнал.\nВ архиве есть все записи.\nПродолжим после сверки.",
+      "attachments": [],
+      "sha256": "ed70ae47766840eb7ea0f5ec1dd4fb638ba578f9fa2d72360c1d45a9b5d53a8c",
+      "terms": [
+        "История работ"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S018",
+      "file": "corpus/S018-synthetic.eml",
+      "subject": "Доставка макета",
+      "from": "Author 18 <author18@example.com>",
+      "to": "review@example.org",
+      "body": "Вчера отправил макет.\nСегодня отправлю описание.\nПакет отправлен курьером.",
+      "attachments": [],
+      "sha256": "10ecce2c87bdfa89baa9c33147f69093f47ffa0c6e4017a436a77cfae120b031",
+      "terms": [
+        "Доставка макета"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S019",
+      "file": "corpus/S019-synthetic.eml",
+      "subject": "Утверждение макета",
+      "from": "Author 19 <author19@example.com>",
+      "to": "planning@example.net",
+      "body": "Макет согласован.\nСогласование завершено.\nДокумент согласованный.",
+      "attachments": [],
+      "sha256": "1863728eeabe67d435e83a36e4cb6291d2260c76e605e1eaa599dda3ab97e30f",
+      "terms": [
+        "Утверждение макета"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S020",
+      "file": "corpus/S020-synthetic.eml",
+      "subject": "Приоритет задачи",
+      "from": "Author 20 <author20@example.com>",
+      "to": "review@example.org",
+      "body": "Запрос срочный.\nНужно срочно подготовить макет.\nСрок подтверждён.",
+      "attachments": [],
+      "sha256": "c7d047c50a5f2883411493a25c69d4de7479e0e8b2af694aafaca23648d26713",
+      "terms": [
+        "Приоритет задачи"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S021",
+      "file": "corpus/S021-synthetic.eml",
+      "subject": "Отчет отдела",
+      "from": "Author 21 <author21@example.com>",
+      "to": "planning@example.net",
+      "body": "Отчёт подготовлен.\nПроверяем отчет отдела.\nСводные данные приложены.",
+      "attachments": [],
+      "sha256": "5cd1b83b05d706079911dc0d25eb2da0a78fc18148a63d01a2be29a40f419543",
+      "terms": [
+        "Отчет отдела"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S022",
+      "file": "corpus/S022-synthetic.eml",
+      "subject": "Передача макета",
+      "from": "Иван Тестов <ivan.testov@example.com>",
+      "to": "review@example.org",
+      "body": "Передайте Тестову макет.\nОбсудили правки с Тестовым.\nТестов ждёт подтверждения.",
+      "attachments": [],
+      "sha256": "7d7e15d8d8b6565152e00fa040318074b99e89d22a99466679dd06ce026ebf8f",
+      "terms": [
+        "Передача макета"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S023",
+      "file": "corpus/S023-synthetic.eml",
+      "subject": "Проверка макета",
+      "from": "Анна Тестова <anna.testova@example.org>",
+      "to": "planning@example.net",
+      "body": "Тестова проверила схему.\nПередали Тестовой список замечаний.\nСверка завершена.",
+      "attachments": [],
+      "sha256": "af5fab6ba16c582c8e80a4398030b34a14ca8a3bcb69cfe16868ea672e427c10",
+      "terms": [
+        "Проверка макета"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S024",
+      "file": "corpus/S024-synthetic.eml",
+      "subject": "Записка Анны",
+      "from": "Author 24 <author24@example.com>",
+      "to": "review@example.org",
+      "body": "Анна Тестова подготовила заметку.\nОна поможет с архивом.\nПродолжим после обеда.",
+      "attachments": [],
+      "sha256": "f5ade80958d717fe39e1a77e43e52c0215c780cdee3e37a4ae3fc12af630be2f",
+      "terms": [
+        "Записка Анны"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S025",
+      "file": "corpus/S025-synthetic.eml",
+      "subject": "Записка Ани",
+      "from": "Author 25 <author25@example.com>",
+      "to": "planning@example.net",
+      "body": "Аня отправила приглашение.\nОно относится к экскурсии.\nРасписание подтверждено.",
+      "attachments": [],
+      "sha256": "ea7a0d4d46a6b6cb1ee8d4993de4763fed8e34d36528f54f978cb322d199f344",
+      "terms": [
+        "Записка Ани"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S026",
+      "file": "corpus/S026-synthetic.eml",
+      "subject": "Monthly report",
+      "from": "Author 26 <author26@example.com>",
+      "to": "review@example.org",
+      "body": "The report is ready.\nReports cover delivery and planning.\nPlease review the document.",
+      "attachments": [],
+      "sha256": "caab70a55ec5825b519cacfcfc9affbd656fc35e1ede6cfc3fb2e59ad768de7e",
+      "terms": [
+        "Monthly report"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S027",
+      "file": "corpus/S027-synthetic.eml",
+      "subject": "Reporting schedule",
+      "from": "Author 27 <author27@example.com>",
+      "to": "planning@example.net",
+      "body": "Reporting takes place monthly.\nThe final report arrives on Friday.\nPlease confirm the schedule.",
+      "attachments": [],
+      "sha256": "e773a5d0cd8540fdc5b8cdba2f397e52606f5bc82266195fb19d8c474310fdff",
+      "terms": [
+        "Reporting schedule"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S028",
+      "file": "corpus/S028-synthetic.eml",
+      "subject": "Planning meeting",
+      "from": "Author 28 <author28@example.com>",
+      "to": "review@example.org",
+      "body": "The meeting starts at noon.\nTwo meetings are planned.\nPlease bring the agenda.",
+      "attachments": [],
+      "sha256": "43aacc1d5d2161bc5435a02925d7c0dd8410164ac3c1ec73c7356916ba626336",
+      "terms": [
+        "Planning meeting"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S029",
+      "file": "corpus/S029-synthetic.eml",
+      "subject": "Supplier invoice",
+      "from": "Author 29 <author29@example.com>",
+      "to": "planning@example.net",
+      "body": "An invoice was received.\nInvoices are stored locally.\nPlease check the amount.",
+      "attachments": [],
+      "sha256": "eef8fbfefa2f3b7c6e7fca5c392e930e29d360dd8a88004b8cfe7ac9fbb99161",
+      "terms": [
+        "Supplier invoice"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S030",
+      "file": "corpus/S030-synthetic.eml",
+      "subject": "Dispatch log",
+      "from": "Author 30 <author30@example.com>",
+      "to": "review@example.org",
+      "body": "Please send the draft.\nWe sent the previous version.\nThe record is complete.",
+      "attachments": [],
+      "sha256": "f59c928ef12de084d9f31a89541bcc8e2b50814c0d7186071ea88a41224b8e4c",
+      "terms": [
+        "Dispatch log"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S031",
+      "file": "corpus/S031-synthetic.eml",
+      "subject": "Sending update",
+      "from": "Author 31 <author31@example.com>",
+      "to": "planning@example.net",
+      "body": "Sending the package tomorrow.\nThe courier confirmed pickup.\nPlease prepare the label.",
+      "attachments": [],
+      "sha256": "7d8199efc75c5d6dc322aa55e62c4fe709efa54abdd01d78eb9ed1839ffb5d3c",
+      "terms": [
+        "Sending update"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S032",
+      "file": "corpus/S032-synthetic.eml",
+      "subject": "Deployment release",
+      "from": "Author 32 <author32@example.com>",
+      "to": "review@example.org",
+      "body": "Релиз готов к deploy.\nОбновите Jira после deploy.\nЗадача проверена.",
+      "attachments": [],
+      "sha256": "189462b52f7d6d19c471dc464143d69270124faf486a93ca8faa5d303eba4b17",
+      "terms": [
+        "Deployment release"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S033",
+      "file": "corpus/S033-synthetic.eml",
+      "subject": "Release checklist",
+      "from": "Author 33 <author33@example.com>",
+      "to": "planning@example.net",
+      "body": "Проверка release завершена.\nНужен review макета.\nСрок подтверждён.",
+      "attachments": [],
+      "sha256": "26ceb47c223b1277f17d243bf724e404567a4f3c317792a3c7bb9f8519bb8dc8",
+      "terms": [
+        "Release checklist"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S034",
+      "file": "corpus/S034-synthetic.eml",
+      "subject": "Calendar update",
+      "from": "Author 34 <author34@example.com>",
+      "to": "review@example.org",
+      "body": "Создана онлайн-встреча.\nWi-Fi проверен в переговорной.\nУчастники уведомлены.",
+      "attachments": [],
+      "sha256": "cdf5e68a40c4fb700cbf7be58cf2868875241574ecd5a107de71f7c5abb78591",
+      "terms": [
+        "Calendar update"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S035",
+      "file": "corpus/S035-synthetic.eml",
+      "subject": "Реквизиты поставки",
+      "from": "Author 35 <author35@example.com>",
+      "to": "planning@example.net",
+      "body": "Д-2026/015 согласован.\nООО Облачный Макет выставило НДС.\nКарточка прилагается.",
+      "attachments": [],
+      "sha256": "445ecb875905b68d3c174071b3c5e610fdeb43c81514c5eaee4ed7d7e4edc70d",
+      "terms": [
+        "Реквизиты поставки"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S036",
+      "file": "corpus/S036-synthetic.eml",
+      "subject": "Обращение поддержки",
+      "from": "Author 36 <author36@example.com>",
+      "to": "review@example.org",
+      "body": "INC-4512 закрыто.\nВерсия 2.1.0 проверена.\nСборка доступна.",
+      "attachments": [],
+      "sha256": "525a9ae48236893e622708f74496413df3043cb273c56a6ea7a6ab26b7266dec",
+      "terms": [
+        "Обращение поддержки"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S037",
+      "file": "corpus/S037-synthetic.eml",
+      "subject": "Обсуждение сроков",
+      "from": "Author 37 <author37@example.com>",
+      "to": "planning@example.net",
+      "body": "Предлагаю договориться о сроках.\nУсловия ещё обсуждаются.\nСозвонимся после обеда.",
+      "attachments": [],
+      "sha256": "b07f1027ce4d2c0afaff12e1fde6b8ee5c661999fa37d0e3f61b36279e3b28b0",
+      "terms": [
+        "Обсуждение сроков"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S038",
+      "file": "corpus/S038-synthetic.eml",
+      "subject": "Дегустация",
+      "from": "Author 38 <author38@example.com>",
+      "to": "review@example.org",
+      "body": "Вина из винограда представлены на выставке.\nСтол оформлен.\nПросьба проверить меню.",
+      "attachments": [],
+      "sha256": "431bdd1002d56f5adaf73793d25fd493bd3853c6cfe9e5cd77d4400aeba14472",
+      "terms": [
+        "Дегустация"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S039",
+      "file": "corpus/S039-synthetic.eml",
+      "subject": "Разбор задержки",
+      "from": "Author 39 <author39@example.com>",
+      "to": "planning@example.net",
+      "body": "Причина задержки и вина исполнителя установлены.\nИсправление принято.\nПоставка продолжена.",
+      "attachments": [],
+      "sha256": "d43afe3a099d08ec79035746a3021cc9b465c4a201a0c161113396cb86d98bf8",
+      "terms": [
+        "Разбор задержки"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S040",
+      "file": "corpus/S040-synthetic.eml",
+      "subject": "Парковка",
+      "from": "Author 40 <author40@example.com>",
+      "to": "review@example.org",
+      "body": "Машина у въезда.\nКурьер ждёт пропуск.\nПросьба открыть шлагбаум.",
+      "attachments": [],
+      "sha256": "c07d1a661183069a7930fcad5dce62c1f4eecbedb8b4b520b547e5b83f8b391f",
+      "terms": [
+        "Парковка"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S041",
+      "file": "corpus/S041-synthetic.eml",
+      "subject": "Инженерная заметка",
+      "from": "Author 41 <author41@example.com>",
+      "to": "planning@example.net",
+      "body": "Машинный зал готов.\nЗавершена уборка.\nПроверим оборудование.",
+      "attachments": [],
+      "sha256": "44d330712c33445c8faa4f0c6efbc66566b44e28371d0abba411e35d2ba5fd9f",
+      "terms": [
+        "Инженерная заметка"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S042",
+      "file": "corpus/S042-synthetic.eml",
+      "subject": "Короткая заметка",
+      "from": "Author 42 <author42@example.com>",
+      "to": "review@example.org",
+      "body": "Лес виден из окна.\nМожно использовать фото для макета.\nСнимок приложим позже.",
+      "attachments": [],
+      "sha256": "3776f623090394697194059371f87e529c5f9f3ff3a35861b7d7a98887b6626c",
+      "terms": [
+        "Короткая заметка"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S043",
+      "file": "corpus/S043-synthetic.eml",
+      "subject": "Маршрут",
+      "from": "Author 43 <author43@example.com>",
+      "to": "planning@example.net",
+      "body": "Лестница ведёт к переговорной.\nПлан эвакуации обновлён.\nПроверим указатели.",
+      "attachments": [],
+      "sha256": "a33ee8e60c7122c82533a458b3a71d39bbe93f06c454c0858399b78e8b473136",
+      "terms": [
+        "Маршрут"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S044",
+      "file": "corpus/S044-synthetic.eml",
+      "subject": "Передача проекта",
+      "from": "Author 44 <author44@example.com>",
+      "to": "review@example.org",
+      "body": "Красный макет готов.\nПоставка нового макета согласована.\nЗавтра передача.",
+      "attachments": [],
+      "sha256": "419511b30826d5657069e027815be5791704583a325a0397f40dabb66bb7a4b8",
+      "terms": [
+        "Передача проекта"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S045",
+      "file": "corpus/S045-synthetic.eml",
+      "subject": "Обратный порядок",
+      "from": "Author 45 <author45@example.com>",
+      "to": "planning@example.net",
+      "body": "Макет красный готов.\nНового макета поставка ожидается.\nПозже будет подтверждение.",
+      "attachments": [],
+      "sha256": "56bbc7696503284b4a9551a3624f52164c3a81570d8eb63f80ef251ba4077ea7",
+      "terms": [
+        "Обратный порядок"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S046",
+      "file": "corpus/S046-synthetic.eml",
+      "subject": "Первая пустая запись",
+      "from": "Author 46 <author46@example.com>",
+      "to": "review@example.org",
+      "body": "И в на.\nНа и в.\nЭто короткая проверка служебных слов.",
+      "attachments": [],
+      "sha256": "70aaf355fff110f9beec05762d38041efb288d764e6140286ff8a27177a07612",
+      "terms": [
+        "Первая пустая запись"
+      ],
+      "note": "Fully invented message; no external content."
+    },
+    {
+      "id": "S047",
+      "file": "corpus/S047-synthetic.eml",
+      "subject": "Учебная запись доступа",
+      "from": "Author 47 <author47@example.com>",
+      "to": "planning@example.net",
+      "body": "Синтетическая запись для проверки фильтра.\nПароль: SYNTHETIC_ONLY_FICTION_47x\nЗначение выдумано, вход невозможен.",
+      "attachments": [],
+      "sha256": "00f753414cb017ba2720888dd0e5e29179b24dde32e596d76253afb5dda65a60",
+      "terms": [
+        "Учебная запись доступа"
+      ],
+      "note": "Fully invented message; no external content.",
+      "redactions": [
+        {
+          "match": "SYNTHETIC_ONLY_FICTION_47x",
+          "detector": "D01"
+        }
+      ],
+      "redactedBody": "Синтетическая запись для проверки фильтра.\nПароль: [скрыто]\nЗначение выдумано, вход невозможен."
+    },
+    {
+      "id": "S048",
+      "file": "corpus/S048-synthetic.eml",
+      "subject": "Учебный документ",
+      "from": "Author 48 <author48@example.com>",
+      "to": "review@example.org",
+      "body": "Синтетическая запись для проверки фильтра.\nПаспорт: 00 00 000042\nНомер выдуман и никому не принадлежит.",
+      "attachments": [],
+      "sha256": "72d3cd74efbb1465b875b22639954fdc0e449d789852bec0f129d24effa92a80",
+      "terms": [
+        "Учебный документ"
+      ],
+      "note": "Fully invented message; no external content.",
+      "redactions": [
+        {
+          "match": "00 00 000042",
+          "detector": "D22"
+        }
+      ],
+      "redactedBody": "Синтетическая запись для проверки фильтра.\nПаспорт: [скрыто]\nНомер выдуман и никому не принадлежит."
+    }
+  ]
+}

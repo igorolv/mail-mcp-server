@@ -5,10 +5,17 @@ This repository will become a local stdio MCP server that lets AI agents read se
 files with extracted text, search mail and attachments through a local index, and filter
 sensitive data before anything reaches the model.
 
-**Current status: stage 1, EWS spike.** There is a Gradle build, a Spring Boot stdio MCP server
+**Current status: stage 1, EWS and IMAP spikes.** There is a Gradle build, a Spring Boot stdio MCP server
 with one tool (`listConnections`), the connections file with a lazy registry, and a read-only EWS
-client with NTLM plus a spike command the user runs against the real mailbox. IMAP, local
-storage, MIME parsing, search and redaction are still design only (`docs/plan.md`). Add new tools
+client with NTLM plus a spike command the user runs against the real mailbox. The user-run EWS
+spike succeeded on 2026-10-25 (see `docs/plan.md` 3.3). A read-only IMAP source on Angus Mail
+and a user-run spike are ready; Mail.ru sign-in and MIME download succeeded on 2026-10-25
+(see `docs/plan.md` 3.4). Gmail OAuth2 (Desktop PKCE, local refresh tokens, XOAUTH2) is ready for
+a user-run check; real Gmail sign-in is not verified yet. The user deferred connecting their
+Gmail on 2026-10-25; their local configuration contains only `work` and `mailru`. Keep Gmail
+and OAuth2 support available, but do not treat Gmail setup as the next required user action. Synthetic RT-11–RT-13
+data sets are ready. Local storage, MIME parsing, search and redaction are still design only
+(`docs/plan.md`). Add new tools
 or subsystems only when the task asks for them.
 
 ## Repository contents
@@ -45,6 +52,8 @@ Read this file first. Then read only the documents whose `When` matches the task
 | `docs/architecture-agent.md` | locating code, adding a package, changing a dependency, Spring wiring or the stdio transport | what is implemented, tech stack, package layout and layer rules |
 | `docs/build-config-agent.md` | building, running tests, adding a setting, changing the connections file format, running the spike | Gradle commands, `MAIL_MCP_*` settings, `connections.json` keys and validation, spike invocation |
 | `docs/ews-source-agent.md` | changing `source/ews/`, adding an EWS operation, NTLM questions, reading spike output | allow-list, response checks, NTLM transport rules, known risks, spike output format |
+| `docs/imap-source-agent.md` | changing `source/imap/`, IMAP authentication or reading IMAP spike output | TLS, command allow-list, one sign-in attempt, EXAMINE/PEEK, bounded MIME downloads and spike output |
+| `docs/gmail-oauth-agent.md` | changing `source/oauth/google/`, Gmail OAuth configuration, authorization or refresh | Desktop client setup, PKCE/state/loopback flow, owner-only refresh storage, token endpoint and XOAUTH2 rules |
 | `scripts/ews-login-check.ps1` | changing or explaining the EWS sign-in check | the script itself; its help block documents parameters |
 
 Name new engineering documents `docs/<topic>-agent.md`, write them in English, and register each
@@ -127,7 +136,8 @@ so you can keep changes consistent with it. What is already implemented is liste
   credentials.
 - EWS source: own thin SOAP client on StAX with a pluggable transport — Apache HttpClient 5 with
   NTLM explicitly registered first, `HttpsURLConnection` as fallback. IMAP source (Gmail,
-  Mail.ru): Eclipse Angus Mail with app passwords; OAuth2 for Gmail later.
+  Mail.ru): Eclipse Angus Mail with app passwords or Gmail OAuth2/XOAUTH2. Initial Gmail OAuth
+  consent is a user-run command, never an MCP tool or an automatic browser flow.
 - Read-only at protocol level: an allow-list of 10 EWS read operations; IMAP `EXAMINE` and
   `BODY.PEEK`; never set flags in the mailbox.
 - Every source delivers messages as MIME (`.eml`), so storage, parsing and attachment extraction
@@ -169,12 +179,17 @@ Sibling projects used as references (same author, both public on GitHub):
 
 - The package root is `mail.mcp`. Never use a package, group id or class name that contains the
   company name or the user's account name (invariant 1).
-- Tests must not sign in to a real mailbox or reach the network; use synthetic responses
-  (`src/test/resources/ews/`) and the fake loopback endpoint of `HttpClient5EwsTransportTest`.
+- Tests must not sign in to a real mailbox or reach an external network; use synthetic responses
+  (`src/test/resources/ews/`) and the fake loopback endpoints of `HttpClient5EwsTransportTest`
+  and `ImapClientTest`.
 - Code copied from a sibling project names its source project and commit in the class Javadoc.
 - The EWS spike (`ews-spike` mode of the jar, `ewsSpike` Gradle task) signs in to the real mailbox:
   only the user runs it. Agents interpret the output the user pastes back
   (`docs/ews-source-agent.md`).
+- The IMAP spike (`imap-spike` mode, `imapSpike` Gradle task) is also run only by the user.
+  Never open the real connections file or saved original messages; use synthetic files for checks.
+- The `gmail-oauth` command opens a browser and exchanges a real authorization code. Only the
+  user runs it. Agents must not open downloaded OAuth client JSON or token files.
 
 ## Scripts
 

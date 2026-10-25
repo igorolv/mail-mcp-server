@@ -1,0 +1,28 @@
+From: Author 9 <author9@example.com>
+To: planning@example.net
+Subject: =?utf-8?b?0JDRgNGF0LjQsiDQv9C10YDQtdC/0LjRgdC60Lg=?=
+Date: Wed, 11 Mar 2026 10:15:00 +0300
+Message-ID: <s009.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="===============1898753244165498665=="
+
+--===============1898753244165498665==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
+
+0KHQvtGF0YDQsNC90LXQvdC+INC/0LjRgdGM0LzQviDQuCDQv9GA0LjQu9C+0LbQtdC90LjRjy4N
+CtCQ0YDRhdC40LIg0LTQvtGB0YLRg9C/0LXQvSDQu9C+0LrQsNC70YzQvdC+Lg0K0JzQvtC20L3Q
+viDQv9GA0LjRgdGC0YPQv9C40YLRjCDQuiDRgdCy0LXRgNC60LUuDQo=
+
+--===============1898753244165498665==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment;
+ filename*0*=utf-8''%D0%9F%D1%80%D0%B8%D0%BB%D0%BE%D0%B6%D0%B5%D0%BD%D0%B8;
+ filename*1*=%D0%B5_09-2026.txt
+MIME-Version: 1.0
+
+0J/RgNC40LvQvtC20LXQvdC40LUg0Log0LfQsNC/0LjRgdC4IFMwMDkuDQrQodCy0L7QtNC90YvQ
+tSDQtNCw0L3QvdGL0LUg0LTQu9GPINC/0YDQvtCy0LXRgNC60LguDQo=
+
+--===============1898753244165498665==--

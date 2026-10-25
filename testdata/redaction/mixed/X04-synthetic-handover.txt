@@ -1,0 +1,14 @@
+Тема: учебная передача 4
+Коллеги, ниже только выдуманные данные.
+Они не выданы ни одним сервисом.
+Система | Состояние
+Учебный стенд | готов
+Authorization: Basic ZmljdGlvbjA6TmV2ZXJMaXZlaEZWcXhVVUtwbWs=
+Сохранённая строка: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInN5bnRoZXRpYyI6dHJ1ZX0.eyJzdWIiOiAiZmljdGlvbjAiLCAiaXNzIjogImh0dHBzOi8vZXhhbXBsZS5jb20ifQ.Y243WXR1TXMxdElBTHJteGxzUTd6RXlt
+jdbc:postgresql://db.example.com/training?user=test&password=ConnFiction_GZhYAae9Oxk3
+Проверка завершена.
+> Предыдущее сообщение:
+> Authorization: Basic ZmljdGlvbjA6TmV2ZXJMaXZlaEZWcXhVVUtwbWs=
+> Заказ: AB-2026-42
+Адрес поддержки: training@example.com
+Спасибо, команда макета.

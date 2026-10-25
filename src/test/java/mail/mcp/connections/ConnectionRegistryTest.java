@@ -69,15 +69,12 @@ class ConnectionRegistryTest {
     }
 
     @Test
-    void standardFactoryRefusesUnusableAndNotYetImplementedConnections() {
+    void standardFactoryRefusesUnusableConnections() {
         MailConnectionFactory factory = MailConnectionFactory.standard();
 
         assertThatThrownBy(() -> factory.create(definition("broken", ConnectionType.EWS, "no 'url'")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cannot be used: no 'url'");
-        assertThatThrownBy(() -> factory.create(definition("gmail", ConnectionType.IMAP, null)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("type 'imap'");
     }
 
     @Test

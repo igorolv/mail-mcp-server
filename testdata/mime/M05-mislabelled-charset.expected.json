@@ -1,0 +1,62 @@
+{
+  "id": "M05",
+  "status": "partial",
+  "headers": {
+    "subject": "Учебный макет M05",
+    "from": [
+      {
+        "name": "Synthetic Author",
+        "address": "sender@example.com"
+      }
+    ],
+    "to": [
+      {
+        "name": null,
+        "address": "reader@example.org"
+      }
+    ],
+    "date": "2026-03-12T10:15:00+03:00",
+    "messageId": "<m05.synthetic@example.com>"
+  },
+  "body": {
+    "selectedPart": "1",
+    "contentType": "text/plain",
+    "charsetDeclared": "iso-8859-1",
+    "charsetActual": "windows-1251",
+    "textContains": [
+      "Приложен макет для проверки."
+    ],
+    "textNotContains": []
+  },
+  "parts": [
+    {
+      "path": "1",
+      "contentType": "text/plain",
+      "disposition": null,
+      "filenameRaw": null,
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 28,
+      "sha256": "495b50c018a088a98da7022520514a4376c3d828f43b81fc15ae1fe577c230fc",
+      "status": "ok",
+      "children": []
+    },
+    {
+      "path": "2",
+      "contentType": "text/plain",
+      "disposition": null,
+      "filenameRaw": null,
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 33,
+      "sha256": "e5d83e7ac113c93876d8a16c119cb0d68625dbc436b8e87eb707e8958646fd5d",
+      "status": "ok",
+      "children": []
+    }
+  ],
+  "warnings": [
+    "charset-mismatch-suspected",
+    "charset-missing"
+  ],
+  "notes": "Ground truth: CP1251. Допустимо не исправлять метку автоматически; предупреждение и исходные байты обязательны."
+}

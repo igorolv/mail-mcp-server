@@ -1,17 +1,18 @@
 package mail.mcp.source.imap;
 
 import mail.mcp.connections.AuthKind;
+import mail.mcp.source.oauth.google.GoogleOAuthSettings;
 
 /**
- * Settings of one IMAP mailbox (Gmail, Mail.ru). Parsed and validated already; the IMAP source
- * itself comes after the EWS spike (decision P8).
+ * Settings of one IMAP mailbox, using implicit TLS with an app password or Gmail OAuth2.
  *
  * @param host     IMAP server, e.g. {@code imap.gmail.com}
  * @param port     IMAP port, 993 by default
  * @param tls      implicit TLS; plain IMAP is rejected by the loader
- * @param auth     {@link AuthKind#APP_PASSWORD} (OAuth2 later)
+ * @param auth     app-password or Gmail oauth2
  * @param username login, usually the full address
  * @param password app password; never logged, never returned by a tool
+ * @param oauth2   Google OAuth file locations; no secret contents, null for app-password
  */
 public record ImapSettings(
         String host,
@@ -19,8 +20,13 @@ public record ImapSettings(
         boolean tls,
         AuthKind auth,
         String username,
-        String password
+        String password,
+        GoogleOAuthSettings oauth2
 ) {
+
+    public ImapSettings(String host, int port, boolean tls, AuthKind auth, String username, String password) {
+        this(host, port, tls, auth, username, password, null);
+    }
 
     public static final int DEFAULT_PORT = 993;
 

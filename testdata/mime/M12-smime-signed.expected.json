@@ -1,0 +1,64 @@
+{
+  "id": "M12",
+  "status": "ok",
+  "headers": {
+    "subject": "Учебный макет M12",
+    "from": [
+      {
+        "name": "Synthetic Author",
+        "address": "sender@example.com"
+      }
+    ],
+    "to": [
+      {
+        "name": null,
+        "address": "reader@example.org"
+      }
+    ],
+    "date": "2026-03-12T10:15:00+03:00",
+    "messageId": "<m12.synthetic@example.com>"
+  },
+  "body": {
+    "selectedPart": "1",
+    "contentType": "text/plain",
+    "charsetDeclared": "utf-8",
+    "charsetActual": "utf-8",
+    "textContains": [
+      "Подписанный учебный макет."
+    ],
+    "textNotContains": []
+  },
+  "parts": [
+    {
+      "path": "1",
+      "contentType": "text/plain",
+      "disposition": null,
+      "filenameRaw": null,
+      "filenameDecoded": null,
+      "contentId": null,
+      "size": 49,
+      "sha256": "57c9344825dee603af09ca5e45be40f0463f44ee0193450401759373906f43ba",
+      "status": "ok",
+      "children": []
+    },
+    {
+      "path": "2",
+      "contentType": "application/pkcs7-signature",
+      "disposition": "attachment",
+      "filenameRaw": "attachment; filename=\"smime.p7s\"",
+      "filenameDecoded": "smime.p7s",
+      "contentId": null,
+      "size": 1535,
+      "sha256": "6f7b370065093ecd0ea68e082b42c52fa53c844e3abac0a38a90a58a50c5d1d4",
+      "status": "ok",
+      "children": []
+    }
+  ],
+  "warnings": [],
+  "notes": "OpenSSL 3.0.3: CMS проверен/расшифрован только собственным учебным ключом; рабочий парсер этого не делает.",
+  "smime": {
+    "kind": "detached_signed",
+    "cmsValid": true,
+    "signatureStatus": "not_verified"
+  }
+}

@@ -1,0 +1,26 @@
+From: Author 10 <author10@example.com>
+To: review@example.org
+Subject: =?utf-8?b?0KDQsNC30LHQvtGAINC/0LXRgNC10L/QuNGB0LrQuA==?=
+Date: Thu, 12 Mar 2026 10:15:00 +0300
+Message-ID: <s010.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="===============8977806617671291798=="
+
+--===============8977806617671291798==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
+
+0JrQvtC/0LjQuCDQv9C40YHQtdC8INC70LXQttCw0YIg0LIg0LDRgNGF0LjQstC1Lg0K0J7QvdC4
+INC+0YLQvdC+0YHRj9GC0YHRjyDQuiDQv9C+0YHRgtCw0LLQutC1Lg0K0J/RgNC+0YHRjNCx0LAg
+0L/RgNC+0LLQtdGA0LjRgtGMINC60L7QvNC/0LvQtdC60YLQvdC+0YHRgtGMLg0K
+
+--===============8977806617671291798==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="REPORT_March_2026.txt"
+MIME-Version: 1.0
+
+0J/RgNC40LvQvtC20LXQvdC40LUg0Log0LfQsNC/0LjRgdC4IFMwMTAuDQrQodCy0L7QtNC90YvQ
+tSDQtNCw0L3QvdGL0LUg0LTQu9GPINC/0YDQvtCy0LXRgNC60LguDQo=
+
+--===============8977806617671291798==--

@@ -1,0 +1,255 @@
+{
+  "detector": "D12",
+  "title": "Блоки приватного ключа",
+  "source": "docs/research/RT-08-redaction-detectors.md, D12",
+  "cases": [
+    {
+      "id": "D12-P01",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "pem",
+        "multiline"
+      ],
+      "text": "Учебный блок:\n-----BEGIN RSA PRIVATE KEY-----\nTk9UX0FfREVSX0tFWV9Pb0dRZWVWWXRmYTM4dHphTjJzaXhQ\nRWZoMXE1eXpZNkJyVjlOOGd4bkE1VTI4MFZ2SjdrUw==\n-----END RSA PRIVATE KEY-----",
+      "expected": [
+        {
+          "detector": "D12",
+          "match": "-----BEGIN RSA PRIVATE KEY-----\nTk9UX0FfREVSX0tFWV9Pb0dRZWVWWXRmYTM4dHphTjJzaXhQ\nRWZoMXE1eXpZNkJyVjlOOGd4bkE1VTI4MFZ2SjdrUw==\n-----END RSA PRIVATE KEY-----",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "Тело заведомо не DER; это не действительный ключ."
+    },
+    {
+      "id": "D12-P02",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "pem",
+        "multiline"
+      ],
+      "text": "Synthetic block:\n-----BEGIN PRIVATE KEY-----\nTk9UX0FfREVSX0tFWV91TmRsRkRVZ3N1R1JaYVVLMVpURkw5\nQ3ZnWENXQnloT253azc1MDF1Wk9FRWF6cFN2VXZqQw==\n-----END PRIVATE KEY-----",
+      "expected": [
+        {
+          "detector": "D12",
+          "match": "-----BEGIN PRIVATE KEY-----\nTk9UX0FfREVSX0tFWV91TmRsRkRVZ3N1R1JaYVVLMVpURkw5\nQ3ZnWENXQnloT253azc1MDF1Wk9FRWF6cFN2VXZqQw==\n-----END PRIVATE KEY-----",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "Тело заведомо не DER; это не действительный ключ."
+    },
+    {
+      "id": "D12-P03",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "pem",
+        "multiline"
+      ],
+      "text": "Учебный блок:\n-----BEGIN EC PRIVATE KEY-----\nTk9UX0FfREVSX0tFWV9uUjVXbmtjYWRlZnI4OUlPTndRRjNE\ndjVjVkpKYkZxNzQ4UTZybkNGNnNwUUhqWnBMS3UzbQ==\n-----END EC PRIVATE KEY-----",
+      "expected": [
+        {
+          "detector": "D12",
+          "match": "-----BEGIN EC PRIVATE KEY-----\nTk9UX0FfREVSX0tFWV9uUjVXbmtjYWRlZnI4OUlPTndRRjNE\ndjVjVkpKYkZxNzQ4UTZybkNGNnNwUUhqWnBMS3UzbQ==\n-----END EC PRIVATE KEY-----",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "Тело заведомо не DER; это не действительный ключ."
+    },
+    {
+      "id": "D12-P04",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "pem",
+        "multiline"
+      ],
+      "text": "Synthetic block:\n-----BEGIN ENCRYPTED PRIVATE KEY-----\nTk9UX0FfREVSX0tFWV9adUJjMEZlb0d5ZVJuaXlvSnN6OUNV\nQTdxV1pjVEhlU1pxc2xGaEhaN3pLN3E0Ylk2NFNHSg==\n-----END ENCRYPTED PRIVATE KEY-----",
+      "expected": [
+        {
+          "detector": "D12",
+          "match": "-----BEGIN ENCRYPTED PRIVATE KEY-----\nTk9UX0FfREVSX0tFWV9adUJjMEZlb0d5ZVJuaXlvSnN6OUNV\nQTdxV1pjVEhlU1pxc2xGaEhaN3pLN3E0Ylk2NFNHSg==\n-----END ENCRYPTED PRIVATE KEY-----",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "Тело заведомо не DER; это не действительный ключ."
+    },
+    {
+      "id": "D12-P05",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "pem",
+        "multiline"
+      ],
+      "text": "Учебный блок:\n-----BEGIN RSA PRIVATE KEY-----\nTk9UX0FfREVSX0tFWV9TM0RFbkdlOVU4eUJWMU51QjdrcnRT\nQmNMTVV5M242eFh6cExGUEtjSW9tRnFVdUJSMUFZeg==\n-----END RSA PRIVATE KEY-----",
+      "expected": [
+        {
+          "detector": "D12",
+          "match": "-----BEGIN RSA PRIVATE KEY-----\nTk9UX0FfREVSX0tFWV9TM0RFbkdlOVU4eUJWMU51QjdrcnRT\nQmNMTVV5M242eFh6cExGUEtjSW9tRnFVdUJSMUFZeg==\n-----END RSA PRIVATE KEY-----",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "Тело заведомо не DER; это не действительный ключ."
+    },
+    {
+      "id": "D12-P06",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "pem",
+        "multiline"
+      ],
+      "text": "Synthetic block:\n-----BEGIN PRIVATE KEY-----\nTk9UX0FfREVSX0tFWV9tY3drV2x6TTd5a0ZaWTltaVYyZzFh\nbmFRckhFTjhvWVFLZWh5UmFsemxHNTA0WERUMm5QaQ==\n-----END PRIVATE KEY-----",
+      "expected": [
+        {
+          "detector": "D12",
+          "match": "-----BEGIN PRIVATE KEY-----\nTk9UX0FfREVSX0tFWV9tY3drV2x6TTd5a0ZaWTltaVYyZzFh\nbmFRckhFTjhvWVFLZWh5UmFsemxHNTA0WERUMm5QaQ==\n-----END PRIVATE KEY-----",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "Тело заведомо не DER; это не действительный ключ."
+    },
+    {
+      "id": "D12-P07",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "pem",
+        "multiline"
+      ],
+      "text": "Учебный блок:\n-----BEGIN EC PRIVATE KEY-----\nTk9UX0FfREVSX0tFWV9oWkVJbWZISW1rTVhqeUk5VXZzcTlt\nVUUzZEowNmtvcUo5N2FUSXFHYUVTZHlUTHdOank5RA==\n-----END EC PRIVATE KEY-----",
+      "expected": [
+        {
+          "detector": "D12",
+          "match": "-----BEGIN EC PRIVATE KEY-----\nTk9UX0FfREVSX0tFWV9oWkVJbWZISW1rTVhqeUk5VXZzcTlt\nVUUzZEowNmtvcUo5N2FUSXFHYUVTZHlUTHdOank5RA==\n-----END EC PRIVATE KEY-----",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "Тело заведомо не DER; это не действительный ключ."
+    },
+    {
+      "id": "D12-P08",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "pem",
+        "multiline"
+      ],
+      "text": "Synthetic block:\n-----BEGIN ENCRYPTED PRIVATE KEY-----\nTk9UX0FfREVSX0tFWV9yNVJjMHQ3cktLcU1Cb0dpYnE1ZXNu\nSE9QMFY5QUFadmlESG14WVdJZmJhMFdUaHRoZ1NYNw==\n-----END ENCRYPTED PRIVATE KEY-----",
+      "expected": [
+        {
+          "detector": "D12",
+          "match": "-----BEGIN ENCRYPTED PRIVATE KEY-----\nTk9UX0FfREVSX0tFWV9yNVJjMHQ3cktLcU1Cb0dpYnE1ZXNu\nSE9QMFY5QUFadmlESG14WVdJZmJhMFdUaHRoZ1NYNw==\n-----END ENCRYPTED PRIVATE KEY-----",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": "Тело заведомо не DER; это не действительный ключ."
+    },
+    {
+      "id": "D12-N01",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "-----BEGIN PUBLIC KEY-----\nTk9UX0FfS0VZ\n-----END PUBLIC KEY-----",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D12-N02",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "-----BEGIN CERTIFICATE-----\nTk9UX0FfQ0VSVA==\n-----END CERTIFICATE-----",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D12-N03",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "-----BEGIN PRIVATE KEY-----\nTk9UX0FfS0VZ",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D12-N04",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "-----END PRIVATE KEY-----",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D12-N05",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "-----BEGIN PRIVATE KEY-----\nTk9UX0FfS0VZ\n-----END RSA PRIVATE KEY-----",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D12-N06",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "PEM private key is not required.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D12-N07",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "${PEM_VALUE}",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D12-N08",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "-----BEGIN SOMETHING ELSE-----\nTk9UX0FfS0VZ\n-----END SOMETHING ELSE-----",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    }
+  ]
+}

@@ -1,0 +1,263 @@
+{
+  "detector": "D22",
+  "title": "Паспорт РФ",
+  "source": "docs/research/RT-08-redaction-detectors.md, D22",
+  "cases": [
+    {
+      "id": "D22-P01",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "label",
+        "no-checksum",
+        "boundary"
+      ],
+      "text": "Паспорт: 79 33 268580.",
+      "expected": [
+        {
+          "detector": "D22",
+          "match": "79 33 268580",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D22-P02",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "label",
+        "no-checksum",
+        "boundary"
+      ],
+      "text": "Russian passport: \"93 83 961627\"",
+      "expected": [
+        {
+          "detector": "D22",
+          "match": "93 83 961627",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D22-P03",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "label",
+        "no-checksum",
+        "boundary"
+      ],
+      "text": "Серия и номер паспорта: «59 51 482950»",
+      "expected": [
+        {
+          "detector": "D22",
+          "match": "59 51 482950",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D22-P04",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "label",
+        "no-checksum",
+        "boundary"
+      ],
+      "text": "> паспорт: 64 88 428304",
+      "expected": [
+        {
+          "detector": "D22",
+          "match": "64 88 428304",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D22-P05",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "label",
+        "no-checksum",
+        "boundary"
+      ],
+      "text": "Паспорт\t68 94 844470",
+      "expected": [
+        {
+          "detector": "D22",
+          "match": "68 94 844470",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D22-P06",
+      "kind": "positive",
+      "lang": "ru",
+      "variants": [
+        "label",
+        "no-checksum",
+        "boundary"
+      ],
+      "text": "Паспорт | 19 99 928615 | получатель | Тестов",
+      "expected": [
+        {
+          "detector": "D22",
+          "match": "19 99 928615",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D22-P07",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "label",
+        "no-checksum",
+        "boundary"
+      ],
+      "text": "<passport>80 12 177708</passport>",
+      "expected": [
+        {
+          "detector": "D22",
+          "match": "80 12 177708",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D22-P08",
+      "kind": "positive",
+      "lang": "en",
+      "variants": [
+        "label",
+        "no-checksum",
+        "boundary"
+      ],
+      "text": "passport = `43 95 060787`",
+      "expected": [
+        {
+          "detector": "D22",
+          "match": "43 95 060787",
+          "occurrence": 1,
+          "confidence": "high"
+        }
+      ],
+      "note": ""
+    },
+    {
+      "id": "D22-N01",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Заказ: 0389503904",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D22-N02",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Passport not required.",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D22-N03",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Паспорт: **********",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D22-N04",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Паспорт: 12 34 12345",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D22-N05",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Паспорт: 12 34 1234567",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D22-N06",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Дата: 2026-03-12",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D22-N07",
+      "kind": "negative",
+      "lang": "ru",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "Серия макета: AB-42",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    },
+    {
+      "id": "D22-N08",
+      "kind": "negative",
+      "lang": "en",
+      "variants": [
+        "look-alike",
+        "boundary"
+      ],
+      "text": "${PASSPORT_VALUE}",
+      "expected": [],
+      "note": "Нет ожидаемых находок всех 15 детекторов."
+    }
+  ]
+}

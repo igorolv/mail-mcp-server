@@ -1,0 +1,38 @@
+{
+  "id": "X04",
+  "file": "X04-synthetic-handover.txt",
+  "expected": [
+    {
+      "detector": "D09",
+      "match": "ZmljdGlvbjA6TmV2ZXJMaXZlaEZWcXhVVUtwbWs=",
+      "occurrence": 1,
+      "confidence": "high"
+    },
+    {
+      "detector": "D09",
+      "match": "ZmljdGlvbjA6TmV2ZXJMaXZlaEZWcXhVVUtwbWs=",
+      "occurrence": 2,
+      "confidence": "high"
+    },
+    {
+      "detector": "D11",
+      "match": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsInN5bnRoZXRpYyI6dHJ1ZX0.eyJzdWIiOiAiZmljdGlvbjAiLCAiaXNzIjogImh0dHBzOi8vZXhhbXBsZS5jb20ifQ.Y243WXR1TXMxdElBTHJteGxzUTd6RXlt",
+      "occurrence": 1,
+      "confidence": "high"
+    },
+    {
+      "detector": "D20",
+      "match": "ConnFiction_GZhYAae9Oxk3",
+      "occurrence": 1,
+      "confidence": "high"
+    },
+    {
+      "detector": "D01",
+      "match": "ConnFiction_GZhYAae9Oxk3",
+      "occurrence": 1,
+      "confidence": "high"
+    }
+  ],
+  "redactedText": "Тема: учебная передача 4\nКоллеги, ниже только выдуманные данные.\nОни не выданы ни одним сервисом.\nСистема | Состояние\nУчебный стенд | готов\nAuthorization: Basic [скрыто:D09]\nСохранённая строка: [скрыто:D11]\njdbc:postgresql://db.example.com/training?user=test&password=[скрыто:D01]\nПроверка завершена.\n> Предыдущее сообщение:\n> Authorization: Basic [скрыто:D09]\n> Заказ: AB-2026-42\nАдрес поддержки: training@example.com\nСпасибо, команда макета.\n",
+  "note": "Overlaps merge by union; largest finding chooses marker, equal lengths choose lowest detector ID."
+}

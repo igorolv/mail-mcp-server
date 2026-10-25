@@ -1,0 +1,40 @@
+From: Synthetic Author <sender@example.com>
+To: reader@example.org
+Subject: =?utf-8?b?0KPRh9C10LHQvdGL0Lkg0LzQsNC60LXRgiBNMDg=?=
+Date: Thu, 12 Mar 2026 10:15:00 +0300
+Message-ID: <m08.synthetic@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/related; boundary="synthetic_boundary_05"
+
+--synthetic_boundary_05
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: base64
+
+PGh0bWw+PGJvZHk+PHA+0JzQsNC60LXRgiDRgSDQuNC30L7QsdGA0LDQttC10L3QuNGP0LzQuC48
+L3A+PGltZyBzcmM9ImNpZDpyZWRAZXhhbXBsZS5jb20iPjxpbWcgc3JjPSJjaWQ6Z3JlZW5AZXhh
+bXBsZS5jb20iPjwvYm9keT48L2h0bWw+
+--synthetic_boundary_05
+Content-Type: image/png
+Content-Disposition: inline; filename*=utf-8''image-1.png
+Content-ID: <red@example.com>
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLv
+AAAAAElFTkSuQmCC
+--synthetic_boundary_05
+Content-Type: image/png
+Content-Disposition: inline; filename*=utf-8''image-2.png
+Content-ID: <green@example.com>
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNg+M8AAAICAQB7CYF4
+AAAAAElFTkSuQmCC
+--synthetic_boundary_05
+Content-Type: image/png
+Content-Disposition: attachment; filename*=utf-8''image-3.png
+Content-ID: <extra@example.com>
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYPgPAAEDAQAIicLs
+AAAAAElFTkSuQmCC
+--synthetic_boundary_05--

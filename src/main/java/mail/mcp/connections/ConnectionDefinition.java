@@ -84,9 +84,9 @@ public record ConnectionDefinition(
         return configError == null;
     }
 
-    /** True when this server version has a source for the type. Stage 1 implements EWS only. */
+    /** True when this server version has a source for the type. */
     public boolean sourceImplemented() {
-        return type == ConnectionType.EWS;
+        return type == ConnectionType.EWS || type == ConnectionType.IMAP;
     }
 
     /** True when {@code <data-dir>/<name>/} already exists. */

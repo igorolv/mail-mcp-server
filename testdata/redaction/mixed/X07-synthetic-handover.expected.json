@@ -1,0 +1,32 @@
+{
+  "id": "X07",
+  "file": "X07-synthetic-handover.txt",
+  "expected": [
+    {
+      "detector": "D23",
+      "match": "599-363-279 67",
+      "occurrence": 1,
+      "confidence": "high"
+    },
+    {
+      "detector": "D23",
+      "match": "599-363-279 67",
+      "occurrence": 2,
+      "confidence": "high"
+    },
+    {
+      "detector": "D25",
+      "match": "002918877470",
+      "occurrence": 1,
+      "confidence": "high"
+    },
+    {
+      "detector": "D08",
+      "match": "fiction0:Pass%3A800rB1PRx",
+      "occurrence": 1,
+      "confidence": "high"
+    }
+  ],
+  "redactedText": "Тема: учебная передача 7\nКоллеги, ниже только выдуманные данные.\nОни не выданы ни одним сервисом.\nСистема | Состояние\nУчебный стенд | готов\nСНИЛС: [скрыто:D23].\nИНН-12: [скрыто:D25].\nОткройте https://[скрыто:D08]@portal.example.com/path.\nПроверка завершена.\n> Предыдущее сообщение:\n> СНИЛС: [скрыто:D23].\n> Заказ: AB-2026-42\nАдрес поддержки: training@example.com\nСпасибо, команда макета.\n",
+  "note": "Overlaps merge by union; largest finding chooses marker, equal lengths choose lowest detector ID."
+}
