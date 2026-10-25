@@ -14,7 +14,10 @@ and a user-run spike are ready; Mail.ru sign-in and MIME download succeeded on 2
 a user-run check; real Gmail sign-in is not verified yet. The user deferred connecting their
 Gmail on 2026-10-25; their local configuration contains only `work` and `mailru`. Keep Gmail
 and OAuth2 support available, but do not treat Gmail setup as the next required user action. Synthetic RT-11–RT-13
-data sets are ready. Local storage, MIME parsing, search and redaction are still design only
+data sets are ready. The first offline MIME step is implemented: streaming EML normalization,
+one selected body, local HTML-to-text, safe leaf persistence and shared limits including nested EML.
+MSG/TNEF/ZIP/calendar extraction and an isolated worker are not implemented; see
+`docs/mime-extraction-agent.md`. Local storage, search and redaction are still design only
 (`docs/plan.md`). Add new tools
 or subsystems only when the task asks for them.
 
@@ -54,6 +57,7 @@ Read this file first. Then read only the documents whose `When` matches the task
 | `docs/ews-source-agent.md` | changing `source/ews/`, adding an EWS operation, NTLM questions, reading spike output | allow-list, response checks, NTLM transport rules, known risks, spike output format |
 | `docs/imap-source-agent.md` | changing `source/imap/`, IMAP authentication or reading IMAP spike output | TLS, command allow-list, one sign-in attempt, EXAMINE/PEEK, bounded MIME downloads and spike output |
 | `docs/gmail-oauth-agent.md` | changing `source/oauth/google/`, Gmail OAuth configuration, authorization or refresh | Desktop client setup, PKCE/state/loopback flow, owner-only refresh storage, token endpoint and XOAUTH2 rules |
+| `docs/mime-extraction-agent.md` | changing `extraction/`, MIME parsing, body selection, attachment persistence or shared limits | offline API, unredacted internal results, container statuses, limits, fixture expectation differences |
 | `scripts/ews-login-check.ps1` | changing or explaining the EWS sign-in check | the script itself; its help block documents parameters |
 
 Name new engineering documents `docs/<topic>-agent.md`, write them in English, and register each

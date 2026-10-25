@@ -7,6 +7,8 @@ spring-ai = "2.1.0-RC1"
 httpclient5 = "5.6.5"
 angus-mail = "2.0.5"
 jakarta-mail = "2.1.5"
+mime4j = "0.8.15"
+jsoup = "1.23.2"
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
@@ -19,3 +21,6 @@ spring-ai-mcp-server = { module = "org.springframework.ai:spring-ai-starter-mcp-
 httpclient5 = { module = "org.apache.httpcomponents.client5:httpclient5", version.ref = "httpclient5" }
 angus-mail = { module = "org.eclipse.angus:angus-mail", version.ref = "angus-mail" }
 jakarta-mail = { module = "jakarta.mail:jakarta.mail-api", version.ref = "jakarta-mail" }
+mime4j-core = { module = "org.apache.james:apache-mime4j-core", version.ref = "mime4j" }
+mime4j-dom = { module = "org.apache.james:apache-mime4j-dom", version.ref = "mime4j" }
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
