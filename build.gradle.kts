@@ -22,9 +22,6 @@ dependencies {
     implementation(libs.httpclient5)
     implementation(libs.angus.mail)
     implementation(libs.jakarta.mail)
-    implementation(libs.mime4j.core)
-    implementation(libs.mime4j.dom)
-    implementation(libs.jsoup)
 
     testImplementation(libs.spring.boot.starter.test)
 }

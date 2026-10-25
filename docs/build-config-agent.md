@@ -171,12 +171,4 @@ documents, and `testdata/search/` has 48 messages with 80 control queries. Each 
 English README, JSON expectations and a complete manifest. Russian reports are in
 `docs/research/RT-11-synthetic-mime.md`, `RT-12-redaction-samples.md`, `RT-13-search-queries.md`.
 Helper generators/validators stay under ignored `testdata/.work/`; only data is tracked, per the briefs.
-`EmlParserFixtureTest` now consumes all 20 MIME cases, including paired expected headers, bodies
-and decoded hashes. Supplemental wire-byte expectations for nested EML live in
-`src/test/resources/mime/wire-expectations.json`; original RT-11 data is unchanged. Deliberate
-expectation differences and unsupported containers are documented in
-[mime-extraction-agent.md](mime-extraction-agent.md). Other sets remain inputs for future filter/index tests.
-
-The offline Java API accepts an existing output root and an explicit `ExtractionContext`;
-it has no new command, server setting or MCP tool. Its files/text are unredacted internal data.
-Focused checks: `.\gradlew.bat test --tests "mail.mcp.extraction.mime.*"`.
+These are inputs for future parser/filter/index tests, not implementations of those subsystems.

@@ -16,11 +16,8 @@ Gmail sign-in is not verified. Synthetic RT-11–RT-13 data sets are ready.
 Gmail Desktop OAuth2 with PKCE, owner-only refresh-token storage and IMAP XOAUTH2 is implemented;
 real initial consent and the Gmail spike are unverified. The user deferred connecting their Gmail
 on 2026-10-25; their local configuration is limited to `work` and `mailru`. Gmail/OAuth support remains.
-The first offline MIME step uses streaming Mime4j, header normalization, one selected body,
-local HTML-to-text, safe decoded-leaf persistence and shared limits across nested EML.
-It is an internal API without Spring/MCP wiring; see [mime-extraction-agent.md](mime-extraction-agent.md).
-Not implemented yet: local store (SQLite), document/container attachment extraction,
-isolated extraction worker, Lucene index, redaction, synchronization, and all mail tools except
+Not implemented yet: local store, MIME parsing,
+attachment extraction, Lucene index, redaction, synchronization, and all mail tools except
 `listConnections`.
 
 ## Transport and execution
@@ -46,8 +43,6 @@ All three select `logback-spike.xml` (stderr only) through the
   `2.1.0` when released. MCP Java SDK 2.1.0, Jackson 3 (`tools.jackson`) come transitively.
 - **Apache HttpClient 5.6.5** classic — EWS transport with explicitly registered NTLM (П1).
 - **Eclipse Angus Mail 2.0.5**, **Jakarta Mail API 2.1.5** — IMAP with implicit TLS (П3).
-- **Mime4j core/DOM 0.8.15** — streaming MIME and header fields; **jsoup 1.23.2** — local HTML-to-text.
-  Jakarta `ParameterList` supplies RFC 2231 decoding without building another message model.
 - StAX from the JDK for SOAP; no generated EWS classes, no `ews-java-api`.
 - **Gradle 9.8.2** wrapper with the version catalog `gradle/libs.versions.toml`.
 
@@ -79,10 +74,8 @@ spike/   — the EWS spike command, no Spring
 | `tools/` | Thin `@McpTool` adapters, Spring `@Service` beans. | `ConnectionTools` (`listConnections`), `ToolLogger`. |
 | `api/` | Stable MCP response records with `@Schema`. | `ConnectionInfo`, `ListConnectionsResult`. Never expose `source/` records or settings here. |
 | `spike/` | User-run connectivity and authorization commands. | `EwsSpikeCommand`, `ImapSpikeCommand`, `GmailOAuthCommand`. |
-| `extraction/` | Offline resource budget shared by every future container extractor. | `ExtractionLimits`, thread-confined `ExtractionContext`, `ExtractionLimitException`. |
-| `extraction/mime/` | Streaming MIME normalization and decoded-leaf persistence. | `EmlParser`, internal unredacted `ParsedMail` records, `MimeHeaders`, `HtmlText`. No mailbox or Spring dependencies. See `docs/mime-extraction-agent.md`. |
 
-Planned packages (`service/`, `store/`, `index/`, `redaction/`) follow plan.md
+Planned packages (`service/`, `store/`, `extraction/`, `index/`, `redaction/`) follow plan.md
 section 6; add each to this table when it gets code.
 
 ## Rules for new code

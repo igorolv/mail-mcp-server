@@ -14,11 +14,11 @@ and a user-run spike are ready; Mail.ru sign-in and MIME download succeeded on 2
 a user-run check; real Gmail sign-in is not verified yet. The user deferred connecting their
 Gmail on 2026-10-25; their local configuration contains only `work` and `mailru`. Keep Gmail
 and OAuth2 support available, but do not treat Gmail setup as the next required user action. Synthetic RT-11–RT-13
-data sets are ready. The first offline MIME step is implemented: streaming EML normalization,
-one selected body, local HTML-to-text, safe leaf persistence and shared limits including nested EML.
-MSG/TNEF/ZIP/calendar extraction and an isolated worker are not implemented; see
-`docs/mime-extraction-agent.md`. Local storage, search and redaction are still design only
-(`docs/plan.md`). Add new tools
+data sets are ready. Local storage, MIME parsing, search and redaction are still design only
+(`docs/plan.md`). An offline MIME pipeline with shared limits (commit `d6534ca`) was reverted on
+2026-10-25 by user decision as over-engineering; do not rebuild it. The storage, object model and
+sync architecture is being re-discussed in `docs/plan.md` section 9; do not implement storage,
+parsing or indexing until that plan is rewritten. Add new tools
 or subsystems only when the task asks for them.
 
 ## Repository contents
@@ -57,7 +57,6 @@ Read this file first. Then read only the documents whose `When` matches the task
 | `docs/ews-source-agent.md` | changing `source/ews/`, adding an EWS operation, NTLM questions, reading spike output | allow-list, response checks, NTLM transport rules, known risks, spike output format |
 | `docs/imap-source-agent.md` | changing `source/imap/`, IMAP authentication or reading IMAP spike output | TLS, command allow-list, one sign-in attempt, EXAMINE/PEEK, bounded MIME downloads and spike output |
 | `docs/gmail-oauth-agent.md` | changing `source/oauth/google/`, Gmail OAuth configuration, authorization or refresh | Desktop client setup, PKCE/state/loopback flow, owner-only refresh storage, token endpoint and XOAUTH2 rules |
-| `docs/mime-extraction-agent.md` | changing `extraction/`, MIME parsing, body selection, attachment persistence or shared limits | offline API, unredacted internal results, container statuses, limits, fixture expectation differences |
 | `scripts/ews-login-check.ps1` | changing or explaining the EWS sign-in check | the script itself; its help block documents parameters |
 
 Name new engineering documents `docs/<topic>-agent.md`, write them in English, and register each
@@ -145,32 +144,30 @@ so you can keep changes consistent with it. What is already implemented is liste
 - Read-only at protocol level: an allow-list of 10 EWS read operations; IMAP `EXAMINE` and
   `BODY.PEEK`; never set flags in the mailbox.
 - Every source delivers messages as MIME (`.eml`), so storage, parsing and attachment extraction
-  are shared. MIME parsing: Apache James Mime4j (streaming), plus POI HSMF/HMEF, jsoup, iCal4j.
-  The extraction pipeline copied from `redmine-mcp-server` must first get one text per file and
-  shared depth and size limits for the whole nesting chain.
+  are shared. The MIME library is to be chosen again with the object model; there is no separate
+  parsing process and no shared limit budget for the nesting chain (user decision 2026-10-25).
 - Message key: a local UUID per connection; the current server address, `Message-ID` and a MIME
   hash are stored separately.
-- Storage: SQLite per connection for metadata and sync state; originals on disk and never
-  returned to the model; Lucene index (BM25, `RussianAnalyzer`) built from redacted text.
-  Embeddings are not in the MVP.
-- Sensitive-data filter runs both before indexing and on every output; `localPath` given to the
-  model points only to redacted text. Tools are the primary access path; MCP resources are an
-  addition.
+- Storage: originals on disk as downloaded; Lucene index (BM25, `RussianAnalyzer`) built from
+  the unfiltered text. Whether SQLite is needed for metadata and sync state is an open question
+  (plan.md section 9). Embeddings are not in the MVP.
+- Sensitive-data filter is deferred. Disk and index hold everything as is; the filter will apply
+  only to output sent to the model, and only optionally (user decision 2026-10-25). Tools are the
+  primary access path; MCP resources are an addition.
 - Every tool, including local search, takes a required `connection`; there is no cross-mailbox
   call.
-- Synchronization runs only on request, through a dedicated tool with a depth parameter (new
-  only / N days / N more messages back / full history). It starts work in the background of its
+- Synchronization runs only on request, through a dedicated tool. There is no depth parameter:
+  it always syncs everything, then incrementally (user decision 2026-10-25). It starts work in the background of its
   own server process and returns at once; `indexStatus` reports progress and coverage. All other
   tools answer immediately from local data and report what is covered. Deletions and moves are
   applied by the same incremental sync. Attachment text is extracted during sync up to a size
   limit. Defaults: every real mail folder except Deleted, Junk, Outbox, Drafts and search
   folders, full history; Gmail syncs All Mail once with labels.
 - Several server processes (different client sessions) share one data directory. All of them
-  read; only the process holding the per-connection lock (OS file lock plus a row in SQLite)
-  syncs and writes the Lucene index. A sign-in failure stops syncing that connection with no
+  read; only the process holding the per-connection lock (an OS file lock) syncs and writes
+  the Lucene index. A sign-in failure stops syncing that connection with no
   retries — repeated attempts with a stale password lock the domain account.
-- Implementation order: EWS spike first; the offline pipeline (parse, store, index, redact) on
-  synthetic `.eml` in parallel; IMAP right after EWS works.
+- Implementation order: to be rewritten in plan.md section 7 as short end-to-end steps.
 
 Sibling projects used as references (same author, both public on GitHub):
 
