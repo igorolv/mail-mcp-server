@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Synthetic FindFolder response; no real mailbox data. -->
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+ xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+ xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+ <s:Body><m:FindFolderResponse><m:ResponseMessages>
+ <m:FindFolderResponseMessage ResponseClass="Success">
+ <m:ResponseCode>NoError</m:ResponseCode>
+ <m:RootFolder IncludesLastItemInRange="false"><t:Folders>
+
+</t:Folders></m:RootFolder>
+ </m:FindFolderResponseMessage>
+ </m:ResponseMessages></m:FindFolderResponse></s:Body>
+</s:Envelope>

@@ -2,6 +2,9 @@ package mail.mcp.connections;
 
 import mail.mcp.source.imap.ImapClient;
 import mail.mcp.source.imap.ImapMailSource;
+import mail.mcp.source.ews.EwsClient;
+import mail.mcp.source.ews.EwsMailSource;
+import mail.mcp.source.ews.HttpClient5EwsTransport;
 
 /**
  * Builds the lazy session factory of one connection. Split from {@link ConnectionRegistry} so tests can
@@ -13,8 +16,7 @@ public interface MailConnectionFactory {
     MailConnection create(ConnectionDefinition definition);
 
     /**
-     * The production factory: fresh lazy {@link ImapMailSource} sessions for IMAP.
-     * EWS has no mail source until step 7.3; its spike creates the client directly.
+     * The production factory: fresh lazy {@link ImapMailSource} and {@link EwsMailSource} sessions.
      *
      * @throws IllegalArgumentException when the entry is unusable or its source is not implemented
      */
@@ -29,7 +31,8 @@ public interface MailConnectionFactory {
                         + definition.type().id() + "', which this server version does not read yet");
             }
             return switch (definition.type()) {
-                case EWS -> new MailConnection(definition, null);
+                case EWS -> new MailConnection(definition,
+                        () -> new EwsMailSource(new EwsClient(new HttpClient5EwsTransport(definition.ews()))));
                 case IMAP -> new MailConnection(definition, () -> new ImapMailSource(new ImapClient(definition.imap())));
             };
         };

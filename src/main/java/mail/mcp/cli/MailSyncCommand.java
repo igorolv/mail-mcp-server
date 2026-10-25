@@ -9,6 +9,10 @@ import mail.mcp.connections.MailConnectionFactory;
 import mail.mcp.index.IndexLockedException;
 import mail.mcp.index.MailIndex;
 import mail.mcp.source.MailSource;
+import mail.mcp.source.ews.EwsAuthenticationException;
+import mail.mcp.source.ews.EwsException;
+import mail.mcp.source.ews.EwsResponseException;
+import mail.mcp.source.ews.EwsSoapFaultException;
 import mail.mcp.source.imap.ImapException;
 import mail.mcp.source.oauth.OAuthException;
 import mail.mcp.store.MessageStore;
@@ -65,12 +69,7 @@ public final class MailSyncCommand {
                 + selected.auth().id() + "; address and credentials hidden)");
         List<FolderProgress> done = new ArrayList<>();
         try (MailConnection connection = factory.create(selected)) {
-            MailSource source;
-            try { source = connection.openSource(); }
-            catch (UnsupportedOperationException e) {
-                out.println("RESULT: FAILED (" + e.getMessage() + ")");
-                return 2;
-            }
+            MailSource source = connection.openSource();
             try (MailIndex index = MailIndex.openWriter(selected.connectionDir()); source) {
                 var store = new MessageStore(selected.connectionDir(), new JsonConfig().mailMcpObjectMapper());
                 new SyncRunner(store, index, source).run(progress -> {
@@ -90,6 +89,17 @@ public final class MailSyncCommand {
         } catch (ImapException e) {
             out.println("RESULT: FAILED (" + e.getMessage() + ")");
             return e.kind() == ImapException.Kind.AUTHENTICATION ? 3 : 4;
+        } catch (EwsAuthenticationException e) {
+            out.println("RESULT: FAILED (EWS sign-in rejected; check the connection locally before the next run)");
+            return 3;
+        } catch (EwsException e) {
+            String code = switch (e) {
+                case EwsResponseException response -> response.responseCode();
+                case EwsSoapFaultException fault -> fault.responseCode();
+                default -> null;
+            };
+            out.println("RESULT: FAILED (EWS error: " + (code == null ? e.getClass().getSimpleName() : code) + ")");
+            return 4;
         } catch (UncheckedIOException e) {
             out.println("RESULT: FAILED (local storage error; details withheld)");
             return 4;

@@ -1,5 +1,7 @@
 package mail.mcp.source.ews;
 
+import mail.mcp.source.MessageUnavailableException;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
@@ -64,7 +66,7 @@ final class Base64ChunkDecoder {
         }
         written += decoded.length;
         if (written > maxBytes) {
-            throw new EwsProtocolException("MIME content is larger than the limit of " + maxBytes + " bytes");
+            throw new MessageUnavailableException(MessageUnavailableException.Reason.TOO_LARGE);
         }
         out.write(decoded);
     }

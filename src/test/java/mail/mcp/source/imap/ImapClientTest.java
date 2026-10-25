@@ -5,11 +5,14 @@ import mail.mcp.connections.ConnectionDefinition;
 import mail.mcp.connections.ConnectionType;
 import mail.mcp.connections.MailConnectionFactory;
 import mail.mcp.source.MessageUnavailableException;
+import mail.mcp.source.ews.EwsMailSource;
+import mail.mcp.source.ews.EwsSettings;
 import org.eclipse.angus.mail.iap.ProtocolException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.charset.StandardCharsets;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -192,10 +195,14 @@ class ImapClientTest {
             }
         }
         var ews = new ConnectionDefinition("work", null, ConnectionType.EWS, AuthKind.NTLM,
-                null, null, temp, null);
+                new EwsSettings(URI.create("https://127.0.0.1:1/EWS/Exchange.asmx"), AuthKind.NTLM,
+                        "user", "synthetic-test-value", null, EwsSettings.DEFAULT_CONNECT_TIMEOUT,
+                        EwsSettings.DEFAULT_READ_TIMEOUT), null, temp, null);
         try (var live = MailConnectionFactory.standard().create(ews)) {
-            assertThatThrownBy(live::openSource).isInstanceOf(UnsupportedOperationException.class)
-                    .hasMessage("Connection 'work' has no mail source yet");
+            try (var source = live.openSource(); var other = live.openSource()) {
+                assertThat(source).isInstanceOf(EwsMailSource.class); // port 1 is never contacted
+                assertThat(other).isNotSameAs(source);
+            }
         }
         var p = ImapClient.properties();
         assertThat(p.getProperty("mail.imaps.ssl.checkserveridentity")).isEqualTo("true");

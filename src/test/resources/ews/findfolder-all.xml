@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Synthetic FindFolder response; no real mailbox data. -->
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+ xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+ xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+ <s:Body><m:FindFolderResponse><m:ResponseMessages>
+ <m:FindFolderResponseMessage ResponseClass="Success">
+ <m:ResponseCode>NoError</m:ResponseCode>
+ <m:RootFolder IncludesLastItemInRange="true"><t:Folders>
+<t:Folder><t:FolderId Id="AAMkSYNTH-inbox" ChangeKey="ignored"/>
+ <t:ParentFolderId Id="AAMkSYNTH-root"/>
+ <t:FolderClass>IPF.Note</t:FolderClass>
+ <t:DisplayName>Входящие</t:DisplayName></t:Folder>
+<t:Folder><t:FolderId Id="AAMkSYNTH-projects" ChangeKey="ignored"/>
+ <t:ParentFolderId Id="AAMkSYNTH-inbox"/>
+ <t:FolderClass>IPF.Note.X</t:FolderClass>
+ <t:DisplayName>Проекты</t:DisplayName></t:Folder>
+<t:Folder><t:FolderId Id="AAMkSYNTH-deleted" ChangeKey="ignored"/>
+ <t:ParentFolderId Id="AAMkSYNTH-root"/>
+ <t:FolderClass>IPF.Note</t:FolderClass>
+ <t:DisplayName>Удалённые</t:DisplayName></t:Folder>
+<t:Folder><t:FolderId Id="AAMkSYNTH-deleted-sub" ChangeKey="ignored"/>
+ <t:ParentFolderId Id="AAMkSYNTH-deleted"/>
+ <t:FolderClass>IPF.Note</t:FolderClass>
+ <t:DisplayName>Подпапка</t:DisplayName></t:Folder>
+<t:Folder><t:FolderId Id="AAMkSYNTH-deleted-deep" ChangeKey="ignored"/>
+ <t:ParentFolderId Id="AAMkSYNTH-deleted-sub"/>
+ <t:FolderClass>IPF.Note</t:FolderClass>
+ <t:DisplayName>Ещё</t:DisplayName></t:Folder>
+<t:Folder><t:FolderId Id="AAMkSYNTH-junk" ChangeKey="ignored"/>
+ <t:ParentFolderId Id="AAMkSYNTH-root"/>
+ <t:FolderClass>IPF.Note</t:FolderClass>
+ <t:DisplayName>Спам</t:DisplayName></t:Folder>
+<t:Folder><t:FolderId Id="AAMkSYNTH-drafts" ChangeKey="ignored"/>
+ <t:ParentFolderId Id="AAMkSYNTH-root"/>
+ <t:FolderClass>IPF.Note</t:FolderClass>
+ <t:DisplayName>Черновики</t:DisplayName></t:Folder>
+<t:Folder><t:FolderId Id="AAMkSYNTH-outbox" ChangeKey="ignored"/>
+ <t:ParentFolderId Id="AAMkSYNTH-root"/>
+ <t:FolderClass>IPF.Note</t:FolderClass>
+ <t:DisplayName>Исходящие</t:DisplayName></t:Folder>
+<t:SearchFolder><t:FolderId Id="AAMkSYNTH-search" ChangeKey="ignored"/>
+ <t:ParentFolderId Id="AAMkSYNTH-root"/>
+ <t:FolderClass>IPF.Note</t:FolderClass>
+ <t:DisplayName>Поиск</t:DisplayName></t:SearchFolder>
+<t:CalendarFolder><t:FolderId Id="AAMkSYNTH-calendar" ChangeKey="ignored"/>
+ <t:ParentFolderId Id="AAMkSYNTH-root"/>
+ 
+ <t:DisplayName>Календарь</t:DisplayName></t:CalendarFolder>
+<t:ContactsFolder><t:FolderId Id="AAMkSYNTH-contacts" ChangeKey="ignored"/>
+ <t:ParentFolderId Id="AAMkSYNTH-root"/>
+ <t:FolderClass>IPF.Contact</t:FolderClass>
+ <t:DisplayName>Контакты</t:DisplayName></t:ContactsFolder>
+<t:TasksFolder><t:FolderId Id="AAMkSYNTH-tasks" ChangeKey="ignored"/>
+ <t:ParentFolderId Id="AAMkSYNTH-root"/>
+ <t:FolderClass>IPF.Task</t:FolderClass>
+ <t:DisplayName>Задачи</t:DisplayName></t:TasksFolder>
+<t:Folder><t:FolderId Id="AAMkSYNTH-contact-folder" ChangeKey="ignored"/>
+ <t:ParentFolderId Id="AAMkSYNTH-root"/>
+ <t:FolderClass>IPF.Contact</t:FolderClass>
+ <t:DisplayName>Адреса</t:DisplayName></t:Folder>
+<t:Folder><t:FolderId Id="AAMkSYNTH-no-class" ChangeKey="ignored"/>
+ <t:ParentFolderId Id="AAMkSYNTH-root"/>
+ 
+ <t:DisplayName>Без класса</t:DisplayName></t:Folder>
+<t:Folder><t:FolderId Id="AAMkSYNTH-not-note" ChangeKey="ignored"/>
+ <t:ParentFolderId Id="AAMkSYNTH-root"/>
+ <t:FolderClass>IPF.Noteworthy</t:FolderClass>
+ <t:DisplayName>Не почта</t:DisplayName></t:Folder>
+<t:Folder><t:FolderId Id="AAMkSYNTH-calendar-mail" ChangeKey="ignored"/>
+ <t:ParentFolderId Id="AAMkSYNTH-calendar"/>
+ <t:FolderClass>IPF.Note</t:FolderClass>
+ <t:DisplayName>Архив</t:DisplayName></t:Folder>
+</t:Folders></m:RootFolder>
+ </m:FindFolderResponseMessage>
+ </m:ResponseMessages></m:FindFolderResponse></s:Body>
+</s:Envelope>

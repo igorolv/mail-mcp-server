@@ -9,15 +9,12 @@ import java.util.function.Supplier;
  * Creating a source is lazy; its caller owns and closes the session.
  *
  * @param definition the configuration it was built from
- * @param sources   creates a fresh mail session, or {@code null} until its source is implemented
+ * @param sources   creates a fresh mail session
  */
 public record MailConnection(ConnectionDefinition definition, Supplier<MailSource> sources) implements AutoCloseable {
 
     /** A new session; the caller closes it. Signs in only on its first request. */
     public MailSource openSource() {
-        if (sources == null) {
-            throw new UnsupportedOperationException("Connection '" + definition.name() + "' has no mail source yet");
-        }
         return sources.get();
     }
 

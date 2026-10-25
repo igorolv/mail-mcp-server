@@ -153,12 +153,12 @@ The command class is `cli/ImapSpikeCommand` (`mail.mcp.cli`); `imapSpike` uses t
 ## Mail sync
 
 Run by the user only: `cli/MailSyncCommand` (`mail.mcp.cli`) signs in to one real mailbox.
-The connection name is required. EWS has no `MailSource` until IT-04 and is refused before
-creating an index or contacting the server.
+The connection name is required. Both IMAP and EWS are supported through `MailSource`.
 
 ```powershell
 .\gradlew.bat bootJar
 java -jar build\libs\mail-mcp-server.jar mail-sync mailru
+java -jar build\libs\mail-mcp-server.jar mail-sync work
 # Alternative: .\gradlew.bat mailSync --args="mailru"
 ```
 
@@ -169,7 +169,8 @@ messages. A folder's opaque cursor is saved only after the folder finishes. Mess
 `downloaded`; an unavailable message gets metadata with `state=failed` and is not retried.
 There is no MIME parsing, conversion, background worker or `sync-status.json` yet.
 
-The first run downloads the whole mailbox and may take a while. Run the same command again:
+The first run downloads the whole mailbox and may take a while (EWS uses one `GetItem` per
+message). Run the same command again:
 with no new mail it ends with `0 downloaded`. After an interruption, the next run removes
 incomplete directories, restores missing index entries from metadata and resumes without
 downloading messages already stored. Failures end the run without automatic retries.
@@ -189,13 +190,23 @@ only completed folder lines, including folders deleted locally. Errors print
 `RESULT: FAILED (<fixed message>)`; configuration and unexpected local details are withheld.
 Lucene may print its `jdk.incubator.vector` warning to stderr.
 
+EWS failures print only these lines, without the host or server message:
+
+```text
+RESULT: FAILED (EWS sign-in rejected; check the connection locally before the next run)
+RESULT: FAILED (EWS error: <code>)
+```
+
+`<code>` is the response code for an EWS error response or SOAP fault when present; otherwise
+it is the exception's simple class name. No EWS failure is retried, including `ErrorServerBusy`.
+
 | Exit | Meaning |
 |---|---|
 | 0 | Success, or `--help` / `-h` |
 | 1 | Unexpected local error; details withheld |
-| 2 | Wrong arguments, invalid configuration/selection, no source yet, or OAuth failure |
-| 3 | IMAP sign-in rejected; no retry |
-| 4 | IMAP/network/protocol or local storage error |
+| 2 | Wrong arguments, invalid configuration/selection, or OAuth failure |
+| 3 | IMAP or EWS sign-in rejected; no retry |
+| 4 | IMAP/EWS/network/protocol or local storage error |
 | 5 | Another process holds the connection's Lucene writer lock; no sign-in |
 
 ## Gmail OAuth2

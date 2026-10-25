@@ -10,13 +10,14 @@ import java.security.DigestOutputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 
 /**
  * Thin read-only EWS client of one mailbox (decision P1). It builds SOAP requests for allow-listed
  * operations only ({@link EwsOperation}) and parses responses as a stream.
  *
- * <p>So far it covers what the spike needs: {@code GetFolder}, a one-page {@code FindItem} and
- * {@code GetItem} with MIME; step 7.3 of docs/plan.md adds what sync needs. Calls are sequential: one request at a time per mailbox (research.md
+ * <p>Covers folder listing, incremental sync, a one-page {@code FindItem} for the spike and
+ * {@code GetItem} with MIME. Calls are sequential: one request at a time per mailbox (research.md
  * 1.2, throttling). Errors are never retried here; in particular an
  * {@link EwsAuthenticationException} must reach the caller after a single sign-in attempt.
  */
@@ -51,6 +52,73 @@ public final class EwsClient implements AutoCloseable {
             w.writeEndElement();
         });
         return transport.exchange(EwsOperation.GET_FOLDER, request, EwsResponseReader::readFolder);
+    }
+
+    /** Resolves distinguished folder ids in request order with one {@code GetFolder}. */
+    public List<String> folderIds(List<DistinguishedFolder> folders) {
+        byte[] request = EwsXml.envelope(EwsOperation.GET_FOLDER, w -> {
+            w.writeStartElement("m", "FolderShape", EwsXml.MESSAGES_NS);
+            EwsXml.typesElement(w, "BaseShape", "IdOnly");
+            w.writeEndElement();
+            w.writeStartElement("m", "FolderIds", EwsXml.MESSAGES_NS);
+            for (var folder : folders) {
+                EwsXml.distinguishedFolderId(w, folder);
+            }
+            w.writeEndElement();
+        });
+        var ids = transport.exchange(EwsOperation.GET_FOLDER, request, EwsResponseReader::readFolderIds);
+        if (ids.size() != folders.size()) {
+            throw new EwsProtocolException("GetFolder returned a different number of folder ids");
+        }
+        return ids;
+    }
+
+    /** One deep {@code FindFolder} page with names, classes and parent ids. */
+    public EwsFolderPage findFolders(DistinguishedFolder root, int offset) {
+        byte[] request = EwsXml.envelope(EwsOperation.FIND_FOLDER, w -> {
+            w.writeAttribute("Traversal", "Deep");
+            w.writeStartElement("m", "FolderShape", EwsXml.MESSAGES_NS);
+            EwsXml.typesElement(w, "BaseShape", "IdOnly");
+            w.writeStartElement("t", "AdditionalProperties", EwsXml.TYPES_NS);
+            EwsXml.fieldUri(w, "folder:DisplayName");
+            EwsXml.fieldUri(w, "folder:FolderClass");
+            EwsXml.fieldUri(w, "folder:ParentFolderId");
+            w.writeEndElement();
+            w.writeEndElement();
+            w.writeEmptyElement("m", "IndexedPageFolderView", EwsXml.MESSAGES_NS);
+            w.writeAttribute("MaxEntriesReturned", "1000");
+            w.writeAttribute("Offset", Integer.toString(offset));
+            w.writeAttribute("BasePoint", "Beginning");
+            w.writeStartElement("m", "ParentFolderIds", EwsXml.MESSAGES_NS);
+            EwsXml.distinguishedFolderId(w, root);
+            w.writeEndElement();
+        });
+        return transport.exchange(EwsOperation.FIND_FOLDER, request, EwsResponseReader::readFolderPage);
+    }
+
+    /** One {@code SyncFolderItems} page; a null state starts a full listing. */
+    public EwsSyncPage syncFolderItems(String folderId, String syncState) {
+        byte[] request = EwsXml.envelope(EwsOperation.SYNC_FOLDER_ITEMS, w -> {
+            w.writeStartElement("m", "ItemShape", EwsXml.MESSAGES_NS);
+            EwsXml.typesElement(w, "BaseShape", "IdOnly");
+            w.writeEndElement();
+            w.writeStartElement("m", "SyncFolderId", EwsXml.MESSAGES_NS);
+            w.writeEmptyElement("t", "FolderId", EwsXml.TYPES_NS);
+            w.writeAttribute("Id", folderId);
+            w.writeEndElement();
+            if (syncState != null) {
+                w.writeStartElement("m", "SyncState", EwsXml.MESSAGES_NS);
+                w.writeCharacters(syncState);
+                w.writeEndElement();
+            }
+            w.writeStartElement("m", "MaxChangesReturned", EwsXml.MESSAGES_NS);
+            w.writeCharacters("512");
+            w.writeEndElement();
+            w.writeStartElement("m", "SyncScope", EwsXml.MESSAGES_NS);
+            w.writeCharacters("NormalItems");
+            w.writeEndElement();
+        });
+        return transport.exchange(EwsOperation.SYNC_FOLDER_ITEMS, request, EwsResponseReader::readSyncPage);
     }
 
     /**

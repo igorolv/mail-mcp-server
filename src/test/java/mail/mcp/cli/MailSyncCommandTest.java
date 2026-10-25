@@ -4,6 +4,12 @@ import mail.mcp.config.MailMcpProperties;
 import mail.mcp.connections.MailConnection;
 import mail.mcp.connections.MailConnectionFactory;
 import mail.mcp.index.MailIndex;
+import mail.mcp.source.ews.EwsAuthenticationException;
+import mail.mcp.source.ews.EwsException;
+import mail.mcp.source.ews.EwsOperation;
+import mail.mcp.source.ews.EwsResponseException;
+import mail.mcp.source.ews.EwsSoapFaultException;
+import mail.mcp.source.ews.EwsTransportException;
 import mail.mcp.source.imap.ImapException;
 import mail.mcp.source.oauth.OAuthException;
 import mail.mcp.sync.FakeMailSource;
@@ -63,13 +69,36 @@ class MailSyncCommandTest {
         assertThat(temp.resolve("test/index")).doesNotExist();
     }
 
-    @Test void ewsConnectionHasNoSourceYet() throws Exception {
+    @Test void ewsFailuresUseFixedMessagesAndExitCodes() throws Exception {
         Files.writeString(temp.resolve("connections.json"), """
                 {"connections":{"work":{"type":"ews","url":"https://webmail.example.com/EWS/Exchange.asmx",
                 "username":"user","password":"${TEST_CREDENTIAL}"}}}
                 """);
-        assertThat(run(MailConnectionFactory.standard(), "work")).isEqualTo(2);
-        assertThat(output()).contains("RESULT: FAILED (Connection 'work' has no mail source yet)");
+        assertThat(run(d -> { throw new EwsAuthenticationException("webmail.example.com rejected user", "NTLM"); },
+                "work")).isEqualTo(3);
+        assertThat(output()).contains("RESULT: FAILED (EWS sign-in rejected; check the connection locally before the next run)")
+                .doesNotContain("webmail.example.com");
+        output.reset();
+        assertThat(run(d -> { throw new EwsSoapFaultException(EwsOperation.SYNC_FOLDER_ITEMS,
+                "s:Server", "webmail.example.com is busy", "ErrorServerBusy"); }, "work")).isEqualTo(4);
+        assertThat(output()).contains("RESULT: FAILED (EWS error: ErrorServerBusy)")
+                .doesNotContain("webmail.example.com");
+        output.reset();
+        assertThat(run(d -> { throw new EwsTransportException("Cannot contact webmail.example.com", null); },
+                "work")).isEqualTo(4);
+        assertThat(output()).contains("RESULT: FAILED (EWS error: EwsTransportException)")
+                .doesNotContain("webmail.example.com");
+        for (var failure : new EwsException[]{
+                new EwsResponseException(EwsOperation.SYNC_FOLDER_ITEMS, "ErrorAccessDenied", "webmail.example.com"),
+                new EwsResponseException(EwsOperation.SYNC_FOLDER_ITEMS, null, "webmail.example.com"),
+                new EwsSoapFaultException(EwsOperation.SYNC_FOLDER_ITEMS, "s:Server", "webmail.example.com", null)}) {
+            output.reset();
+            assertThat(run(d -> { throw failure; }, "work")).isEqualTo(4);
+            String code = failure instanceof EwsResponseException response && response.responseCode() != null
+                    ? response.responseCode() : failure.getClass().getSimpleName();
+            assertThat(output()).contains("RESULT: FAILED (EWS error: " + code + ")")
+                    .doesNotContain("webmail.example.com");
+        }
         assertThat(temp.resolve("work/index")).doesNotExist();
     }
 

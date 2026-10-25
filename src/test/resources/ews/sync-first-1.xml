@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Synthetic SyncFolderItems response; no real mailbox data. -->
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+ xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+ xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+ <s:Body><m:SyncFolderItemsResponse><m:ResponseMessages>
+ <m:SyncFolderItemsResponseMessage ResponseClass="Success">
+ <m:ResponseCode>NoError</m:ResponseCode>
+ <m:SyncState>state-page-1</m:SyncState>
+<m:IncludesLastItemInRange>false</m:IncludesLastItemInRange>
+<m:Changes><t:Create><t:MeetingRequest><t:ItemId Id="AAMkSYNTH-b" ChangeKey="ignored"/></t:MeetingRequest></t:Create><t:Create><t:Message><t:ItemId Id="AAMkSYNTH-a" ChangeKey="ignored"/></t:Message></t:Create></m:Changes>
+ </m:SyncFolderItemsResponseMessage>
+ </m:ResponseMessages></m:SyncFolderItemsResponse></s:Body>
+</s:Envelope>

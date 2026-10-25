@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Request envelopes and the read-only allow-list. No network. */
 class EwsRequestTest {
@@ -85,6 +86,67 @@ class EwsRequestTest {
                 .contains("<t:IncludeMimeContent>true</t:IncludeMimeContent>")
                 .contains("Id=\"id&quot;with&lt;markup&gt;&amp;\"");
         assertThat(dir).isEmptyDirectory(); // the partial file of a failed call is removed
+    }
+
+    @Test
+    void findFolderAsksForADeepPagedListingOfTheMessageRoot() {
+        var transport = new ScriptedEwsTransport().answer(EwsOperation.FIND_FOLDER, "findfolder-empty.xml");
+        try (var client = new EwsClient(transport)) {
+            client.findFolders(DistinguishedFolder.MSG_FOLDER_ROOT, 7);
+        }
+        String xml = transport.requests.getFirst();
+        assertThat(xml).contains("<m:FindFolder Traversal=\"Deep\">",
+                "<t:BaseShape>IdOnly</t:BaseShape>", "FieldURI=\"folder:DisplayName\"",
+                "FieldURI=\"folder:FolderClass\"", "FieldURI=\"folder:ParentFolderId\"",
+                "<m:IndexedPageFolderView MaxEntriesReturned=\"1000\" Offset=\"7\" BasePoint=\"Beginning\"",
+                "<t:DistinguishedFolderId Id=\"msgfolderroot\"");
+        assertThat(xml.indexOf("<m:FolderShape>")).isLessThan(xml.indexOf("<m:IndexedPageFolderView"));
+        assertThat(xml.indexOf("<m:IndexedPageFolderView")).isLessThan(xml.indexOf("<m:ParentFolderIds>"));
+    }
+
+    @Test
+    void syncFolderItemsOmitsTheSyncStateOnTheFirstCall() {
+        var transport = new ScriptedEwsTransport().answer(EwsOperation.SYNC_FOLDER_ITEMS, "sync-empty.xml");
+        try (var client = new EwsClient(transport)) {
+            client.syncFolderItems("AAMkSYNTH-inbox", null);
+        }
+        String xml = transport.requests.getFirst();
+        assertThat(xml).doesNotContain("SyncState").contains("<t:BaseShape>IdOnly</t:BaseShape>",
+                "<m:SyncFolderId><t:FolderId Id=\"AAMkSYNTH-inbox\"",
+                "<m:MaxChangesReturned>512</m:MaxChangesReturned>", "<m:SyncScope>NormalItems</m:SyncScope>");
+        assertThat(xml.indexOf("<m:ItemShape>")).isLessThan(xml.indexOf("<m:SyncFolderId>"));
+        assertThat(xml.indexOf("<m:SyncFolderId>")).isLessThan(xml.indexOf("<m:MaxChangesReturned>"));
+        assertThat(xml.indexOf("<m:MaxChangesReturned>")).isLessThan(xml.indexOf("<m:SyncScope>"));
+    }
+
+    @Test
+    void syncFolderItemsSendsTheSyncStateAndFolderIdEscaped() {
+        var transport = new ScriptedEwsTransport().answer(EwsOperation.SYNC_FOLDER_ITEMS, "sync-empty.xml");
+        try (var client = new EwsClient(transport)) {
+            client.syncFolderItems("id\"<>&", " state<>& ");
+        }
+        String xml = transport.requests.getFirst();
+        assertThat(xml).contains("Id=\"id&quot;&lt;&gt;&amp;\"", "<m:SyncState> state&lt;&gt;&amp; </m:SyncState>");
+        assertThat(xml.indexOf("<m:SyncFolderId>")).isLessThan(xml.indexOf("<m:SyncState>"));
+        assertThat(xml.indexOf("<m:SyncState>")).isLessThan(xml.indexOf("<m:MaxChangesReturned>"));
+    }
+
+    @Test
+    void folderIdsUsesOneIdOnlyRequestAndRejectsADifferentCount() {
+        var transport = new ScriptedEwsTransport().answer(EwsOperation.GET_FOLDER, "getfolder-excluded.xml")
+                .answer(EwsOperation.GET_FOLDER, "getfolder-excluded.xml");
+        try (var client = new EwsClient(transport)) {
+            assertThat(client.folderIds(List.of(DistinguishedFolder.DELETED_ITEMS, DistinguishedFolder.JUNK_EMAIL,
+                    DistinguishedFolder.DRAFTS, DistinguishedFolder.OUTBOX))).containsExactly(
+                    "AAMkSYNTH-deleted", "AAMkSYNTH-junk", "AAMkSYNTH-drafts", "AAMkSYNTH-outbox");
+            assertThatThrownBy(() -> client.folderIds(List.of(DistinguishedFolder.INBOX)))
+                    .isInstanceOf(EwsProtocolException.class);
+        }
+        String xml = transport.requests.getFirst();
+        assertThat(xml).contains("<t:BaseShape>IdOnly</t:BaseShape>").doesNotContain("AdditionalProperties");
+        assertThat(xml.indexOf("Id=\"deleteditems\"")).isLessThan(xml.indexOf("Id=\"junkemail\""));
+        assertThat(xml.indexOf("Id=\"junkemail\"")).isLessThan(xml.indexOf("Id=\"drafts\""));
+        assertThat(xml.indexOf("Id=\"drafts\"")).isLessThan(xml.indexOf("Id=\"outbox\""));
     }
 
     /** Captures the request and refuses to answer. */

@@ -5,11 +5,12 @@ transport and Spring wiring. The target design is `docs/plan.md` section 6 (pack
 work order is section 7, decisions are in section 10. This file describes what exists now and
 where planned code goes.
 
-## Status (after IT-03, step 7.2)
+## Status (after IT-04, step 7.3)
 
 Implemented: Gradle build, Spring Boot application with the stdio MCP transport, the connections
 file with a lazy registry, the `listConnections` tool, a read-only EWS client (`GetFolder`,
-`FindItem`, `GetItem` with MIME) over Apache HttpClient 5 with NTLM, a read-only IMAP client on
+`FindFolder`, `SyncFolderItems`, `FindItem`, `GetItem` with MIME) over Apache HttpClient 5 with NTLM,
+`EwsMailSource` (filtered folder tree, paged changes, MIME downloads), a read-only IMAP client on
 Angus Mail and `ImapMailSource` (filtered folders, UID changes, MIME downloads in one session),
 Gmail Desktop OAuth2 with PKCE and IMAP XOAUTH2, and four user-run commands: `ews-spike`,
 `imap-spike`, `gmail-oauth`, `mail-sync`. User-run spikes succeeded
@@ -21,9 +22,13 @@ reconciliation. IT-03 adds `SyncRunner` and the `mail-sync` command: reconcile, 
 folders, remove vanished messages, download MIME and metadata, commit batches and save cursors.
 User-run commands now live in `cli/`. See `docs/storage-agent.md`.
 
-Not implemented: `EwsMailSource`, background `SyncService` and `sync-status.json` (IT-06), MIME
+IT-04 connects EWS to the same runner and `mail-sync`, including recovery from an invalid
+`SyncState` without re-downloading known messages.
+
+Not implemented: background `SyncService` and `sync-status.json` (IT-06), MIME
 parsing, pandoc conversion, text indexing, and all mail tools except `listConnections`.
-The next task is IT-04, the EWS source (plan.md 7.3). Real `mail-sync` checks are user-run only.
+The next task is IT-05, MIME reading and pandoc (plan.md 7.4, first half).
+Real `mail-sync` checks are user-run only.
 
 ## Transport and execution
 
@@ -86,9 +91,9 @@ cli/ ──► sync/, connections/, source/, store/, index/  (user-run commands 
 |---|---|---|
 | `MailMcpServerApplication` | Entry point. Empty apart from command dispatch. | Nothing else. |
 | `config/` | Spring wiring. | `MailMcpProperties` (`mail-mcp.*`), `ConnectionsConfig` (loader + registry beans), `McpServerConfig`, `JsonConfig`. |
-| `connections/` | The connections file and the registry. | `ConnectionsFile` (JSON shape), `ConnectionsLoader`, `ConnectionDefinition`, `EnvironmentPlaceholders`, `ConnectionType`, `AuthKind`, `ConnectionRegistry`, `MailConnection`, `MailConnectionFactory`. `MailConnection.openSource()` supplies a fresh lazy IMAP session, owned by its caller. EWS has no source until step 7.3; the EWS spike creates its client directly. |
+| `connections/` | The connections file and the registry. | `ConnectionsFile` (JSON shape), `ConnectionsLoader`, `ConnectionDefinition`, `EnvironmentPlaceholders`, `ConnectionType`, `AuthKind`, `ConnectionRegistry`, `MailConnection`, `MailConnectionFactory`. `MailConnection.openSource()` supplies a fresh lazy IMAP or EWS session, owned by its caller. The EWS spike creates its client directly. |
 | `source/` (root) | Common mailbox session contract. | `MailSource`, `RemoteFolder`, `FolderChanges`, `Downloaded`, `MessageUnavailableException` (GONE/TOO_LARGE leaves the session usable). |
-| `source/ews/` | Thin read-only EWS client. | `EwsClient`, `EwsOperation` (allow-list), `EwsXml` (envelope, parser settings), `EwsResponseReader` (StAX), `EwsTransport` + `HttpClient5EwsTransport`, result records, `Ews*Exception`. See `docs/ews-source-agent.md`. |
+| `source/ews/` | Read-only EWS source and thin client. | `EwsMailSource`, `EwsClient`, `EwsOperation` (allow-list), `EwsXml` (envelope, parser settings), `EwsResponseReader` (StAX), `EwsTransport` + `HttpClient5EwsTransport`, result records (`EwsFolderNode`, `EwsFolderPage`, `EwsSyncPage`), `Ews*Exception`. See `docs/ews-source-agent.md`. |
 | `source/imap/` | Read-only IMAP source and client. | `ImapMailSource`, `ImapClient` (one session across folders/downloads), `ReadOnlyImapStore` (wire command guard), `ImapSettings`, `ImapFolderInfo`, `FolderUids`, sanitized `ImapException`. See `docs/imap-source-agent.md`. |
 | `source/oauth/` | Provider-independent OAuth components. | `OAuthLoopbackReceiver` and sanitized `OAuthException`. No provider endpoints, settings or provider-specific messages. |
 | `source/oauth/google/` | Google Desktop OAuth and refresh credentials. | All `Google*` classes and the package-private `OAuthJson` helper. Depends on shared `source/oauth/` components. See `docs/gmail-oauth-agent.md`. |

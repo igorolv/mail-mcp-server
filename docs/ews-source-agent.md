@@ -17,7 +17,11 @@ EwsClient ──builds request (EwsXml.envelope)──> EwsTransport.exchange(op
   `EwsRequestTest` fails if a write operation from RT-03 appears in it. Adding an operation needs a
   decision in plan.md section 10.
 - Every request carries `RequestServerVersion Exchange2013_SP1` (the server is Exchange 2013 CU23).
-- `EwsClient` methods so far: `getFolder(DistinguishedFolder)`,
+- `EwsClient` methods: `getFolder(DistinguishedFolder)`,
+  `folderIds(List<DistinguishedFolder>)` (one IdOnly `GetFolder`, ids in request order; a count
+  mismatch is a protocol error), `findFolders(root, offset)` (deep `FindFolder`, pages of 1000,
+  names, classes and parent ids), `syncFolderItems(folderId, syncState)` (IdOnly,
+  `MaxChangesReturned=512`, `SyncScope=NormalItems`; null state is omitted),
   `findNewestItems(folder, max)` (one `FindItem` page sorted by `DateTimeReceived` descending),
   `getItemMime(itemId, target)` (`GetItem` with `IncludeMimeContent`; writes `<target>.part`, moves
   it into place after the whole response was read, and returns size and SHA-256).
@@ -34,6 +38,41 @@ Parser settings (`EwsXml.inputFactory`): no DTD, no external entities, namespace
 coalescing. `MimeContent` is decoded chunk by chunk by `Base64ChunkDecoder` straight into the output
 stream with a size cap (`EwsClient.DEFAULT_MAX_MIME_BYTES`, 64 MiB), so a large message is never one
 string in memory.
+Exceeding the decoded MIME limit throws `MessageUnavailableException(TOO_LARGE)`; the temporary
+file is removed and the session remains usable.
+
+## Mail source
+
+`EwsMailSource` implements `MailSource` on one `EwsClient` and transport, owned and closed by its
+caller. The production connection factory creates it lazily; opening the source contacts no
+server. `mail-sync` uses the same `SyncRunner`, store and catalog as IMAP.
+
+Folders are paged through a deep `FindFolder` under `MSG_FOLDER_ROOT`, advancing the offset by
+the number returned. The listing ends at `IncludesLastItemInRange` or an empty page. Only
+`Folder` nodes with class `IPF.Note` or `IPF.Note.*` are kept. Deleted Items, Junk Email, Drafts,
+Outbox and every descendant of those folders are excluded by ids resolved in one `GetFolder`.
+Search, calendar, contacts and tasks nodes are not kept. Paths join the display names of all
+listed ancestors with `/`, including ancestors of other kinds; folder order stays as listed.
+The folder id identifies a folder across renames; item refs are `ItemId` ids, ignoring `ChangeKey`.
+
+`changes` reads `SyncFolderItems` until its last page, passing each page's `SyncState` into the
+next request. `Create` entries of any item kind contribute ids in server order; `Delete` removes
+an id created during this call or contributes a deletion. `Update` and `ReadFlagChange` are
+consumed and ignored. The last page's opaque state is returned unchanged. Known refs are skipped
+in the added list, and known deletions are returned in natural string order.
+
+A first sync (null state) enumerates all items, so known refs absent from the created set are
+also removed. A later sync applies only reported additions/deletions. If the first request with
+a non-null state returns `ErrorInvalidSyncStateData`, the source starts once without a state
+and applies first-sync rules. This is not a reset: EWS item ids remain valid, and known messages
+must not be downloaded again. EWS always returns `reset=false`. An invalid state on a later page
+or after starting without a state propagates.
+
+Downloads use one `GetItem` per message and return the decoded size and SHA-256.
+`ErrorItemNotFound` becomes `MessageUnavailableException(GONE)`; the size decoder supplies
+`TOO_LARGE`. Other errors propagate. There are no retries for authentication, SOAP faults,
+HTTP or transport failures, including `ErrorServerBusy`. A long first run can therefore stop
+when Exchange throttles it; a later user-run sync resumes using known refs and saved cursors.
 
 ## Transport and NTLM
 

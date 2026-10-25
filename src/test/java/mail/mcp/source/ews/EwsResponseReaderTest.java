@@ -1,5 +1,6 @@
 package mail.mcp.source.ews;
 
+import mail.mcp.source.MessageUnavailableException;
 import org.junit.jupiter.api.Test;
 
 import javax.xml.stream.XMLStreamException;
@@ -87,8 +88,57 @@ class EwsResponseReaderTest {
     void mimeLargerThanTheLimitIsRejected() {
         assertThatThrownBy(() -> EwsResponseReader.readMime(fixture("getitem-mime.xml"),
                 new ByteArrayOutputStream(), 100))
-                .isInstanceOf(EwsProtocolException.class)
-                .hasMessageContaining("limit of 100 bytes");
+                .isInstanceOfSatisfying(MessageUnavailableException.class,
+                        e -> assertThat(e.reason()).isEqualTo(MessageUnavailableException.Reason.TOO_LARGE));
+    }
+
+    @Test
+    void getFolderReadsSeveralFolderIdsInOrder() throws Exception {
+        assertThat(EwsResponseReader.readFolderIds(fixture("getfolder-excluded.xml"))).containsExactly(
+                "AAMkSYNTH-deleted", "AAMkSYNTH-junk", "AAMkSYNTH-drafts", "AAMkSYNTH-outbox");
+    }
+
+    @Test
+    void findFolderReadsEveryFolderKindWithParentAndClass() throws Exception {
+        var page = EwsResponseReader.readFolderPage(fixture("findfolder-all.xml"));
+        assertThat(page.includesLastItemInRange()).isTrue();
+        assertThat(page.folders()).hasSize(16).contains(
+                new EwsFolderNode("AAMkSYNTH-inbox", "AAMkSYNTH-root", "Входящие", "IPF.Note", "Folder"),
+                new EwsFolderNode("AAMkSYNTH-projects", "AAMkSYNTH-inbox", "Проекты", "IPF.Note.X", "Folder"),
+                new EwsFolderNode("AAMkSYNTH-calendar", "AAMkSYNTH-root", "Календарь", null, "CalendarFolder"),
+                new EwsFolderNode("AAMkSYNTH-contacts", "AAMkSYNTH-root", "Контакты", "IPF.Contact", "ContactsFolder"),
+                new EwsFolderNode("AAMkSYNTH-tasks", "AAMkSYNTH-root", "Задачи", "IPF.Task", "TasksFolder"),
+                new EwsFolderNode("AAMkSYNTH-search", "AAMkSYNTH-root", "Поиск", "IPF.Note", "SearchFolder"));
+    }
+
+    @Test
+    void syncFolderItemsReadsCreatesAndDeletesAndSkipsOtherChanges() throws Exception {
+        var page = EwsResponseReader.readSyncPage(fixture("sync-changes.xml"));
+        assertThat(page.created()).containsExactly("AAMkSYNTH-b", "AAMkSYNTH-a");
+        assertThat(page.deleted()).containsExactly("AAMkSYNTH-gone");
+        assertThat(page.syncState()).isEqualTo("state-final");
+        assertThat(page.includesLastItemInRange()).isTrue();
+    }
+
+    @Test
+    void syncFolderItemsWithoutSyncStateIsAProtocolError() {
+        assertThatThrownBy(() -> EwsResponseReader.readSyncPage(fixture("sync-no-state.xml")))
+                .isInstanceOf(EwsProtocolException.class).hasMessageContaining("no SyncState");
+    }
+
+    @Test
+    void syncFolderItemsWithoutChangeIdIsAProtocolError() {
+        for (String name : new String[]{"sync-create-no-id.xml", "sync-delete-no-id.xml"}) {
+            assertThatThrownBy(() -> EwsResponseReader.readSyncPage(fixture(name)))
+                    .isInstanceOf(EwsProtocolException.class).hasMessageContaining("no ItemId Id");
+        }
+    }
+
+    @Test
+    void invalidSyncStateBecomesAResponseExceptionWithItsCode() {
+        assertThatThrownBy(() -> EwsResponseReader.readSyncPage(fixture("sync-invalid-state.xml")))
+                .isInstanceOfSatisfying(EwsResponseException.class,
+                        e -> assertThat(e.responseCode()).isEqualTo("ErrorInvalidSyncStateData"));
     }
 
     @Test

@@ -63,6 +63,131 @@ final class EwsResponseReader {
         return new EwsFolder(f.id, f.displayName, f.folderClass, f.totalCount, f.unreadCount, f.childFolderCount);
     }
 
+    /** Folder ids from a multi-folder {@code GetFolder}, in response order. */
+    static List<String> readFolderIds(InputStream in) throws XMLStreamException, IOException {
+        List<String> ids = new ArrayList<>();
+        read(EwsOperation.GET_FOLDER, in, r -> {
+            if (EwsXml.TYPES_NS.equals(r.getNamespaceURI()) && "FolderId".equals(r.getLocalName())) {
+                String id = r.getAttributeValue(null, "Id");
+                if (id == null) {
+                    throw new EwsProtocolException("GetFolder response has a FolderId without Id");
+                }
+                ids.add(id);
+            }
+        });
+        return List.copyOf(ids);
+    }
+
+    /** One deep {@code FindFolder} page. */
+    static EwsFolderPage readFolderPage(InputStream in) throws XMLStreamException, IOException {
+        List<EwsFolderNode> folders = new ArrayList<>();
+        boolean[] includesLast = {false};
+        read(EwsOperation.FIND_FOLDER, in, r -> {
+            if (EwsXml.MESSAGES_NS.equals(r.getNamespaceURI()) && "RootFolder".equals(r.getLocalName())) {
+                includesLast[0] = Boolean.parseBoolean(r.getAttributeValue(null, "IncludesLastItemInRange"));
+            } else if (EwsXml.TYPES_NS.equals(r.getNamespaceURI()) && "Folders".equals(r.getLocalName())) {
+                while (r.hasNext()) {
+                    int event = r.next();
+                    if (event == END_ELEMENT) {
+                        break;
+                    }
+                    if (event == START_ELEMENT) {
+                        folders.add(readFolderNode(r));
+                    }
+                }
+            }
+        });
+        return new EwsFolderPage(List.copyOf(folders), includesLast[0]);
+    }
+
+    private static EwsFolderNode readFolderNode(XMLStreamReader r) throws XMLStreamException {
+        String kind = r.getLocalName();
+        String id = null;
+        String parentId = null;
+        String name = null;
+        String folderClass = null;
+        while (r.hasNext()) {
+            int event = r.next();
+            if (event == END_ELEMENT) {
+                break;
+            }
+            if (event != START_ELEMENT) {
+                continue;
+            }
+            if (EwsXml.TYPES_NS.equals(r.getNamespaceURI())) {
+                switch (r.getLocalName()) {
+                    case "FolderId" -> id = r.getAttributeValue(null, "Id");
+                    case "ParentFolderId" -> parentId = r.getAttributeValue(null, "Id");
+                    case "DisplayName" -> { name = r.getElementText(); continue; }
+                    case "FolderClass" -> { folderClass = r.getElementText(); continue; }
+                    default -> { }
+                }
+            }
+            skipElement(r);
+        }
+        return new EwsFolderNode(id, parentId, name, folderClass, kind);
+    }
+
+    /** One {@code SyncFolderItems} page, consuming each change as a whole. */
+    static EwsSyncPage readSyncPage(InputStream in) throws XMLStreamException, IOException {
+        String[] state = {null};
+        boolean[] includesLast = {false};
+        List<String> created = new ArrayList<>();
+        List<String> deleted = new ArrayList<>();
+        read(EwsOperation.SYNC_FOLDER_ITEMS, in, r -> {
+            if (EwsXml.MESSAGES_NS.equals(r.getNamespaceURI())) {
+                switch (r.getLocalName()) {
+                    case "SyncState" -> state[0] = r.getElementText();
+                    case "IncludesLastItemInRange" ->
+                            includesLast[0] = parseBoolean(r.getElementText(), "IncludesLastItemInRange");
+                    case "Changes" -> {
+                        while (r.hasNext()) {
+                            int event = r.next();
+                            if (event == END_ELEMENT) {
+                                break;
+                            }
+                            if (event != START_ELEMENT) {
+                                continue;
+                            }
+                            String kind = r.getLocalName();
+                            if (EwsXml.TYPES_NS.equals(r.getNamespaceURI())
+                                    && ("Create".equals(kind) || "Delete".equals(kind))) {
+                                ("Create".equals(kind) ? created : deleted).add(readChangeId(r));
+                            } else {
+                                skipElement(r);
+                            }
+                        }
+                    }
+                    default -> { }
+                }
+            }
+        });
+        if (state[0] == null) {
+            throw new EwsProtocolException("SyncFolderItems response has no SyncState");
+        }
+        return new EwsSyncPage(state[0], includesLast[0], List.copyOf(created), List.copyOf(deleted));
+    }
+
+    private static String readChangeId(XMLStreamReader r) throws XMLStreamException {
+        String id = null;
+        int depth = 1;
+        while (depth > 0) {
+            int event = r.next();
+            if (event == START_ELEMENT) {
+                depth++;
+                if (EwsXml.TYPES_NS.equals(r.getNamespaceURI()) && "ItemId".equals(r.getLocalName())) {
+                    id = r.getAttributeValue(null, "Id");
+                }
+            } else if (event == END_ELEMENT) {
+                depth--;
+            }
+        }
+        if (id == null) {
+            throw new EwsProtocolException("SyncFolderItems change has no ItemId Id");
+        }
+        return id;
+    }
+
     /** One {@code FindItem} page. */
     static EwsItemPage readItemPage(InputStream in) throws XMLStreamException, IOException {
         List<ItemFields> items = new ArrayList<>();
