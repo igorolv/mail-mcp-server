@@ -5,8 +5,6 @@ import mail.mcp.config.MailMcpProperties;
 import mail.mcp.connections.ConnectionDefinition;
 import mail.mcp.connections.ConnectionType;
 import mail.mcp.connections.ConnectionsLoader;
-import mail.mcp.connections.MailConnection;
-import mail.mcp.connections.MailConnectionFactory;
 import mail.mcp.source.ews.DistinguishedFolder;
 import mail.mcp.source.ews.EwsAuthenticationException;
 import mail.mcp.source.ews.EwsClient;
@@ -15,6 +13,7 @@ import mail.mcp.source.ews.EwsFolder;
 import mail.mcp.source.ews.EwsItemPage;
 import mail.mcp.source.ews.EwsItemRef;
 import mail.mcp.source.ews.EwsMimeItem;
+import mail.mcp.source.ews.HttpClient5EwsTransport;
 
 import java.io.PrintStream;
 import java.nio.file.Path;
@@ -97,8 +96,8 @@ public final class EwsSpikeCommand {
         out.println("Connection: " + definition.name() + " (type " + definition.type().id() + ", auth "
                 + definition.auth().id() + "; server address and credentials are not shown)");
 
-        try (MailConnection connection = MailConnectionFactory.standard().create(definition)) {
-            return spike(connection.ews(), definition.connectionDir(), out);
+        try (EwsClient client = new EwsClient(new HttpClient5EwsTransport(definition.ews()))) {
+            return spike(client, definition.connectionDir(), out);
         }
     }
 

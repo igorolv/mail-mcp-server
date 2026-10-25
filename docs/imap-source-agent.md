@@ -5,15 +5,18 @@ Design: plan.md 5.2, 5.6, decisions П3, П4, П8; background: research/RT-04-im
 
 ## Implemented scope
 
-Angus Mail 2.0.5 with Jakarta Mail API 2.1.5. `ImapClient` lists folders and downloads the last
-message in a selected folder as original MIME. This is connectivity code, not sync, search or a
-mail MCP tool; plan.md step 7.1 builds `ImapMailSource` on it. Gmail labels/deduplication, CONDSTORE/QRESYNC and paging are
-not implemented. Only `listConnections` remains exposed through MCP.
+Angus Mail 2.0.5 with Jakarta Mail API 2.1.5. `ImapMailSource` implements `MailSource` on top
+of `ImapClient`: filtered mail folders, changes by UIDVALIDITY and folder UIDs, and original
+MIME downloads by UID. One source owns one lazy session for any number of queries and downloads
+across folders. Storage, sync, search and mail MCP tools are not implemented; only
+`listConnections` remains exposed through MCP. Gmail labels/deduplication, CONDSTORE/QRESYNC
+and paging are not implemented.
 
-Construction is lazy: `MailConnectionFactory` creates an IMAP client without contacting a server.
-`sourceAvailable` is true for both EWS and IMAP. Gmail OAuth2/XOAUTH2 and the user-run `gmail-oauth`
-command are implemented; setup and token lifecycle are in `docs/gmail-oauth-agent.md`.
-Angus objects stay private: source records contain folder metadata or saved-MIME metadata only.
+`MailConnectionFactory` creates a connection with a supplier; `openSource()` creates a fresh
+`ImapMailSource` without contacting a server. The caller closes the source. EWS connections
+have no `MailSource` until step 7.3, though their standalone client and spike remain available.
+Gmail OAuth2/XOAUTH2 and the user-run `gmail-oauth` command are implemented; setup and token
+lifecycle are in `docs/gmail-oauth-agent.md`. Angus objects stay private.
 
 ## TLS and authentication
 
@@ -29,10 +32,12 @@ Angus objects stay private: source records contain folder metadata or saved-MIME
 - `ReadOnlyImapStore` shares an authentication-started flag across all sockets. Its protocol
   subclass checks `writeCommand` before bytes are written and refuses a second credential exchange,
   including an internal Angus reconnect. No provider object is exposed to callers.
-- Failure closes the client permanently. A download also ends its single-socket session; create
-  another client only as part of an explicit new request. Step 7.1 (plan.md) changes this to one
-  session for a whole sync run, with tests for reconnects and failed credentials; never silently
-  reauthenticate.
+- A rejected sign-in, broken connection or protocol error closes the client permanently; nothing
+  retries. Successful downloads and `MessageUnavailableException` (GONE or TOO_LARGE) leave
+  the session usable. At most one folder is open READ_ONLY; switching closes it with
+  `close(false)`. LIST also closes the current folder first, returning its socket to the pool
+  before Angus requests a store connection. Closing the source closes the client and store,
+  including the selected folder.
 - Provider exception messages and causes can contain credentials or mail data. `ImapException`
   returns only a fixed error category/message. The spike withholds raw loader errors too.
 - Session debug is off and its debug stream discarded. Angus/Jakarta JUL categories and their
@@ -41,31 +46,49 @@ Angus objects stay private: source records contain folder metadata or saved-MIME
 ## Read-only command guard
 
 Allowed control commands: CAPABILITY, NOOP, LOGOUT, LOGIN, AUTHENTICATE (PLAIN/LOGIN through the
-configured provider), LIST, LSUB, NAMESPACE, STATUS, EXAMINE, UNSELECT and ENABLE (UTF8 negotiation).
+configured provider), LIST, LSUB, NAMESPACE, STATUS, EXAMINE, CLOSE, UNSELECT and ENABLE (UTF8 negotiation).
 OAuth connections use AUTHENTICATE with XOAUTH2 arguments; the wrapper acknowledges OAuth error
 challenges with an empty response instead of resending credentials (see gmail-oauth-agent.md).
 FETCH/UID FETCH is allowed only with UID, FLAGS, INTERNALDATE, RFC822.SIZE and BODY.PEEK[]
 (optionally a partial byte range). Command text containing CR/LF is rejected.
 
-SELECT, STORE, EXPUNGE, CLOSE, APPEND, COPY, MOVE, folder/subscription/ACL/quota mutations,
+CLOSE is safe because SELECT is forbidden: RFC 3501 section 6.4.2 specifies that CLOSE cannot
+remove messages from a mailbox opened with EXAMINE. Angus uses it to return the socket to the
+pool when switching READ_ONLY folders.
+
+SELECT, STORE, EXPUNGE, APPEND, COPY, MOVE, folder/subscription/ACL/quota mutations,
 RFC822 body retrieval and non-PEEK BODY retrieval are rejected before they reach the socket.
 The guard checks provider-generated commands as well as application calls; keep this seam on upgrades.
 Folder names are passed as encoded Angus arguments, never interpolated into command text.
 
 ## MIME download
 
-`downloadLastMessage(folderName, target, maxBytes)`:
+`folderUids(folderName)` opens the folder with EXAMINE, reads UIDVALIDITY and fetches all UIDs
+with `FETCH 1:N (UID)` (no FETCH for an empty folder). Non-positive UIDVALIDITY or UID is a
+protocol failure. UIDs are returned sorted and copied. `ImapMailSource.changes` compares those
+refs with the known local refs. A changed UIDVALIDITY resets the folder: all known refs are
+removed and all present refs added. Cursors and download refs are checked before any I/O.
 
-1. Open through `Folder.READ_ONLY` (EXAMINE). Empty folders return an empty result.
-2. Pick the last mailbox sequence position, not the Date-header maximum. Fetch UID and flags;
-   retain UIDVALIDITY with UID. Sequence numbers are not persistent message keys.
-3. Set PEEK on the message; stream `getMimeStream()` into a random local `.part` file with a
-   64 MiB default byte limit and SHA-256. Do not trust declared message size.
-4. Call `invalidateHeaders()` to invalidate cached flags, then fetch FLAGS again. Comparing cached
-   flags is not a read-only check. A flag change fails the operation; it may reflect concurrent activity.
-5. Publish by moving to the destination without replacement only after success. An existing original
-   is never overwritten. Errors delete the partial file where possible.
-6. Force-close the selected folder's socket (no CLOSE/EXPUNGE), then close the client.
+`download(folderName, uid, target, maxBytes)`:
+
+1. Validate the folder, positive UID and positive byte limit, then reuse or EXAMINE the folder.
+2. Resolve the UID; a missing message raises `MessageUnavailableException(GONE)`.
+3. Set PEEK and fetch `RFC822.SIZE` using `FetchProfile.Item.SIZE`. A declared size above the
+   limit raises `MessageUnavailableException(TOO_LARGE)` before fetching the body. Do not call
+   `IMAPMessage.getSize()`: it fetches ENVELOPE, which the guard forbids.
+4. Stream `getMimeStream()` in partial BODY.PEEK blocks into a random local `.part` file next to
+   the target, enforcing the byte limit (64 MiB by default) and computing SHA-256. Exceeding the
+   limit despite the declared size removes the partial and raises TOO_LARGE. The next message
+   can still be downloaded on the same socket. Zero bytes are a protocol failure.
+5. Move to the target without replacement and return `Downloaded(size, sha256)`. Local I/O
+   errors close the client with a sanitized LOCAL_IO failure. The partial file is cleaned up.
+6. Keep the session open after success or message unavailability. Read-only behavior is proved
+   by the command guard (BODY.PEEK only, no STORE) and offline tests; there is no per-download
+   FLAGS comparison.
+
+`folders()` preserves server order, keeps only folders holding messages and excludes attributes
+`\Noselect`, `\NonExistent`, `\Trash`, `\Junk`, `\Drafts` ignoring case. No provider-specific
+Gmail handling is added.
 
 Original MIME is kept on disk as downloaded. Under the 2026-10-25 decisions mail content and
 local paths may reach the model through tools, with an optional output filter later (plan.md 5.4,
@@ -83,18 +106,16 @@ Expected report:
 ```text
 IMAP spike (read-only: LIST, EXAMINE, BODY.PEEK; one sign-in attempt)
 Connection: gmail (imap, app-password; address and credentials hidden)
-Step 1/2 LIST: OK, folders: <n> (names hidden)
-Step 2/2 EXAMINE inbox and BODY.PEEK: OK
-  UIDVALIDITY: <n>, UID: <n>
-  MIME: <bytes> bytes, SHA-256 <hex>
-  Seen after download: <bool> (before: <bool>)
+Step 1/3 LIST: OK, folders to sync: <n> (names hidden)
+Step 2/3 EXAMINE inbox: OK, messages: <n>, cursor (UIDVALIDITY): <cursor>
+Step 3/3 BODY.PEEK last message: OK, <bytes> bytes, SHA-256 <hex>
   saved to: <data-dir>\gmail\spike\inbox-last-<time>.eml
 RESULT: OK
 ```
 
 Exit codes: 0 success (including an empty inbox), 2 configuration/selection, 3 sign-in rejected,
-4 IMAP/network/limit/local-save error, 1 unexpected error with details withheld. A true→true result
-does not verify an unread message. Record anonymized user results in plan.md; do not copy local
+4 IMAP/network/message-unavailable/limit/local-save error, 1 unexpected error with details withheld.
+An absent or empty inbox succeeds without a download. Record anonymized user results in plan.md; do not copy local
 user paths, addresses or original contents into tracked files.
 
 Verified on 2026-10-25 by a user-run Mail.ru spike: LIST returned 41 folders, EXAMINE and
@@ -102,21 +123,26 @@ BODY.PEEK succeeded, and one MIME original of 25831 bytes was saved. Seen was tr
 and after, so an unread message was not tested. See plan.md 3.4. An earlier user run rejected
 sign-in for both Mail.ru and Gmail; the report did not include a provider reason. Gmail still
 has no successful user-run result. Do not infer server extensions from the folder count.
+After step 7.1 a user-run Mail.ru spike on `MailSource` succeeded on 2026-10-25: 39 folders to
+sync, one `FETCH 1:N (UID)` for an inbox of about 13 thousand messages, and the highest UID
+downloaded through `RFC822.SIZE` and BODY.PEEK in the same session (plan.md 3.4).
 The user deferred Gmail setup on 2026-10-25; their local connections are `work` and `mailru`.
 Gmail and OAuth2 support remain available for later use.
 
 ## Offline verification and primary references
 
-`ImapClientTest` uses only a loopback fake endpoint: one LOGIN or AUTHENTICATE PLAIN exchange,
-no fallback to advertised LOGIN after a PLAIN rejection, LIST, EXAMINE, exact MIME bytes,
-BODY.PEEK, separate FLAGS fetches, unchanged unread flags, changed-flags failure, empty inbox,
-size limit, partial cleanup, existing-target preservation, command rejection and lazy factory behavior.
+`ImapClientTest` and `ImapMailSourceTest` share `FakeImapServer`, a strict single-socket
+loopback endpoint with synthetic ASCII mail. Tests cover one LOGIN/PLAIN/XOAUTH2 exchange,
+no fallback after rejection, EXAMINE/CLOSE folder switching, UID listing, filtering, new and
+removed refs, UIDVALIDITY resets, input validation before commands, exact MIME and SHA-256,
+BODY.PEEK only, missing UIDs, declared and streamed size limits, continued use after unavailable
+messages, partial cleanup, existing-target preservation, command rejection and lazy factories.
 `ImapSpikeCommandTest` verifies invalid configuration/selection stops before client creation and
 raw configuration values do not enter the report. All tests are part of `gradlew.bat build`.
 
 Angus 2.0.5 sources inspected on 2026-10-25:
 
 - [IMAPStore](https://github.com/eclipse-ee4j/angus-mail/blob/2.0.5/providers/imap/src/main/java/org/eclipse/angus/mail/imap/IMAPStore.java): mechanism selection, pool and newIMAPProtocol seam.
-- [IMAPMessage](https://github.com/eclipse-ee4j/angus-mail/blob/2.0.5/providers/imap/src/main/java/org/eclipse/angus/mail/imap/IMAPMessage.java): getMimeStream, PEEK and invalidateHeaders.
-- [IMAPFolder](https://github.com/eclipse-ee4j/angus-mail/blob/2.0.5/providers/imap/src/main/java/org/eclipse/angus/mail/imap/IMAPFolder.java): READ_ONLY/EXAMINE, flags fetch and forceClose.
+- [IMAPMessage](https://github.com/eclipse-ee4j/angus-mail/blob/2.0.5/providers/imap/src/main/java/org/eclipse/angus/mail/imap/IMAPMessage.java): getMimeStream, PEEK and getSizeLong.
+- [IMAPFolder](https://github.com/eclipse-ee4j/angus-mail/blob/2.0.5/providers/imap/src/main/java/org/eclipse/angus/mail/imap/IMAPFolder.java): READ_ONLY/EXAMINE, UID/size fetch and close(false).
 - [Protocol](https://github.com/eclipse-ee4j/angus-mail/blob/2.0.5/providers/imap/src/main/java/org/eclipse/angus/mail/iap/Protocol.java): command/writeCommand boundary.

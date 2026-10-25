@@ -103,9 +103,10 @@ final class ReadOnlyImapStore extends IMAPStore {
         if (upper.indexOf('\r') >= 0 || upper.indexOf('\n') >= 0) {
             throw new ProtocolException("Invalid IMAP command");
         }
+        // CLOSE cannot expunge an EXAMINE mailbox (RFC 3501 6.4.2); SELECT stays forbidden.
         if (Set.of("CAPABILITY", "NOOP", "LOGOUT", "LOGIN", "AUTHENTICATE PLAIN",
                 "AUTHENTICATE LOGIN", "LIST", "LSUB", "NAMESPACE", "STATUS", "EXAMINE",
-                "UNSELECT").contains(upper) || upper.equals("ENABLE") || upper.equals("AUTHENTICATE")) {
+                "UNSELECT", "CLOSE").contains(upper) || upper.equals("ENABLE") || upper.equals("AUTHENTICATE")) {
             return;
         }
         // Restrict FETCH attributes as well as its verb: BODY/RFC822 can set \\Seen.

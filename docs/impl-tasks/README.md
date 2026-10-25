@@ -32,8 +32,8 @@ check the diff against the brief before the next brief is written.
 
 | ID | Plan step | Brief | Status |
 |---|---|---|---|
-| IT-01 | 7.1 | [MailSource and the IMAP source](IT-01-mail-source-imap.md) | ready |
-| IT-02 | 7.2, first half | message directories, `meta.json`, `folders.json`, Lucene catalog | not written |
+| IT-01 | 7.1 | [MailSource and the IMAP source](IT-01-mail-source-imap.md) | accepted 2026-10-25 |
+| IT-02 | 7.2, first half | [Message directories and the Lucene catalog](IT-02-store-and-catalog.md) | ready |
 | IT-03 | 7.2, second half | `SyncRunner`, reconciliation, `mail-sync`, `spike/` → `cli/` | not written |
 | IT-04 | 7.3 | EWS source | not written |
 | IT-05 | 7.4, first half | `MimeReader`, attachments on disk, pandoc server, `body.md` | not written |

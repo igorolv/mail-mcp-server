@@ -139,9 +139,11 @@ java -jar build\libs\mail-mcp-server.jar imap-spike mailru
 ```
 
 Run only the connection you have configured; a sign-in rejection stops the client without a retry.
-The spike lists folder count, opens INBOX read-only, downloads one message with BODY.PEEK and
-compares freshly fetched flags. It saves original MIME under `<data-dir>\<connection>\spike\`.
-The last mailbox position is chosen; it is not a search for the newest Date header.
+The spike uses one `MailSource` session in three steps: LIST the folders to sync, EXAMINE INBOX
+and list its UIDs with the UIDVALIDITY cursor, then download the highest UID with BODY.PEEK.
+There is no per-download \Seen comparison; the command guard and offline tests verify read-only
+behavior. It saves original MIME under `<data-dir>\<connection>\spike\`. The highest UID is
+chosen; it is not a search for the newest Date header.
 The report hides subjects, addresses, credentials and folder names. An empty inbox is successful.
 Exit codes: 0 success, 2 invalid config/selection, 3 sign-in rejected, 4 IMAP/network/limit/local
 save error, 1 unexpected failure. Details: `docs/imap-source-agent.md`.

@@ -5,20 +5,21 @@ transport and Spring wiring. The target design is `docs/plan.md` section 6 (pack
 work order is section 7, decisions are in section 10. This file describes what exists now and
 where planned code goes.
 
-## Status (before step 7.1)
+## Status (after step 7.1)
 
 Implemented: Gradle build, Spring Boot application with the stdio MCP transport, the connections
 file with a lazy registry, the `listConnections` tool, a read-only EWS client (`GetFolder`,
 `FindItem`, `GetItem` with MIME) over Apache HttpClient 5 with NTLM, a read-only IMAP client on
-Angus Mail (folder listing, one MIME download), Gmail Desktop OAuth2 with PKCE and IMAP XOAUTH2,
-and three user-run commands: `ews-spike`, `imap-spike`, `gmail-oauth`. User-run spikes succeeded
+Angus Mail and `ImapMailSource` (filtered folders, UID changes, MIME downloads in one session),
+Gmail Desktop OAuth2 with PKCE and IMAP XOAUTH2, and three user-run commands: `ews-spike`,
+`imap-spike`, `gmail-oauth`. User-run spikes succeeded
 on 2026-10-25 for EWS (plan.md 3.3) and Mail.ru (plan.md 3.4). Gmail is supported but its sign-in
 is unverified; the user deferred it, their local connections are `work` and `mailru`. Synthetic
 RT-11–RT-13 data sets are in `testdata/`.
 
-Not implemented: everything marked "no" in plan.md 6.3 — `MailSource`, message directories,
-the Lucene index, synchronization, MIME parsing, pandoc conversion, and all mail tools except
-`listConnections`. The next step is plan.md 7.1.
+Not implemented: `EwsMailSource`, message directories, the Lucene index, synchronization, MIME
+parsing, pandoc conversion, and all mail tools except `listConnections`. The next step is
+plan.md 7.2. `MailSource` and its IMAP implementation are implemented (IT-01).
 
 ## Transport and execution
 
@@ -61,11 +62,11 @@ There is no `service/` layer. Dependencies flow downward only; planned packages 
 brackets:
 
 ```
-tools/ ──► [sync/] ──► source/ ([MailSource]; ews/, imap/)
+tools/ ──► [sync/] ──► source/ (MailSource; ews/, imap/)
   │           ├──────► [mime/], [convert/]
   │           └──────► [store/], [index/]
   └──────────────────► [store/], [index/]      (read)
-connections/ ──► source/                        (builds the clients, later MailSource)
+connections/ ──► source/                        (builds lazy MailSource session factories)
 [model/] — records shared by mime/, store/, index/, sync/, tools/
 api/     — MCP wire records returned by tools
 config/  — Spring configuration, properties, MCP customizer
@@ -78,9 +79,10 @@ spike/   — user-run commands without Spring (becomes cli/ in step 7.2)
 |---|---|---|
 | `MailMcpServerApplication` | Entry point. Empty apart from command dispatch. | Nothing else. |
 | `config/` | Spring wiring. | `MailMcpProperties` (`mail-mcp.*`), `ConnectionsConfig` (loader + registry beans), `McpServerConfig`, `JsonConfig`. |
-| `connections/` | The connections file and the registry. | `ConnectionsFile` (JSON shape), `ConnectionsLoader`, `ConnectionDefinition`, `EnvironmentPlaceholders`, `ConnectionType`, `AuthKind`, `ConnectionRegistry`, `MailConnection`, `MailConnectionFactory`. Today `MailConnection` holds an `EwsClient` or an `ImapClient` with the other field `null`; step 7.1 replaces that with a `MailSource`. |
+| `connections/` | The connections file and the registry. | `ConnectionsFile` (JSON shape), `ConnectionsLoader`, `ConnectionDefinition`, `EnvironmentPlaceholders`, `ConnectionType`, `AuthKind`, `ConnectionRegistry`, `MailConnection`, `MailConnectionFactory`. `MailConnection.openSource()` supplies a fresh lazy IMAP session, owned by its caller. EWS has no source until step 7.3; the EWS spike creates its client directly. |
+| `source/` (root) | Common mailbox session contract. | `MailSource`, `RemoteFolder`, `FolderChanges`, `Downloaded`, `MessageUnavailableException` (GONE/TOO_LARGE leaves the session usable). |
 | `source/ews/` | Thin read-only EWS client. | `EwsClient`, `EwsOperation` (allow-list), `EwsXml` (envelope, parser settings), `EwsResponseReader` (StAX), `EwsTransport` + `HttpClient5EwsTransport`, result records, `Ews*Exception`. See `docs/ews-source-agent.md`. |
-| `source/imap/` | Read-only IMAP client. | `ImapClient`, `ReadOnlyImapStore` (wire command guard), `ImapSettings`, `ImapFolderInfo`, `ImapMimeItem`, sanitized `ImapException`. See `docs/imap-source-agent.md`. |
+| `source/imap/` | Read-only IMAP source and client. | `ImapMailSource`, `ImapClient` (one session across folders/downloads), `ReadOnlyImapStore` (wire command guard), `ImapSettings`, `ImapFolderInfo`, `FolderUids`, sanitized `ImapException`. See `docs/imap-source-agent.md`. |
 | `source/oauth/` | Provider-independent OAuth components. | `OAuthLoopbackReceiver` and sanitized `OAuthException`. No provider endpoints, settings or provider-specific messages. |
 | `source/oauth/google/` | Google Desktop OAuth and refresh credentials. | All `Google*` classes and the package-private `OAuthJson` helper. Depends on shared `source/oauth/` components. See `docs/gmail-oauth-agent.md`. |
 | `tools/` | Thin `@McpTool` adapters, Spring `@Service` beans. | `ConnectionTools` (`listConnections`), `ToolLogger`. |
@@ -93,7 +95,6 @@ Add a package only in the step that needs it, then move its row to the table abo
 
 | Package | Step | What goes here (plan.md 6.3) |
 |---|---|---|
-| `source/` (root) | 7.1 | `MailSource`, `RemoteFolder`, `FolderChanges`, `Downloaded`; `ImapMailSource` in `source/imap/` (7.1), `EwsMailSource` in `source/ews/` (7.3) |
 | `model/` | 7.2, 7.4 | `MessageMeta`, `LocalFolder` (7.2); `MailMessage`, `Address`, `AttachmentInfo`, `MessageCard` (7.4). One record per file |
 | `store/` | 7.2 | `MessageStore`: message directories, `meta.json`, `folders.json`, `sync-status.json` |
 | `index/` | 7.2 | `MailIndex`: document fields, writing, reading, rebuilding from disk |

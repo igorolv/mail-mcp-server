@@ -7,7 +7,8 @@ import mail.mcp.connections.ConnectionType;
 import mail.mcp.connections.ConnectionsLoader;
 import mail.mcp.connections.MailConnection;
 import mail.mcp.connections.MailConnectionFactory;
-import mail.mcp.source.imap.ImapClient;
+import mail.mcp.source.MailSource;
+import mail.mcp.source.MessageUnavailableException;
 import mail.mcp.source.imap.ImapException;
 import mail.mcp.source.oauth.OAuthException;
 
@@ -15,9 +16,10 @@ import java.io.PrintStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Set;
 import java.util.function.UnaryOperator;
 
-/** User-run only: list folders, EXAMINE inbox, save one MIME with BODY.PEEK, compare flags. */
+/** User-run only: list sync folders, EXAMINE inbox UIDs, save one MIME with BODY.PEEK. */
 public final class ImapSpikeCommand {
     public static final String MODE = "imap-spike";
     private ImapSpikeCommand() { }
@@ -57,28 +59,34 @@ public final class ImapSpikeCommand {
             return 2;
         }
         out.println("Connection: " + selected.name() + " (imap, " + selected.auth().id() + "; address and credentials hidden)");
-        try (MailConnection connection = factory.create(selected)) {
-            var client = connection.imap();
-            var folders = client.listFolders();
-            out.println("Step 1/2 LIST: OK, folders: " + folders.size() + " (names hidden)");
-            var target = selected.connectionDir().resolve("spike").resolve("inbox-last-"
-                    + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS")) + ".eml");
-            var item = client.downloadLastMessage("INBOX", target, ImapClient.DEFAULT_MAX_MIME_BYTES);
-            if (item.isEmpty()) {
+        try (MailConnection connection = factory.create(selected); MailSource source = connection.openSource()) {
+            var folders = source.folders();
+            out.println("Step 1/3 LIST: OK, folders to sync: " + folders.size() + " (names hidden)");
+            var inbox = folders.stream().filter(f -> f.remoteId().equalsIgnoreCase("INBOX")).findFirst().orElse(null);
+            if (inbox == null) {
                 out.println("RESULT: OK (signed in; inbox empty)");
                 return 0;
             }
-            var mime = item.orElseThrow();
-            out.println("Step 2/2 EXAMINE inbox and BODY.PEEK: OK");
-            out.println("  UIDVALIDITY: " + mime.uidValidity() + ", UID: " + mime.uid());
-            out.println("  MIME: " + mime.bytes() + " bytes, SHA-256 " + mime.sha256());
-            out.println("  Seen after download: " + mime.seenAfter() + " (before: " + mime.seenBefore() + ")");
-            out.println("  saved to: " + mime.file());
+            var changes = source.changes(inbox, null, Set.of());
+            out.println("Step 2/3 EXAMINE inbox: OK, messages: " + changes.added().size()
+                    + ", cursor (UIDVALIDITY): " + changes.cursor());
+            if (changes.added().isEmpty()) {
+                out.println("RESULT: OK (signed in; inbox empty)");
+                return 0;
+            }
+            var target = selected.connectionDir().resolve("spike").resolve("inbox-last-"
+                    + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS")) + ".eml");
+            var mime = source.download(inbox, changes.added().getLast(), target);
+            out.println("Step 3/3 BODY.PEEK last message: OK, " + mime.size() + " bytes, SHA-256 " + mime.sha256());
+            out.println("  saved to: " + target);
             out.println("RESULT: OK");
             return 0;
         } catch (OAuthException e) {
             out.println("RESULT: FAILED (" + e.getMessage() + ")");
             return 2;
+        } catch (MessageUnavailableException e) {
+            out.println("RESULT: FAILED (" + e.getMessage() + ")");
+            return 4;
         } catch (ImapException e) {
             out.println("RESULT: FAILED (" + e.getMessage() + ")");
             return e.kind() == ImapException.Kind.AUTHENTICATION ? 3 : 4;

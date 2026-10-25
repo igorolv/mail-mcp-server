@@ -1,28 +1,26 @@
 package mail.mcp.connections;
 
-import mail.mcp.source.ews.EwsClient;
-import mail.mcp.source.imap.ImapClient;
+import mail.mcp.source.MailSource;
+
+import java.util.function.Supplier;
 
 /**
- * The live objects of one connection, created on first use by {@link ConnectionRegistry}.
- *
- * <p>Creating it does not sign in: both clients connect on the first request.
+ * The session factory of one connection, created on first use by {@link ConnectionRegistry}.
+ * Creating a source is lazy; its caller owns and closes the session.
  *
  * @param definition the configuration it was built from
- * @param ews        EWS client for an {@code ews} connection, otherwise {@code null}
- * @param imap       IMAP client for an {@code imap} connection, otherwise {@code null}
+ * @param sources   creates a fresh mail session, or {@code null} until its source is implemented
  */
-public record MailConnection(ConnectionDefinition definition, EwsClient ews, ImapClient imap) implements AutoCloseable {
+public record MailConnection(ConnectionDefinition definition, Supplier<MailSource> sources) implements AutoCloseable {
 
-    public MailConnection(ConnectionDefinition definition, EwsClient ews) {
-        this(definition, ews, null);
+    /** A new session; the caller closes it. Signs in only on its first request. */
+    public MailSource openSource() {
+        if (sources == null) {
+            throw new UnsupportedOperationException("Connection '" + definition.name() + "' has no mail source yet");
+        }
+        return sources.get();
     }
 
     @Override
-    public void close() {
-        if (ews != null) {
-            ews.close();
-        }
-        if (imap != null) { imap.close(); }
-    }
+    public void close() { } // sessions are owned by their callers
 }

@@ -2,13 +2,14 @@ package mail.mcp.source.imap;
 
 import jakarta.mail.AuthenticationFailedException;
 import jakarta.mail.FetchProfile;
-import jakarta.mail.Flags;
 import jakarta.mail.Folder;
 import jakarta.mail.Message;
 import jakarta.mail.MessagingException;
 import jakarta.mail.Session;
 import jakarta.mail.UIDFolder;
 import mail.mcp.connections.AuthKind;
+import mail.mcp.source.Downloaded;
+import mail.mcp.source.MessageUnavailableException;
 import mail.mcp.source.oauth.google.GoogleAccessTokenProvider;
 import mail.mcp.source.oauth.OAuthException;
 import org.eclipse.angus.mail.imap.IMAPFolder;
@@ -25,7 +26,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.Optional;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -39,6 +39,7 @@ public final class ImapClient implements AutoCloseable {
     private final Supplier<String> credential;
     private boolean connected;
     private boolean closed;
+    private IMAPFolder currentFolder;
 
     public ImapClient(ImapSettings settings) { this(settings, true); }
 
@@ -106,6 +107,11 @@ public final class ImapClient implements AutoCloseable {
     public synchronized List<ImapFolderInfo> listFolders() {
         try {
             connect();
+            // Return the selected folder's socket before Angus requests a store connection for LIST.
+            if (currentFolder != null) {
+                currentFolder.close(false);
+                currentFolder = null;
+            }
             var result = new ArrayList<ImapFolderInfo>();
             for (Folder folder : store.getDefaultFolder().list("*")) {
                 result.add(new ImapFolderInfo(folder.getFullName(),
@@ -116,28 +122,56 @@ public final class ImapClient implements AutoCloseable {
         } catch (MessagingException e) { throw fail(e); }
     }
 
-    /** Last message by mailbox sequence order, not by a possibly forged Date header. */
-    public synchronized Optional<ImapMimeItem> downloadLastMessage(String folderName, Path target, long maxBytes) {
+    private IMAPFolder open(String name) throws MessagingException {
+        connect();
+        if (currentFolder != null) {
+            if (currentFolder.getFullName().equals(name) && currentFolder.isOpen()) { return currentFolder; }
+            currentFolder.close(false);
+        }
+        currentFolder = (IMAPFolder) store.getFolder(name);
+        currentFolder.open(Folder.READ_ONLY); // EXAMINE, never SELECT
+        return currentFolder;
+    }
+
+    public synchronized FolderUids folderUids(String folderName) {
+        try {
+            var folder = open(folderName);
+            long uidValidity = folder.getUIDValidity();
+            if (uidValidity <= 0) { throw new ImapException(ImapException.Kind.PROTOCOL); }
+            var uids = new ArrayList<Long>();
+            if (folder.getMessageCount() > 0) {
+                var messages = folder.getMessages();
+                var profile = new FetchProfile();
+                profile.add(UIDFolder.FetchProfileItem.UID);
+                folder.fetch(messages, profile);
+                for (var message : messages) {
+                    long uid = folder.getUID(message);
+                    if (uid <= 0) { throw new ImapException(ImapException.Kind.PROTOCOL); }
+                    uids.add(uid);
+                }
+                uids.sort(Long::compareTo);
+            }
+            return new FolderUids(uidValidity, uids);
+        } catch (MessagingException e) { throw fail(e); }
+        catch (ImapException e) { close(); throw e; }
+    }
+
+    public synchronized Downloaded download(String folderName, long uid, Path target, long maxBytes) {
         if (maxBytes <= 0) { throw new IllegalArgumentException("MIME byte limit must be positive"); }
         if (folderName == null || folderName.isBlank()) { throw new IllegalArgumentException("Folder is required"); }
-        IMAPFolder folder = null;
+        if (uid <= 0) { throw new IllegalArgumentException("UID must be positive"); }
         Path partial = null;
         try {
-            connect();
-            folder = (IMAPFolder) store.getFolder(folderName);
-            folder.open(Folder.READ_ONLY); // EXAMINE, never SELECT
-            int count = folder.getMessageCount();
-            if (count == 0) { return Optional.empty(); }
-            var message = (IMAPMessage) folder.getMessage(count);
+            var folder = open(folderName);
+            var message = (IMAPMessage) folder.getMessageByUID(uid);
+            if (message == null) { throw new MessageUnavailableException(MessageUnavailableException.Reason.GONE); }
             message.setPeek(true);
             var profile = new FetchProfile();
-            profile.add(UIDFolder.FetchProfileItem.UID);
-            profile.add(FetchProfile.Item.FLAGS);
+            profile.add(FetchProfile.Item.SIZE);
             folder.fetch(new Message[] {message}, profile);
-            long uid = folder.getUID(message);
-            long uidValidity = folder.getUIDValidity();
-            if (uid <= 0 || uidValidity <= 0) { throw new ImapException(ImapException.Kind.PROTOCOL); }
-            boolean before = message.isSet(Flags.Flag.SEEN);
+            if (message.getSizeLong() > maxBytes) {
+                throw new MessageUnavailableException(MessageUnavailableException.Reason.TOO_LARGE);
+            }
             Path absolute = target.toAbsolutePath();
             Files.createDirectories(absolute.getParent());
             partial = Files.createTempFile(absolute.getParent(), ".imap-", ".part");
@@ -147,42 +181,26 @@ public final class ImapClient implements AutoCloseable {
                 byte[] buffer = new byte[16384];
                 int n;
                 while ((n = in.read(buffer)) != -1) {
-                    if (n > maxBytes - bytes) { throw new ImapException(ImapException.Kind.LIMIT); }
+                    if (n > maxBytes - bytes) {
+                        throw new MessageUnavailableException(MessageUnavailableException.Reason.TOO_LARGE);
+                    }
                     bytes += n;
                     out.write(buffer, 0, n);
                     digest.update(buffer, 0, n);
                 }
             }
             if (bytes == 0) { throw new ImapException(ImapException.Kind.PROTOCOL); }
-            // Invalidate Angus's cached flags and fetch them again from the server.
-            message.invalidateHeaders();
-            folder.fetch(new Message[] {message}, flagsProfile());
-            boolean after = message.isSet(Flags.Flag.SEEN);
-            if (before != after) { throw new ImapException(ImapException.Kind.PROTOCOL); }
             Files.move(partial, absolute); // no replacement: never overwrite another original
             partial = null;
-            return Optional.of(new ImapMimeItem(uidValidity, uid, bytes,
-                    HexFormat.of().formatHex(digest.digest()), before, after, absolute));
+            return new Downloaded(bytes, HexFormat.of().formatHex(digest.digest()));
         } catch (MessagingException e) { throw fail(e); }
         catch (IOException e) { close(); throw new ImapException(ImapException.Kind.LOCAL_IO); }
         catch (ImapException e) { close(); throw e; }
         finally {
-            if (folder != null && folder.isOpen()) {
-                try { folder.forceClose(); } catch (MessagingException ignored) { /* no CLOSE/EXPUNGE */ }
-            }
-            // A download ends this single-socket session. Reusing it must never cause
-            // Angus to authenticate a replacement socket behind the caller's back.
-            close();
             if (partial != null) {
                 try { Files.deleteIfExists(partial); } catch (IOException ignored) { /* local partial only */ }
             }
         }
-    }
-
-    private static FetchProfile flagsProfile() {
-        var profile = new FetchProfile();
-        profile.add(FetchProfile.Item.FLAGS);
-        return profile;
     }
 
     private ImapException fail(MessagingException e) {

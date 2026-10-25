@@ -5,11 +5,11 @@ This repository will become a local stdio MCP server that lets AI agents read se
 files with extracted text, search mail and attachments through a local index, and filter
 sensitive data before anything reaches the model.
 
-**Current status: spikes done, next is step 7.1 of `docs/plan.md`.** There is a Gradle build, a Spring Boot stdio MCP server
+**Current status: step 7.1 done, next is step 7.2 of `docs/plan.md` (brief IT-02).** There is a Gradle build, a Spring Boot stdio MCP server
 with one tool (`listConnections`), the connections file with a lazy registry, and a read-only EWS
 client with NTLM plus a spike command the user runs against the real mailbox. The user-run EWS
-spike succeeded on 2026-10-25 (see `docs/plan.md` 3.3). A read-only IMAP source on Angus Mail
-and a user-run spike are ready; Mail.ru sign-in and MIME download succeeded on 2026-10-25
+spike succeeded on 2026-10-25 (see `docs/plan.md` 3.3). `MailSource` and its IMAP implementation
+on Angus Mail (one session per source) and a user-run spike are ready; Mail.ru sign-in and MIME download succeeded on 2026-10-25
 (see `docs/plan.md` 3.4). Gmail OAuth2 (Desktop PKCE, local refresh tokens, XOAUTH2) is ready for
 a user-run check; real Gmail sign-in is not verified yet. The user deferred connecting their
 Gmail on 2026-10-25; their local configuration contains only `work` and `mailru`. Keep Gmail
