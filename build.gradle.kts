@@ -22,6 +22,7 @@ dependencies {
     implementation(libs.httpclient5)
     implementation(libs.angus.mail)
     implementation(libs.jakarta.mail)
+    implementation(libs.lucene.core)
 
     testImplementation(libs.spring.boot.starter.test)
 }

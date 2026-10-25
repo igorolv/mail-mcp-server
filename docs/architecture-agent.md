@@ -5,7 +5,7 @@ transport and Spring wiring. The target design is `docs/plan.md` section 6 (pack
 work order is section 7, decisions are in section 10. This file describes what exists now and
 where planned code goes.
 
-## Status (after step 7.1)
+## Status (after IT-02, first half of step 7.2)
 
 Implemented: Gradle build, Spring Boot application with the stdio MCP transport, the connections
 file with a lazy registry, the `listConnections` tool, a read-only EWS client (`GetFolder`,
@@ -15,11 +15,13 @@ Gmail Desktop OAuth2 with PKCE and IMAP XOAUTH2, and three user-run commands: `e
 `imap-spike`, `gmail-oauth`. User-run spikes succeeded
 on 2026-10-25 for EWS (plan.md 3.3) and Mail.ru (plan.md 3.4). Gmail is supported but its sign-in
 is unverified; the user deferred it, their local connections are `work` and `mailru`. Synthetic
-RT-11–RT-13 data sets are in `testdata/`.
+RT-11–RT-13 data sets are in `testdata/`. IT-02 adds message directories with atomically written
+`meta.json` and `folders.json`, and a derived Lucene catalog with a single writer and disk
+reconciliation. See `docs/storage-agent.md`.
 
-Not implemented: `EwsMailSource`, message directories, the Lucene index, synchronization, MIME
-parsing, pandoc conversion, and all mail tools except `listConnections`. The next step is
-plan.md 7.2. `MailSource` and its IMAP implementation are implemented (IT-01).
+Not implemented: `EwsMailSource`, synchronization and `sync-status.json`, MIME parsing, pandoc
+conversion, text indexing, and all mail tools except `listConnections`. The next task is IT-03,
+the second half of plan.md 7.2 (`SyncRunner`, `mail-sync`, `spike/` → `cli/`).
 
 ## Transport and execution
 
@@ -45,10 +47,11 @@ system property. Step 7.2 adds `mail-sync` the same way.
 - **Apache HttpClient 5.6.5** classic — EWS transport with explicitly registered NTLM (П1).
 - **Eclipse Angus Mail 2.0.5**, **Jakarta Mail API 2.1.5** — IMAP with implicit TLS (П3); also the
   MIME parser from step 7.4 (plan.md 6.7).
+- **Lucene Core 10.5.2** — derived catalog, NRT lookups and the per-connection write lock (IT-02).
 - StAX from the JDK for SOAP; no generated EWS classes, no `ews-java-api`.
 - **Gradle 9.8.2** wrapper with the version catalog `gradle/libs.versions.toml`.
 
-Planned, added only in their step: Lucene with `RussianAnalyzer` (7.2, analyzer in 7.5), pandoc
+Planned, added only in their step: Lucene text fields with `RussianAnalyzer` (7.4), pandoc
 as a required external program run as `pandoc server` (7.4), PDFBox and POI from the
 redmine-mcp-server parsers (7.6). Do not add Mime4j, jsoup, SQLite or any other library the plan
 does not name (plan.md 6.9).
@@ -64,10 +67,11 @@ brackets:
 ```
 tools/ ──► [sync/] ──► source/ (MailSource; ews/, imap/)
   │           ├──────► [mime/], [convert/]
-  │           └──────► [store/], [index/]
-  └──────────────────► [store/], [index/]      (read)
+  │           └──────► store/, index/
+  └──────────────────► store/, index/          (tool readers planned)
+index/ ──► store/                              (reconciliation)
 connections/ ──► source/                        (builds lazy MailSource session factories)
-[model/] — records shared by mime/, store/, index/, sync/, tools/
+model/   — shared disk records; more records planned for step 7.4
 api/     — MCP wire records returned by tools
 config/  — Spring configuration, properties, MCP customizer
 spike/   — user-run commands without Spring (becomes cli/ in step 7.2)
@@ -85,6 +89,9 @@ spike/   — user-run commands without Spring (becomes cli/ in step 7.2)
 | `source/imap/` | Read-only IMAP source and client. | `ImapMailSource`, `ImapClient` (one session across folders/downloads), `ReadOnlyImapStore` (wire command guard), `ImapSettings`, `ImapFolderInfo`, `FolderUids`, sanitized `ImapException`. See `docs/imap-source-agent.md`. |
 | `source/oauth/` | Provider-independent OAuth components. | `OAuthLoopbackReceiver` and sanitized `OAuthException`. No provider endpoints, settings or provider-specific messages. |
 | `source/oauth/google/` | Google Desktop OAuth and refresh credentials. | All `Google*` classes and the package-private `OAuthJson` helper. Depends on shared `source/oauth/` components. See `docs/gmail-oauth-agent.md`. |
+| `model/` | Shared disk records and lifecycle. | `MessageState`, `MessageMeta`, `LocalFolder` (IT-02), one type per file. Planned for 7.4: `MailMessage`, `Address`, `AttachmentInfo`, `MessageCard`. |
+| `store/` | Local message directories and metadata. | `MessageStore`: UUID paths, atomic `meta.json` and `folders.json`, listing and deletion. `sync-status.json` remains planned for IT-03. See `docs/storage-agent.md`. |
+| `index/` | Derived Lucene catalog, writer side. | `MailIndex`: metadata fields, NRT key/ref lookups, commit and reconciliation through `store/`; `IndexLockedException`. Text fields and tool readers remain planned for 7.4. See `docs/storage-agent.md`. |
 | `tools/` | Thin `@McpTool` adapters, Spring `@Service` beans. | `ConnectionTools` (`listConnections`), `ToolLogger`. |
 | `api/` | Stable MCP response records with `@Schema`. | `ConnectionInfo`, `ListConnectionsResult`. Never expose `source/` or `model/` records or settings here. |
 | `spike/` | User-run commands without Spring. | `EwsSpikeCommand`, `ImapSpikeCommand`, `GmailOAuthCommand`. Renamed to `cli/` in step 7.2. |
@@ -95,9 +102,6 @@ Add a package only in the step that needs it, then move its row to the table abo
 
 | Package | Step | What goes here (plan.md 6.3) |
 |---|---|---|
-| `model/` | 7.2, 7.4 | `MessageMeta`, `LocalFolder` (7.2); `MailMessage`, `Address`, `AttachmentInfo`, `MessageCard` (7.4). One record per file |
-| `store/` | 7.2 | `MessageStore`: message directories, `meta.json`, `folders.json`, `sync-status.json` |
-| `index/` | 7.2 | `MailIndex`: document fields, writing, reading, rebuilding from disk |
 | `sync/` | 7.2 | `SyncRunner` (one run), `SyncService` (background, status) |
 | `cli/` | 7.2 | today's `spike/` commands plus `mail-sync` |
 | `mime/` | 7.4 | `MimeReader`: `.eml` → `MailMessage` and part streams |

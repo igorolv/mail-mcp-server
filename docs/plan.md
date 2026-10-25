@@ -926,7 +926,9 @@ JSON-файлы пишутся во временный и переименовы
 - [x] Шаг 7.1: `MailSource` и IMAP-источник — бриф [IT-01](impl-tasks/IT-01-mail-source-imap.md);
       принят 2026-10-25, `imap-spike mailru` на `MailSource` успешен (раздел 3.4).
 - [ ] Шаг 7.2, первая половина: каталоги писем, `meta.json`, `folders.json`, индекс-каталог
-      Lucene — бриф [IT-02](impl-tasks/IT-02-store-and-catalog.md).
+      Lucene — бриф [IT-02](impl-tasks/IT-02-store-and-catalog.md); принят 2026-10-25.
+- [ ] Шаг 7.2, вторая половина: `SyncRunner`, команда `mail-sync`, `spike/` → `cli/` — бриф
+      [IT-03](impl-tasks/IT-03-sync-runner.md); затем пользователь дважды запускает `mail-sync mailru`.
 
 ## 10. Журнал решений
 
@@ -1259,3 +1261,20 @@ Codex выполнил IT-01: пакет `source/` (`MailSource`, `RemoteFolder`
 тестах (дубль константы MIME, лишняя проверка, неиспользуемое поле `flags` поддельного
 сервера) оставлены. Пользовательский `imap-spike mailru` успешен (раздел 3.4). Следующий бриф —
 IT-02.
+
+### 2026-10-25 — первая половина шага 7.2 принята
+
+Codex выполнил IT-02: записи `MessageState`, `MessageMeta`, `LocalFolder` в `model/`;
+`MessageStore` (каталоги писем по UUID, `meta.json` и `folders.json` через временный файл и
+атомарную замену); `MailIndex` на `lucene-core` 10.5.2 с полями `key`, `ref`, `folder`, `state`,
+`error`, единственным писателем (`IndexLockedException`) и сверкой диска с индексом;
+`docs/storage-agent.md`. Сборка проходит, 122 теста, один давно отключённый тест stdio
+пропущен; в stdout ничего, Lucene пишет в stderr предупреждение о модуле
+`jdk.incubator.vector` — оставлено. Реальных значений в диффе нет. Замечания мелкие: нет
+Javadoc у `IndexLockedException`, тест использует устаревший `asText()` Jackson 3.
+
+На будущее отмечено: в Windows атомарная замена `meta.json` не удастся, если другой процесс
+держит файл открытым, поэтому инструменты чтения (шаг 7.4) должны читать его целиком и сразу
+закрывать. Предложено (не решение пользователя): `sync-status.json` писать не в IT-03, а
+вместе с инструментом `syncStatus`, который его читает (IT-06); `mail-sync` показывает ход
+синхронизации сам, печатая строку после каждой пачки.

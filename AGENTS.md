@@ -5,7 +5,7 @@ This repository will become a local stdio MCP server that lets AI agents read se
 files with extracted text, search mail and attachments through a local index, and filter
 sensitive data before anything reaches the model.
 
-**Current status: step 7.1 done, next is step 7.2 of `docs/plan.md` (brief IT-02).** There is a Gradle build, a Spring Boot stdio MCP server
+**Current status: step 7.1 and the first half of 7.2 done, next is IT-03 (second half of step 7.2 of `docs/plan.md`).** There is a Gradle build, a Spring Boot stdio MCP server
 with one tool (`listConnections`), the connections file with a lazy registry, and a read-only EWS
 client with NTLM plus a spike command the user runs against the real mailbox. The user-run EWS
 spike succeeded on 2026-10-25 (see `docs/plan.md` 3.3). `MailSource` and its IMAP implementation
@@ -14,7 +14,8 @@ on Angus Mail (one session per source) and a user-run spike are ready; Mail.ru s
 a user-run check; real Gmail sign-in is not verified yet. The user deferred connecting their
 Gmail on 2026-10-25; their local configuration contains only `work` and `mailru`. Keep Gmail
 and OAuth2 support available, but do not treat Gmail setup as the next required user action. Synthetic RT-11–RT-13
-data sets are ready. Local storage, MIME parsing, search and redaction are still design only
+data sets are ready. Message directories and the Lucene catalog exist (`docs/storage-agent.md`)
+but nothing fills them yet. Synchronization, MIME parsing, search and redaction are still design only
 (`docs/plan.md`). An offline MIME pipeline with shared limits (commit `d6534ca`) was reverted on
 2026-10-25 by user decision as over-engineering; do not rebuild it. The architecture was rewritten
 on 2026-10-25 (`docs/plan.md` section 6). Work goes through the steps of section 7 one at a time,
@@ -61,6 +62,7 @@ Read this file first. Then read only the documents whose `When` matches the task
 | `docs/ews-source-agent.md` | changing `source/ews/`, adding an EWS operation, NTLM questions, reading spike output | allow-list, response checks, NTLM transport rules, known risks, spike output format |
 | `docs/imap-source-agent.md` | changing `source/imap/`, IMAP authentication or reading IMAP spike output | TLS, command allow-list, one sign-in attempt, EXAMINE/PEEK, bounded MIME downloads and spike output |
 | `docs/gmail-oauth-agent.md` | changing `source/oauth/google/`, Gmail OAuth configuration, authorization or refresh | Desktop client setup, PKCE/state/loopback flow, owner-only refresh storage, token endpoint and XOAUTH2 rules |
+| `docs/storage-agent.md` | changing `model/`, `store/` or `index/`, the on-disk layout, `meta.json`, `folders.json` or the Lucene catalog | message directories, write order and atomic writes, index fields, single writer, reconciliation |
 | `scripts/ews-login-check.ps1` | changing or explaining the EWS sign-in check | the script itself; its help block documents parameters |
 
 Name new engineering documents `docs/<topic>-agent.md`, write them in English, and register each
