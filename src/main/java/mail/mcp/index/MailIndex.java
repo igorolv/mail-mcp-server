@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 
 /** Derived catalog for one connection, owned by the process holding Lucene's write lock. */
 public final class MailIndex implements AutoCloseable {
-    public static final String SCHEMA = "2";
+    public static final String SCHEMA = "3";
     private final FSDirectory directory;
     private final IndexWriter writer;
 
@@ -74,7 +74,7 @@ public final class MailIndex implements AutoCloseable {
         } catch (IOException e) { throw new UncheckedIOException(e); }
     }
 
-    public void put(MessageMeta meta, MailMessage message, String body) {
+    public void put(MessageMeta meta, MailMessage message, String body, String attachmentText) {
         Document document = new Document();
         document.add(new StringField("key", meta.key(), Field.Store.YES));
         document.add(new SortedDocValuesField("keySort", new BytesRef(meta.key())));
@@ -111,6 +111,8 @@ public final class MailIndex implements AutoCloseable {
         }
         text(document, "body", body);
         unstoredText(document, "body_en", body);
+        unstoredText(document, "attachmentText", attachmentText);
+        unstoredText(document, "attachmentText_en", attachmentText);
         try { writer.updateDocument(new Term("key", meta.key()), document); }
         catch (IOException e) { throw new UncheckedIOException(e); }
     }

@@ -49,11 +49,79 @@ class MailToolsTest {
                 store.writeMeta(meta);
                 var processed = new MessageProcessor(store, new Pandoc("unused")).process(meta);
                 assertThat(processed.meta().state()).isEqualTo(MessageState.CONVERTED);
-                index.put(processed.meta(), processed.message(), processed.body());
+                index.put(processed.meta(), processed.message(), processed.body(), processed.attachmentText());
             }
             index.commit();
         }
         keys = store.keys();
+    }
+
+    @Test void getAttachmentChunksTheText() throws Exception {
+        String key = keys.getFirst();
+        var attachment = tools.getMessage("local", key, null, null).attachments().getFirst();
+        Path markdown = Path.of(attachment.path() + ".md");
+        String expected = "Attachment text 😀 конец";
+        Files.writeString(markdown, expected);
+        var text = new StringBuilder();
+        Integer offset = 0;
+        do {
+            var chunk = tools.getAttachment("local", key, attachment.file(), offset, 3);
+            assertThat(chunk.key()).isEqualTo(key);
+            assertThat(chunk.file()).isEqualTo(attachment.file());
+            assertThat(chunk.name()).isEqualTo(attachment.name());
+            assertThat(chunk.contentType()).isEqualTo(attachment.contentType());
+            assertThat(chunk.size()).isEqualTo(attachment.size());
+            assertThat(chunk.path()).isEqualTo(attachment.path());
+            assertThat(chunk.textPath()).isEqualTo(markdown.toString());
+            assertThat(chunk.offset()).isEqualTo(offset);
+            assertThat(chunk.textLength()).isEqualTo(expected.length());
+            assertThat(chunk.text()).hasSizeLessThanOrEqualTo(3);
+            text.append(chunk.text());
+            offset = chunk.nextOffset();
+        } while (offset != null);
+        assertThat(text.toString()).isEqualTo(expected);
+        var beyond = tools.getAttachment("local", key, attachment.file(), Integer.MAX_VALUE, 10);
+        assertThat(beyond.text()).isEmpty();
+        assertThat(beyond.nextOffset()).isNull();
+        Files.writeString(markdown, "x".repeat(100_001));
+        assertThat(tools.getAttachment("local", key, attachment.file(), null, null).text()).hasSize(20_000);
+        assertThat(tools.getAttachment("local", key, attachment.file(), 0, Integer.MAX_VALUE).text()).hasSize(100_000);
+        assertThatThrownBy(() -> tools.getAttachment("local", key, attachment.file(), -1, 10))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> tools.getAttachment("local", key, attachment.file(), 0, 0))
+                .isInstanceOf(IllegalArgumentException.class);
+        Files.delete(markdown);
+        var absent = tools.getAttachment("local", key, attachment.file(), 0, 10);
+        assertThat(absent.text()).isNull();
+        assertThat(absent.textPath()).isNull();
+        assertThat(absent.textLength()).isZero();
+        assertThat(absent.nextOffset()).isNull();
+        String json = new JsonConfig().mailMcpObjectMapper().writeValueAsString(absent);
+        assertThat(json).doesNotContain("\"text\"", "\"textPath\"");
+    }
+
+    @Test void getAttachmentRejectsUnknownFile() {
+        String key = keys.getFirst();
+        var ownFiles = tools.getMessage("local", key, null, null).attachments().stream().map(a -> a.file()).toList();
+        String other = tools.getMessage("local", keys.getLast(), null, null).attachments().stream()
+                .map(a -> a.file()).filter(file -> !ownFiles.contains(file)).findFirst().orElseThrow();
+        for (String file : List.of("missing", "..\\..\\x", other)) {
+            assertThatThrownBy(() -> tools.getAttachment("local", key, file, null, null))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThatThrownBy(() -> tools.getAttachment("local", key, null, null, null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void getMessageShowsTextPath() throws Exception {
+        String key = keys.getFirst();
+        var attachment = tools.getMessage("local", key, null, null).attachments().getFirst();
+        Path markdown = Path.of(attachment.path() + ".md");
+        Files.writeString(markdown, "Saved text");
+        assertThat(tools.getMessage("local", key, null, null).attachments().getFirst().textPath())
+                .isEqualTo(markdown.toString());
+        Files.delete(markdown);
+        assertThat(tools.getMessage("local", key, null, null).attachments().getFirst().textPath()).isNull();
     }
 
     @Test void listFoldersCountsMessagesAndShowsSynced() {
@@ -88,7 +156,7 @@ class MailToolsTest {
         try (var index = MailIndex.openWriter(dir)) {
             for (int i = 0; i < 201; i++) {
                 index.put(new MessageMeta(store.newKey(), "f1", "INBOX", "extra" + i, 0, null,
-                        Instant.now(), MessageState.FAILED, "synthetic"), null, null);
+                        Instant.now(), MessageState.FAILED, "synthetic"), null, null, null);
             }
             index.commit();
         }

@@ -5,7 +5,7 @@ transport and Spring wiring. The target design is `docs/plan.md` section 6 (pack
 work order is section 7, decisions are in section 10. This file describes what exists now and
 where planned code goes.
 
-## Status (after IT-07, step 7.5 complete)
+## Status (after IT-08, step 7.6 complete)
 
 Implemented: Gradle build, Spring Boot application with the stdio MCP transport, the connections
 file with a lazy registry, the `listConnections` tool, a read-only EWS client (`GetFolder`,
@@ -38,8 +38,13 @@ filename parts, highlighted body snippets, schema 2 and offline `mail-reindex`.
 The 48-message/80-query control set passes with recall 78/86 and 7 false positives.
 See `docs/tools-agent.md` for category counts and known limits.
 
-Not implemented: attachment text (7.6) and the optional sensitive-data filter.
-The next step is IT-08 (attachment text, plan.md 7.6).
+IT-08 adds attachment Markdown (pandoc, PDFBox and POI), schema 3 attachment text search,
+`getAttachment` and attachment `textPath`, bringing the tool count to eight. The control set
+now passes with recall 79/86 = 0.918605 and 7 false positives. PDFBox/POI methods
+in `convert/PdfText`, `XlsxText` and `PptxText` are adapted from redmine-mcp-server
+`extraction/parser/{PdfTextParser,XlsxTextParser,PptxTextParser}.java` at commit `f62b3e5`.
+
+Not implemented: the optional sensitive-data filter (7.7), which awaits user decisions.
 Real `mail-sync` checks are user-run only.
 
 ## Transport and execution
@@ -71,12 +76,13 @@ platform thread through `SyncService` and returns at once.
 - **Lucene Core 10.5.2** — derived catalog, NRT lookups and the per-connection write lock (IT-02).
 - **Lucene analysis-common, queryparser, highlighter 10.5.2** — field analyzers,
   `SimpleQueryParser` and `UnifiedHighlighter` (IT-07), all on the catalog's version.
+- **PDFBox 3.0.5**, **POI poi-ooxml 5.4.1** — PDF, XLSX and PPTX attachment text (IT-08).
 - StAX from the JDK for SOAP; no generated EWS classes, no `ews-java-api`.
 - **Gradle 9.8.2** wrapper with the version catalog `gradle/libs.versions.toml`.
 
 Pandoc is required on `PATH` for sync/reprocessing/reindexing; `Pandoc` runs one sandboxed process per
-HTML conversion. Planned, added only in their step: PDFBox and POI from the
-redmine-mcp-server parsers (7.6). Do not add Mime4j, jsoup, SQLite or any other library the plan
+body or supported attachment conversion. PDFBox and POI run in-process, without the sibling
+parser framework. Do not add Mime4j, jsoup, SQLite or any other library the plan
 does not name (plan.md 6.9).
 
 If you change a dependency, update `libs.versions.toml`, not the build script.
@@ -113,18 +119,18 @@ cli/ ──► sync/, connections/, source/, store/, index/  (user-run commands 
 | `source/oauth/google/` | Google Desktop OAuth and refresh credentials. | All `Google*` classes and the package-private `OAuthJson` helper. Depends on shared `source/oauth/` components. See `docs/gmail-oauth-agent.md`. |
 | `model/` | Shared disk records and lifecycle. | `MessageState`, `MessageMeta`, `LocalFolder`, `MailMessage`, `Address`, `AttachmentInfo`, `MessageCard`, `SearchHit`, `SearchResults`, `FolderProgress`, `SyncStatus`, one type per file. |
 | `store/` | Local message directories and metadata. | `MessageStore`: UUID paths, atomic `meta.json`, `folders.json` and `sync-status.json`, listing and deletion. See `docs/storage-agent.md`. |
-| `index/` | Derived Lucene catalog and committed readers. | `MailIndex`: schema 2, metadata, headers/body fields, NRT key/ref lookups, commit and reconciliation; `IndexLockedException`. `MailAnalyzers` shares per-field analysis, `SearchField` defines groups. `MailIndexReader` reads committed counts, sorted cards and scored search hits with snippets without the writer lock. See `docs/storage-agent.md`. |
+| `index/` | Derived Lucene catalog and committed readers. | `MailIndex`: schema 3, metadata, headers/body/attachment text fields, NRT key/ref lookups, commit and reconciliation; `IndexLockedException`. `MailAnalyzers` shares per-field analysis, `SearchField` defines groups. `MailIndexReader` reads committed counts, sorted cards and scored search hits with snippets without the writer lock. See `docs/storage-agent.md`. |
 | `tools/` | Thin `@McpTool` adapters, Spring `@Service` beans. | `ConnectionTools` (`listConnections`), `SyncTools` (`sync`, `syncStatus`), `MailTools` (`listFolders`, `listMessages`, `getMessage`), `SearchTools` (`search`), `ToolLogger`. |
 | `api/` | Stable MCP response records with `@Schema`. | Discovery, sync start/status, folder/message pages, body chunks, attachment references, `SearchResult` and `SearchHitInfo`. Never expose `source/` or `model/` records or settings here. |
 | `sync/` | One synchronization run and local conversion. | `SyncRunner`, `MessageProcessor`, `Processed`: reconcile by state, folders, removals, downloads/conversion in batches of 100, cursor after the folder. Caller owns the source and writer. `SyncService` owns background runs, `SyncStart` their immediate result; `SyncErrors` shares fixed CLI/status failure messages. |
 | `cli/` | User-run commands without Spring. | `EwsSpikeCommand`, `ImapSpikeCommand`, `GmailOAuthCommand`, `MailSyncCommand`, `MailReprocessCommand`, `MailReindexCommand`. Check pandoc before the index or sign-in; source closes before the index. Reprocessing and reindexing are offline. |
 | `mime/` | Local MIME parsing. | `MimeReader`, `ParsedMessage`: decoded headers, selected body and attachment files, no container expansion. See `docs/mime-agent.md`. |
-| `convert/` | HTML conversion. | `Pandoc`, `PandocException`: sandboxed process per conversion. PDF/XLSX/PPTX converters remain planned for 7.6. |
+| `convert/` | Body and attachment text. | `Pandoc`, `PandocException`: sandboxed process per conversion; `AttachmentText` dispatches formats, `PdfText`, `XlsxText`, `PptxText` adapt sibling extraction methods. |
 
 ### Planned packages
 
 No additional packages are needed for the current step. Add packages only in the step that
-needs them and register them above. Attachment converters extend `convert/` in step 7.6.
+needs them and register them above. Attachment converters live in `convert/`.
 
 ## Rules for new code
 

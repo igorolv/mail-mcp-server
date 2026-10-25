@@ -37,7 +37,8 @@ Attachments are numbered from one in walk order. Stored names are `<n>__<sanitiz
 dots/spaces with `_`; truncate the sanitized name to 100 characters. Truncation also leaves no
 trailing dot or space. The prefix prevents collisions and bare reserved names such as `CON.txt`.
 The decoded name is kept separately. `Content-ID` loses enclosing angle brackets. Content types
-are lowercase base types; inline means disposition `inline`.
+are lowercase base types; inline means disposition `inline`. `AttachmentInfo.charset` is the
+lowercase declared Content-Type charset parameter, or null when absent.
 
 `getInputStream()` supplies decoded attachment bytes. Size counts bytes read. Passing a null
 attachment directory still lists and counts attachments, but writes nothing. A non-null
@@ -47,13 +48,13 @@ directory is created only when an attachment exists.
 
 `convert/Pandoc.locate()` runs `pandoc --version`. Pandoc must be on `PATH`; there is no path
 setting or fallback. Both commands check it before opening the index or contacting a mailbox.
-Each HTML conversion starts one process:
+Each body or attachment conversion through pandoc starts one process:
 
 ```text
-pandoc --sandbox -f html -t gfm --wrap=none --eol=lf
+pandoc --sandbox -f <format> -t gfm --wrap=none --eol=lf [file]
 ```
 
-Input and output are UTF-8, stderr is discarded, stdin is closed after writing. A nonzero exit
+Stdin text and output are UTF-8, stderr is discarded, stdin is closed after writing. A nonzero exit
 has the fixed message `pandoc failed with exit code <n>`. I/O and interruption messages are
 fixed too and never include mail or process output. There are no timeouts or retries.
 
@@ -66,8 +67,9 @@ Tests cover UTF-8 Markdown, removal of styles/scripts and no inclusion of local 
 writes UTF-8 `body.md` if there is a body, then writes converted metadata. MIME errors and
 pandoc failures write failed metadata with a fixed reason; the original MIME stays. Local
 cleanup/body-write errors propagate as local storage errors. `load` reads MIME and saved
-Markdown without writing, returning null message/body on read failure. Attachment text is
-deferred to step 7.6.
+Markdown without writing, returning null message/body/attachmentText on read failure. IT-08
+adds attachment Markdown; `Processed.attachmentText` joins available texts in attachment order
+with a blank line, or is null when none exists.
 
 ## Synthetic fixture differences
 
@@ -89,3 +91,40 @@ as a contract. These differences follow the rules above and were accepted in the
   probably the trailing CRLF lost at each nesting level; nested messages are not opened (plan.md
   6.9), and `message.eml` keeps the original bytes.
 - M20: the invalid date stays null and the recipient group stays a group address.
+
+## Attachment text (IT-08, plan.md 7.6)
+
+After attachment files and body.md are saved, `AttachmentText` converts each supported file to
+UTF-8 `attachments/<file>.md`. Files larger than **20 MiB (20 * 1024 * 1024 decoded bytes)**
+are kept without Markdown. Blank text and conversion errors also produce no Markdown. A failed
+attachment never changes message state or adds an error to metadata. Exceptions are logged at
+debug level by class name only. Markdown write errors propagate as local storage failures.
+`MessageProcessor.load` reads existing Markdown without running converters.
+
+The lowercase extension of the decoded name (stored filename when unnamed) selects the format;
+without a known extension the MIME base content type selects it.
+
+| Extensions | Content types | Conversion |
+|---|---|---|
+| docx | application/vnd.openxmlformats-officedocument.wordprocessingml.document | pandoc file, docx |
+| odt | application/vnd.oasis.opendocument.text | pandoc file, odt |
+| rtf | application/rtf, text/rtf | pandoc file, rtf |
+| epub | application/epub+zip | pandoc file, epub |
+| html, htm | text/html | decode, pandoc stdin, html |
+| csv | text/csv | decode, pandoc stdin, csv |
+| pdf | application/pdf | PDFBox |
+| xlsx | application/vnd.openxmlformats-officedocument.spreadsheetml.sheet | POI |
+| pptx | application/vnd.openxmlformats-officedocument.presentationml.presentation | POI |
+| txt | text/plain | decode, save as is |
+
+HTML, CSV and plain text use the declared charset, UTF-8 when absent, with malformed bytes
+replaced; no charset guessing. Text passed to pandoc stdin is UTF-8. DOCX/ODT/RTF/EPUB are
+passed as file arguments, with stdin closed. `htmlToMarkdown` delegates to the generic stdin
+method. There are no additional budgets, timeouts, counters or per-attachment states.
+
+The reviewer measured pandoc 3.1.11 on 2026-10-26: sandboxed file arguments work for DOCX, ODT,
+RTF and EPUB, while references inside a document remain sandboxed. Broken DOCX exits 63.
+Semicolon-separated CSV becomes one column; its text remains searchable, which is accepted.
+
+Images, archives, nested messages, MSG, TNEF, calendars, S/MIME and binary DOC/XLS/PPT are never
+converted; no OCR, archive expansion or embedded-message parsing is added.

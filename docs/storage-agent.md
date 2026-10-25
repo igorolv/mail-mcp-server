@@ -1,7 +1,8 @@
 # docs/storage-agent.md — message directories and the derived catalog
 
 Storage and catalog implemented in IT-02, synchronization in IT-03 (plan.md 7.2), MIME/body
-processing and header/body index fields in IT-05 (plan.md 7.4, first half), search in IT-07 (7.5).
+processing and header/body index fields in IT-05 (plan.md 7.4, first half), search in IT-07 (7.5),
+attachment text in IT-08 (7.6).
 See `docs/plan.md` 6.2–6.6 for the design.
 `MessageStore` and `MailIndex` take one connection directory; neither contacts a mailbox.
 
@@ -18,6 +19,7 @@ Under `ConnectionDefinition.connectionDir()`:
     meta.json
     body.md
     attachments/<n>__<sanitized name>
+    attachments/<n>__<sanitized name>.md
   index/
 ```
 
@@ -46,7 +48,9 @@ an `error` explaining the failure; it may have no `message.eml`. Null properties
 by the configured Jackson 3 mapper and read back as null. A converted message has its selected
 body in UTF-8 `body.md` (absent when there is no body) and decoded attachment files under
 `attachments/` (absent when there are none). A conversion failure keeps the original MIME,
-size and SHA-256, with `state=failed` and a fixed error. Attachment `.md` files are deferred.
+size and SHA-256, with `state=failed` and a fixed error. Supported attachments up to 20 MiB also have UTF-8
+`<file>.md`; absent or failed attachment
+text never changes metadata or the converted message state.
 See `docs/mime-agent.md` for parsing, naming and pandoc rules.
 
 `folders.json` example (synthetic):
@@ -76,7 +80,8 @@ of that folder, even if the source's removed list is incomplete, then downloads 
 writes `meta.json` with `state=downloaded`, size, SHA-256 and download time. `MessageProcessor`
 removes output from any earlier attempt, saves decoded attachments and `body.md`, then writes
 metadata with `state=converted` or `failed`. The runner calls `MailIndex.put` with the resulting
-metadata, headers and Markdown (null headers/body on failure). `MessageStore` never writes MIME.
+metadata, headers, body Markdown and joined attachment text (null text/headers on failure).
+`MessageStore` never writes MIME.
 Without metadata, the directory is incomplete.
 Metadata writes require an existing message directory; saving folders creates the connection
 directory if needed. Constructors perform no I/O.
@@ -93,7 +98,8 @@ pending entries, including a partial batch with completed metadata.
 `FolderProgress.downloaded` counts new messages ending converted; `failed` includes download
 and conversion failures. Conversion failures are not automatically retried. The offline
 `mail-reprocess` command processes every message with metadata and MIME, replacing output and
-index fields; entries without MIME remain unchanged.
+index fields, including creating attachment `.md` files for messages already on disk; entries
+without MIME remain unchanged.
 
 Metadata, folders and sync status JSON files are written to a temporary file in the target
 directory, then moved with `ATOMIC_MOVE` and `REPLACE_EXISTING`. Temporary files are cleaned up
@@ -117,6 +123,7 @@ parsed MIME headers/attachment descriptions and saved Markdown:
 | `date` | Epoch milliseconds, absent when null | `LongPoint`, `StoredField`, `NumericDocValuesField` |
 | `subject`, `body` | Decoded subject and Markdown body, absent when null | `TextField`, stored |
 | `subject_en`, `body_en` | Same subject and body | `TextField`, not stored |
+| `attachmentText`, `attachmentText_en` | Saved attachment Markdown, in attachment order joined by a blank line | `TextField`, not stored |
 | `from`, `to`, `cc` | Display addresses joined by `, ` as `Name <address>` or `address` | `StoredField` only |
 | `fromAddress`, `toAddress`, `ccAddress` | One complete address per value | `TextField`, not stored |
 | `fromName`, `toName`, `ccName` | One non-null display name per value | `TextField`, not stored |
@@ -130,13 +137,16 @@ The `_en` fields use `EnglishAnalyzer` with both English and Russian default sto
 Address fields and `attachmentFile` use `KeywordTokenizer` and `LowerCaseFilter`, preserving
 complete addresses and filenames. `attachmentName` uses `PatternTokenizer("[^\\p{L}\\p{N}]+", -1)`,
 `LowerCaseFilter` and Snowball's `RussianStemmer`, splitting underscores and punctuation.
-Attachment contents are not indexed until step 7.6.
+Attachment contents use the Russian default analyzer and English analyzer for `attachmentText_en`.
+They are indexed without being stored; snippets still use the message body, so an attachment-only
+hit may show leading body text.
 
-Every commit, including closing the writer, carries user data `schema=2` (`MailIndex.SCHEMA`).
+Every commit, including closing the writer, carries user data `schema=3` (`MailIndex.SCHEMA`).
 Opening an existing index with another schema or no schema uses `OpenMode.CREATE`, rebuilding
 in place. `openWriter(dir, true)` always recreates it. No second generation is kept.
 The next `SyncRunner.restore` reconciles every missing entry from disk before network access:
-converted entries load MIME headers and saved Markdown, downloaded entries are processed,
+converted entries load MIME headers and saved body/attachment Markdown, downloaded entries
+are processed,
 and failed entries get metadata only. It commits every 100 restored entries and at the end.
 `mail-reindex <connection>` runs this restoration offline with recreation forced; it checks
 pandoc before taking the writer lock because downloaded messages may need conversion.
@@ -153,8 +163,8 @@ Other Lucene I/O failures become `UncheckedIOException`.
 `reconcile(store)` deletes incomplete message directories, removes indexed keys absent from
 disk, and returns sorted keys with metadata missing from the index. It does not index or
 commit them itself. `SyncRunner` processes downloaded entries, loads converted entries using
-MIME headers and saved `body.md` without writes, and indexes failed entries with null headers
-and body. Existing index entries are left alone. Failed
+MIME headers, saved `body.md` and attachment Markdown without writes, and indexes failed
+entries with null headers, body and attachment text. Existing index entries are left alone. Failed
 messages with metadata remain valid without MIME. Deleting `index/` loses no source data:
 reconciliation restores headers and body from disk before the runner accesses the source.
 `mail-reprocess` also restores processed entries offline, without sign-in.
@@ -164,7 +174,7 @@ request and closes the source before the index. `SyncRunner` opens and closes ne
 cumulative `FolderProgress` after each committed batch and after a folder's cursor is saved (or
 the folder is deleted). `FolderProgress` lives in `model/`. IT-06 adds `SyncService` background
 runs and the read-only `MailIndexReader`; IT-07 adds search and offline `mail-reindex`.
-Attachment text is step 7.6.
+IT-08 adds attachment text to processing, restore and reprocessing.
 
 ## Sync status and tool readers
 

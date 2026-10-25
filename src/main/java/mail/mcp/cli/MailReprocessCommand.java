@@ -81,7 +81,7 @@ public final class MailReprocessCommand {
                         continue;
                     }
                     var processed = processor.process(meta.orElseThrow());
-                    index.put(processed.meta(), processed.message(), processed.body());
+                    index.put(processed.meta(), processed.message(), processed.body(), processed.attachmentText());
                     count++;
                     if (processed.meta().state() == MessageState.CONVERTED) { converted++; }
                     else { failures.merge(processed.meta().error(), 1, Integer::sum); }

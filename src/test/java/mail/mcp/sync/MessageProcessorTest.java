@@ -125,6 +125,71 @@ class MessageProcessorTest {
         assertThat(snapshot(directory)).isEqualTo(before);
     }
 
+    private MessageMeta attachmentsMessage() throws Exception {
+        var meta = message("M01");
+        Files.writeString(store().messageDir(meta.key()).resolve(MessageStore.MESSAGE_FILE), """
+                MIME-Version: 1.0
+                Content-Type: multipart/mixed; boundary=parts
+
+                --parts
+                Content-Type: text/plain; charset=UTF-8
+
+                Message body
+                --parts
+                Content-Type: text/plain; charset=UTF-8
+                Content-Disposition: attachment; filename=first.txt
+
+                First attachment
+                --parts
+                Content-Type: application/pdf
+                Content-Disposition: attachment; filename=broken.pdf
+
+                not a PDF
+                --parts
+                Content-Type: text/plain
+                Content-Disposition: attachment; filename=last.txt
+
+                Last attachment
+                --parts--
+                """);
+        return meta;
+    }
+
+    @Test void attachmentMarkdownIsWrittenNextToTheFile() throws Exception {
+        var result = processor().process(attachmentsMessage());
+        var attachments = store().messageDir(result.meta().key()).resolve(MessageStore.ATTACHMENTS_DIR);
+        assertThat(result.message().attachments().getFirst().charset()).isEqualTo("utf-8");
+        assertThat(result.message().attachments().getLast().charset()).isNull();
+        assertThat(Files.readString(attachments.resolve("1__first.txt.md"))).isEqualTo("First attachment");
+        assertThat(Files.readString(attachments.resolve("3__last.txt.md"))).isEqualTo("Last attachment");
+        assertThat(result.attachmentText()).isEqualTo("First attachment\n\nLast attachment");
+    }
+
+    @Test void failedAttachmentLeavesTheMessageConverted() throws Exception {
+        var result = processor().process(attachmentsMessage());
+        assertThat(result.meta().state()).isEqualTo(MessageState.CONVERTED);
+        assertThat(result.meta().error()).isNull();
+        assertThat(store().readMeta(result.meta().key())).contains(result.meta());
+        var attachments = store().messageDir(result.meta().key()).resolve(MessageStore.ATTACHMENTS_DIR);
+        assertThat(attachments.resolve("2__broken.pdf")).isRegularFile();
+        assertThat(attachments.resolve("2__broken.pdf.md")).doesNotExist();
+        assertThat(result.attachmentText()).contains("First attachment", "Last attachment");
+    }
+
+    @Test void loadReadsAttachmentMarkdown() throws Exception {
+        var result = processor().process(attachmentsMessage());
+        var directory = store().messageDir(result.meta().key());
+        var attachments = directory.resolve(MessageStore.ATTACHMENTS_DIR);
+        Files.writeString(attachments.resolve("1__first.txt.md"), "Saved Markdown");
+        Files.delete(attachments.resolve("3__last.txt.md"));
+        var before = snapshot(directory);
+        var loaded = new MessageProcessor(store(), new Pandoc("unused")).load(result.meta());
+        assertThat(loaded.attachmentText()).isEqualTo("Saved Markdown");
+        assertThat(snapshot(directory)).isEqualTo(before);
+        Files.delete(attachments.resolve("1__first.txt.md"));
+        assertThat(processor().load(result.meta()).attachmentText()).isNull();
+    }
+
     private static Map<Path, String> snapshot(Path directory) throws Exception {
         Map<Path, String> result = new LinkedHashMap<>();
         try (var files = Files.walk(directory)) {

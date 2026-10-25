@@ -74,9 +74,9 @@ class MailReindexCommandTest {
         String incomplete = store().newKey();
         store().createMessageDir(incomplete);
         try (var index = MailIndex.openWriter(temp.resolve("test"))) {
-            index.put(converted, null, "Stale data");
+            index.put(converted, null, "Stale data", null);
             index.put(new MessageMeta(store().newKey(), "f1", "INBOX", "stale", 0, null, Instant.now(),
-                    MessageState.DOWNLOADED, null), null, "Stale data");
+                    MessageState.DOWNLOADED, null), null, "Stale data", null);
         }
         byte[] mime = Files.readAllBytes(store().messageDir(converted.key()).resolve(MessageStore.MESSAGE_FILE));
         assertThat(run()).isZero();
@@ -102,7 +102,7 @@ class MailReindexCommandTest {
         configuration();
         try (var index = MailIndex.openWriter(temp.resolve("test"))) {
             var meta = save(null);
-            index.put(meta, null, null);
+            index.put(meta, null, null, null);
             index.commit();
             assertThat(run()).isEqualTo(5);
             assertThat(index.keys()).containsExactly(meta.key());

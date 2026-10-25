@@ -44,14 +44,19 @@ class MailIndexTest {
             var doc = new org.apache.lucene.document.Document();
             doc.add(new org.apache.lucene.document.StringField("key", "old", org.apache.lucene.document.Field.Store.YES));
             writer.addDocument(doc);
+            writer.setLiveCommitData(Map.of("schema", "2").entrySet());
             writer.commit();
         }
         try (var index = MailIndex.openWriter(connectionDir)) { assertThat(index.keys()).isEmpty(); }
         try (var reader = MailIndexReader.open(connectionDir).orElseThrow()) { assertThat(reader.current()).isTrue(); }
+        try (var directory = FSDirectory.open(connectionDir.resolve("index"));
+             var reader = DirectoryReader.open(directory)) {
+            assertThat(reader.getIndexCommit().getUserData().get("schema")).isEqualTo("3");
+        }
     }
 
     @Test void recreateFlagEmptiesTheIndex() {
-        try (var index = MailIndex.openWriter(connectionDir)) { index.put(meta("a", "f1", "101"), null, null); }
+        try (var index = MailIndex.openWriter(connectionDir)) { index.put(meta("a", "f1", "101"), null, null, null); }
         try (var index = MailIndex.openWriter(connectionDir, true)) { assertThat(index.keys()).isEmpty(); }
         try (var reader = MailIndexReader.open(connectionDir).orElseThrow()) { assertThat(reader.current()).isTrue(); }
     }
@@ -60,7 +65,7 @@ class MailIndexTest {
         var message = new mail.mcp.model.MailMessage("Subject",
                 java.util.List.of(new mail.mcp.model.Address("Name", "ivan.testov@example.com")),
                 null, null, null, null, null, null, null);
-        try (var index = MailIndex.openWriter(connectionDir)) { index.put(meta("a", "f1", "101"), message, null); }
+        try (var index = MailIndex.openWriter(connectionDir)) { index.put(meta("a", "f1", "101"), message, null, null); }
         try (var reader = MailIndexReader.open(connectionDir).orElseThrow()) {
             assertThat(reader.search("IVAN.TESTOV@EXAMPLE.COM", SearchField.FROM, null, 0, 20).total()).isEqualTo(1);
             assertThat(reader.search("ivan.testov", SearchField.FROM, null, 0, 20).total()).isZero();
@@ -75,10 +80,10 @@ class MailIndexTest {
         try (var index = MailIndex.openWriter(connectionDir)) {
             assertThat(index.keys()).isEmpty();
             assertThat(index.folderRefs("f1")).isEmpty();
-            index.put(meta(key, "f1", "101"), null, null);
+            index.put(meta(key, "f1", "101"), null, null, null);
             assertThat(index.keys()).containsExactly(key);
             assertThat(index.folderRefs("f1")).containsExactlyEntriesOf(Map.of("101", key));
-            index.put(meta(key, "f2", "102"), null, null);
+            index.put(meta(key, "f2", "102"), null, null, null);
             assertThat(index.keys()).containsExactly(key);
             assertThat(index.folderRefs("f1")).isEmpty();
             assertThat(index.folderRefs("f2")).containsExactlyEntriesOf(Map.of("102", key));
@@ -94,9 +99,9 @@ class MailIndexTest {
         String b = store.newKey();
         String c = store.newKey();
         try (var index = MailIndex.openWriter(connectionDir)) {
-            index.put(meta(a, "f1", "101"), null, null);
-            index.put(meta(b, "f10", "102"), null, null);
-            index.put(meta(c, "f1", "AAMk/x+y="), null, null);
+            index.put(meta(a, "f1", "101"), null, null, null);
+            index.put(meta(b, "f10", "102"), null, null, null);
+            index.put(meta(c, "f1", "AAMk/x+y="), null, null, null);
             assertThat(index.folderRefs("f1")).containsExactlyInAnyOrderEntriesOf(
                     Map.of("101", a, "AAMk/x+y=", c));
             assertThat(index.folderRefs("f10")).containsExactlyEntriesOf(Map.of("102", b));
@@ -108,9 +113,9 @@ class MailIndexTest {
         String a = store().newKey();
         String b = store().newKey();
         try (var index = MailIndex.openWriter(connectionDir)) {
-            index.put(meta(a, "f1", "101"), null, null);
+            index.put(meta(a, "f1", "101"), null, null, null);
             index.commit();
-            index.put(meta(b, "f1", "102"), null, null);
+            index.put(meta(b, "f1", "102"), null, null, null);
         }
         try (var index = MailIndex.openWriter(connectionDir)) {
             assertThat(index.keys()).containsExactlyInAnyOrder(a, b);
@@ -148,14 +153,14 @@ class MailIndexTest {
         store.createMessageDir(b);
         save(store, alreadyIndexed);
         try (var index = MailIndex.openWriter(connectionDir)) {
-            index.put(meta(c, "f1", "103"), null, null);
-            index.put(alreadyIndexed, null, null);
+            index.put(meta(c, "f1", "103"), null, null, null);
+            index.put(alreadyIndexed, null, null, null);
             // Existing indexed metadata must not be read during reconciliation.
             Files.writeString(store.messageDir(alreadyIndexed.key()).resolve(MessageStore.META_FILE), "not JSON");
             var missingKeys = index.reconcile(store);
             assertThat(missingKeys).containsExactly(a.key());
             assertThat(index.keys()).containsExactly(alreadyIndexed.key());
-            for (String missing : missingKeys) { index.put(store.readMeta(missing).orElseThrow(), null, null); }
+            for (String missing : missingKeys) { index.put(store.readMeta(missing).orElseThrow(), null, null, null); }
             index.commit();
             assertThat(index.keys()).containsExactlyInAnyOrder(a.key(), alreadyIndexed.key());
             assertThat(index.folderRefs("f1")).containsExactlyEntriesOf(Map.of("101", a.key()));
@@ -179,7 +184,7 @@ class MailIndexTest {
         try (var index = MailIndex.openWriter(connectionDir)) {
             for (var meta : new MessageMeta[] { a, b, c }) {
                 save(store, meta);
-                index.put(meta, null, null);
+                index.put(meta, null, null, null);
             }
             keys = index.keys();
             f1 = index.folderRefs("f1");
@@ -194,7 +199,7 @@ class MailIndexTest {
         assertThat(indexDir).doesNotExist();
         try (var index = MailIndex.openWriter(connectionDir)) {
             assertThat(index.keys()).isEmpty();
-            for (String missing : index.reconcile(store)) { index.put(store.readMeta(missing).orElseThrow(), null, null); }
+            for (String missing : index.reconcile(store)) { index.put(store.readMeta(missing).orElseThrow(), null, null, null); }
             index.commit();
             assertThat(index.keys()).isEqualTo(keys);
             assertThat(index.folderRefs("f1")).isEqualTo(f1);
@@ -209,7 +214,7 @@ class MailIndexTest {
                 Instant.parse("2026-10-25T12:00:00Z"), MessageState.FAILED, "Synthetic download failure");
         save(store, meta);
         try (var index = MailIndex.openWriter(connectionDir)) {
-            for (String missing : index.reconcile(store)) { index.put(store.readMeta(missing).orElseThrow(), null, null); }
+            for (String missing : index.reconcile(store)) { index.put(store.readMeta(missing).orElseThrow(), null, null, null); }
             index.commit();
             assertThat(index.keys()).containsExactly(key);
             assertThat(index.folderRefs("f1")).containsExactlyEntriesOf(Map.of("101", key));
@@ -238,10 +243,10 @@ class MailIndexTest {
                 java.util.List.of(new mail.mcp.model.Address("Copy", "copy@example.com")), date,
                 "<message@example.com>", "<parent@example.com>",
                 java.util.List.of("<one@example.com>", "<two@example.com>"),
-                java.util.List.of(new mail.mcp.model.AttachmentInfo("1__part", null, "application/octet-stream", 1, null, false),
-                        new mail.mcp.model.AttachmentInfo("2__file.txt", "file.txt", "text/plain", 1, null, false)));
+                java.util.List.of(new mail.mcp.model.AttachmentInfo("1__part", null, "application/octet-stream", 1, null, false, null),
+                        new mail.mcp.model.AttachmentInfo("2__file.txt", "file.txt", "text/plain", 1, null, false, null)));
         try (var index = MailIndex.openWriter(connectionDir)) {
-            index.put(meta, message, "Indexed body");
+            index.put(meta, message, "Indexed body", null);
             index.commit();
         }
         try (var directory = FSDirectory.open(connectionDir.resolve("index"));

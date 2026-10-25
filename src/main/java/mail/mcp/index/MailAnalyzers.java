@@ -14,7 +14,7 @@ import org.tartarus.snowball.ext.RussianStemmer;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-/** Shared indexing and query analysis for schema 2. */
+/** Shared indexing and query analysis for schema 3. */
 public final class MailAnalyzers {
     private static final Analyzer ANALYZER = create();
 
@@ -40,7 +40,7 @@ public final class MailAnalyzers {
             }
         };
         return new PerFieldAnalyzerWrapper(new RussianAnalyzer(), Map.of(
-                "subject_en", english, "body_en", english,
+                "subject_en", english, "body_en", english, "attachmentText_en", english,
                 "fromAddress", exact, "toAddress", exact, "ccAddress", exact,
                 "attachmentFile", exact, "attachmentName", parts));
     }

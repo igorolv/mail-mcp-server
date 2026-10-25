@@ -4,6 +4,7 @@ import jakarta.mail.MessagingException;
 import mail.mcp.api.AttachmentRef;
 import mail.mcp.api.FolderInfo;
 import mail.mcp.api.GetMessageResult;
+import mail.mcp.api.GetAttachmentResult;
 import mail.mcp.api.ListFoldersResult;
 import mail.mcp.api.ListMessagesResult;
 import mail.mcp.api.MessageSummary;
@@ -127,7 +128,9 @@ public class MailTools {
             var attachments = message == null ? List.<AttachmentRef>of() : message.attachments().stream().map(a -> {
                 var path = directory.resolve(MessageStore.ATTACHMENTS_DIR).resolve(a.file());
                 return new AttachmentRef(a.file(), a.name(), a.contentType(), a.size(), a.inline(),
-                        Files.exists(path) ? path.toString() : null);
+                        Files.exists(path) ? path.toString() : null,
+                        Files.exists(path.resolveSibling(a.file() + ".md"))
+                                ? path.resolveSibling(a.file() + ".md").toString() : null);
             }).toList();
             var result = new GetMessageResult(key, meta.folder(), meta.state().id(), meta.error(),
                     message == null ? null : message.subject(), message == null ? null : display(message.from()),
@@ -142,6 +145,52 @@ public class MailTools {
             throw new UncheckedIOException(e);
         } catch (RuntimeException e) {
             ToolLogger.failed(log, "getMessage", start, e.getClass().getSimpleName());
+            throw e;
+        }
+    }
+
+    @McpTool(description = "Read a local attachment and extracted text in chunks. Text exists only for DOCX, ODT, " +
+            "RTF, EPUB, HTML, CSV, PDF, XLSX, PPTX and plain text up to 20 MiB, when conversion succeeds. " +
+            "path is the original file; textPath is the Markdown. maxChars defaults to 20000, capped at 100000; " +
+            "use nextOffset for the next chunk. No mailbox or pandoc access.", generateOutputSchema = true,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
+    public GetAttachmentResult getAttachment(
+            @McpToolParam(description = "Connection name from listConnections") String connection,
+            @McpToolParam(description = "Local message UUID") String key,
+            @McpToolParam(description = "Exact stored attachment filename from getMessage") String file,
+            @McpToolParam(description = "Nonnegative text character offset; default 0", required = false) Integer offset,
+            @McpToolParam(description = "Positive chunk size; default 20000, at most 100000", required = false) Integer maxChars) {
+        long start = System.nanoTime();
+        try {
+            int position = offset(offset);
+            int size = bounded(maxChars, 20_000, 100_000, "maxChars");
+            var definition = registry.definition(connection);
+            var store = new MessageStore(definition.connectionDir(), mapper);
+            var directory = store.messageDir(key).toAbsolutePath();
+            store.readMeta(key).orElseThrow(() -> new IllegalArgumentException("Unknown message key"));
+            final MailMessage message;
+            try { message = MimeReader.read(directory.resolve(MessageStore.MESSAGE_FILE), null).message(); }
+            catch (MessagingException | IOException | RuntimeException e) {
+                throw new IllegalArgumentException("Attachment list is unavailable");
+            }
+            var attachment = message.attachments().stream().filter(a -> a.file().equals(file)).findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown attachment file; use getMessage"));
+            var path = directory.resolve(MessageStore.ATTACHMENTS_DIR).resolve(attachment.file());
+            var textPath = path.resolveSibling(attachment.file() + ".md");
+            String text = Files.exists(textPath) ? Files.readString(textPath) : null;
+            int length = text == null ? 0 : text.length();
+            int end = (int) Math.min(length, (long) position + size);
+            String chunk = text == null ? null : text.substring(Math.min(position, length), end);
+            var result = new GetAttachmentResult(key, attachment.file(), attachment.name(), attachment.contentType(),
+                    attachment.size(), Files.exists(path) ? path.toString() : null,
+                    text == null ? null : textPath.toString(), chunk, position, end < length ? end : null, length);
+            ToolLogger.completed(log, "getAttachment", start);
+            return result;
+        } catch (IOException e) {
+            ToolLogger.failed(log, "getAttachment", start, e.getClass().getSimpleName());
+            throw new UncheckedIOException(e);
+        } catch (RuntimeException e) {
+            ToolLogger.failed(log, "getAttachment", start, e.getClass().getSimpleName());
             throw e;
         }
     }

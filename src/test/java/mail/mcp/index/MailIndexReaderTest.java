@@ -21,7 +21,28 @@ class MailIndexReaderTest {
         writer.put(new MessageMeta(key, folder, "INBOX", key, 0, null, Instant.now(), MessageState.CONVERTED, null),
                 new MailMessage("Subject", List.of(new Address("Name", "user@example.com")), null, null,
                         date, null, null, null,
-                        List.of(new AttachmentInfo("1__a", "a", "text/plain", 1, null, false))), null);
+                        List.of(new AttachmentInfo("1__a", "a", "text/plain", 1, null, false, null))), null, null);
+    }
+
+    @Test void attachmentTextFieldFindsTheMessage() throws Exception {
+        try (var writer = MailIndex.openWriter(dir)) {
+            writer.put(new MessageMeta("a", "f1", "INBOX", "a", 0, null, Instant.now(), MessageState.CONVERTED, null),
+                    null, "Leading body", "Договоры поставки. Reporting results.");
+            writer.commit();
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                for (String query : List.of("договорами", "reports")) {
+                    assertThat(reader.search(query, SearchField.ATTACHMENT_TEXT, null, 0, 20).hits())
+                            .extracting(hit -> hit.card().key()).containsExactly("a");
+                    assertThat(reader.search(query, SearchField.ANY, null, 0, 20).total()).isEqualTo(1);
+                    assertThat(reader.search(query, SearchField.BODY, null, 0, 20).total()).isZero();
+                }
+            }
+        }
+        try (var directory = org.apache.lucene.store.FSDirectory.open(dir.resolve("index"));
+             var reader = org.apache.lucene.index.DirectoryReader.open(directory)) {
+            assertThat(reader.storedFields().document(0).get("attachmentText")).isNull();
+            assertThat(reader.storedFields().document(0).get("attachmentText_en")).isNull();
+        }
     }
 
     @Test void searchFiltersByFolderAndPages() {
@@ -58,7 +79,7 @@ class MailIndexReaderTest {
     @Test void snippetMarksTheMatch() {
         try (var writer = MailIndex.openWriter(dir)) {
             writer.put(new MessageMeta("a", "f1", "INBOX", "a", 0, null, Instant.now(), MessageState.CONVERTED, null),
-                    null, "Обсудим договоры поставки. Reporting results.");
+                    null, "Обсудим договоры поставки. Reporting results.", null);
             writer.commit();
             try (var reader = MailIndexReader.open(dir).orElseThrow()) {
                 assertThat(reader.search("договорами", SearchField.BODY, null, 0, 20).hits().getFirst().snippet())

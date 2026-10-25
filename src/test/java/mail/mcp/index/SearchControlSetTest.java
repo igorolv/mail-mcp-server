@@ -23,15 +23,18 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static mail.mcp.convert.PandocTest.pandocAvailable;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class SearchControlSetTest {
     @TempDir Path dir;
 
     @Test void controlSetMeetsBaseline() throws Exception {
+        assumeTrue(pandocAvailable());
         var mapper = new JsonConfig().mailMcpObjectMapper();
         var store = new MessageStore(dir, mapper);
         store.saveFolders(List.of(new LocalFolder("f1", "INBOX", "INBOX", "7")));
-        var processor = new MessageProcessor(store, new Pandoc("unused"));
+        var processor = new MessageProcessor(store, Pandoc.locate());
         Map<String, String> ids = new HashMap<>();
         var corpus = mapper.readTree(Path.of("testdata/search/corpus.json").toFile()).get("messages");
         assertThat(corpus.size()).isEqualTo(48);
@@ -47,7 +50,7 @@ class SearchControlSetTest {
                 store.writeMeta(meta);
                 var processed = processor.process(meta);
                 assertThat(processed.meta().state()).as(file).isEqualTo(MessageState.CONVERTED);
-                index.put(processed.meta(), processed.message(), processed.body());
+                index.put(processed.meta(), processed.message(), processed.body(), processed.attachmentText());
             }
             index.commit();
         }
@@ -61,10 +64,9 @@ class SearchControlSetTest {
             for (var query : queries) {
                 String id = query.get("id").asString();
                 String field = query.get("field").asString();
-                // Q061 exercises attachment text, deliberately unavailable until IT-08.
-                Set<String> found = "attachmentText".equals(field) ? Set.of()
-                        : reader.search(query.get("query").asString(), SearchField.of(field), null, 0, 50)
+                Set<String> found = reader.search(query.get("query").asString(), SearchField.of(field), null, 0, 50)
                         .hits().stream().map(hit -> ids.get(hit.card().key())).collect(Collectors.toSet());
+                if (id.equals("Q061")) { assertThat(found).contains("S001"); }
                 int[] stats = categories.computeIfAbsent(query.get("category").asString(), name -> new int[3]);
                 for (var expected : query.get("expected")) {
                     stats[1]++;
@@ -88,7 +90,7 @@ class SearchControlSetTest {
         System.out.printf(Locale.ROOT, "TOTAL: recall %d/%d = %.6f, false positives %d%n", totals[0], totals[1], recall, totals[2]);
         System.out.println("MISSES: " + misses);
         System.out.println("FALSE POSITIVES: " + wrong);
-        assertThat(recall).isGreaterThanOrEqualTo(0.90);
+        assertThat(recall).isGreaterThanOrEqualTo(0.91);
         assertThat(totals[2]).isLessThanOrEqualTo(7);
     }
 }

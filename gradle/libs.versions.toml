@@ -8,6 +8,8 @@ httpclient5 = "5.6.5"
 angus-mail = "2.0.5"
 jakarta-mail = "2.1.5"
 lucene = "10.5.2"
+pdfbox = "3.0.5"
+poi = "5.4.1"
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
@@ -24,3 +26,5 @@ lucene-core = { module = "org.apache.lucene:lucene-core", version.ref = "lucene"
 lucene-analysis-common = { module = "org.apache.lucene:lucene-analysis-common", version.ref = "lucene" }
 lucene-queryparser = { module = "org.apache.lucene:lucene-queryparser", version.ref = "lucene" }
 lucene-highlighter = { module = "org.apache.lucene:lucene-highlighter", version.ref = "lucene" }
+pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
+poi-ooxml = { module = "org.apache.poi:poi-ooxml", version.ref = "poi" }

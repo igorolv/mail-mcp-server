@@ -50,8 +50,8 @@ class SearchToolsTest {
         store.writeMeta(meta);
         index.put(meta, new MailMessage("Договор поставки", List.of(new Address("Sender", "sender@example.com")),
                 null, List.of(new Address("Copy", "copy@example.org")), Instant.parse("2026-10-26T00:00:00Z"),
-                null, null, null, List.of(new AttachmentInfo("1__report.txt", "Report_2026.txt", "text/plain", 1, null, false))),
-                "Согласуем договоры. Reporting results.");
+                null, null, null, List.of(new AttachmentInfo("1__report.txt", "Report_2026.txt", "text/plain", 1, null, false, null))),
+                "Согласуем договоры. Reporting results.", null);
         return key;
     }
 

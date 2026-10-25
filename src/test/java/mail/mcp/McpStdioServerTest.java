@@ -90,7 +90,7 @@ class McpStdioServerTest {
             // Not findValues("name"): the output schema has a "name" property object too.
             List<String> toolNames = new ArrayList<>();
             tools.at("/result/tools").forEach(tool -> toolNames.add(tool.get("name").asString()));
-            assertThat(toolNames).containsExactlyInAnyOrder("listConnections", "sync", "syncStatus", "listFolders", "listMessages", "getMessage", "search");
+            assertThat(toolNames).containsExactlyInAnyOrder("listConnections", "sync", "syncStatus", "listFolders", "listMessages", "getMessage", "search", "getAttachment");
 
             send(requests, "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\","
                     + "\"params\":{\"name\":\"listConnections\",\"arguments\":{}}}");
@@ -130,6 +130,15 @@ class McpStdioServerTest {
             assertThat(search.at("/hits/0/folder").asString()).isEqualTo("f1");
             assertThat(Path.of(search.at("/hits/0/localPath").asString())).isDirectory();
 
+            String attachmentFile = message.at("/attachments/0/file").asString();
+            JsonNode attachment = call(requests, io, replies, stderr, stdout, 10, "getAttachment",
+                    "{\"connection\":\"local\",\"key\":\"" + key + "\",\"file\":\"" + attachmentFile + "\",\"maxChars\":10}");
+            assertThat(attachment.get("file").asString()).isEqualTo(attachmentFile);
+            assertThat(Path.of(attachment.get("path").asString())).isRegularFile();
+            assertThat(attachment.get("text").asString()).isEqualTo("Synthetic ");
+            assertThat(attachment.get("nextOffset").asInt()).isEqualTo(10);
+            assertThat(Path.of(attachment.get("textPath").asString())).isRegularFile();
+
             assertThat(stdout).allSatisfy(line -> assertThat(JSON.readTree(line).get("jsonrpc").asString()).isEqualTo("2.0"));
             assertThat(String.join("\n", stdout)).doesNotContain(SECRET, "webmail.example.com", "imap.mail.ru");
         } finally {
@@ -154,7 +163,10 @@ class McpStdioServerTest {
                 var meta = new MessageMeta(key, "f1", "INBOX", fixture, 0, null, Instant.now(), MessageState.DOWNLOADED, null);
                 store.writeMeta(meta);
                 var processed = new MessageProcessor(store, new Pandoc("unused")).process(meta);
-                index.put(processed.meta(), processed.message(), processed.body());
+                var attachment = processed.message().attachments().getFirst();
+                Files.writeString(store.messageDir(key).resolve(MessageStore.ATTACHMENTS_DIR)
+                        .resolve(attachment.file() + ".md"), "Synthetic attachment Markdown");
+                index.put(processed.meta(), processed.message(), processed.body(), processed.attachmentText());
             }
             index.commit();
         }

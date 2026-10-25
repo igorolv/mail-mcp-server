@@ -15,5 +15,7 @@ public record AttachmentRef(
         @Schema(description = "Whether disposition is inline.", requiredMode = Schema.RequiredMode.REQUIRED)
         boolean inline,
         @Schema(description = "Absolute attachment path; absent if the file does not exist.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
-        String path
+        String path,
+        @Schema(description = "Absolute Markdown path; absent without extracted text.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        String textPath
 ) { }

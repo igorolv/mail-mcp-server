@@ -1,6 +1,7 @@
 package mail.mcp.sync;
 
 import jakarta.mail.MessagingException;
+import mail.mcp.convert.AttachmentText;
 import mail.mcp.convert.Pandoc;
 import mail.mcp.convert.PandocException;
 import mail.mcp.mime.MimeReader;
@@ -13,6 +14,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Comparator;
+import java.util.ArrayList;
 
 /** Converts downloaded MIME into local attachment files and body.md, then updates metadata. */
 public final class MessageProcessor {
@@ -43,7 +45,18 @@ public final class MessageProcessor {
                 try { Files.writeString(directory.resolve(MessageStore.BODY_FILE), body, StandardCharsets.UTF_8); }
                 catch (IOException e) { throw new UncheckedIOException(e); }
             }
-            result = new Processed(state(meta, MessageState.CONVERTED, null), parsed.message(), body);
+            var texts = new ArrayList<String>();
+            for (var attachment : parsed.message().attachments()) {
+                var path = attachments.resolve(attachment.file());
+                var text = AttachmentText.toMarkdown(path, attachment, pandoc);
+                if (text.isPresent()) {
+                    try { Files.writeString(attachments.resolve(attachment.file() + ".md"), text.get(), StandardCharsets.UTF_8); }
+                    catch (IOException e) { throw new UncheckedIOException(e); }
+                    texts.add(text.get());
+                }
+            }
+            result = new Processed(state(meta, MessageState.CONVERTED, null), parsed.message(), body,
+                    texts.isEmpty() ? null : String.join("\n\n", texts));
         } catch (MessagingException | IOException e) {
             return failed(meta, "MIME parsing failed (" + e.getClass().getSimpleName() + ")");
         } catch (PandocException e) { return failed(meta, e.getMessage()); }
@@ -57,14 +70,19 @@ public final class MessageProcessor {
             var parsed = MimeReader.read(directory.resolve(MessageStore.MESSAGE_FILE), null);
             var bodyFile = directory.resolve(MessageStore.BODY_FILE);
             String body = Files.exists(bodyFile) ? Files.readString(bodyFile, StandardCharsets.UTF_8) : null;
-            return new Processed(meta, parsed.message(), body);
-        } catch (MessagingException | IOException e) { return new Processed(meta, null, null); }
+            var texts = new ArrayList<String>();
+            for (var attachment : parsed.message().attachments()) {
+                var path = directory.resolve(MessageStore.ATTACHMENTS_DIR).resolve(attachment.file() + ".md");
+                if (Files.exists(path)) { texts.add(Files.readString(path, StandardCharsets.UTF_8)); }
+            }
+            return new Processed(meta, parsed.message(), body, texts.isEmpty() ? null : String.join("\n\n", texts));
+        } catch (MessagingException | IOException e) { return new Processed(meta, null, null, null); }
     }
 
     private Processed failed(MessageMeta meta, String error) {
         var failed = state(meta, MessageState.FAILED, error);
         store.writeMeta(failed);
-        return new Processed(failed, null, null);
+        return new Processed(failed, null, null, null);
     }
 
     private static MessageMeta state(MessageMeta meta, MessageState state, String error) {

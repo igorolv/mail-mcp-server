@@ -26,6 +26,8 @@ dependencies {
     implementation(libs.lucene.analysis.common)
     implementation(libs.lucene.queryparser)
     implementation(libs.lucene.highlighter)
+    implementation(libs.pdfbox)
+    implementation(libs.poi.ooxml)
 
     testImplementation(libs.spring.boot.starter.test)
 }

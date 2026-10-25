@@ -68,9 +68,9 @@ public final class SyncRunner {
             var processed = switch (meta.state()) {
                 case DOWNLOADED -> processor.process(meta);
                 case CONVERTED -> processor.load(meta);
-                case FAILED -> new Processed(meta, null, null);
+                case FAILED -> new Processed(meta, null, null, null);
             };
-            index.put(processed.meta(), processed.message(), processed.body());
+            index.put(processed.meta(), processed.message(), processed.body(), processed.attachmentText());
             count++;
             if (count % 100 == 0) { index.commit(); }
             progress.accept(count);
@@ -141,8 +141,8 @@ public final class SyncRunner {
                 }
                 store.writeMeta(meta);
                 var processed = meta.state() == MessageState.DOWNLOADED
-                        ? processor.process(meta) : new Processed(meta, null, null);
-                index.put(processed.meta(), processed.message(), processed.body());
+                        ? processor.process(meta) : new Processed(meta, null, null, null);
+                index.put(processed.meta(), processed.message(), processed.body(), processed.attachmentText());
                 if (processed.meta().state() == MessageState.CONVERTED) { downloaded++; }
                 else { failed++; }
                 if ((downloaded + failed) % 100 == 0) {

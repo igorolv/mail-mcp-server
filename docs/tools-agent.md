@@ -1,7 +1,7 @@
 # docs/tools-agent.md — MCP tools and background synchronization
 
 IT-06 completes plan.md 7.4. Tools are Spring services returning `api/` records, never `model/`
-records. IT-07 adds search (7.5), bringing the tool count to seven.
+records. IT-07 adds search (7.5); IT-08 adds attachment text (7.6), bringing the tool count to eight.
 Only JSON-RPC is written to stdout. Failures are logged through `ToolLogger.failed`
 and rethrown; `IllegalArgumentException` becomes an MCP tool error with its message.
 
@@ -14,14 +14,26 @@ and rethrown; `IllegalArgumentException` becomes an MCP tool error with its mess
 | `syncStatus` | Required `connection` | Current/last local run, per-folder progress, summed downloaded/failed/removed counts, timestamps, error and `signInRejected`. No file means `never`. |
 | `listFolders` | Required `connection` | Stored folder keys and paths, committed catalog counts and `synced` (cursor exists), in stored order. No index means zero counts. |
 | `listMessages` | Required `connection`, `folder`; optional `offset`, `limit` | Folder cards sorted by descending date (undated last), then key; total, offset, optional nextOffset. Offset defaults to 0; limit to 50, capped at 200. Unknown folder is an error. |
-| `getMessage` | Required `connection`, `key`; optional `offset`, `maxChars` | Metadata, MIME headers, body.md chunk, bodyLength, optional nextOffset and attachment file paths. Offset defaults to 0; maxChars to 20,000, capped at 100,000. Invalid/nonexistent UUID is an error. |
+| `getMessage` | Required `connection`, `key`; optional `offset`, `maxChars` | Metadata, MIME headers, body.md chunk, bodyLength, optional nextOffset and attachment file paths and optional Markdown `textPath`. Offset defaults to 0; maxChars to 20,000, capped at 100,000. Invalid/nonexistent UUID is an error. |
+| `getAttachment` | Required `connection`, `key`, `file`; optional `offset`, `maxChars` | Original file path and saved Markdown chunk, textPath, textLength and optional nextOffset. `file` must exactly match a stored attachment filename parsed from that message's MIME. Unknown file (including traversal or another message's filename) is an error. Offset defaults to 0; maxChars to 20,000, capped at 100,000. |
 | `search` | Required `connection`, `query`; optional `field`, `folder`, `offset`, `limit` | Local cards with BM25 score and body snippet, sorted by score descending then key. Exact total, offset and optional nextOffset. Query must be nonblank and at most 1,000 characters. Offset defaults to 0; limit to 20, capped at 100. Unknown field/folder is an error. No index means zero hits. |
 
 Offsets must be nonnegative and sizes positive; invalid values raise `IllegalArgumentException`.
-Offsets at or beyond the end yield an empty page/chunk with no nextOffset. Body offsets and
-lengths count Java string characters (UTF-16 code units). Missing body.md means absent body and
-zero bodyLength. Header parsing failure leaves headers absent but still returns metadata and
-saved body. Attachment paths are absent for missing files. Null fields are omitted from JSON.
+Offsets at or beyond the end yield an empty page/chunk with no nextOffset. Body and attachment text offsets
+and lengths count Java string characters (UTF-16 code units). Missing body.md means absent body
+and zero bodyLength. Header parsing failure leaves headers absent but still returns metadata and
+saved body. Attachment paths are absent for missing files. `AttachmentRef.textPath` points to `<file>.md`
+when it exists. `getAttachment` returns `key`, `file`, original `name`, `contentType`, decoded
+`size`, `path`, `textPath`, `text`, `offset`, `nextOffset`, `textLength`. Without Markdown,
+`text` and `textPath` are absent, textLength is zero and nextOffset is absent. Null fields are
+omitted from JSON.
+
+Attachment text is available for DOCX, ODT, RTF, EPUB, HTML/HTM, CSV, PDF, XLSX, PPTX and plain
+text up to 20 MiB of decoded bytes, when conversion yields nonblank text. `path` is the original
+attachment file and `textPath` is its UTF-8 Markdown; the tool never converts on demand.
+Unsupported, oversized or failed attachments retain their original files. See `docs/mime-agent.md`.
+Use offline `mail-reprocess <connection>` to create Markdown for messages already on disk,
+with no sync running.
 
 Every message response includes an absolute `localPath` to its directory. An agent with local
 file access may read those files directly. All reading tools use local data only, without
@@ -31,7 +43,7 @@ completed folder pass and `syncStatus` for current progress. A committed catalog
 being processed. `MailIndexReader` opens the latest commit once per call.
 
 All tools advertise read-only and non-destructive hints. `sync` is not idempotent.
-Attachment text, MCP resources, mail flags and mail writing are not implemented here.
+MCP resources, mail flags and mail writing are not implemented here.
 
 ## Search
 
@@ -40,6 +52,8 @@ nextOffset, hits)`. Each `SearchHitInfo` includes key, folder key, date, display
 hasAttachments, state, score, snippet and the absolute message directory `localPath`.
 Snippets use Markdown `**matches**` and `… ` between passages; absent bodies yield null.
 The stored body is reanalyzed by `UnifiedHighlighter`, including English-field matches.
+Attachment text is indexed without being stored. Snippets remain on body; an attachment-only
+match may show leading body text.
 
 | Field group | Index fields |
 |---|---|
@@ -49,6 +63,7 @@ The stored body is reanalyzed by `UnifiedHighlighter`, including English-field m
 | `from` | `fromAddress`, `fromName` |
 | `to` | `toAddress`, `toName`, `ccAddress`, `ccName` |
 | `attachmentName` | `attachmentName`, `attachmentFile` |
+| `attachmentText` | `attachmentText`, `attachmentText_en` |
 
 Every word is required, quoted text is a phrase, and stop-word-only queries return nothing.
 `SimpleQueryParser` enables phrase and whitespace operators; fuzzy/wildcard syntax is disabled.
@@ -58,9 +73,9 @@ An old schema raises `IllegalStateException` with:
 `The index was built by an older version; run 'mail-reindex <connection>' in a terminal or start a sync to rebuild it`.
 Use offline `mail-reindex` or a requested sync to rebuild from disk.
 
-The 2026-10-26 offline control baseline processes all 48 synthetic MIME messages and scores
-all 80 queries: recall **78/86 = 0.906977**, **7 false positives**. Q061 is counted as an
-expected miss because its `attachmentText` field is deferred to IT-08, not exposed by this tool.
+The 2026-10-26 offline control set processes all 48 synthetic MIME messages and scores
+all 80 queries: recall **79/86 = 0.918605**, **7 false positives**. Q061 now finds S001 through
+`attachmentText` (the CSV attachment). The IT-07 baseline was 78/86 = 0.906977.
 The fixtures' redaction proposal is superseded by the deferred filter: raw synthetic text is indexed.
 
 | Category | Expected matches found / expected | False positives |
@@ -73,15 +88,15 @@ The fixtures' redaction proposal is superseded by the deferred filter: raw synth
 | en-forms | 17/17 | 0 |
 | mixed-lang | 5/5 | 0 |
 | address | 4/4 | 0 |
-| filename | 7/8 | 0 |
+| filename | 8/8 | 0 |
 | identifier | 5/5 | 0 |
 | precision | 6/6 | 2 |
 | stopwords-phrase | 3/3 | 0 |
 | case | 2/2 | 0 |
 | redacted | 0/0 | 2 |
 
-Misses: Q011:S010, Q012:S009, Q012:S011, Q013:S010, Q014:S013, Q015:S015, Q016:S017,
-Q061:S001. Wrong matches: Q025:S024, Q028:S025, Q029:S024, Q067:S037, Q068:S041,
+Misses: Q011:S010, Q012:S009, Q012:S011, Q013:S010, Q014:S013, Q015:S015, Q016:S017.
+Wrong matches: Q025:S024, Q028:S025, Q029:S024, Q067:S037, Q068:S041,
 Q079:S047, Q080:S048. Snowball misses irregular Russian forms and conflates some names;
 precision collisions and raw synthetic secret matches remain accepted limitations.
 

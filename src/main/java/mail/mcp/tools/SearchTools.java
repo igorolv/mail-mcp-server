@@ -28,17 +28,21 @@ public class SearchTools {
         this.mapper = mapper;
     }
 
-    @McpTool(description = "Search local messages by words. field: any (default), subject, body, from, to " +
-            "(including cc), attachmentName. Every word is required; \"...\" means a phrase. Russian and English " +
-            "word forms are matched; full addresses must be complete; file names match whole or by part. " +
+    @McpTool(description = "Search local messages by words. field: any (default; every field below, including " +
+            "attachment text), subject, body, from, to (including cc), attachmentName, attachmentText (text " +
+            "extracted from DOCX, ODT, RTF, EPUB, HTML, CSV, PDF, XLSX, PPTX and plain-text attachments up to " +
+            "20 MiB). Every word is required; \"...\" means a phrase. Russian and English word forms are matched; " +
+            "full addresses must be complete; file names match whole or by parts split at non-letters. " +
             "Results use local data only; listFolders.synced shows coverage. limit defaults to 20, capped at 100. " +
-            "Use nextOffset to page. snippet marks body matches with **. localPath points at files the agent may read.",
+            "Use nextOffset to page. snippet always comes from the body and marks body matches with **; for a " +
+            "match in attachment text only, read the attachments with getAttachment. localPath points at files " +
+            "the agent may read.",
             generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public SearchResult search(
             @McpToolParam(description = "Connection name from listConnections") String connection,
             @McpToolParam(description = "Nonblank query, at most 1000 characters") String query,
-            @McpToolParam(description = "any, subject, body, from, to, attachmentName; default any", required = false) String field,
+            @McpToolParam(description = "any, subject, body, from, to, attachmentName, attachmentText; default any", required = false) String field,
             @McpToolParam(description = "Optional folder key from listFolders", required = false) String folder,
             @McpToolParam(description = "Nonnegative starting position; default 0", required = false) Integer offset,
             @McpToolParam(description = "Positive page size; default 20, at most 100", required = false) Integer limit) {

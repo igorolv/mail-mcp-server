@@ -2,8 +2,11 @@ package mail.mcp.convert;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
-/** A sandboxed pandoc process per HTML conversion; no timeout or retries. */
+/** A sandboxed pandoc process per document conversion; no timeout or retries. */
 public final class Pandoc {
     private final String executable;
 
@@ -22,12 +25,22 @@ public final class Pandoc {
         throw new PandocException("pandoc not found on PATH");
     }
 
-    public String htmlToMarkdown(String html) {
+    public String htmlToMarkdown(String html) { return toMarkdown(html, "html"); }
+
+    public String toMarkdown(String text, String format) { return convert(text, null, format); }
+
+    public String toMarkdown(Path file, String format) { return convert(null, file, format); }
+
+    private String convert(String text, Path file, String format) {
         try {
-            var process = new ProcessBuilder(executable, "--sandbox", "-f", "html", "-t", "gfm",
-                    "--wrap=none", "--eol=lf").redirectError(ProcessBuilder.Redirect.DISCARD).start();
+            var command = new ArrayList<>(List.of(executable, "--sandbox", "-f", format, "-t", "gfm",
+                    "--wrap=none", "--eol=lf"));
+            if (file != null) { command.add(file.toAbsolutePath().toString()); }
+            var process = new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.DISCARD).start();
             IOException writeFailure = null;
-            try (var input = process.getOutputStream()) { input.write(html.getBytes(StandardCharsets.UTF_8)); }
+            try (var input = process.getOutputStream()) {
+                if (text != null) { input.write(text.getBytes(StandardCharsets.UTF_8)); }
+            }
             catch (IOException e) { writeFailure = e; }
             String output;
             try (var stream = process.getInputStream()) {

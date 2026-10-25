@@ -7,12 +7,14 @@ import java.util.stream.Stream;
 /** Public field groups supported by the search tool. */
 public enum SearchField {
     ANY("any", "subject", "subject_en", "body", "body_en", "fromAddress", "fromName",
-            "toAddress", "toName", "ccAddress", "ccName", "attachmentName", "attachmentFile"),
+            "toAddress", "toName", "ccAddress", "ccName", "attachmentName", "attachmentFile",
+            "attachmentText", "attachmentText_en"),
     SUBJECT("subject", "subject", "subject_en"),
     BODY("body", "body", "body_en"),
     FROM("from", "fromAddress", "fromName"),
     TO("to", "toAddress", "toName", "ccAddress", "ccName"),
-    ATTACHMENT_NAME("attachmentName", "attachmentName", "attachmentFile");
+    ATTACHMENT_NAME("attachmentName", "attachmentName", "attachmentFile"),
+    ATTACHMENT_TEXT("attachmentText", "attachmentText", "attachmentText_en");
 
     private final String id;
     private final List<String> fields;

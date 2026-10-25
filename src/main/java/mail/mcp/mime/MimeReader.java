@@ -118,8 +118,10 @@ public final class MimeReader {
             if (contentId != null && contentId.startsWith("<") && contentId.endsWith(">")) {
                 contentId = contentId.substring(1, contentId.length() - 1);
             }
+            String charset = new ContentType(part.getContentType()).getParameter("charset");
             attachments.add(new AttachmentInfo(file, name, type, size, contentId,
-                    Part.INLINE.equalsIgnoreCase(disposition)));
+                    Part.INLINE.equalsIgnoreCase(disposition),
+                    charset == null ? null : charset.toLowerCase(Locale.ROOT)));
         }
     }
 }
