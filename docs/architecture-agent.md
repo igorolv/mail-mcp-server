@@ -75,7 +75,7 @@ spike/   — the EWS spike command, no Spring
 | `api/` | Stable MCP response records with `@Schema`. | `ConnectionInfo`, `ListConnectionsResult`. Never expose `source/` records or settings here. |
 | `spike/` | User-run connectivity and authorization commands. | `EwsSpikeCommand`, `ImapSpikeCommand`, `GmailOAuthCommand`. |
 
-Planned packages (`model/`, `mime/`, `store/`, `index/`, `sync/`) follow plan.md 6.3;
+Planned packages (`model/`, `mime/`, `convert/`, `store/`, `index/`, `sync/`) follow plan.md 6.3;
 add each to this table when it gets code.
 
 ## Rules for new code

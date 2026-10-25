@@ -133,7 +133,7 @@ changes consistent with it. Section 6 is authoritative where this summary is sho
   move to `2.1.0` when it is released), Gradle 9 with a version catalog.
 - stdio is the only transport; nothing but JSON-RPC may be written to `System.out`.
 - Packages (plan.md 6.3): `source/` (`MailSource`, EWS and IMAP implementations), `model/`
-  (one record per file), `mime/`, `store/`, `index/`, `sync/`, `tools/`; `api/` records are the
+  (one record per file), `mime/`, `convert/`, `store/`, `index/`, `sync/`, `tools/`; `api/` records are the
   MCP wire contract, `model/` records are not returned directly.
 - Several mailboxes from the start: a `connections.json` file outside the repository
   (`%USERPROFILE%\.mail-mcp-server\`), modeled on the sibling project `jdbc-mcp-server`. Each
@@ -146,18 +146,25 @@ changes consistent with it. Section 6 is authoritative where this summary is sho
 - Read-only at protocol level: an allow-list of 10 EWS read operations; IMAP `EXAMINE` and
   `BODY.PEEK`; never set flags in the mailbox.
 - Every source delivers messages as MIME (`.eml`), so storage, parsing and attachment extraction
-  are shared. `.eml` is kept exactly as downloaded and is the local source of truth. It is parsed
-  with Angus Mail (`MimeMessage` over `SharedFileInputStream`); nested messages, MSG, TNEF and ZIP
-  stay plain attachments in the MVP. No separate parsing process, no shared limit budget.
+  are shared. `.eml` is kept exactly as downloaded. It is parsed with Angus Mail (`MimeMessage`
+  over `SharedFileInputStream`); nested messages, MSG, TNEF and ZIP stay plain attachments in the
+  MVP. No separate parsing process, no shared limit budget.
+- Pandoc is required (user decision 2026-10-25): HTML bodies and DOCX/ODT/RTF/EPUB attachments
+  become Markdown through one `pandoc server` process; PDF, XLSX and PPTX use the PDFBox/POI
+  parsers copied from `redmine-mcp-server`. Without pandoc, sync refuses to start.
 - Message key: a local UUID per connection; the current server address, `Message-ID` and a MIME
   hash are stored separately.
-- Storage, no SQLite (user decision 2026-10-25): `<connection>/messages/<key>.eml`,
-  `folders.json` with an opaque cursor per folder, `sync-status.json`, and one Lucene index per
-  connection that is both the catalog (server ref, folder, state) and the search index
-  (BM25, `RussianAnalyzer`, unfiltered text). Embeddings are not in the MVP.
+- Storage, no SQLite (user decisions 2026-10-25): one directory per message,
+  `<connection>/messages/<k2>/<key>/` with `message.eml`, `meta.json` (folder, server ref,
+  state), `body.md` and `attachments/` (each file plus its `.md`); `folders.json` with an opaque
+  cursor per folder; `sync-status.json`. The disk is the complete copy. One Lucene index per
+  connection (catalog and BM25 search with `RussianAnalyzer`, unfiltered text) is derived and
+  rebuilt from disk without the network. Disk space is not a constraint. Embeddings are not in
+  the MVP.
 - Sensitive-data filter is deferred. Disk and index hold everything as is; the filter will apply
-  only to output sent to the model, and only optionally (user decision 2026-10-25). Tools are the
-  primary access path; MCP resources are an addition.
+  only to output sent to the model, and only optionally (user decision 2026-10-25). Tools may
+  return local paths to any file in a message directory. Tools are the primary access path; MCP
+  resources are an addition.
 - Every tool, including local search, takes a required `connection`; there is no cross-mailbox
   call.
 - Synchronization runs only on request, through a dedicated tool. There is no depth parameter:
