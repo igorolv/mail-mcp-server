@@ -111,9 +111,7 @@ The reviewer checks; it does not fix. Work through every point and report what y
 
 ## Task list
 
-| Brief | Improvement | Status |
-|---|---|---|
-| [IT-14](IT-14-nested-messages-and-zip.md) | Д10 part 1: files inside nested messages and ZIP archives as attachments | Implemented in `07cd667` on 2026-10-26; acceptance and user-run results not recorded |
+No open implementation briefs.
 
 IT-09…IT-11 were accepted and recorded on 2026-10-26 in `docs/plan.md`
 section 4 (Д1, Д2, Д17). The real-mailbox check for Д2 is still pending.
@@ -121,10 +119,9 @@ IT-13 (Д3) was accepted and recorded on 2026-10-26 after offline review:
 535 tests, one intentional skip, no failures. No user-run check was required.
 IT-12 (Д6) was accepted and recorded on 2026-10-26 after review fixes and offline
 verification: 538 tests, one intentional skip, no failures. No user-run check was required.
-IT-15 (Д10 part 2, MSG/TNEF) and IT-16 (Д11, DOC/XLS/PPT text) were accepted by the user on
+IT-14/IT-15 (Д10, EML/ZIP/MSG/TNEF) and IT-16 (Д11, DOC/XLS/PPT text) were accepted by the user on
 2026-10-27 after review fixes and offline verification: 582 tests, one intentional skip,
-zero failures and zero errors. Shared user-run reprocessing and real-data checks are pending;
-this does not record IT-14 acceptance.
+zero failures and zero errors. Shared user-run reprocessing and real-data checks are pending.
 
 ## Rules for every implementation session
 

@@ -10,9 +10,9 @@ mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/plan.md` section 2).
 - Eight MCP tools, background sync, offline reprocessing and reindexing work.
 - Gmail OAuth2 is implemented, but its real sign-in is unverified. The user deferred Gmail, so do
   not treat Gmail setup as a required next step.
-- MSG/TNEF expansion and DOC/XLS/PPT text (IT-15/IT-16) were accepted by the user on
+- EML/ZIP/MSG/TNEF expansion and DOC/XLS/PPT text (IT-14/IT-15/IT-16) were accepted by the user on
   2026-10-27 after offline verification: 582 tests, one intentional skip, no failures or errors.
-  User-run reprocessing and real-data checks are still pending. IT-14 acceptance is not recorded.
+  User-run reprocessing and real-data checks are still pending.
 
 Work now consists of polishing and optional improvements:
 - `docs/plan.md` section 4 lists them (`Д1`, `Д2`, …); the user chooses which to take.
