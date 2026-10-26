@@ -166,7 +166,7 @@ code is listed in `docs/architecture-agent.md`.
 - **Optional output filter:** `MAIL_MCP_REDACT_SECRETS=true` replaces recognized secrets only in
   tool response text. Downloads, disk and index hold everything as is. Tools still return original
   file paths and stored filenames. This reduces accidental context exposure, not intentional
-  extraction. See `docs/redaction-agent.md` (Д6 implementation; separate review pending).
+  extraction. See `docs/redaction-agent.md` (Д6 accepted on 2026-10-26 after offline review).
 - **Synchronization:**
   - runs only on request: the `sync` tool in the background, or `mail-sync`;
   - always syncs everything, then incrementally;

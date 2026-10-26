@@ -111,14 +111,14 @@ The reviewer checks; it does not fix. Work through every point and report what y
 
 ## Task list
 
-| Brief | Improvement | Status |
-|---|---|---|
-| [IT-12](IT-12-output-redaction.md) | Д6: optional secret redaction in tool output | Implemented; separate review pending |
+No open briefs.
 
 IT-09…IT-11 were accepted and recorded on 2026-10-26 in `docs/plan.md`
 section 4 (Д1, Д2, Д17). The real-mailbox check for Д2 is still pending.
 IT-13 (Д3) was accepted and recorded on 2026-10-26 after offline review:
 535 tests, one intentional skip, no failures. No user-run check was required.
+IT-12 (Д6) was accepted and recorded on 2026-10-26 after review fixes and offline
+verification: 538 tests, one intentional skip, no failures. No user-run check was required.
 
 ## Rules for every implementation session
 
