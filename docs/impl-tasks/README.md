@@ -117,6 +117,8 @@ The reviewer checks; it does not fix. Work through every point and report what y
 
 IT-09…IT-11 were accepted and recorded on 2026-10-26 in `docs/plan.md`
 section 4 (Д1, Д2, Д17). The real-mailbox check for Д2 is still pending.
+IT-13 (Д3) was accepted and recorded on 2026-10-26 after offline review:
+535 tests, one intentional skip, no failures. No user-run check was required.
 
 ## Rules for every implementation session
 

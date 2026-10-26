@@ -72,8 +72,13 @@ Labeled values support quotes (including escaped/doubled quotes and Russian quot
 simple pipe tables, JSON-style assignments and XML leaves. Unquoted ambiguous values extend
 to the field boundary; this can hide nearby prose. A semicolon/ampersand/comma followed by an
 assignment starts another field; semicolons inside a quoted value are preserved as part of it.
+Field types use the recognized secret label, excluding configuration-name prefixes and suffixes:
+`ENCODED_SECRET` remains a secret and `DB_OTP` retains numeric code validation.
 No entropy threshold rejects short passwords. `${VAR}`, masked stars and existing replacement
 markers are left alone. Labels without a field separator do not trigger password replacement.
+
+JWT/JWE detection preserves a sentence-ending period after a structurally valid token,
+including an indented continuation. A malformed longer token is not treated as a valid prefix.
 
 Markers are `[redacted:password]`, `[redacted:code]`, `[redacted:credentials]`,
 `[redacted:token]`, `[redacted:private-key]` and `[redacted:secret]`. They contain no source

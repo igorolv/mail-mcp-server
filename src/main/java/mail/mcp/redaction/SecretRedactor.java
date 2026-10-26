@@ -22,8 +22,8 @@ public final class SecretRedactor {
             + "код[ \\t]+подтверждения|одноразовый[ \\t]+код|verification[ \\t]+code|otp|"
             + "api[ _-]?key|api[ _-]?secret|access[ _-]?token|refresh[ _-]?token|client[ _-]?secret|"
             + "secret|token|токен|секрет|ключ[ \\t]+api)";
-    private static final Pattern FIELD = pattern("(?<![\\p{L}\\p{N}_])(?:[a-z0-9_]*_)?" + LABEL
-            + "(?:_[a-z0-9_]+)?(?![\\p{L}\\p{N}_])");
+    private static final Pattern FIELD = pattern("(?<![\\p{L}\\p{N}_])(?:[a-z0-9_]*_)?(?<label>" + LABEL
+            + ")(?:_[a-z0-9_]+)?(?![\\p{L}\\p{N}_])");
     private static final Pattern NEXT_FIELD = pattern("[;,&][ \\t]*+[\\p{L}\\p{N}_-][\\p{L}\\p{N}_ -]*[=:]|"
             + "(?<![ \\t])[ \\t]++" + LABEL + "[ \\t]*[=:]");
     private static final Pattern URI = pattern("(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*://([^\\s/@?#<>\"`]+)@");
@@ -33,9 +33,9 @@ public final class SecretRedactor {
             + "|github_pat_[A-Za-z0-9]{22}_[A-Za-z0-9]{59})(?![\\p{L}\\p{N}_])");
     private static final Pattern PEM = Pattern.compile("-----BEGIN ((?:RSA |EC |DSA |ENCRYPTED |OPENSSH )?PRIVATE KEY)-----");
     // Candidate runs are scanned once; validation is structural, never a signature or sign-in check.
-    private static final Pattern JWT = Pattern.compile("(?<![\\p{L}\\p{N}_-])[A-Za-z0-9_-]++(?:\\.[A-Za-z0-9_-]*+){2,4}"
+    private static final Pattern JWT = Pattern.compile("(?<![\\p{L}\\p{N}_.-])[A-Za-z0-9_-]++(?:\\.[A-Za-z0-9_-]*+){2,5}"
             + "(?![\\p{L}\\p{N}_.-])");
-    private static final Pattern WRAPPED_JWT = Pattern.compile("(?<![\\p{L}\\p{N}_-])eyJ[A-Za-z0-9_.-]*+"
+    private static final Pattern WRAPPED_JWT = Pattern.compile("(?<![\\p{L}\\p{N}_.-])eyJ[A-Za-z0-9_.-]*+"
             + "(?:\\r?\\n[ \\t]++[A-Za-z0-9_.-]++){1,8}(?![\\p{L}\\p{N}_.-])");
     private static final Pattern MASK = pattern("(?:\\*{3,}|\\$\\{[^}]*}|\\[(?:скрыто|redacted)[^]]*])");
     private final boolean enabled;
@@ -77,13 +77,13 @@ public final class SecretRedactor {
         }
         var jwt = JWT.matcher(text);
         while (jwt.find()) {
-            if (jwt(jwt.group())) { spans.add(new Span(jwt.start(), jwt.end(), "token")); }
+            int length = jwtLength(jwt.group());
+            if (length > 0) { spans.add(new Span(jwt.start(), jwt.start() + length, "token")); }
         }
         var wrapped = WRAPPED_JWT.matcher(text);
         while (wrapped.find()) {
-            if (jwt(wrapped.group().replaceAll("\\r?\\n[ \\t]+", ""))) {
-                spans.add(new Span(wrapped.start(), wrapped.end(), "token"));
-            }
+            int length = jwtLength(wrapped.group());
+            if (length > 0) { spans.add(new Span(wrapped.start(), wrapped.start() + length, "token")); }
         }
         if (spans.isEmpty()) { return text; }
         spans.sort(Comparator.comparingInt(Span::start).thenComparing(Comparator.comparingInt(Span::end).reversed()));
@@ -110,7 +110,7 @@ public final class SecretRedactor {
         while (fields.find()) {
             // A label inside an already hidden quoted value must not consume its closing syntax.
             if (fields.start() < valueEnd) { continue; }
-            String label = fields.group().toLowerCase(Locale.ROOT);
+            String label = fields.group("label").toLowerCase(Locale.ROOT);
             boolean otp = label.equals("otp") || label.contains("код") || label.contains("code");
             int at = fields.end();
             // JSON keys, Markdown labels and XML leaves retain their surrounding syntax.
@@ -180,6 +180,17 @@ public final class SecretRedactor {
         try {
             return new String(Base64.getDecoder().decode(encoded), StandardCharsets.ISO_8859_1).contains(":");
         } catch (IllegalArgumentException e) { return false; }
+    }
+
+    private static int jwtLength(String candidate) {
+        String compact = candidate.replaceAll("\\r?\\n[ \\t]+", "");
+        if (jwt(compact)) { return candidate.length(); }
+        // A sentence-ending period is not an extra segment. Validate the whole remaining
+        // token; never fall back to a valid prefix of a longer, malformed token.
+        if (compact.endsWith(".") && jwt(compact.substring(0, compact.length() - 1))) {
+            return candidate.length() - 1;
+        }
+        return 0;
     }
 
     private static boolean jwt(String candidate) {
