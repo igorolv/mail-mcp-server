@@ -27,7 +27,10 @@ Implemented and checked on the user's real mailboxes (plan.md section 2):
 `convert/PdfText`, `XlsxText` and `PptxText` are adapted from redmine-mcp-server
 `extraction/parser/{PdfTextParser,XlsxTextParser,PptxTextParser}.java` at commit `f62b3e5`.
 
-Not implemented: the sensitive-data filter, MCP resources, threads, flags, embeddings, writing
+Optional tool-output secret replacement is implemented for Д6 (separate review pending);
+see `docs/redaction-agent.md`. Local files and the index remain unfiltered.
+
+Not implemented: PII anonymization, MCP resources, threads, flags, embeddings, writing
 mail; see plan.md section 4.
 
 ## Transport and execution
@@ -110,6 +113,7 @@ cli/ ──► sync/, connections/, source/, store/, index/  (user-run commands 
 | `cli/` | User-run commands without Spring. | `GmailOAuthCommand`, `MailSyncCommand`, `MailReprocessCommand`, `MailReindexCommand`. Check pandoc before the index or sign-in; source closes before the index. Reprocessing and reindexing are offline. |
 | `mime/` | Local MIME parsing. | `MimeReader`, `ParsedMessage`: decoded headers, selected body and attachment files, no container expansion. See `docs/mime-agent.md`. |
 | `convert/` | Body and attachment text. | `Pandoc`, `PandocException`: sandboxed process per conversion; `AttachmentText` dispatches formats, `PdfText`, `XlsxText`, `PptxText` adapt sibling extraction methods. |
+| `redaction/` | Tool-output text only. | `SecretRedactor`: offline detectors and merged replacement; wired by `config/RedactionConfig`. Never called by storage, index writers, MIME parsing, conversion or synchronization. |
 
 ### Planned packages
 
@@ -121,8 +125,9 @@ needs them and register them above. Attachment converters live in `convert/`.
 - Every tool takes a required `connection` argument resolved through
   `ConnectionRegistry` name/definition lookups (source resolution only for sync); there is no
   default connection and no cross-mailbox call.
-- Tools return `api/` records; secrets, hosts and logins never appear in a tool response. Mail
-  content and local paths to message files may be returned (plan.md 3.7).
+- Tools return `api/` records; connection credentials, hosts and logins are not returned. Mail
+  content and local paths to message files may be returned (plan.md 3.7). Optional output
+  filtering applies to human-readable response text, not original paths or lookup identifiers.
 - Anything that reaches a mail server goes through `source/`; only allow-listed EWS operations
   exist (`EwsOperation`). Adding one needs a decision in plan.md section 5.
 - Follow plan.md 3.8: no limit budgets, extra databases, diagnostic codes or speculative

@@ -197,4 +197,8 @@ Search uses equal-weight field groups, required words and phrases through `Simpl
 an optional folder ref prefix FILTER, exact counts and score descending/key ascending sorting.
 `UnifiedHighlighter` reanalyzes stored `body`, combining matches from `body_en` on the same text;
 the formatter uses `**` around matches and `… ` between passages. Missing bodies yield null.
+An optional output transform passed by `SearchTools` filters the complete stored body before
+in-memory highlighting (`highlightWithoutSearcher`); the query used for highlighting omits
+the folder filter. This affects snippets only, not search matches, scores, totals, disk or index.
+See `docs/redaction-agent.md`. With no transform, the existing highlighting path is unchanged.
 The writer's NRT lookups remain separate; tools see only committed documents.

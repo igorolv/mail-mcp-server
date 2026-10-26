@@ -4,6 +4,7 @@ import mail.mcp.api.FolderSyncInfo;
 import mail.mcp.api.SyncStartResult;
 import mail.mcp.api.SyncStatusResult;
 import mail.mcp.connections.ConnectionRegistry;
+import mail.mcp.redaction.SecretRedactor;
 import mail.mcp.store.MessageStore;
 import mail.mcp.sync.SyncService;
 import org.slf4j.Logger;
@@ -11,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
@@ -22,11 +24,18 @@ public class SyncTools {
     private final ConnectionRegistry registry;
     private final SyncService syncService;
     private final ObjectMapper mapper;
+    private final SecretRedactor redactor;
 
     public SyncTools(ConnectionRegistry registry, SyncService syncService, ObjectMapper mapper) {
+        this(registry, syncService, mapper, new SecretRedactor(false));
+    }
+
+    @Autowired
+    public SyncTools(ConnectionRegistry registry, SyncService syncService, ObjectMapper mapper, SecretRedactor redactor) {
         this.registry = registry;
         this.syncService = syncService;
         this.mapper = mapper;
+        this.redactor = redactor;
     }
 
     @McpTool(description = "Start a read-only mailbox synchronization in the background and return at once. " +
@@ -45,7 +54,7 @@ public class SyncTools {
                 case REFUSED -> "refused";
             };
             ToolLogger.completed(log, "sync", start);
-            return new SyncStartResult(name, status, result.message());
+            return new SyncStartResult(name, status, redactor.text(result.message()));
         } catch (RuntimeException e) {
             ToolLogger.failed(log, "sync", start, e.getClass().getSimpleName());
             throw e;
@@ -70,13 +79,13 @@ public class SyncTools {
                         && ProcessHandle.of(status.pid()).filter(ProcessHandle::isAlive).isEmpty()) {
                     state = "interrupted";
                 }
-                var folders = status.folders().stream().map(p -> new FolderSyncInfo(p.path(), p.downloaded(),
+                var folders = status.folders().stream().map(p -> new FolderSyncInfo(redactor.text(p.path()), p.downloaded(),
                         p.failed(), p.removed(), p.reset(), p.done())).toList();
                 result = new SyncStatusResult(definition.name(), state, status.startedAt(), status.finishedAt(),
                         folders.stream().mapToInt(FolderSyncInfo::downloaded).sum(),
                         folders.stream().mapToInt(FolderSyncInfo::failed).sum(),
                         folders.stream().mapToInt(FolderSyncInfo::removed).sum(), folders,
-                        status.error(), status.signInRejected());
+                        redactor.text(status.error()), status.signInRejected());
             }
             ToolLogger.completed(log, "syncStatus", start);
             return result;

@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.function.UnaryOperator;
 
 /** Read-only snapshot of the last committed catalog; never takes the writer lock. */
 public final class MailIndexReader implements AutoCloseable {
@@ -74,6 +75,12 @@ public final class MailIndexReader implements AutoCloseable {
     }
 
     public SearchResults search(String query, SearchField field, String folderKey, int offset, int limit) {
+        return search(query, field, folderKey, offset, limit, null);
+    }
+
+    /** Optional output transform runs on the entire stored body, before passage selection. */
+    public SearchResults search(String query, SearchField field, String folderKey, int offset, int limit,
+                                UnaryOperator<String> outputText) {
         if (offset < 0 || limit < 1) { throw new IllegalArgumentException("Invalid offset or limit"); }
         // Phrase and whitespace syntax only; fuzzy and wildcard operators are not enabled.
         boolean fullAddress = isFullAddress(query);
@@ -85,6 +92,7 @@ public final class MailIndexReader implements AutoCloseable {
         parser.setDefaultOperator(BooleanClause.Occur.MUST);
         var parsed = parser.parse(query);
         if (parsed == null) { return new SearchResults(0, List.of()); }
+        var highlightQuery = parsed;
         if (folderKey != null) {
             parsed = new BooleanQuery.Builder().add(parsed, BooleanClause.Occur.MUST)
                     .add(new PrefixQuery(new Term("ref", folderKey + "/")), BooleanClause.Occur.FILTER).build();
@@ -96,15 +104,23 @@ public final class MailIndexReader implements AutoCloseable {
             var sort = new Sort(SortField.FIELD_SCORE, new SortField("keySort", SortField.Type.STRING));
             var top = searcher.search(parsed, size, sort, true);
             var page = Arrays.copyOfRange(top.scoreDocs, offset, top.scoreDocs.length);
-            var highlighter = UnifiedHighlighter.builder(searcher, MailAnalyzers.analyzer())
+            var highlighter = (outputText == null ? UnifiedHighlighter.builder(searcher, MailAnalyzers.analyzer())
+                    : UnifiedHighlighter.builderWithoutSearcher(MailAnalyzers.analyzer()))
                     .withFormatter(new DefaultPassageFormatter("**", "**", "… ", false))
                     .withMaskedFieldsFunc(name -> "body".equals(name) ? Set.of("body_en") : Set.of())
                     .build();
-            String[] snippets = highlighter.highlight("body", parsed, new TopDocs(top.totalHits, page));
+            String[] snippets = outputText == null
+                    ? highlighter.highlight("body", parsed, new TopDocs(top.totalHits, page)) : null;
             List<SearchHit> hits = new ArrayList<>();
             for (int i = 0; i < page.length; i++) {
                 var doc = searcher.storedFields().document(page[i].doc);
-                hits.add(new SearchHit(card(doc), page[i].score, doc.get("body") == null ? null : snippets[i]));
+                String body = doc.get("body");
+                String snippet = null;
+                if (body != null) {
+                    snippet = outputText == null ? snippets[i] : (String) highlighter.highlightWithoutSearcher(
+                            "body", highlightQuery, outputText.apply(body), 1);
+                }
+                hits.add(new SearchHit(card(doc), page[i].score, snippet));
             }
             return new SearchResults(total, List.copyOf(hits));
         } catch (IOException e) { throw new UncheckedIOException(e); }

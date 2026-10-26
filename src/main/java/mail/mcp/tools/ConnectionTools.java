@@ -4,10 +4,12 @@ import mail.mcp.api.ConnectionInfo;
 import mail.mcp.api.ListConnectionsResult;
 import mail.mcp.connections.ConnectionDefinition;
 import mail.mcp.connections.ConnectionRegistry;
+import mail.mcp.redaction.SecretRedactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,9 +29,16 @@ public class ConnectionTools {
     private static final Logger log = LoggerFactory.getLogger(ConnectionTools.class);
 
     private final ConnectionRegistry connections;
+    private final SecretRedactor redactor;
 
     public ConnectionTools(ConnectionRegistry connections) {
+        this(connections, new SecretRedactor(false));
+    }
+
+    @Autowired
+    public ConnectionTools(ConnectionRegistry connections, SecretRedactor redactor) {
         this.connections = connections;
+        this.redactor = redactor;
     }
 
     @McpTool(
@@ -46,13 +55,13 @@ public class ConnectionTools {
         for (ConnectionDefinition definition : connections.definitions()) {
             infos.add(new ConnectionInfo(
                     definition.name(),
-                    definition.description(),
+                    redactor.text(definition.description()),
                     definition.type() == null ? null : definition.type().id(),
                     definition.auth() == null ? null : definition.auth().id(),
                     definition.sourceImplemented(),
                     definition.hasLocalData(),
                     connections.isInitialized(definition.name()),
-                    definition.configError()));
+                    redactor.text(definition.configError())));
         }
         ToolLogger.completed(log, "listConnections", start);
         return new ListConnectionsResult(List.copyOf(infos));

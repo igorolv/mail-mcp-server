@@ -32,13 +32,13 @@ public record GetMessageResult(
         String inReplyTo,
         @Schema(description = "References header identifiers.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         List<String> references,
-        @Schema(description = "Chunk of body.md; absent if there is no saved body.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Body chunk, with optional secret replacement; absent without a saved body.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String body,
-        @Schema(description = "Requested character position in body.md.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Requested character position in the returned view (after optional filtering).", requiredMode = Schema.RequiredMode.REQUIRED)
         int offset,
         @Schema(description = "Next character position; absent at the end.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         Integer nextOffset,
-        @Schema(description = "Full body length in Java characters; zero without a body.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Full returned body length in Java characters, after optional filtering; zero without a body.", requiredMode = Schema.RequiredMode.REQUIRED)
         int bodyLength,
         @Schema(description = "Attachments parsed from MIME; empty if unavailable.", requiredMode = Schema.RequiredMode.REQUIRED)
         List<AttachmentRef> attachments,

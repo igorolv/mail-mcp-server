@@ -44,6 +44,8 @@ checks run on Windows. Possible improvements are listed in
 - **Bounded answers:** pages of message cards, message bodies and attachment text in chunks with
   `nextOffset`. Every message carries `localPath`, so an agent with file access can open the
   files directly.
+- **Optional secret replacement** in tool response text, enabled with `MAIL_MCP_REDACT_SECRETS=true`.
+  Downloads, local files and the search index keep their original content.
 
 ## How it works
 
@@ -197,9 +199,17 @@ Everything is stored locally and **unfiltered** in `%USERPROFILE%\.mail-mcp-serv
 - their Markdown;
 - the index.
 
-Tools return message content and local file paths to the agent, so the model sees your mail. A
-sensitive-data filter for tool output is planned as an option but does not exist yet. Disk space
-is not saved: expect roughly the size of the mailbox plus its text.
+Tools return message content and local file paths to the agent, so the model sees your mail.
+Set `MAIL_MCP_REDACT_SECRETS=true` in the MCP server's environment and restart it to replace
+recognized passwords, verification codes, tokens and private keys in response text with markers
+such as `[redacted:password]`. The default is false. No reprocessing or reindexing is needed.
+
+The filter reduces accidental inclusion of secrets in context. Original paths and stored filenames
+remain usable; direct file access still returns unfiltered content. Search still matches the raw
+index, but snippets use filtered text. Body/attachment offsets and lengths refer to the filtered
+view when enabled. This is best-effort text detection: it can miss secrets or hide ordinary text,
+and does not anonymize personal data or process images. See [filter details](docs/redaction-agent.md).
+Disk space is not saved: expect roughly the size of the mailbox plus its text.
 
 ## Environment variables
 
@@ -207,6 +217,7 @@ is not saved: expect roughly the size of the mailbox plus its text.
 |---|---|---|
 | `MAIL_MCP_DATA_DIR` | `%USERPROFILE%\.mail-mcp-server` | Root of local data and logs |
 | `MAIL_MCP_CONNECTIONS_FILE` | `<data-dir>\connections.json` | The connections file |
+| `MAIL_MCP_REDACT_SECRETS` | `false` | Replace recognized secrets in tool response text only; restart to apply |
 
 Everything about a mailbox lives in its `connections.json` entry.
 

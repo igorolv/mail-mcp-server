@@ -13,6 +13,7 @@ import mail.mcp.index.MailIndexReader;
 import mail.mcp.mime.MimeReader;
 import mail.mcp.model.Address;
 import mail.mcp.model.MailMessage;
+import mail.mcp.redaction.SecretRedactor;
 import mail.mcp.store.MessageStore;
 import mail.mcp.sync.SyncService;
 import org.slf4j.Logger;
@@ -20,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -33,10 +35,17 @@ public class MailTools {
     private static final Logger log = LoggerFactory.getLogger(MailTools.class);
     private final ConnectionRegistry registry;
     private final ObjectMapper mapper;
+    private final SecretRedactor redactor;
 
     public MailTools(ConnectionRegistry registry, SyncService syncService, ObjectMapper mapper) {
+        this(registry, syncService, mapper, new SecretRedactor(false));
+    }
+
+    @Autowired
+    public MailTools(ConnectionRegistry registry, SyncService syncService, ObjectMapper mapper, SecretRedactor redactor) {
         this.registry = registry;
         this.mapper = mapper;
+        this.redactor = redactor;
     }
 
     @McpTool(description = "List locally stored folders and committed message counts. synced is true after " +
@@ -49,7 +58,7 @@ public class MailTools {
             var definition = registry.definition(connection);
             var store = new MessageStore(definition.connectionDir(), mapper);
             try (var reader = MailIndexReader.open(definition.connectionDir()).orElse(null)) {
-                var folders = store.folders().stream().map(f -> new FolderInfo(f.key(), f.path(),
+                var folders = store.folders().stream().map(f -> new FolderInfo(f.key(), redactor.text(f.path()),
                         reader == null ? 0 : reader.count(f.key()), f.cursor() != null)).toList();
                 ToolLogger.completed(log, "listFolders", start);
                 return new ListFoldersResult(definition.name(), folders);
@@ -83,7 +92,7 @@ public class MailTools {
                 int total = reader == null ? 0 : reader.count(folder);
                 var messages = reader == null ? List.<MessageSummary>of()
                         : reader.cards(folder, position, size).stream().map(c -> new MessageSummary(c.key(),
-                        c.date(), c.from(), c.subject(), c.hasAttachments(), c.state(),
+                        c.date(), redactor.text(c.from()), redactor.text(c.subject()), c.hasAttachments(), c.state(),
                         store.messageDir(c.key()).toAbsolutePath().toString())).toList();
                 Integer next = (long) position + messages.size() < total ? position + messages.size() : null;
                 ToolLogger.completed(log, "listMessages", start);
@@ -98,7 +107,8 @@ public class MailTools {
     @McpTool(description = "Read local message headers, a body.md chunk and attachment paths. maxChars " +
             "defaults to 20000, capped at 100000; use nextOffset for the next chunk. localPath points at files " +
             "the agent may read directly. Local data may be incomplete during sync; check listFolders.synced " +
-            "and syncStatus. No mailbox or pandoc access.", generateOutputSchema = true,
+            "and syncStatus. When secret filtering is enabled, body offsets refer to the filtered text; " +
+            "original files stay unfiltered. No mailbox or pandoc access.", generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public GetMessageResult getMessage(
             @McpToolParam(description = "Connection name from listConnections") String connection,
@@ -120,23 +130,23 @@ public class MailTools {
                 catch (MessagingException | IOException | RuntimeException e) { /* metadata/body remain readable */ }
             }
             var bodyFile = directory.resolve(MessageStore.BODY_FILE);
-            String body = Files.exists(bodyFile) ? Files.readString(bodyFile) : null;
+            String body = redactor.text(Files.exists(bodyFile) ? Files.readString(bodyFile) : null);
             int length = body == null ? 0 : body.length();
             int end = (int) Math.min(length, (long) position + size);
             String chunk = body == null ? null : body.substring(Math.min(position, length), end);
             Integer next = end < length ? end : null;
             var attachments = message == null ? List.<AttachmentRef>of() : message.attachments().stream().map(a -> {
                 var path = directory.resolve(MessageStore.ATTACHMENTS_DIR).resolve(a.file());
-                return new AttachmentRef(a.file(), a.name(), a.contentType(), a.size(), a.inline(),
+                return new AttachmentRef(a.file(), redactor.text(a.name()), a.contentType(), a.size(), a.inline(),
                         Files.exists(path) ? path.toString() : null,
                         Files.exists(path.resolveSibling(a.file() + ".md"))
                                 ? path.resolveSibling(a.file() + ".md").toString() : null);
             }).toList();
-            var result = new GetMessageResult(key, meta.folder(), meta.state().id(), meta.error(),
-                    message == null ? null : message.subject(), message == null ? null : display(message.from()),
+            var result = new GetMessageResult(key, redactor.text(meta.folder()), meta.state().id(), redactor.text(meta.error()),
+                    message == null ? null : redactor.text(message.subject()), message == null ? null : display(message.from()),
                     message == null ? null : display(message.to()), message == null ? null : display(message.cc()),
-                    message == null ? null : message.date(), message == null ? null : message.messageId(),
-                    message == null ? null : message.inReplyTo(), message == null ? null : message.references(),
+                    message == null ? null : message.date(), message == null ? null : redactor.text(message.messageId()),
+                    message == null ? null : redactor.text(message.inReplyTo()), message == null ? null : redactor.texts(message.references()),
                     chunk, position, next, length, attachments, directory.toString());
             ToolLogger.completed(log, "getMessage", start);
             return result;
@@ -152,7 +162,8 @@ public class MailTools {
     @McpTool(description = "Read a local attachment and extracted text in chunks. Text exists only for DOCX, ODT, " +
             "RTF, EPUB, HTML, CSV, PDF, XLSX, PPTX and plain text up to 20 MiB, when conversion succeeds. " +
             "path is the original file; textPath is the Markdown. maxChars defaults to 20000, capped at 100000; " +
-            "use nextOffset for the next chunk. No mailbox or pandoc access.", generateOutputSchema = true,
+            "use nextOffset for the next chunk. With secret filtering, offsets refer to filtered text; " +
+            "original files stay unfiltered. No mailbox or pandoc access.", generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public GetAttachmentResult getAttachment(
             @McpToolParam(description = "Connection name from listConnections") String connection,
@@ -177,11 +188,11 @@ public class MailTools {
                     .orElseThrow(() -> new IllegalArgumentException("Unknown attachment file; use getMessage"));
             var path = directory.resolve(MessageStore.ATTACHMENTS_DIR).resolve(attachment.file());
             var textPath = path.resolveSibling(attachment.file() + ".md");
-            String text = Files.exists(textPath) ? Files.readString(textPath) : null;
+            String text = redactor.text(Files.exists(textPath) ? Files.readString(textPath) : null);
             int length = text == null ? 0 : text.length();
             int end = (int) Math.min(length, (long) position + size);
             String chunk = text == null ? null : text.substring(Math.min(position, length), end);
-            var result = new GetAttachmentResult(key, attachment.file(), attachment.name(), attachment.contentType(),
+            var result = new GetAttachmentResult(key, attachment.file(), redactor.text(attachment.name()), attachment.contentType(),
                     attachment.size(), Files.exists(path) ? path.toString() : null,
                     text == null ? null : textPath.toString(), chunk, position, end < length ? end : null, length);
             ToolLogger.completed(log, "getAttachment", start);
@@ -195,8 +206,8 @@ public class MailTools {
         }
     }
 
-    private static List<String> display(List<Address> addresses) {
-        return addresses.stream().map(Address::display).toList();
+    private List<String> display(List<Address> addresses) {
+        return addresses.stream().map(Address::display).map(redactor::text).toList();
     }
 
     private static int offset(Integer value) {

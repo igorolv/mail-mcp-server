@@ -1,6 +1,7 @@
 package mail.mcp.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,9 +17,17 @@ import java.util.function.UnaryOperator;
  *                        {@code <data-dir>/logs/}
  * @param connectionsFile JSON file with the named mailboxes; {@code <data-dir>/connections.json}
  *                        when blank
+ * @param redactSecrets   optional tool-output secret replacement; never changes local data
  */
 @ConfigurationProperties(prefix = "mail-mcp")
-public record MailMcpProperties(String dataDir, String connectionsFile) {
+public record MailMcpProperties(String dataDir, String connectionsFile, boolean redactSecrets) {
+
+    @ConstructorBinding
+    public MailMcpProperties { }
+
+    public MailMcpProperties(String dataDir, String connectionsFile) {
+        this(dataDir, connectionsFile, false);
+    }
 
     /** Environment variable that overrides {@link #dataDir()}. */
     public static final String DATA_DIR_ENV = "MAIL_MCP_DATA_DIR";
@@ -26,12 +35,19 @@ public record MailMcpProperties(String dataDir, String connectionsFile) {
     /** Environment variable that overrides {@link #connectionsFile()}. */
     public static final String CONNECTIONS_FILE_ENV = "MAIL_MCP_CONNECTIONS_FILE";
 
+    public static final String REDACT_SECRETS_ENV = "MAIL_MCP_REDACT_SECRETS";
+
     /**
      * Settings read straight from the environment, for user-run commands without Spring.
      * Mirrors the {@code mail-mcp.*} block of {@code application.yml}.
      */
     public static MailMcpProperties fromEnvironment(UnaryOperator<String> env) {
-        return new MailMcpProperties(env.apply(DATA_DIR_ENV), env.apply(CONNECTIONS_FILE_ENV));
+        String redaction = env.apply(REDACT_SECRETS_ENV);
+        if (redaction != null && !redaction.equalsIgnoreCase("true") && !redaction.equalsIgnoreCase("false")) {
+            throw new IllegalArgumentException("MAIL_MCP_REDACT_SECRETS must be true or false");
+        }
+        return new MailMcpProperties(env.apply(DATA_DIR_ENV), env.apply(CONNECTIONS_FILE_ENV),
+                Boolean.parseBoolean(redaction));
     }
 
     public Path resolvedDataDir() {

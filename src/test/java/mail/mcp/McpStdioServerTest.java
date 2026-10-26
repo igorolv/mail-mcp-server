@@ -9,7 +9,8 @@ import mail.mcp.store.MessageStore;
 import mail.mcp.sync.MessageProcessor;
 import mail.mcp.convert.Pandoc;
 import java.time.Instant;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -41,9 +42,11 @@ class McpStdioServerTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String SECRET = "stdio-test-secret-value";
+    private static final String BODY_SECRET = "FictionOnlyStdioBodySecret";
 
-    @Test
-    void listConnectionsWorksOverStdioAndStdoutIsPureJsonRpc(@TempDir Path dir) throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = { false, true })
+    void listConnectionsWorksOverStdioAndStdoutIsPureJsonRpc(boolean redact, @TempDir Path dir) throws Exception {
         Path dataDir = dir.resolve("data");
         Files.createDirectories(dataDir);
         Files.writeString(dataDir.resolve("connections.json"), """
@@ -67,6 +70,7 @@ class McpStdioServerTest {
         builder.environment().put("MAIL_MCP_DATA_DIR", dataDir.toString());
         builder.environment().put("MAIL_MCP_STDIO_TEST_PASSWORD", SECRET);
         builder.environment().put("MAIL_MCP_STDIO_TEST_USERNAME", "user@example.com");
+        builder.environment().put("MAIL_MCP_REDACT_SECRETS", Boolean.toString(redact));
         builder.environment().remove("MAIL_MCP_CONNECTIONS_FILE");
         Process server = builder.start();
         ExecutorService io = Executors.newFixedThreadPool(2);
@@ -139,6 +143,26 @@ class McpStdioServerTest {
             assertThat(attachment.get("nextOffset").asInt()).isEqualTo(10);
             assertThat(Path.of(attachment.get("textPath").asString())).isRegularFile();
 
+            JsonNode fullMessage = call(requests, io, replies, stderr, stdout, 11, "getMessage",
+                    "{\"connection\":\"local\",\"key\":\"" + key + "\"}");
+            JsonNode fullAttachment = call(requests, io, replies, stderr, stdout, 12, "getAttachment",
+                    "{\"connection\":\"local\",\"key\":\"" + key + "\",\"file\":\"" + attachmentFile + "\"}");
+            JsonNode passwordSearch = call(requests, io, replies, stderr, stdout, 13, "search",
+                    "{\"connection\":\"local\",\"query\":\"password\",\"field\":\"body\"}");
+            assertThat(passwordSearch.path("total").asInt()).isEqualTo(2);
+            if (redact) {
+                assertThat(fullMessage.path("body").asString()).contains("[redacted:password]").doesNotContain(BODY_SECRET);
+                assertThat(fullAttachment.path("text").asString()).contains("[redacted:password]").doesNotContain(BODY_SECRET);
+                // Includes both structuredContent and serialized text content, across every tool call.
+                assertThat(String.join("\n", stdout)).doesNotContain(BODY_SECRET);
+            } else {
+                assertThat(fullMessage.path("body").asString()).contains(BODY_SECRET);
+                assertThat(fullAttachment.path("text").asString()).contains(BODY_SECRET);
+            }
+            assertThat(Files.readString(Path.of(fullMessage.path("localPath").asString()).resolve("body.md")))
+                    .contains(BODY_SECRET);
+            assertThat(Files.readString(Path.of(fullAttachment.path("textPath").asString()))).contains(BODY_SECRET);
+
             assertThat(stdout).allSatisfy(line -> assertThat(JSON.readTree(line).get("jsonrpc").asString()).isEqualTo("2.0"));
             assertThat(String.join("\n", stdout)).doesNotContain(SECRET, "webmail.example.com", "imap.mail.ru");
         } finally {
@@ -165,8 +189,10 @@ class McpStdioServerTest {
                 var processed = new MessageProcessor(store, new Pandoc("unused")).process(meta);
                 var attachment = processed.message().attachments().getFirst();
                 Files.writeString(store.messageDir(key).resolve(MessageStore.ATTACHMENTS_DIR)
-                        .resolve(attachment.file() + ".md"), "Synthetic attachment Markdown");
-                index.put(processed.meta(), processed.message(), processed.body(), processed.attachmentText());
+                        .resolve(attachment.file() + ".md"), "Synthetic attachment Markdown\nPassword: " + BODY_SECRET);
+                String body = processed.body() + "\nPassword: " + BODY_SECRET;
+                Files.writeString(store.messageDir(key).resolve(MessageStore.BODY_FILE), body);
+                index.put(processed.meta(), processed.message(), body, processed.attachmentText());
             }
             index.commit();
         }

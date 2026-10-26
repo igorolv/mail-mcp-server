@@ -54,6 +54,7 @@ Read this file first. Then read only the documents whose `When` matches the task
 | `docs/imap-source-agent.md` | changing `source/imap/` or IMAP authentication | TLS, command allow-list, one sign-in attempt, EXAMINE/PEEK, bounded MIME downloads |
 | `docs/gmail-oauth-agent.md` | changing `source/oauth/google/`, Gmail OAuth configuration, authorization or refresh | Desktop client setup, PKCE/state/loopback flow, owner-only refresh storage, token endpoint and XOAUTH2 rules |
 | `docs/tools-agent.md` | changing `tools/`, `api/`, `SyncService`, `sync-status.json` or a tool's arguments and bounds | the eight tools, local-only reading, status file fields, single writer across processes, sign-in refusal, search control-set numbers |
+| `docs/redaction-agent.md` | changing `redaction/`, output filtering or its setting | output-only secret replacement, detectors, chunk/highlight ordering, unchanged original paths and control-set policy |
 | `docs/mime-agent.md` | changing `mime/` or `convert/`, MIME parsing rules, attachment names, pandoc calls, attachment text, `mail-reprocess` | Angus properties, body and attachment rules, stored names, sandboxed pandoc, attachment formats, known `testdata/mime` differences |
 | `docs/storage-agent.md` | changing `model/`, `store/` or `index/`, the on-disk layout, `meta.json`, `folders.json` or the Lucene index | message directories, write order and atomic writes, index fields and schema, single writer, reconciliation |
 
@@ -135,7 +136,7 @@ code is listed in `docs/architecture-agent.md`.
 - **Transport:** stdio only; nothing but JSON-RPC may be written to `System.out`.
 - **Packages:** `config/`, `connections/`, `source/` (`MailSource`; `ews/`, `imap/`, `oauth/`,
   `oauth/google/`), `model/` (one record per file), `mime/`, `convert/`, `store/`, `index/`,
-  `sync/`, `tools/`, `api/`, `cli/`. There is no `service/` layer. `api/` records are the MCP
+  `sync/`, `redaction/`, `tools/`, `api/`, `cli/`. There is no `service/` layer. `api/` records are the MCP
   wire contract; `model/` records are not returned directly.
 - **Connections:** a `connections.json` file outside the repository
   (`%USERPROFILE%\.mail-mcp-server\`), modeled on the sibling project `jdbc-mcp-server`.
@@ -162,9 +163,10 @@ code is listed in `docs/architecture-agent.md`.
   - `folders.json` with an opaque cursor per folder, and `sync-status.json`;
   - the disk is the complete copy. One Lucene index per connection (catalog and search, schema
     version in the commit data) is derived and rebuilt from disk without the network.
-- **No filter yet:** the sensitive-data filter is not implemented. Disk and index hold everything
-  as is; a filter may later apply only to output sent to the model, and only optionally. Tools may
-  return local paths to any file in a message directory.
+- **Optional output filter:** `MAIL_MCP_REDACT_SECRETS=true` replaces recognized secrets only in
+  tool response text. Downloads, disk and index hold everything as is. Tools still return original
+  file paths and stored filenames. This reduces accidental context exposure, not intentional
+  extraction. See `docs/redaction-agent.md` (Д6 implementation; separate review pending).
 - **Synchronization:**
   - runs only on request: the `sync` tool in the background, or `mail-sync`;
   - always syncs everything, then incrementally;

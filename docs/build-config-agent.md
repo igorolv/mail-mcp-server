@@ -34,6 +34,7 @@ Bound from `mail-mcp.*` in `application.yml` into `config/MailMcpProperties`:
 |---|---|---|
 | `MAIL_MCP_DATA_DIR` | `%USERPROFILE%\.mail-mcp-server` | Root of local data: `<data-dir>\<connection>\`, `logs\` |
 | `MAIL_MCP_CONNECTIONS_FILE` | `<data-dir>\connections.json` | The connections file |
+| `MAIL_MCP_REDACT_SECRETS` | `false` | Optional secret replacement in tool response text; restart to apply. CLI output and local data stay unfiltered. See `docs/redaction-agent.md`. |
 
 To add a setting: add a component to `MailMcpProperties` (or a nested record), a line under
 `mail-mcp:` in `application.yml` with a `MAIL_MCP_*` override, and a row to this table. Code that
@@ -274,5 +275,7 @@ documents, and `testdata/search/` has 48 messages with 80 control queries. Each 
 English README, JSON expectations and a complete manifest. Russian reports are in
 `docs/research/RT-11-synthetic-mime.md`, `RT-12-redaction-samples.md`, `RT-13-search-queries.md`.
 Helper generators/validators stay under ignored `testdata/.work/`; only data is tracked.
-They feed `MimeReaderTest` and `SearchControlSetTest`; `testdata/redaction/` waits for the optional
-filter (plan.md section 4, Д6).
+They feed `MimeReaderTest`, `SearchControlSetTest` and `SecretRedactorTest`. The latter checks
+all 256 cases and eight mixed documents against the secrets-only output policy; PII is unchanged
+and two incomplete PEM examples intentionally differ from the old expectations. See
+`docs/redaction-agent.md` (plan.md section 4, Д6).

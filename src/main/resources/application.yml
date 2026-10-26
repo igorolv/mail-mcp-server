@@ -17,3 +17,5 @@ mail-mcp:
   # credentials and per-connection settings are configured. Defaults to <data-dir>/connections.json.
   # A missing or empty file starts the server with no connections; a malformed one fails startup.
   connections-file: ${MAIL_MCP_CONNECTIONS_FILE:}
+  # Tool output only. Downloads, disk, index and original paths stay unchanged.
+  redact-secrets: ${MAIL_MCP_REDACT_SECRETS:false}

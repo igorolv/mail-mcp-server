@@ -6,12 +6,14 @@ import mail.mcp.connections.ConnectionRegistry;
 import mail.mcp.index.MailIndexReader;
 import mail.mcp.index.SearchField;
 import mail.mcp.model.SearchResults;
+import mail.mcp.redaction.SecretRedactor;
 import mail.mcp.store.MessageStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
@@ -22,10 +24,17 @@ public class SearchTools {
     private static final Logger log = LoggerFactory.getLogger(SearchTools.class);
     private final ConnectionRegistry registry;
     private final ObjectMapper mapper;
+    private final SecretRedactor redactor;
 
     public SearchTools(ConnectionRegistry registry, ObjectMapper mapper) {
+        this(registry, mapper, new SecretRedactor(false));
+    }
+
+    @Autowired
+    public SearchTools(ConnectionRegistry registry, ObjectMapper mapper, SecretRedactor redactor) {
         this.registry = registry;
         this.mapper = mapper;
+        this.redactor = redactor;
     }
 
     @McpTool(description = "Search local messages by words. field: any (default; every field below, including " +
@@ -37,7 +46,8 @@ public class SearchTools {
             "Results use local data only; listFolders.synced shows coverage. limit defaults to 20, capped at 100. " +
             "Use nextOffset to page. snippet always comes from the body and marks body matches with **; for a " +
             "match in attachment text only, read the attachments with getAttachment. localPath points at files " +
-            "the agent may read.",
+            "the agent may read. Optional secret filtering changes output text only, not matching or ranking; " +
+            "snippets are built from the filtered body. Original files stay unfiltered.",
             generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public SearchResult search(
@@ -68,16 +78,16 @@ public class SearchTools {
                             "run 'mail-reindex <connection>' in a terminal or start a sync to rebuild it");
                 }
                 var results = reader == null ? new SearchResults(0, List.of())
-                        : reader.search(query, group, folder, position, size);
+                        : reader.search(query, group, folder, position, size, redactor.enabled() ? redactor::text : null);
                 var hits = results.hits().stream().map(hit -> {
                     var c = hit.card();
-                    return new SearchHitInfo(c.key(), c.folderKey(), c.date(), c.from(), c.subject(),
+                    return new SearchHitInfo(c.key(), c.folderKey(), c.date(), redactor.text(c.from()), redactor.text(c.subject()),
                             c.hasAttachments(), c.state(), hit.score(), hit.snippet(),
                             store.messageDir(c.key()).toAbsolutePath().toString());
                 }).toList();
                 Integer next = (long) position + hits.size() < results.total() ? position + hits.size() : null;
                 ToolLogger.completed(log, "search", start);
-                return new SearchResult(definition.name(), query, group.id(), folder, results.total(), position, next, hits);
+                return new SearchResult(definition.name(), redactor.text(query), group.id(), folder, results.total(), position, next, hits);
             }
         } catch (RuntimeException e) {
             ToolLogger.failed(log, "search", start, e.getClass().getSimpleName());

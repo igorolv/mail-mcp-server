@@ -2,6 +2,8 @@
 
 Eight tools (plan.md 3.7). Tools are Spring services returning `api/` records, never `model/`
 records.
+`MAIL_MCP_REDACT_SECRETS=true` optionally filters response text; see `docs/redaction-agent.md`.
+Downloads, files, index, lookup IDs, stored filenames and original local paths stay unchanged.
 Only JSON-RPC is written to stdout. Failures are logged through `ToolLogger.failed`
 and rethrown; `IllegalArgumentException` becomes an MCP tool error with its message.
 
@@ -28,6 +30,10 @@ when it exists. `getAttachment` returns `key`, `file`, original `name`, `content
 `text` and `textPath` are absent, textLength is zero and nextOffset is absent. Null fields are
 omitted from JSON.
 
+With secret filtering enabled, full body/attachment text is filtered in memory before slicing;
+offsets and lengths refer to the filtered view. Headers, display names, descriptions, status text
+and folder paths are also filtered. Local file paths and attachment `file` values remain original.
+
 Attachment text is available for DOCX, ODT, RTF, EPUB, HTML/HTM, CSV, PDF, XLSX, PPTX and plain
 text up to 20 MiB of decoded bytes, when conversion yields nonblank text. `path` is the original
 attachment file and `textPath` is its UTF-8 Markdown; the tool never converts on demand.
@@ -52,6 +58,9 @@ nextOffset, hits)`. Each `SearchHitInfo` includes key, folder key, date, display
 hasAttachments, state, score, snippet and the absolute message directory `localPath`.
 Snippets use Markdown `**matches**` and `… ` between passages; absent bodies yield null.
 The stored body is reanalyzed by `UnifiedHighlighter`, including English-field matches.
+With secret filtering enabled, the complete stored body is filtered before passage selection
+and highlighting using the highlighter's in-memory API; raw matching, scores and totals stay
+unchanged. The search query echo is filtered too. No reindexing is needed.
 Attachment text is indexed without being stored. Snippets remain on body; an attachment-only
 match may show leading body text.
 
@@ -79,7 +88,8 @@ Use offline `mail-reindex` or a requested sync to rebuild from disk.
 The 2026-10-26 offline control set processes all 48 synthetic MIME messages and scores
 all 80 queries: recall **79/86 = 0.918605**, **7 false positives**. Q061 now finds S001 through
 `attachmentText` (the CSV attachment). Before attachment text the baseline was 78/86 = 0.906977.
-The fixtures' redaction proposal is superseded by the deferred filter: raw synthetic text is indexed.
+The fixtures' redaction-before-index proposal is superseded: raw synthetic text is indexed,
+and optional response filtering does not remove search matches.
 
 | Category | Expected matches found / expected | False positives |
 |---|---|---|

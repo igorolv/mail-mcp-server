@@ -18,12 +18,12 @@ public record GetAttachmentResult(
         String path,
         @Schema(description = "Absolute Markdown path; absent without extracted text.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String textPath,
-        @Schema(description = "Markdown chunk; absent without extracted text.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Markdown chunk with optional secret replacement; absent without extracted text.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String text,
-        @Schema(description = "Requested Java character position.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Requested Java character position in the returned view (after optional filtering).", requiredMode = Schema.RequiredMode.REQUIRED)
         int offset,
         @Schema(description = "Next character position; absent at the end.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         Integer nextOffset,
-        @Schema(description = "Full Markdown length in Java characters; zero without text.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Full returned Markdown length in Java characters, after optional filtering; zero without text.", requiredMode = Schema.RequiredMode.REQUIRED)
         int textLength
 ) { }
