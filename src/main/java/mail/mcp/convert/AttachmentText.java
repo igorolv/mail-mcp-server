@@ -4,6 +4,13 @@ import jakarta.mail.MessagingException;
 import mail.mcp.mime.MimeReader;
 import mail.mcp.model.Address;
 import mail.mcp.model.AttachmentInfo;
+import org.apache.poi.hmef.HMEFMessage;
+import org.apache.poi.hsmf.MAPIMessage;
+import org.apache.poi.hsmf.datatypes.MAPIProperty;
+import org.apache.poi.hsmf.datatypes.PropertyValue.LongPropertyValue;
+import org.apache.poi.hsmf.exceptions.ChunkNotFoundException;
+import org.apache.poi.poifs.filesystem.POIFSFileSystem;
+import org.apache.poi.util.CodePageUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,16 +34,25 @@ public final class AttachmentText {
     public static Optional<String> toMarkdown(Path file, AttachmentInfo info, Pandoc pandoc) {
         try {
             if (Files.size(file) > MAX_SIZE) { return Optional.empty(); }
-            String name = info.name() == null ? info.file() : info.name();
+            String name = (info.name() == null ? info.file() : info.name()).replace('\\', '/');
+            name = name.substring(name.lastIndexOf('/') + 1).toLowerCase(Locale.ROOT);
+            String type = info.contentType().toLowerCase(Locale.ROOT);
             int dot = name.lastIndexOf('.');
             String extension = dot < 0 ? "" : name.substring(dot + 1).toLowerCase(Locale.ROOT);
-            if (extension.equals("zip") || info.contentType().equals("application/zip")
-                    || info.contentType().equals("application/x-zip-compressed")
-                    || info.contentType().equals("application/x-zip")) { return Optional.empty(); }
-            String format = info.contentType().equals("message/rfc822") ? "eml" : switch (extension) {
-                case "docx", "odt", "rtf", "epub", "html", "csv", "pdf", "xlsx", "pptx", "txt", "eml" -> extension;
+            boolean eml = extension.equals("eml") || type.equals("message/rfc822");
+            boolean zip = extension.equals("zip") || type.equals("application/zip")
+                    || type.equals("application/x-zip-compressed") || type.equals("application/x-zip");
+            boolean msg = extension.equals("msg") || type.equals("application/vnd.ms-outlook");
+            boolean tnef = extension.equals("tnef") || name.equals("winmail.dat")
+                    || type.equals("application/ms-tnef") || type.equals("application/vnd.ms-tnef");
+            if (!eml && zip) { return Optional.empty(); }
+            String format = eml ? "eml" : msg ? "msg" : tnef ? "tnef" : switch (extension) {
+                case "doc", "xls", "ppt", "docx", "odt", "rtf", "epub", "html", "csv", "pdf", "xlsx", "pptx", "txt", "eml" -> extension;
                 case "htm" -> "html";
-                default -> switch (info.contentType()) {
+                default -> switch (type) {
+                    case "application/msword" -> "doc";
+                    case "application/vnd.ms-excel" -> "xls";
+                    case "application/vnd.ms-powerpoint" -> "ppt";
                     case "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> "docx";
                     case "application/vnd.oasis.opendocument.text" -> "odt";
                     case "application/rtf", "text/rtf" -> "rtf";
@@ -62,13 +78,76 @@ public final class AttachmentText {
                 case "pdf" -> PdfText.extract(file);
                 case "xlsx" -> XlsxText.extract(file);
                 case "pptx" -> PptxText.extract(file);
+                case "doc" -> DocText.extract(file);
+                case "xls" -> XlsText.extract(file);
+                case "ppt" -> PptText.extract(file);
                 case "eml" -> nestedMessage(file, pandoc);
+                case "msg" -> outlookMessage(file, pandoc);
+                case "tnef" -> tnefMessage(file, pandoc);
                 default -> throw new IllegalStateException();
             };
             return text.isBlank() ? Optional.empty() : Optional.of(text);
         } catch (IOException | MessagingException | RuntimeException e) {
             log.debug("{}", e.getClass().getSimpleName());
             return Optional.empty();
+        }
+    }
+
+    private static String outlookMessage(Path file, Pandoc pandoc) throws IOException {
+        try (var fs = new POIFSFileSystem(file.toFile(), true); var message = new MAPIMessage(fs)) {
+            // Only declared code pages: guess7BitEncoding also uses heuristics and is deliberately avoided.
+            String general = codepage(message, MAPIProperty.MESSAGE_CODEPAGE);
+            String internet = codepage(message, MAPIProperty.INTERNET_CPID);
+            // Plain text uses the message code page; HTML may declare a different Internet code page.
+            String plain = general == null ? internet : general;
+            message.set7BitEncoding(plain, internet == null ? general : internet, plain);
+            var headers = new StringBuilder();
+            try { header(headers, "Subject", message.getSubject()); } catch (ChunkNotFoundException e) { /* absent */ }
+            try { header(headers, "From", message.getDisplayFrom()); } catch (ChunkNotFoundException e) { /* absent */ }
+            try { header(headers, "To", message.getDisplayTo()); } catch (ChunkNotFoundException e) { /* absent */ }
+            try { header(headers, "Cc", message.getDisplayCC()); } catch (ChunkNotFoundException e) { /* absent */ }
+            try {
+                var date = message.getMessageDate();
+                if (date != null) { header(headers, "Date", date.toInstant().toString()); }
+            } catch (ChunkNotFoundException e) { /* absent */ }
+            String body = null;
+            try { body = message.getTextBody(); } catch (ChunkNotFoundException e) { /* next alternative */ }
+            if (body == null || body.isBlank()) {
+                try { body = message.getHtmlBody(); } catch (ChunkNotFoundException e) { body = null; }
+                if (body != null && !body.isBlank()) { body = pandoc.htmlToMarkdown(body); }
+                else {
+                    try { body = message.getRtfBody(); } catch (ChunkNotFoundException e) { body = null; }
+                    if (body != null && !body.isBlank()) { body = pandoc.toMarkdown(body, "rtf"); }
+                }
+            }
+            if (body != null && !body.isBlank()) {
+                if (!headers.isEmpty()) { headers.append('\n'); }
+                headers.append(body);
+            }
+            return headers.toString();
+        }
+    }
+
+    private static String codepage(MAPIMessage message, MAPIProperty property) throws IOException {
+        var values = message.getMainChunks().getProperties().get(property);
+        return values == null || values.isEmpty() ? null
+                : CodePageUtil.codepageToEncoding(((LongPropertyValue) values.getFirst()).getValue(), true);
+    }
+
+    private static String tnefMessage(Path file, Pandoc pandoc) throws IOException {
+        try (var input = Files.newInputStream(file)) {
+            var message = new HMEFMessage(input);
+            var text = new StringBuilder();
+            header(text, "Subject", message.getSubject());
+            String body = message.getBody();
+            if (body != null && !body.isBlank()) {
+                String markdown = pandoc.toMarkdown(body, "rtf");
+                if (!markdown.isBlank()) {
+                    if (!text.isEmpty()) { text.append('\n'); }
+                    text.append(markdown);
+                }
+            }
+            return text.toString();
         }
     }
 

@@ -234,6 +234,62 @@ class MessageProcessorTest {
         assertThat(snapshot(directory)).isEqualTo(before);
     }
 
+    @Test void outlookEntriesGetMarkdownAndText() throws Exception {
+        assumeTrue(pandocAvailable());
+        for (String id : new String[]{"M09", "M10"}) {
+            var meta = message(id);
+            var directory = store().messageDir(meta.key());
+            var eml = directory.resolve(MessageStore.MESSAGE_FILE);
+            byte[] original = Files.readAllBytes(eml);
+            var outer = MimeReader.read(eml, null);
+            var processed = processor().process(meta);
+            assertThat(processed.meta().state()).isEqualTo(MessageState.CONVERTED);
+            assertThat(processed.meta().error()).isNull();
+            assertThat(processed.body()).isEqualTo(outer.body());
+            assertThat(processed.message().attachments()).hasSize(id.equals("M09") ? 4 : 2);
+            var last = processed.message().attachments().getLast();
+            Path markdown = directory.resolve(MessageStore.ATTACHMENTS_DIR).resolve(last.file() + ".md");
+            assertThat(markdown).isRegularFile();
+            assertThat(processed.attachmentText()).contains(Files.readString(markdown));
+            Path containerText = directory.resolve("attachments/" + (id.equals("M09") ? "2__nested.msg.md" : "1__winmail.dat.md"));
+            assertThat(containerText).isRegularFile();
+            assertThat(processed.attachmentText()).contains(Files.readString(containerText));
+            assertThat(Files.readAllBytes(eml)).isEqualTo(original);
+            var before = snapshot(directory);
+            assertThat(new MessageProcessor(store(), new Pandoc("unused")).load(processed.meta())).isEqualTo(processed);
+            assertThat(snapshot(directory)).isEqualTo(before);
+        }
+    }
+
+    @Test void legacyOfficeAttachmentsGetMarkdownAndText() throws Exception {
+        var meta = message("M01");
+        var directory = store().messageDir(meta.key());
+        var eml = directory.resolve(MessageStore.MESSAGE_FILE);
+        byte[] original = mail.mcp.LegacyOfficeFixtures.message();
+        Files.write(eml, original);
+        var emlTime = Files.getLastModifiedTime(eml);
+        var result = processor().process(meta);
+        assertThat(result.meta().state()).isEqualTo(MessageState.CONVERTED);
+        assertThat(result.meta().error()).isNull();
+        assertThat(result.body()).isEqualTo("Outer body");
+        assertThat(result.message().attachments()).extracting(a -> a.file())
+                .containsExactly("1__document.doc", "2__cells.xls", "3__slides.ppt", "4__broken.doc");
+        var attachments = directory.resolve(MessageStore.ATTACHMENTS_DIR);
+        for (var entry : result.message().attachments().subList(0, 3)) {
+            var sidecar = attachments.resolve(entry.file() + ".md");
+            assertThat(sidecar).isRegularFile();
+            assertThat(result.attachmentText()).contains(Files.readString(sidecar));
+        }
+        assertThat(result.attachmentText()).contains("Договор документа", "Договор таблицы", "Отчёт презентации");
+        assertThat(attachments.resolve("4__broken.doc")).isRegularFile();
+        assertThat(attachments.resolve("4__broken.doc.md")).doesNotExist();
+        assertThat(Files.readAllBytes(eml)).isEqualTo(original);
+        assertThat(Files.getLastModifiedTime(eml)).isEqualTo(emlTime);
+        var before = snapshot(directory);
+        assertThat(new MessageProcessor(store(), new Pandoc("unused")).load(result.meta())).isEqualTo(result);
+        assertThat(snapshot(directory)).isEqualTo(before);
+    }
+
     private static Map<Path, String> snapshot(Path directory) throws Exception {
         Map<Path, String> result = new LinkedHashMap<>();
         try (var files = Files.walk(directory)) {

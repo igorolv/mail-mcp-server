@@ -17,7 +17,7 @@ and rethrown; `IllegalArgumentException` becomes an MCP tool error with its mess
 | `listFolders` | Required `connection` | Stored folder keys and paths, committed catalog counts and `synced` (cursor exists), in stored order. No index means zero counts. |
 | `listMessages` | Required `connection`, `folder`; optional `offset`, `limit` | Folder cards sorted by descending date (undated last), then key; total, offset, optional nextOffset. Offset defaults to 0; limit to 50, capped at 200. Unknown folder is an error. |
 | `getMessage` | Required `connection`, `key`; optional `offset`, `maxChars` | Metadata, MIME headers, body.md chunk, bodyLength, optional nextOffset and attachment file paths and optional Markdown `textPath`. Offset defaults to 0; maxChars to 20,000, capped at 100,000. Invalid/nonexistent UUID is an error. |
-| `getAttachment` | Required `connection`, `key`, `file`; optional `offset`, `maxChars` | Original file path and saved Markdown chunk, textPath, textLength and optional nextOffset. `file` must exactly match a stored filename in that message's expanded attachment list, including files inside nested messages and ZIP archives. Unknown file (including traversal or another message's filename) is an error. Offset defaults to 0; maxChars to 20,000, capped at 100,000. |
+| `getAttachment` | Required `connection`, `key`, `file`; optional `offset`, `maxChars` | Original file path and saved Markdown chunk, textPath, textLength and optional nextOffset. `file` must exactly match a stored filename in that message's expanded attachment list, including files inside EML, ZIP, MSG and TNEF containers. Unknown file (including traversal or another message's filename) is an error. Offset defaults to 0; maxChars to 20,000, capped at 100,000. |
 | `search` | Required `connection`, `query`; optional `field`, `folder`, `offset`, `limit` | Local cards with BM25 score and body or saved attachment snippet, sorted by score descending then key. Exact total, offset and optional nextOffset. Query must be nonblank and at most 1,000 characters. Offset defaults to 0; limit to 20, capped at 100. Unknown field/folder is an error. No index means zero hits. |
 
 Offsets must be nonnegative and sizes positive; invalid values raise `IllegalArgumentException`.
@@ -30,23 +30,33 @@ when it exists. `getAttachment` returns `key`, `file`, original `name`, `content
 `text` and `textPath` are absent, textLength is zero and nextOffset is absent. Null fields are
 omitted from JSON.
 
-`getMessage` includes files inside saved nested messages and ZIP archives after the MIME
+`getMessage` includes files inside saved EML, ZIP, MSG and TNEF containers after the MIME
 attachments, expanded breadth first with one flat numbering. `AttachmentRef.parent` is the
 containing attachment's exact stored `file`, absent for the message's own attachments. It is
 a lookup filename and remains unchanged by secret filtering. `getAttachment` accepts the
 entries' `file` values directly. The list is rebuilt without writes; before `mail-reprocess`,
 entries may be listed without `path` or `textPath`. Missing containers yield no entries.
+The `parent` contract is unchanged for MSG/TNEF children, including derived standalone embedded
+MSG files. Finish offline reprocessing of a connection before attachment lookup/search after
+this upgrade: new containers can renumber later extracted files. `mail-reindex` alone is
+insufficient to create children/Markdown; original MIME is preserved.
 
 With secret filtering enabled, full body/attachment text is filtered in memory before slicing;
 offsets and lengths refer to the filtered view. Headers, display names, descriptions, status text
 and folder paths are also filtered. Local file paths and attachment `file` values remain original.
 
-Attachment text is available for DOCX, ODT, RTF, EPUB, HTML/HTM, CSV, PDF, XLSX, PPTX, EML and plain
+Attachment text is available for DOCX, ODT, RTF, EPUB, HTML/HTM, CSV, PDF, DOC, XLS, PPT, XLSX, PPTX, EML, MSG, TNEF and plain
 text up to 20 MiB of decoded bytes, when conversion yields nonblank text. `path` is the original
 attachment file and `textPath` is its UTF-8 Markdown; the tool never converts on demand.
 Unsupported, oversized or failed attachments retain their original files. See `docs/mime-agent.md`.
 Use offline `mail-reprocess <connection>` to create Markdown for messages already on disk,
 with no sync running.
+Binary DOC/XLS/PPT support targets Office 97-2003 and also applies to files inside containers.
+It uses the same saved-text lookup and snippet attribution; legacy text is never converted
+on demand. Encrypted or malformed documents retain their file without Markdown.
+One reprocessing pass creates both container children and legacy Office text; `mail-reindex`
+alone cannot create that text. IT-15 and IT-16 were accepted on 2026-10-27 after offline
+verification; user-run reprocessing and real-data checks are still pending.
 
 Every message response includes an absolute `localPath` to its directory. An agent with local
 file access may read those files directly. All reading tools use local data only, without

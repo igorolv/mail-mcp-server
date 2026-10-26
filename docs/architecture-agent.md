@@ -24,7 +24,7 @@ Implemented and checked on the user's real mailboxes (plan.md section 2):
 - Synthetic data sets in `testdata/` (`mime`, `search`, `redaction`); the search control set
   gives recall 79/86 = 0.919 with 7 false positives.
 
-`convert/PdfText`, `XlsxText` and `PptxText` are adapted from redmine-mcp-server
+`convert/PdfText`, `XlsxText`/`XlsText` and `PptxText`/`PptText` are adapted from redmine-mcp-server
 `extraction/parser/{PdfTextParser,XlsxTextParser,PptxTextParser}.java` at commit `f62b3e5`.
 
 Optional tool-output secret replacement for Д6 was accepted on 2026-10-26 after offline review;
@@ -63,7 +63,8 @@ platform thread through `SyncService` and returns at once.
 - **Lucene Core 10.5.2** — derived catalog, NRT lookups and the per-connection write lock.
 - **Lucene analysis-common, queryparser, highlighter 10.5.2** — field analyzers,
   `SimpleQueryParser` and `UnifiedHighlighter`, all on the catalog's version.
-- **PDFBox 3.0.5**, **POI poi-ooxml 5.4.1** — PDF, XLSX and PPTX attachment text.
+- **PDFBox 3.0.5**, **POI poi-ooxml and poi-scratchpad 5.4.1** — PDF, XLSX/PPTX text;
+  HWPF/HSSF/HSLF for binary DOC/XLS/PPT, HSMF/HMEF for MSG/TNEF children and message text.
 - StAX from the JDK for SOAP; no generated EWS classes, no `ews-java-api`.
 - **Gradle 9.8.2** wrapper with the version catalog `gradle/libs.versions.toml`.
 
@@ -112,18 +113,21 @@ cli/ ──► sync/, connections/, source/, store/, index/  (user-run commands 
 | `api/` | Stable MCP response records with `@Schema`. | Discovery, sync start/status, folder/message pages, body chunks, attachment references, `SearchResult` and `SearchHitInfo`. Never expose `source/` or `model/` records or settings here. |
 | `sync/` | One synchronization run and local conversion. | `SyncRunner`, `MessageProcessor`, `Processed`: reconcile by state, folders, removals, downloads/conversion in batches of 100, cursor after the folder. Caller owns the source and writer. `SyncService` owns background runs, `SyncStart` their immediate result; `SyncErrors` shares fixed CLI/status failure messages. |
 | `cli/` | User-run commands without Spring. | `GmailOAuthCommand`, `MailSyncCommand`, `MailReprocessCommand`, `MailReindexCommand`. Check pandoc before the index or sign-in; source closes before the index. Reprocessing and reindexing are offline. |
-| `mime/` | Local MIME parsing. | `MimeReader`, `ParsedMessage`: decoded headers, selected body and attachment files, no container expansion. See `docs/mime-agent.md`. |
-| `convert/` | Body and attachment text. | `Pandoc`, `PandocException`: sandboxed process per conversion; `AttachmentText` dispatches formats, `PdfText`, `XlsxText`, `PptxText` adapt sibling extraction methods. |
+| `mime/` | Local MIME and container reading. | `MimeReader`, `ParsedMessage`: decoded headers, selected body and MIME attachment files. `Containers` coordinates breadth-first EML/ZIP/MSG/TNEF expansion; package-private `MsgReader`/`TnefReader` enumerate immediate children using POI. See `docs/mime-agent.md`. |
+| `convert/` | Body and attachment text. | `Pandoc`, `PandocException`: sandboxed process per conversion; `AttachmentText` dispatches formats. `PdfText`, `XlsxText`/`XlsText`, `PptxText`/`PptText` adapt sibling extraction methods; `DocText` uses HWPF `WordExtractor`. |
 | `redaction/` | Tool-output text only. | `SecretRedactor`: offline detectors and merged replacement; wired by `config/RedactionConfig`. Never called by storage, index writers, MIME parsing, conversion or synchronization. |
 
-`SearchSnippets` has a narrow dependency on `MimeReader.read(eml, null)` to enumerate attachments
-in MIME order without writing. Only eligible returned page hits reach local MIME and UTF-8
+`SearchSnippets` uses `MimeReader.read(eml, null)` and `Containers.expand(..., false)` to enumerate
+MIME attachments followed by EML/ZIP/MSG/TNEF children breadth first without writing.
+Only eligible returned page hits reach local MIME and UTF-8
 `attachments/<file>.md`; no source, converter, cache or manifest is involved. For `any`, a real
 body highlight wins; otherwise the first matching attachment is used. `attachmentText` selects
 attachments first. Other field groups and legacy reader overloads keep body-only snippets.
 Missing local candidates retain body context. The complete selected text is transformed before
 rendering. Search hits expose the exact lookup filename and a separately filtered display name
-only for attachment snippets. Schema 3 and disk layout are unchanged; no migration is required.
+only for attachment snippets. Schema 3 and disk layout are unchanged. Existing data requires
+`mail-reprocess` to create newly supported children/Markdown; finish a connection before using
+attachment lookup/search because extracted filenames can be renumbered in mixed lists.
 
 ### Planned packages
 

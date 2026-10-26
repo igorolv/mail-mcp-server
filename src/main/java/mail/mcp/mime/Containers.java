@@ -16,7 +16,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.zip.ZipInputStream;
 
-/** Appends the files of saved nested messages and ZIP archives to the attachment list (plan.md 3.5). */
+/** Appends files inside saved EML, ZIP, MSG and TNEF containers (plan.md 3.5). */
 public final class Containers {
     private static final Logger log = LoggerFactory.getLogger(Containers.class);
     private static final int MAX_DEPTH = 5;
@@ -41,24 +41,36 @@ public final class Containers {
             var container = attachments.get(i);
             int depth = depths.getOrDefault(container.file(), 1);
             if (depth > MAX_DEPTH) { continue; }
-            String name = container.name() == null ? container.file() : container.name();
+            String name = (container.name() == null ? container.file() : container.name()).replace('\\', '/');
+            name = name.substring(name.lastIndexOf('/') + 1).toLowerCase(Locale.ROOT);
+            String type = container.contentType().toLowerCase(Locale.ROOT);
             int dot = name.lastIndexOf('.');
             String extension = dot < 0 ? "" : name.substring(dot + 1).toLowerCase(Locale.ROOT);
-            boolean eml = extension.equals("eml") || container.contentType().equals("message/rfc822");
-            boolean zip = extension.equals("zip") || container.contentType().equals("application/zip")
-                    || container.contentType().equals("application/x-zip-compressed")
-                    || container.contentType().equals("application/x-zip");
-            if (!eml && !zip) { continue; }
+            boolean eml = extension.equals("eml") || type.equals("message/rfc822");
+            boolean zip = extension.equals("zip") || type.equals("application/zip")
+                    || type.equals("application/x-zip-compressed") || type.equals("application/x-zip");
+            boolean msg = extension.equals("msg") || type.equals("application/vnd.ms-outlook");
+            boolean tnef = extension.equals("tnef") || name.equals("winmail.dat")
+                    || type.equals("application/ms-tnef") || type.equals("application/vnd.ms-tnef");
+            if (!eml && !zip && !msg && !tnef) { continue; }
             Path source = attachmentsDir.resolve(container.file());
             if (!Files.isRegularFile(source)) { continue; }
             Path partial = null;
             int next = attachments.size() + 1;
             try {
-                if (eml) {
+                if (eml || !zip && (msg || tnef)) {
                     var entries = new ArrayList<AttachmentInfo>();
                     try {
-                        stopped = MimeReader.readAttachments(source, save ? attachmentsDir : null, next,
-                                fileLimit - files, byteLimit - bytes, entries);
+                        if (eml) {
+                            stopped = MimeReader.readAttachments(source, save ? attachmentsDir : null, next,
+                                    fileLimit - files, byteLimit - bytes, entries);
+                        } else if (msg) {
+                            stopped = MsgReader.readAttachments(source, save ? attachmentsDir : null, next,
+                                    fileLimit - files, byteLimit - bytes, entries);
+                        } else {
+                            stopped = TnefReader.readAttachments(source, save ? attachmentsDir : null, next,
+                                    fileLimit - files, byteLimit - bytes, entries);
+                        }
                     } finally {
                         for (var entry : entries) {
                             attachments.add(new AttachmentInfo(entry.file(), entry.name(), entry.contentType(), entry.size(),

@@ -29,8 +29,8 @@ Walk `multipart/*` depth first. All other parts are leaves. A body candidate is 
 or `text/html`, without a filename and without attachment disposition. Select the first plain
 candidate, otherwise the first HTML candidate, otherwise no body. Other candidates are ignored.
 Use the declared charset without guessing. Every other leaf is an attachment, including unnamed
-binary parts and inline images. The reader keeps nested messages and ZIP as opaque leaves;
-`Containers` expands their saved files afterward. MSG, TNEF, S/MIME and calendars remain opaque.
+binary parts and inline images. The MIME reader keeps containers as leaves;
+`Containers` expands saved EML, ZIP, MSG and TNEF files afterward. S/MIME and calendars remain opaque.
 
 Attachments are numbered from one in walk order; the three-argument `read` starts at its
 `firstNumber` argument. Stored names are `<n>__<sanitized name>` or
@@ -47,8 +47,8 @@ directory is created only when an attachment exists.
 
 ## Containers
 
-`mime/Containers.expand(message, attachmentsDir, save)` appends files inside saved nested
-messages and ZIP archives to the original MIME attachment list. It walks the growing list by
+`mime/Containers.expand(message, attachmentsDir, save)` appends files inside saved EML, ZIP,
+MSG and TNEF containers to the original MIME attachment list. It walks the growing list by
 index (breadth first), opening appended containers when reached. One numbering continues
 after the MIME attachments. All files stay flat in `attachments/`; no archive path becomes
 a filesystem path. `AttachmentInfo.parent` is the containing attachment's stored filename,
@@ -67,9 +67,34 @@ last segment. ZIP entries have type `application/octet-stream`, no charset or co
 `inline=false`. Office formats are converted as documents, never opened as ZIP containers.
 ZIP names without the UTF-8 flag use CP866 (`IBM866`); flagged names use UTF-8.
 
+MSG is selected by `.msg` or `application/vnd.ms-outlook`; TNEF by `.tnef`, basename
+`winmail.dat`, `application/ms-tnef` or `application/vnd.ms-tnef`. Names and types match
+case-insensitively, with backslashes normalized before taking the basename. A generic `.dat`
+stays opaque. EML takes priority, then ZIP, MSG and TNEF, including for Markdown dispatch;
+conflicting text suffixes do not turn recognized containers into plain text. Parsers validate
+the selected format; arbitrary binary files are not sniffed.
+
+Package-private `MsgReader` (POI HSMF) and `TnefReader` (HMEF) enumerate immediate children
+only. They prefer a nonblank long filename, then short filename, otherwise no display name.
+Display paths normalize backslashes; stored filenames use only `MimeReader.safeName` of the
+last segment, with `part` for unnamed children. Binary payload bytes are unchanged; zero-byte
+attachments count as files. TNEF children have binary type, null charset/content ID and no
+inline disposition. Its RTF body is not an attachment. MSG children use valid declared MIME
+base types (lowercase) and charset parameters, otherwise binary type; angle brackets are
+removed from CIDs and `inline=false`. Explicit MSG code pages decode legacy filename chunks.
+Missing MSG payloads are skipped without consuming a number; reference paths/URLs are never opened.
+
+Embedded MAPI directories become standalone child `.msg` files with type
+`application/vnd.ms-outlook`. A supplied name gains `.msg` if needed; an unnamed message uses
+`embedded.msg`. POIFS copies the message streams/sub-storages, inserts the top-level header's
+eight reserved bytes after the embedded property header, and preserves the source root's
+`__nameid_version1.0` mapping (MS-OXMSG 2.2.2.1, 2.2.3, 2.4.1). It never serializes the whole
+parent filesystem or calls `MAPIMessage.write`. Subsequent breadth-first passes expand the saved
+child. Enumeration uses the same serialization into a counting/discard output, with no temporary files.
+
 A message's own attachments have depth 1. A container is opened only at depth at most 5;
 entries at depth 6 remain listed but unopened. Local constants allow at most 1,000 extracted
-files and 256 MiB extracted bytes per message, checked before containers and ZIP entries.
+files and 256 MiB extracted bytes per message across all four formats, checked before containers and children.
 Reaching either limit stops all later expansion. A ZIP entry over 20 MiB decoded is skipped
 without a number, and the next entry can still be extracted. An entry that would exceed the
 message byte limit stops expansion. Partial/skipped files are deleted when saving.
@@ -79,10 +104,23 @@ an overflowing attachment is not listed and its partial file is removed. Read-on
 uses the same limits. Completed entries survive a later MIME error; cleanup affects only the
 incomplete attachment. These checks do not impose new limits on the outer message's MIME walk.
 
+MSG/TNEF output uses actual payload lengths, or the serialized embedded MSG size. An exact fit
+is retained; overflow stops all later expansion without a number or partial file. Embedded MSG
+serialization stops writing when the remaining allowance would be exceeded. Readers append each
+completed entry immediately; `Containers` accounts for completed entries in `finally`, even on
+a later failure. POI eagerly loads data before enumeration: these are extracted-output limits,
+not a guaranteed heap bound. Default POI allocation safeguards are unchanged; there is no new
+source-size limit, shared budget, setting or catch of `Error`.
+
 An I/O, messaging or runtime exception stops only that container. Earlier listed entries remain,
 the incomplete entry is removed, and later containers can still expand. Debug logs contain
 only the exception class name. Container failures never change message state. These local
 limits are the approved exception in `plan.md` 3.8, not settings or a shared budget.
+
+For existing local data, run `mail-reprocess <connection>`; `mail-reindex` alone does not create
+children or Markdown. Complete reprocessing of the connection before attachment lookup/search
+with this version: newly supported containers can renumber later extracted files in mixed lists.
+Extracted filenames are not stable across this upgrade. Original `message.eml` stays unchanged.
 
 ## Pandoc and processing
 
@@ -118,8 +156,10 @@ as a contract. These differences follow the rules above and were accepted in rev
 (2026-10-25):
 
 - M05: declared ISO-8859-1 stays garbled; the second candidate is ignored.
-- M09: the opaque embedded-message stream is 6,276 bytes rather than 6,278; appending CRLF
-  reproduces the expected hash.
+- M09: the embedded EML stream is 6,276 bytes rather than 6,278; appending CRLF
+  reproduces the expected hash. The MSG, ZIP and TXT chain is expanded; ZIP/TXT hashes match.
+- M10: the long Cyrillic attachment name, size and payload hash match. The research expectation's
+  RTF body is converted to container Markdown, not emitted as an extra child attachment.
 - M16 part 3: the decoded name is `/etc/passwd`, sanitized only for storage.
 - M16 part 6: Angus retains the control character in the decoded name, matching the fixture;
   storage replaces it with `_`. The XML test report renders that character as `?`; the brief's
@@ -142,8 +182,8 @@ debug level by class name only. Markdown write errors propagate as local storage
 `MessageProcessor.load` reads existing Markdown without running converters.
 
 The lowercase extension of the decoded name (stored filename when unnamed) selects the format;
-without a known extension the MIME base content type selects it. Type `message/rfc822` also
-selects EML when the filename has another extension. ZIP containers never get Markdown.
+without a known extension the MIME base content type selects it. Container rules above take
+priority over ordinary format suffixes. ZIP containers never get Markdown.
 
 | Extensions | Content types | Conversion |
 |---|---|---|
@@ -154,10 +194,15 @@ selects EML when the filename has another extension. ZIP containers never get Ma
 | html, htm | text/html | decode, pandoc stdin, html |
 | csv | text/csv | decode, pandoc stdin, csv |
 | pdf | application/pdf | PDFBox |
+| doc | application/msword | POI HWPF WordExtractor |
+| xls | application/vnd.ms-excel | POI HSSF sheet names and formatted cells |
+| ppt | application/vnd.ms-powerpoint | POI HSLF slide text and tables |
 | xlsx | application/vnd.openxmlformats-officedocument.spreadsheetml.sheet | POI |
 | pptx | application/vnd.openxmlformats-officedocument.presentationml.presentation | POI |
 | txt | text/plain | decode, save as is |
 | eml | message/rfc822 | MIME headers and selected body |
+| msg | application/vnd.ms-outlook | HSMF display headers and first nonblank plain/HTML/RTF body |
+| tnef, winmail.dat | application/ms-tnef, application/vnd.ms-tnef | HMEF subject and RTF through pandoc stdin |
 
 HTML, CSV and plain text use the declared charset, UTF-8 when absent, with malformed bytes
 replaced; no charset guessing. Text passed to pandoc stdin is UTF-8. DOCX/ODT/RTF/EPUB are
@@ -170,9 +215,42 @@ ISO-8601 instant. A blank line separates headers from the selected body (plain t
 HTML through `pandoc.htmlToMarkdown`). Missing headers and missing bodies are omitted.
 The same 20 MiB conversion threshold applies. ZIP archives themselves get no Markdown.
 
+MSG emits the same header order using HSMF display getters for addresses and an ISO instant
+for a known date. Missing chunks are omitted individually; no fabricated date or address/name
+pairing. Body preference is plain, HTML through `htmlToMarkdown`, then decompressed RTF through
+`toMarkdown(rtf, "rtf")`. Only one body is included, with no attachment text or name listing.
+Legacy strings use declared `MESSAGE_CODEPAGE`/`INTERNET_CPID` with POI setters; Unicode is
+preserved and `guess7BitEncoding()` is never used. When both code pages are declared,
+`MESSAGE_CODEPAGE` applies to legacy headers and plain text, while `INTERNET_CPID` applies to
+HTML. TNEF emits an available subject and converts
+`HMEFMessage.getBody()` as RTF, never exposing raw control words. One blank line separates
+headers and body. Headers alone are useful; blank output or parsing/conversion failure yields
+no sidecar. POI objects/streams remain local and are closed on every path.
+
 The reviewer measured pandoc 3.1.11 on 2026-10-26: sandboxed file arguments work for DOCX, ODT,
 RTF and EPUB, while references inside a document remain sandboxed. Broken DOCX exits 63.
 Semicolon-separated CSV becomes one column; its text remains searchable, which is accepted.
 
-Images, archives themselves, MSG, TNEF, calendars, S/MIME and binary DOC/XLS/PPT are never
-converted; no OCR or expansion of archive formats other than ZIP is added.
+Binary Office 97-2003 files use `DocText`, `XlsText` and `PptText`. DOC uses
+`WordExtractor.getText()`; XLS uses the XLSX layout (`--- Sheet: name ---`, row cells joined
+with ` | `) and `DataFormatter`, without formula evaluation. PPT uses the PPTX layout
+(`--- Slide n ---`) for slide text and table cells. Readers close documents and read-only
+POIFS filesystems on every path. XLS sheet headings require a row with a nonblank cell;
+PPT table rows require a nonblank cell before adding separators. Empty sheets and slides
+containing only empty or whitespace-only table cells produce no Markdown. Input bytes remain
+unchanged. No scripts/macros, external
+references or embedded objects are executed or expanded. Earlier Word/Excel/PowerPoint
+formats have no extra compatibility reader. Encrypted, malformed or oversized inputs and
+blank extracted output have no Markdown; attachment failures remain best effort.
+
+Legacy extensions and base types are matched case-insensitively under the normal dispatch
+rules; EML/ZIP/MSG/TNEF recognition still takes priority. A recognized legacy suffix cannot
+fall through to plain text because of a conflicting `text/plain` declaration. No new
+dependency, option, size limit or state is introduced. Existing DOC/XLS/PPT files need
+`mail-reprocess` to create Markdown and indexed text, rather than `mail-reindex` alone.
+One reprocessing pass per connection covers both changes. IT-15 and IT-16 were accepted by
+the user on 2026-10-27 after offline verification; user-run reprocessing and real-data checks
+are still pending.
+
+Images, ZIP archives themselves, calendars and S/MIME are never converted; no OCR or expansion
+of archive formats other than ZIP is added.

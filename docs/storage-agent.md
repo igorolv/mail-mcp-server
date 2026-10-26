@@ -50,14 +50,24 @@ size and SHA-256, with `state=failed` and a fixed error. Supported attachments u
 `<file>.md`; absent or failed attachment
 text never changes metadata or the converted message state.
 See `docs/mime-agent.md` for parsing, naming and pandoc rules.
+Binary DOC/XLS/PPT (Office 97-2003) use the same `<file>.md` sidecars and index fields,
+including documents inside containers. No disk/API/schema change is required. Existing
+files need offline `mail-reprocess`, not merely `mail-reindex`, to create the newly supported
+Markdown; one pass covers containers and legacy Office text. IT-15 and IT-16 were accepted
+on 2026-10-27 after offline verification; user-run reprocessing and real-data checks are pending.
 
-Files inside nested messages and ZIP archives share the same flat `attachments/` directory
+Files inside EML, ZIP, MSG and TNEF containers share the same flat `attachments/` directory
 and numbering as MIME attachments. Their `AttachmentInfo.parent` points to the containing
 attachment's stored filename. The expanded list is derived from saved containers during
 processing and every read; there is no new JSON file or `meta.json` field. Existing messages
 need offline `mail-reprocess <connection>` to save extracted files and Markdown and update
 their indexed text. Until then, readers may list entries without paths or text paths.
 Index fields come from the expanded attachment list and saved Markdown; schema remains 3.
+MSG/TNEF expansion can renumber later extracted files in a mixed list. Finish reprocessing a
+connection before attachment lookup/search with this version; extracted filenames are not
+stable across the upgrade. `mail-reindex` alone does not create children or their Markdown.
+Original MIME/container bytes are preserved; embedded MAPI directories gain derived standalone
+`.msg` files with adapted property headers and the root named-property mapping.
 
 `folders.json` example (synthetic):
 

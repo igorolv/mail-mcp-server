@@ -28,6 +28,7 @@ dependencies {
     implementation(libs.lucene.highlighter)
     implementation(libs.pdfbox)
     implementation(libs.poi.ooxml)
+    implementation(libs.poi.scratchpad)
 
     testImplementation(libs.spring.boot.starter.test)
 }

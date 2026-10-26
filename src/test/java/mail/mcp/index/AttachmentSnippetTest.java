@@ -248,6 +248,64 @@ class AttachmentSnippetTest {
         }
     }
 
+    @Test void snippetComesFromOutlookEntry() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(mail.mcp.convert.PandocTest.pandocAvailable());
+        for (String id : new String[]{"M09", "M10"}) {
+            String key = store.newKey();
+            var directory = store.createMessageDir(key);
+            Files.copy(mail.mcp.OutlookFixtures.fixture(id), directory.resolve(MessageStore.MESSAGE_FILE));
+            var processed = new mail.mcp.sync.MessageProcessor(store, new mail.mcp.convert.Pandoc("pandoc"))
+                    .process(meta(key, "f1"));
+            try (var writer = MailIndex.openWriter(dir)) {
+                writer.put(processed.meta(), processed.message(), processed.body(), processed.attachmentText());
+                writer.commit();
+            }
+            var child = processed.message().attachments().getLast();
+            // A child-only word must attribute the passage to the document, not its container.
+            String query = id.equals("M09") ? "архива" : "вложение";
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                var hit = reader.search(query, SearchField.ATTACHMENT_TEXT, null, 0, 20, null, store).hits().stream()
+                        .filter(h -> h.card().key().equals(key)).findFirst().orElseThrow();
+                assertAttachment(hit, child.file(), child.name(), "**");
+                assertThat(hit.snippet()).containsIgnoringCase(query);
+                assertThat(child.parent()).isNotNull();
+                assertThat(MailIndex.SCHEMA).isEqualTo("3");
+            }
+        }
+    }
+
+    @Test void snippetComesFromLegacyOfficeInsideContainers() throws Exception {
+        byte[] xls = mail.mcp.LegacyOfficeFixtures.xls("Уникальный cobaltneedle в ячейке");
+        byte[] archive = mail.mcp.LegacyOfficeFixtures.zip("folder/ledger.xls", xls);
+        byte[] msg = mail.mcp.OutlookFixtures.msg("Container subject", "Unrelated container body",
+                new mail.mcp.OutlookFixtures.Child("archive.zip", archive));
+        String key = store.newKey();
+        var directory = store.createMessageDir(key);
+        var eml = directory.resolve(MessageStore.MESSAGE_FILE);
+        Files.write(eml, mail.mcp.OutlookFixtures.eml("message.msg", "application/vnd.ms-outlook", msg));
+        var processed = new mail.mcp.sync.MessageProcessor(store, new mail.mcp.convert.Pandoc("unused"))
+                .process(meta(key, "f1"));
+        assertThat(processed.meta().state()).isEqualTo(MessageState.CONVERTED);
+        assertThat(processed.message().attachments()).extracting(a -> a.file())
+                .containsExactly("1__message.msg", "2__archive.zip", "3__ledger.xls");
+        assertThat(processed.message().attachments()).extracting(a -> a.parent())
+                .containsExactly(null, "1__message.msg", "2__archive.zip");
+        assertThat(directory.resolve("attachments/3__ledger.xls")).hasBinaryContent(xls);
+        assertThat(directory.resolve("attachments/1__message.msg")).hasBinaryContent(msg);
+        try (var writer = MailIndex.openWriter(dir)) {
+            writer.put(processed.meta(), processed.message(), processed.body(), processed.attachmentText());
+            writer.commit();
+        }
+        try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+            for (var field : List.of(SearchField.ANY, SearchField.ATTACHMENT_TEXT)) {
+                var page = reader.search("cobaltneedle", field, null, 0, 20, null, store);
+                assertThat(page.total()).isEqualTo(1);
+                assertAttachment(page.hits().getFirst(), "3__ledger.xls", "folder/ledger.xls", "**cobaltneedle**");
+            }
+            assertThat(MailIndex.SCHEMA).isEqualTo("3");
+        }
+    }
+
     private SearchHit first(MailIndexReader reader, String query) {
         return reader.search(query, SearchField.ATTACHMENT_TEXT, null, 0, 20, null, store).hits().getFirst();
     }

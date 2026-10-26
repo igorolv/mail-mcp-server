@@ -10,6 +10,9 @@ mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/plan.md` section 2).
 - Eight MCP tools, background sync, offline reprocessing and reindexing work.
 - Gmail OAuth2 is implemented, but its real sign-in is unverified. The user deferred Gmail, so do
   not treat Gmail setup as a required next step.
+- MSG/TNEF expansion and DOC/XLS/PPT text (IT-15/IT-16) were accepted by the user on
+  2026-10-27 after offline verification: 582 tests, one intentional skip, no failures or errors.
+  User-run reprocessing and real-data checks are still pending. IT-14 acceptance is not recorded.
 
 Work now consists of polishing and optional improvements:
 - `docs/plan.md` section 4 lists them (`Д1`, `Д2`, …); the user chooses which to take.
@@ -150,12 +153,19 @@ code is listed in `docs/architecture-agent.md`.
 - **Read-only at protocol level:** an allow-list of 10 EWS read operations; IMAP `EXAMINE`,
   `BODY.PEEK` and `CLOSE`, never `SELECT`; never set flags in the mailbox.
 - **MIME:** every source delivers MIME (`.eml`), kept exactly as downloaded and parsed with Angus
-  Mail. Nested messages, MSG, TNEF and ZIP stay plain attachments. There is no separate parsing
-  process and no shared limit budget.
+  Mail. `Containers` expands EML, ZIP, MSG and TNEF breadth first into a flat attachment list
+  with immediate `parent` links, depth 5 and message-wide extracted-output limits of 1,000
+  files / 256 MiB. ZIP entries have a 20 MiB limit. Original containers remain unchanged;
+  embedded MAPI messages gain standalone `.msg` files. There is no separate parsing process
+  or shared budget object; POI parsing itself is eager. Existing data needs user-run
+  `mail-reprocess`; finish a connection before attachment lookup/search because extracted
+  filenames can change across this upgrade.
 - **Pandoc is required** (user decision).
   - One sandboxed `pandoc --sandbox` process per conversion turns HTML bodies and
     DOCX/ODT/RTF/EPUB/HTML/CSV attachments into Markdown.
-  - PDF, XLSX and PPTX use PDFBox and POI.
+  - PDF uses PDFBox; DOC/XLS/PPT (Office 97-2003), XLSX and PPTX use POI.
+  - MSG headers and the first nonblank plain/HTML/RTF body become Markdown; TNEF provides
+    its subject and RTF body. HTML/RTF use pandoc. Declared code pages are applied without guessing.
   - Without pandoc, sync and reprocessing refuse to start.
 - **Storage, no SQLite:**
   - one directory per message, `<connection>/messages/<k2>/<key>/`, with `message.eml`,

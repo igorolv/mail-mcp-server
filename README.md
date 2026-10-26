@@ -14,6 +14,10 @@ Gmail with OAuth2 is implemented but has not been tried against a real account. 
 checks run on Windows. Possible improvements are listed in
 [docs/plan.md](docs/plan.md#4-возможные-доработки) (in Russian).
 
+MSG/TNEF extraction and DOC/XLS/PPT text were accepted on 2026-10-27 after offline verification
+(582 tests, one intentional skip, no failures or errors). Reprocessing existing data and checking
+these additions against real messages are still pending.
+
 **Contents:** [Features](#features) · [How it works](#how-it-works) · [Quickstart](#quickstart) ·
 [MCP tools](#mcp-tools) · [Commands](#commands) · [Read-only protection](#read-only-protection) ·
 [Data and privacy](#data-and-privacy) · [Environment variables](#environment-variables) ·
@@ -35,9 +39,15 @@ checks run on Windows. Possible improvements are listed in
 - **Full local copy** per message: `message.eml` as downloaded, `meta.json`, `body.md`, the
   attachments, and `<attachment>.md` with the attachment's text.
   - Bodies, DOCX, ODT, RTF, EPUB, HTML and CSV are converted with sandboxed pandoc.
-  - PDF goes through PDFBox, XLSX and PPTX through Apache POI.
-  - Files inside nested messages and ZIP archives are extracted as attachments and converted too;
-    nested message headers and bodies become Markdown. Use `mail-reprocess` for existing messages.
+  - PDF goes through PDFBox; DOC/XLS/PPT (Office 97-2003), XLSX and PPTX through Apache POI.
+  - Files inside EML, ZIP, Outlook MSG and TNEF (`winmail.dat`) containers are extracted as
+    attachments and converted too; message headers and selected bodies become Markdown.
+    Each child's `parent` is its container's stored filename. Original MIME and container bytes
+    are preserved; embedded MAPI messages gain standalone `.msg` files.
+    Use `mail-reprocess` for existing messages (`mail-reindex` alone is insufficient).
+    Finish reprocessing a connection before attachment lookup/search after this upgrade:
+    newly supported containers can renumber later extracted files in mixed lists.
+    A single reprocessing pass covers both container extraction and legacy Office text.
 - **Search:** Lucene with `RussianAnalyzer` plus an English field, exact address and file name
   terms, file name parts, phrases, and a highlighted snippet. It searches subject, body, sender,
   recipients, attachment names and attachment text.

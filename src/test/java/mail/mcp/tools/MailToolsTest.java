@@ -177,6 +177,54 @@ class MailToolsTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test void getMessageAndAttachmentExposeOutlookEntries() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(mail.mcp.convert.PandocTest.pandocAvailable());
+        for (String id : new String[]{"M09", "M10"}) {
+            String key = keys.getFirst();
+            var directory = store.messageDir(key);
+            Files.copy(mail.mcp.OutlookFixtures.fixture(id), directory.resolve(MessageStore.MESSAGE_FILE),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            var processed = new MessageProcessor(store, new Pandoc("pandoc")).process(store.readMeta(key).orElseThrow());
+            var result = tools.getMessage("local", key, null, null);
+            assertThat(result.attachments()).hasSize(id.equals("M09") ? 4 : 2);
+            for (int i = 0; i < result.attachments().size(); i++) {
+                var entry = result.attachments().get(i);
+                var expected = processed.message().attachments().get(i);
+                assertThat(entry.file()).isEqualTo(expected.file());
+                assertThat(entry.parent()).isEqualTo(expected.parent());
+                var actual = tools.getAttachment("local", key, entry.file(), null, null);
+                assertThat(actual.path()).isEqualTo(entry.path());
+                assertThat(Files.size(Path.of(actual.path()))).isEqualTo(expected.size());
+                if (entry.textPath() != null) { assertThat(actual.text()).isEqualTo(Files.readString(Path.of(entry.textPath()))); }
+            }
+            var child = result.attachments().getLast();
+            assertThat(child.parent()).isEqualTo(id.equals("M09") ? "3__package.zip" : "1__winmail.dat");
+            if (id.equals("M10")) {
+                assertThat(child.name()).isEqualTo("Длинное имя вложения для учебного письма.txt");
+                assertThat(tools.getAttachment("local", key, child.file(), null, null).text()).isNotBlank();
+            }
+        }
+    }
+
+    @Test void getAttachmentExposesLegacyOfficeText() throws Exception {
+        String key = keys.getFirst();
+        var directory = store.messageDir(key);
+        Files.write(directory.resolve(MessageStore.MESSAGE_FILE), mail.mcp.LegacyOfficeFixtures.message());
+        new MessageProcessor(store, new Pandoc("unused")).process(store.readMeta(key).orElseThrow());
+        var message = tools.getMessage("local", key, null, null);
+        assertThat(message.state()).isEqualTo("converted");
+        assertThat(message.attachments()).hasSize(4);
+        for (var entry : message.attachments().subList(0, 3)) {
+            var result = tools.getAttachment("local", key, entry.file(), null, null);
+            assertThat(result.file()).isEqualTo(entry.file());
+            assertThat(result.path()).isEqualTo(entry.path());
+            assertThat(result.textPath()).isEqualTo(entry.textPath());
+            assertThat(result.text()).isEqualTo(Files.readString(Path.of(entry.textPath())));
+            assertThat(result.textLength()).isEqualTo(result.text().length());
+        }
+        assertThat(tools.getAttachment("local", key, "4__broken.doc", null, null).text()).isNull();
+    }
+
     @Test void listFoldersCountsMessagesAndShowsSynced() {
         var result = tools.listFolders("local");
         assertThat(result.folders()).extracting(f -> f.key()).containsExactly("f1", "f2");

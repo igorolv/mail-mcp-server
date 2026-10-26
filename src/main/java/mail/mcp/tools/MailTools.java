@@ -106,7 +106,7 @@ public class MailTools {
     }
 
     @McpTool(description = "Read local message headers, a body.md chunk and attachment paths. " +
-            "Attachments include files inside nested messages and ZIP archives, with their parent file. " +
+            "Attachments include files inside EML, ZIP, MSG and TNEF containers, with their parent file. " +
             "maxChars defaults to 20000, capped at 100000; use nextOffset for the next chunk. localPath points at files " +
             "the agent may read directly. Local data may be incomplete during sync; check listFolders.synced " +
             "and syncStatus. When secret filtering is enabled, body offsets refer to the filtered text; " +
@@ -163,8 +163,8 @@ public class MailTools {
     }
 
     @McpTool(description = "Read a local attachment and extracted text in chunks. Text exists only for DOCX, ODT, " +
-            "RTF, EPUB, HTML, CSV, PDF, XLSX, PPTX, EML and plain text up to 20 MiB, when conversion succeeds. " +
-            "Attachments include files inside nested messages and ZIP archives; accepts their exact file from getMessage. " +
+            "RTF, EPUB, HTML, CSV, PDF, DOC, XLS, PPT, XLSX, PPTX, EML, MSG, TNEF and plain text up to 20 MiB, when conversion succeeds. " +
+            "Attachments include files inside EML, ZIP, MSG and TNEF containers; accepts their exact file from getMessage. " +
             "path is the original file; textPath is the Markdown. maxChars defaults to 20000, capped at 100000; " +
             "use nextOffset for the next chunk. With secret filtering, offsets refer to filtered text; " +
             "original files stay unfiltered. No mailbox or pandoc access.", generateOutputSchema = true,
