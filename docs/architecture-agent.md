@@ -85,6 +85,7 @@ tools/ ──► sync/SyncService ──► sync/ ──► source/ (MailSource;
   │                                └────► store/, index/
   └──────────────────► store/, index/          (committed tool readers)
 index/ ──► store/                              (reconciliation)
+       └─► mime/                               (read-only snippet attachment enumeration)
 connections/ ──► source/                        (builds lazy MailSource session factories)
 model/   — shared disk and catalog records
 api/     — MCP wire records returned by tools
@@ -106,7 +107,7 @@ cli/ ──► sync/, connections/, source/, store/, index/  (user-run commands 
 | `source/oauth/google/` | Google Desktop OAuth and refresh credentials. | All `Google*` classes and the package-private `OAuthJson` helper. Depends on shared `source/oauth/` components. See `docs/gmail-oauth-agent.md`. |
 | `model/` | Shared disk records and lifecycle. | `MessageState`, `MessageMeta`, `LocalFolder`, `MailMessage`, `Address`, `AttachmentInfo`, `MessageCard`, `SearchHit`, `SearchResults`, `FolderProgress`, `SyncStatus`, one type per file. |
 | `store/` | Local message directories and metadata. | `MessageStore`: UUID paths, atomic `meta.json`, `folders.json` and `sync-status.json`, listing and deletion. See `docs/storage-agent.md`. |
-| `index/` | Derived Lucene catalog and committed readers. | `MailIndex`: schema 3, metadata, headers/body/attachment text fields, NRT key/ref lookups, commit and reconciliation; `IndexLockedException`. `MailAnalyzers` shares per-field analysis, `SearchField` defines groups. `MailIndexReader` reads committed counts, sorted cards and scored search hits with snippets without the writer lock. See `docs/storage-agent.md`. |
+| `index/` | Derived Lucene catalog and committed readers. | `MailIndex`: schema 3, metadata, headers/body/attachment text fields, NRT key/ref lookups, commit and reconciliation; `IndexLockedException`. `MailAnalyzers` shares per-field analysis, `SearchField` defines groups. `MailIndexReader` reads committed counts, sorted cards and scored search hits without the writer lock. Package-private `SearchSnippets` selects a body or saved attachment passage after paging. See `docs/storage-agent.md`. |
 | `tools/` | Thin `@McpTool` adapters, Spring `@Service` beans. | `ConnectionTools` (`listConnections`), `SyncTools` (`sync`, `syncStatus`), `MailTools` (`listFolders`, `listMessages`, `getMessage`), `SearchTools` (`search`), `ToolLogger`. |
 | `api/` | Stable MCP response records with `@Schema`. | Discovery, sync start/status, folder/message pages, body chunks, attachment references, `SearchResult` and `SearchHitInfo`. Never expose `source/` or `model/` records or settings here. |
 | `sync/` | One synchronization run and local conversion. | `SyncRunner`, `MessageProcessor`, `Processed`: reconcile by state, folders, removals, downloads/conversion in batches of 100, cursor after the folder. Caller owns the source and writer. `SyncService` owns background runs, `SyncStart` their immediate result; `SyncErrors` shares fixed CLI/status failure messages. |
@@ -114,6 +115,15 @@ cli/ ──► sync/, connections/, source/, store/, index/  (user-run commands 
 | `mime/` | Local MIME parsing. | `MimeReader`, `ParsedMessage`: decoded headers, selected body and attachment files, no container expansion. See `docs/mime-agent.md`. |
 | `convert/` | Body and attachment text. | `Pandoc`, `PandocException`: sandboxed process per conversion; `AttachmentText` dispatches formats, `PdfText`, `XlsxText`, `PptxText` adapt sibling extraction methods. |
 | `redaction/` | Tool-output text only. | `SecretRedactor`: offline detectors and merged replacement; wired by `config/RedactionConfig`. Never called by storage, index writers, MIME parsing, conversion or synchronization. |
+
+`SearchSnippets` has a narrow dependency on `MimeReader.read(eml, null)` to enumerate attachments
+in MIME order without writing. Only eligible returned page hits reach local MIME and UTF-8
+`attachments/<file>.md`; no source, converter, cache or manifest is involved. For `any`, a real
+body highlight wins; otherwise the first matching attachment is used. `attachmentText` selects
+attachments first. Other field groups and legacy reader overloads keep body-only snippets.
+Missing local candidates retain body context. The complete selected text is transformed before
+rendering. Search hits expose the exact lookup filename and a separately filtered display name
+only for attachment snippets. Schema 3 and disk layout are unchanged; no migration is required.
 
 ### Planned packages
 

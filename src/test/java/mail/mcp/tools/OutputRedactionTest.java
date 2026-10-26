@@ -169,6 +169,50 @@ class OutputRedactionTest {
         assertThat(new SyncTools(registry, sync, mapper).syncStatus("local").error()).contains(SECRET);
     }
 
+    @Test void attachmentSnippetsFilterBeforeHighlightingAndKeepIdentity() throws Exception {
+        var directory = store.messageDir(key);
+        var message = MimeReader.read(directory.resolve(MessageStore.MESSAGE_FILE), null).message();
+        String file = message.attachments().getFirst().file();
+        String farSecret = "FictionOnlyFarAttachmentSecret";
+        String text = "Reporting results.\nPassword: \"" + SECRET + "\"\nSafe nearby sentence.\n"
+                + "Password: \"" + "Filler sentence. ".repeat(1200) + farSecret + "\"\nFinal safe context.";
+        Files.writeString(directory.resolve("attachments").resolve(file + ".md"), text);
+        String body = "Unrelated **note** in the body.";
+        Files.writeString(directory.resolve(MessageStore.BODY_FILE), body);
+        try (var index = MailIndex.openWriter(dir)) {
+            index.put(store.readMeta(key).orElseThrow(), message, body, text);
+            index.commit();
+        }
+        var before = snapshot();
+        var rawSearch = new SearchTools(registry, mapper);
+        var filteredSearch = new SearchTools(registry, mapper, redactor);
+        for (var field : List.of("any", "attachmentText")) {
+            for (String query : List.of(SECRET, "Reporting", farSecret)) {
+                var original = rawSearch.search("local", query, field, "f1", null, null);
+                var result = filteredSearch.search("local", query, field, "f1", null, null);
+                assertThat(result.total()).isEqualTo(1).isEqualTo(original.total());
+                var rawHit = original.hits().getFirst();
+                var hit = result.hits().getFirst();
+                assertThat(hit.key()).isEqualTo(key).isEqualTo(rawHit.key());
+                assertThat(hit.score()).isEqualTo(rawHit.score());
+                assertThat(hit.localPath()).isEqualTo(rawHit.localPath());
+                assertThat(hit.snippetAttachmentFile()).isEqualTo(file).isEqualTo(rawHit.snippetAttachmentFile());
+                assertThat(file).contains(SECRET);
+                assertThat(rawHit.snippetAttachmentName()).contains(SECRET);
+                assertThat(hit.snippetAttachmentName()).isEqualTo(redactor.text(rawHit.snippetAttachmentName()))
+                        .doesNotContain(SECRET);
+                assertThat(hit.snippet()).doesNotContain(SECRET, farSecret, "Filler");
+                if (query.equals("Reporting")) {
+                    assertThat(hit.snippet()).contains("**Reporting**");
+                } else {
+                    assertThat(rawHit.snippet()).contains("**" + query + "**");
+                    assertThat(hit.snippet()).contains("Reporting results.");
+                }
+            }
+        }
+        assertUnchanged(before);
+    }
+
     private Map<Path, byte[]> snapshot() throws Exception {
         Map<Path, byte[]> result = new LinkedHashMap<>();
         try (var files = Files.walk(dir)) {

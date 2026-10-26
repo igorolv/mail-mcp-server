@@ -136,8 +136,8 @@ Address fields and `attachmentFile` use `KeywordTokenizer` and `LowerCaseFilter`
 complete addresses and filenames. `attachmentName` uses `PatternTokenizer("[^\\p{L}\\p{N}]+", -1)`,
 `LowerCaseFilter` and Snowball's `RussianStemmer`, splitting underscores and punctuation.
 Attachment contents use the Russian default analyzer and English analyzer for `attachmentText_en`.
-They are indexed without being stored; snippets still use the message body, so an attachment-only
-hit may show leading body text.
+They are indexed without being stored. Snippets can read individual saved Markdown sidecars
+after paging; index fields and schema remain unchanged, with no migration or reindexing needed.
 
 Every commit, including closing the writer, carries user data `schema=3` (`MailIndex.SCHEMA`).
 Opening an existing index with another schema or no schema uses `OpenMode.CREATE`, rebuilding
@@ -195,10 +195,19 @@ The separate field preserves the `key` field's doc values type NONE.
 `current()` checks commit schema; search tools reject old schemas until a rebuild.
 Search uses equal-weight field groups, required words and phrases through `SimpleQueryParser`,
 an optional folder ref prefix FILTER, exact counts and score descending/key ascending sorting.
-`UnifiedHighlighter` reanalyzes stored `body`, combining matches from `body_en` on the same text;
-the formatter uses `**` around matches and `… ` between passages. Missing bodies yield null.
-An optional output transform passed by `SearchTools` filters the complete stored body before
-in-memory highlighting (`highlightWithoutSearcher`); the query used for highlighting omits
-the folder filter. This affects snippets only, not search matches, scores, totals, disk or index.
-See `docs/redaction-agent.md`. With no transform, the existing highlighting path is unchanged.
+`SearchSnippets` uses in-memory `UnifiedHighlighter` with the parsed query without the folder
+filter. `any` prefers a real body highlight, then the first matching attachment; `attachmentText`
+selects attachments first. Other groups and overloads without a `MessageStore` keep body-only
+snippets. Only eligible page hits enumerate local MIME once without output and read saved UTF-8
+`attachments/<AttachmentInfo.file()>.md` in MIME order, one text at a time. Missing/broken MIME
+or unusable sidecars keep the hit and body context fallback (null without a body). Original
+binaries are not needed for an existing sidecar; `.md` attachments use `.md.md` sidecars.
+The formatter uses `**` around matches and `… ` between passages, at most one passage. Body and
+attachment fields mask only their own `_en` field; phrase positions apply to each individual text.
+The highlighters see complete supplied text, including matches beyond character 10,000.
+An optional output transform filters the complete selected text before rendering. If it removes
+the match, safe context keeps the selected attachment identity; blank transformed text has no
+snippet/identity. The exact lookup filename and the separately filtered display name are optional
+search-hit fields. This changes no matches, scores, totals, pagination, files or index schema.
+See `docs/redaction-agent.md`; no reprocessing or migration is required for existing sidecars.
 The writer's NRT lookups remain separate; tools see only committed documents.

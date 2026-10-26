@@ -6,6 +6,7 @@ import mail.mcp.connections.ConnectionDefinition;
 import mail.mcp.connections.ConnectionRegistry;
 import mail.mcp.connections.ConnectionType;
 import mail.mcp.index.MailIndex;
+import mail.mcp.mime.MimeReader;
 import mail.mcp.model.Address;
 import mail.mcp.model.AttachmentInfo;
 import mail.mcp.model.LocalFolder;
@@ -13,6 +14,7 @@ import mail.mcp.model.MailMessage;
 import mail.mcp.model.MessageMeta;
 import mail.mcp.model.MessageState;
 import mail.mcp.store.MessageStore;
+import mail.mcp.sync.SyncService;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.FSDirectory;
@@ -21,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.util.List;
 
@@ -31,16 +34,68 @@ class SearchToolsTest {
     @TempDir Path dir;
     private MessageStore store;
     private SearchTools tools;
+    private ConnectionRegistry registry;
 
     @BeforeEach void prepare() {
         var mapper = new JsonConfig().mailMcpObjectMapper();
         store = new MessageStore(dir, mapper);
         var definition = new ConnectionDefinition("local", null, ConnectionType.IMAP, AuthKind.APP_PASSWORD,
                 null, null, dir, null);
-        var registry = new ConnectionRegistry(List.of(definition), d -> { throw new AssertionError("no source"); });
+        registry = new ConnectionRegistry(List.of(definition), d -> { throw new AssertionError("no source"); });
         tools = new SearchTools(registry, mapper);
         store.saveFolders(List.of(new LocalFolder("f1", "INBOX", "INBOX", "7"),
                 new LocalFolder("f2", "Archive", "Archive", null)));
+    }
+
+    @Test void attachmentSnippetIdentifiesAReadableAttachment() throws Exception {
+        String key = store.newKey();
+        var directory = store.createMessageDir(key);
+        var eml = directory.resolve(MessageStore.MESSAGE_FILE);
+        Files.writeString(eml, """
+                Subject: Synthetic attachment
+                MIME-Version: 1.0
+                Content-Type: multipart/mixed; boundary=synthetic
+
+                --synthetic
+                Content-Type: text/plain
+
+                Unrelated body.
+                --synthetic
+                Content-Type: application/pdf
+                Content-Disposition: attachment; filename="report.pdf"
+
+                Synthetic binary
+                --synthetic--
+                """.replace("\n", "\r\n"));
+        var message = MimeReader.read(eml, directory.resolve("attachments")).message();
+        String file = message.attachments().getFirst().file();
+        String text = "A needle in the saved Markdown.";
+        Files.writeString(directory.resolve("attachments").resolve(file + ".md"), text);
+        var meta = new MessageMeta(key, "f1", "INBOX", key, 0, null, Instant.now(), MessageState.CONVERTED, null);
+        store.writeMeta(meta);
+        var mapper = new JsonConfig().mailMcpObjectMapper();
+        try (var index = MailIndex.openWriter(dir)) {
+            index.put(meta, message, "Unrelated body.", text);
+            put(index, "f1");
+            index.commit();
+        }
+        var hit = tools.search("local", "needle", "attachmentText", null, null, null).hits().getFirst();
+        assertThat(hit.snippet()).contains("**needle**");
+        assertThat(hit.snippetAttachmentFile()).isEqualTo(file);
+        assertThat(hit.snippetAttachmentName()).isEqualTo("report.pdf");
+        var mail = new MailTools(registry, new SyncService(registry,
+                () -> { throw new AssertionError("no pandoc"); }, mapper), mapper);
+        var attachment = mail.getAttachment("local", hit.key(), hit.snippetAttachmentFile(), null, null);
+        assertThat(attachment.text()).isEqualTo(text);
+        assertThat(attachment.path()).isEqualTo(directory.resolve("attachments").resolve(file).toAbsolutePath().toString());
+        assertThat(hit.localPath()).isEqualTo(mail.getMessage("local", key, null, null).localPath());
+        var json = mapper.readTree(mapper.writeValueAsString(hit));
+        assertThat(json.path("snippetAttachmentFile").asString()).isEqualTo(file);
+        assertThat(json.path("snippetAttachmentName").asString()).isEqualTo("report.pdf");
+        var body = tools.search("local", "reports", "body", null, null, null).hits().getFirst();
+        var bodyJson = mapper.readTree(mapper.writeValueAsString(body));
+        assertThat(bodyJson.has("snippetAttachmentFile")).isFalse();
+        assertThat(bodyJson.has("snippetAttachmentName")).isFalse();
     }
 
     private String put(MailIndex index, String folder) {

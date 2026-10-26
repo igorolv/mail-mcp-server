@@ -18,7 +18,7 @@ and rethrown; `IllegalArgumentException` becomes an MCP tool error with its mess
 | `listMessages` | Required `connection`, `folder`; optional `offset`, `limit` | Folder cards sorted by descending date (undated last), then key; total, offset, optional nextOffset. Offset defaults to 0; limit to 50, capped at 200. Unknown folder is an error. |
 | `getMessage` | Required `connection`, `key`; optional `offset`, `maxChars` | Metadata, MIME headers, body.md chunk, bodyLength, optional nextOffset and attachment file paths and optional Markdown `textPath`. Offset defaults to 0; maxChars to 20,000, capped at 100,000. Invalid/nonexistent UUID is an error. |
 | `getAttachment` | Required `connection`, `key`, `file`; optional `offset`, `maxChars` | Original file path and saved Markdown chunk, textPath, textLength and optional nextOffset. `file` must exactly match a stored attachment filename parsed from that message's MIME. Unknown file (including traversal or another message's filename) is an error. Offset defaults to 0; maxChars to 20,000, capped at 100,000. |
-| `search` | Required `connection`, `query`; optional `field`, `folder`, `offset`, `limit` | Local cards with BM25 score and body snippet, sorted by score descending then key. Exact total, offset and optional nextOffset. Query must be nonblank and at most 1,000 characters. Offset defaults to 0; limit to 20, capped at 100. Unknown field/folder is an error. No index means zero hits. |
+| `search` | Required `connection`, `query`; optional `field`, `folder`, `offset`, `limit` | Local cards with BM25 score and body or saved attachment snippet, sorted by score descending then key. Exact total, offset and optional nextOffset. Query must be nonblank and at most 1,000 characters. Offset defaults to 0; limit to 20, capped at 100. Unknown field/folder is an error. No index means zero hits. |
 
 Offsets must be nonnegative and sizes positive; invalid values raise `IllegalArgumentException`.
 Offsets at or beyond the end yield an empty page/chunk with no nextOffset. Body and attachment text offsets
@@ -56,13 +56,28 @@ MCP resources, mail flags and mail writing are not implemented here.
 `SearchTools.search` returns `SearchResult(connection, query, field, folder, total, offset,
 nextOffset, hits)`. Each `SearchHitInfo` includes key, folder key, date, displayed from, subject,
 hasAttachments, state, score, snippet and the absolute message directory `localPath`.
-Snippets use Markdown `**matches**` and `… ` between passages; absent bodies yield null.
-The stored body is reanalyzed by `UnifiedHighlighter`, including English-field matches.
-With secret filtering enabled, the complete stored body is filtered before passage selection
-and highlighting using the highlighter's in-memory API; raw matching, scores and totals stay
-unchanged. The search query echo is filtered too. No reindexing is needed.
-Attachment text is indexed without being stored. Snippets remain on body; an attachment-only
-match may show leading body text.
+Snippets use Markdown `**matches**` and `… ` between passages, at most one passage per hit.
+For `any`, a real body highlight wins; otherwise the first attachment with a highlightable query
+clause supplies the passage. `attachmentText` selects attachments first, even when the body
+contains the same words. Other field groups retain body snippet/context behavior.
+`snippetAttachmentFile` is the exact `AttachmentInfo.file()` without the sidecar suffix, usable
+directly as `getAttachment(connection, key, file, ...)`. `snippetAttachmentName` is the original
+display name, falling back to `file` when null/blank, with optional secret filtering. The lookup
+filename is unchanged. Both fields are optional and omitted for body or absent snippets.
+
+Only eligible returned page hits read local `message.eml` once with `MimeReader.read(eml, null)`,
+then saved UTF-8 `attachments/<file>.md` one at a time in MIME order. No conversion or writes occur.
+An original `.md` attachment uses its `.md.md` sidecar. A missing binary does not block a sidecar.
+Missing/broken MIME or missing, unreadable, malformed UTF-8 or blank sidecars retain the hit and
+fall back to body context (null without a body) when no later usable match exists.
+
+`UnifiedHighlighter` reanalyzes the complete selected text, including English-field matches and
+occurrences beyond 10,000 characters. Selection uses raw text regardless of the redaction flag;
+with filtering enabled, the complete selected text is filtered before passage selection and
+highlighting. If the match is removed, safe leading context retains the attachment identity;
+blank transformed text has no snippet or attachment fields. Raw matches, scores, totals and
+pagination stay unchanged. The query echo is filtered too. Schema 3 and disk format remain
+unchanged; existing Markdown needs no migration, reindexing or reprocessing.
 
 | Field group | Index fields |
 |---|---|

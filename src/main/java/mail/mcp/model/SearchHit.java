@@ -1,4 +1,9 @@
 package mail.mcp.model;
 
-/** A local message card with its BM25 score and optional body snippet. */
-public record SearchHit(MessageCard card, float score, String snippet) { }
+/**
+ * A scored card with an optional Markdown passage from the body or one saved attachment text.
+ * Attachment fields are null for body/absent snippets; file is the exact AttachmentInfo.file()
+ * lookup identifier without the sidecar suffix, and name is the display name (file when blank).
+ */
+public record SearchHit(MessageCard card, float score, String snippet,
+                        String snippetAttachmentFile, String snippetAttachmentName) { }

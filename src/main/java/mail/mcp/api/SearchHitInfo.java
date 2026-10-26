@@ -1,10 +1,12 @@
 package mail.mcp.api;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
 
-@Schema(description = "A matching local message with a score and body snippet.")
+/** A scored message with an optional body or saved attachment Markdown passage and its identity. */
+@Schema(description = "A matching local message with a score and body or attachment snippet.")
 public record SearchHitInfo(
         @Schema(description = "Local message UUID.", requiredMode = Schema.RequiredMode.REQUIRED)
         String key,
@@ -22,9 +24,18 @@ public record SearchHitInfo(
         String state,
         @Schema(description = "BM25 relevance score.", requiredMode = Schema.RequiredMode.REQUIRED)
         float score,
-        @Schema(description = "Markdown body passage with **matches**; absent without a body.", nullable = true,
+        @Schema(description = "Markdown passage from the body or one saved attachment text, with **matches**; optional.", nullable = true,
                 requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String snippet,
         @Schema(description = "Absolute message directory; files may be read directly.", requiredMode = Schema.RequiredMode.REQUIRED)
-        String localPath
+        String localPath,
+        @Schema(description = "Exact AttachmentInfo.file() lookup identifier, without the sidecar .md suffix; " +
+                "pass to getAttachment(connection, key, file, ...). Absent for body or missing snippets.",
+                nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        String snippetAttachmentFile,
+        @Schema(description = "Attachment display name, falling back to its exact filename when null or blank; " +
+                "present only with an attachment snippet.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        String snippetAttachmentName
 ) { }

@@ -44,10 +44,12 @@ public class SearchTools {
             "full addresses must be complete; a query that is a single full address is matched against " +
             "addresses only, not display names; file names match whole or by parts split at non-letters. " +
             "Results use local data only; listFolders.synced shows coverage. limit defaults to 20, capped at 100. " +
-            "Use nextOffset to page. snippet always comes from the body and marks body matches with **; for a " +
-            "match in attachment text only, read the attachments with getAttachment. localPath points at files " +
+            "Use nextOffset to page. snippet marks matches with **. For any, body matches win, otherwise the first " +
+            "matching saved attachment text is used; attachmentText uses attachments first. Other fields keep body " +
+            "context. Missing local texts fall back to body context. snippetAttachmentFile is the exact file for " +
+            "getAttachment; snippetAttachmentName is its display name. localPath points at files " +
             "the agent may read. Optional secret filtering changes output text only, not matching or ranking; " +
-            "snippets are built from the filtered body. Original files stay unfiltered.",
+            "the complete selected text is filtered before highlighting. No reindexing is needed. Original files stay unfiltered.",
             generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public SearchResult search(
@@ -78,12 +80,13 @@ public class SearchTools {
                             "run 'mail-reindex <connection>' in a terminal or start a sync to rebuild it");
                 }
                 var results = reader == null ? new SearchResults(0, List.of())
-                        : reader.search(query, group, folder, position, size, redactor.enabled() ? redactor::text : null);
+                        : reader.search(query, group, folder, position, size, redactor.enabled() ? redactor::text : null, store);
                 var hits = results.hits().stream().map(hit -> {
                     var c = hit.card();
                     return new SearchHitInfo(c.key(), c.folderKey(), c.date(), redactor.text(c.from()), redactor.text(c.subject()),
                             c.hasAttachments(), c.state(), hit.score(), hit.snippet(),
-                            store.messageDir(c.key()).toAbsolutePath().toString());
+                            store.messageDir(c.key()).toAbsolutePath().toString(), hit.snippetAttachmentFile(),
+                            redactor.text(hit.snippetAttachmentName()));
                 }).toList();
                 Integer next = (long) position + hits.size() < results.total() ? position + hits.size() : null;
                 ToolLogger.completed(log, "search", start);

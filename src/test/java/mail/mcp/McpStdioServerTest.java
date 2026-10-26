@@ -95,6 +95,12 @@ class McpStdioServerTest {
             List<String> toolNames = new ArrayList<>();
             tools.at("/result/tools").forEach(tool -> toolNames.add(tool.get("name").asString()));
             assertThat(toolNames).containsExactlyInAnyOrder("listConnections", "sync", "syncStatus", "listFolders", "listMessages", "getMessage", "search", "getAttachment");
+            JsonNode searchTool = java.util.stream.StreamSupport.stream(tools.at("/result/tools").spliterator(), false)
+                    .filter(tool -> tool.path("name").asString().equals("search")).findFirst().orElseThrow();
+            JsonNode hitSchema = searchTool.at("/outputSchema/properties/hits/items");
+            assertThat(hitSchema.at("/properties/snippetAttachmentFile").isMissingNode()).isFalse();
+            assertThat(hitSchema.at("/properties/snippetAttachmentName").isMissingNode()).isFalse();
+            assertThat(hitSchema.path("required").toString()).doesNotContain("snippetAttachmentFile", "snippetAttachmentName");
 
             send(requests, "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\","
                     + "\"params\":{\"name\":\"listConnections\",\"arguments\":{}}}");
@@ -150,6 +156,27 @@ class McpStdioServerTest {
             JsonNode passwordSearch = call(requests, io, replies, stderr, stdout, 13, "search",
                     "{\"connection\":\"local\",\"query\":\"password\",\"field\":\"body\"}");
             assertThat(passwordSearch.path("total").asInt()).isEqualTo(2);
+            assertThat(passwordSearch.at("/hits/0").has("snippetAttachmentFile")).isFalse();
+            assertThat(passwordSearch.at("/hits/0").has("snippetAttachmentName")).isFalse();
+            for (String field : List.of("any", "attachmentText")) {
+                int id = field.equals("any") ? 14 : 15;
+                JsonNode attachmentSearch = call(requests, io, replies, stderr, stdout, id, "search",
+                        "{\"connection\":\"local\",\"query\":\"Synthetic\",\"field\":\"" + field + "\"}");
+                assertThat(attachmentSearch.path("total").asInt()).isEqualTo(2);
+                var hits = attachmentSearch.path("hits");
+                hits.forEach(hit -> {
+                    assertThat(hit.path("snippet").asString()).contains("**Synthetic**");
+                    assertThat(hit.path("snippetAttachmentFile").asString()).isNotBlank();
+                    assertThat(hit.path("snippetAttachmentName").asString()).isNotBlank();
+                });
+                JsonNode response = JSON.readTree(stdout.getLast());
+                var textResult = JSON.readTree(response.at("/result/content/0/text").asString());
+                assertThat(textResult).isEqualTo(attachmentSearch);
+                assertThat(textResult.at("/hits/0/snippetAttachmentFile").asString())
+                        .isEqualTo(hits.get(0).path("snippetAttachmentFile").asString());
+                assertThat(textResult.at("/hits/0/snippetAttachmentName").asString())
+                        .isEqualTo(hits.get(0).path("snippetAttachmentName").asString());
+            }
             if (redact) {
                 assertThat(fullMessage.path("body").asString()).contains("[redacted:password]").doesNotContain(BODY_SECRET);
                 assertThat(fullAttachment.path("text").asString()).contains("[redacted:password]").doesNotContain(BODY_SECRET);
@@ -192,7 +219,13 @@ class McpStdioServerTest {
                         .resolve(attachment.file() + ".md"), "Synthetic attachment Markdown\nPassword: " + BODY_SECRET);
                 String body = processed.body() + "\nPassword: " + BODY_SECRET;
                 Files.writeString(store.messageDir(key).resolve(MessageStore.BODY_FILE), body);
-                index.put(processed.meta(), processed.message(), body, processed.attachmentText());
+                var savedTexts = new ArrayList<String>();
+                for (var savedAttachment : processed.message().attachments()) {
+                    var sidecar = store.messageDir(key).resolve(MessageStore.ATTACHMENTS_DIR)
+                            .resolve(savedAttachment.file() + ".md");
+                    if (Files.exists(sidecar)) { savedTexts.add(Files.readString(sidecar)); }
+                }
+                index.put(processed.meta(), processed.message(), body, String.join("\n\n", savedTexts));
             }
             index.commit();
         }

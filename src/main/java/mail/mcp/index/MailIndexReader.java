@@ -3,6 +3,7 @@ package mail.mcp.index;
 import mail.mcp.model.MessageCard;
 import mail.mcp.model.SearchHit;
 import mail.mcp.model.SearchResults;
+import mail.mcp.store.MessageStore;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.queryparser.simple.SimpleQueryParser;
 import org.apache.lucene.search.BooleanClause;
@@ -13,9 +14,6 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
-import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.search.uhighlight.DefaultPassageFormatter;
-import org.apache.lucene.search.uhighlight.UnifiedHighlighter;
 import org.apache.lucene.store.FSDirectory;
 
 import java.io.IOException;
@@ -78,9 +76,15 @@ public final class MailIndexReader implements AutoCloseable {
         return search(query, field, folderKey, offset, limit, null);
     }
 
-    /** Optional output transform runs on the entire stored body, before passage selection. */
+    /** Body-only snippets; the optional transform runs on the complete text before rendering. */
     public SearchResults search(String query, SearchField field, String folderKey, int offset, int limit,
                                 UnaryOperator<String> outputText) {
+        return search(query, field, folderKey, offset, limit, outputText, null);
+    }
+
+    /** Selects body or saved attachment passages after paging; never writes local files. */
+    public SearchResults search(String query, SearchField field, String folderKey, int offset, int limit,
+                                UnaryOperator<String> outputText, MessageStore store) {
         if (offset < 0 || limit < 1) { throw new IllegalArgumentException("Invalid offset or limit"); }
         // Phrase and whitespace syntax only; fuzzy and wildcard operators are not enabled.
         boolean fullAddress = isFullAddress(query);
@@ -104,23 +108,12 @@ public final class MailIndexReader implements AutoCloseable {
             var sort = new Sort(SortField.FIELD_SCORE, new SortField("keySort", SortField.Type.STRING));
             var top = searcher.search(parsed, size, sort, true);
             var page = Arrays.copyOfRange(top.scoreDocs, offset, top.scoreDocs.length);
-            var highlighter = (outputText == null ? UnifiedHighlighter.builder(searcher, MailAnalyzers.analyzer())
-                    : UnifiedHighlighter.builderWithoutSearcher(MailAnalyzers.analyzer()))
-                    .withFormatter(new DefaultPassageFormatter("**", "**", "… ", false))
-                    .withMaskedFieldsFunc(name -> "body".equals(name) ? Set.of("body_en") : Set.of())
-                    .build();
-            String[] snippets = outputText == null
-                    ? highlighter.highlight("body", parsed, new TopDocs(top.totalHits, page)) : null;
+            var snippets = new SearchSnippets(highlightQuery, outputText);
             List<SearchHit> hits = new ArrayList<>();
             for (int i = 0; i < page.length; i++) {
                 var doc = searcher.storedFields().document(page[i].doc);
-                String body = doc.get("body");
-                String snippet = null;
-                if (body != null) {
-                    snippet = outputText == null ? snippets[i] : (String) highlighter.highlightWithoutSearcher(
-                            "body", highlightQuery, outputText.apply(body), 1);
-                }
-                hits.add(new SearchHit(card(doc), page[i].score, snippet));
+                var snippet = snippets.select(doc.get("key"), doc.get("body"), field, store);
+                hits.add(new SearchHit(card(doc), page[i].score, snippet.text(), snippet.file(), snippet.name()));
             }
             return new SearchResults(total, List.copyOf(hits));
         } catch (IOException e) { throw new UncheckedIOException(e); }

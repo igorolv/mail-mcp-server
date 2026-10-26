@@ -154,6 +154,16 @@ opencode (`~/.config/opencode/opencode.jsonc`, section `mcp`):
 
 Arguments, bounds and errors: [docs/tools-agent.md](docs/tools-agent.md).
 
+For `any`, a body match supplies the snippet; otherwise search uses the first matching saved
+attachment Markdown in MIME order. `attachmentText` selects attachments first; other groups
+keep body snippets/context. Attachment snippets include `snippetAttachmentFile` (the exact
+`file` for `getAttachment`) and `snippetAttachmentName` (display name, falling back to `file`).
+Both are omitted for body or absent snippets. Search reads local MIME and existing sidecars
+only for eligible page hits, without conversion or writes. Missing/unreadable MIME or sidecars
+fall back to body context, or no snippet without a body. The complete selected text is filtered
+before highlighting when secret filtering is enabled. No reindexing or reprocessing is needed
+when attachment Markdown already exists; the disk format and index schema remain unchanged.
+
 ## Commands
 
 The same jar has user-run modes; none of them starts the MCP transport.

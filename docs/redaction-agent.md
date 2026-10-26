@@ -35,12 +35,22 @@ changes. A tiny chunk may split a marker, but cannot reveal the original matched
 
 Search still queries the raw index and keeps its ranking, score, total and pagination.
 `MailIndexReader.search` accepts an optional `UnaryOperator<String>` used only to render
-output. With filtering, it transforms the **complete stored body** and uses
-`UnifiedHighlighter.highlightWithoutSearcher` to reanalyze the changed text. Do not filter
+output. Raw highlight detection selects the source independently of filtering: `any` prefers a
+body match, otherwise the first matching attachment in MIME order; `attachmentText` selects
+attachments first. Other groups keep body snippets/context. Eligible page hits only read local
+MIME and saved sidecars, without writes or conversion; missing/broken files retain body fallback.
+With filtering, it transforms the **complete selected body or attachment text** and uses
+`UnifiedHighlighter.highlightWithoutSearcher` to reanalyze the changed text. Both detection and
+rendering see the full supplied text, including occurrences after character 10,000. Do not filter
 already shortened/highlighted snippets: their labels may be outside the passage, and `**`
 can split a token. The highlighting query excludes the folder filter, which is irrelevant to
-the in-memory body. Without filtering, the original highlighter path is unchanged.
-Searching for a secret can therefore still find the message while its snippet hides the value.
+the in-memory text. Body and attachment fields mask only their own English companion field.
+Searching for a secret can still find the message while its snippet shows safe leading context,
+retaining the selected attachment identity. Blank transformed text returns no snippet or identity.
+`snippetAttachmentFile` remains the exact lookup filename; `snippetAttachmentName` is filtered
+separately (original display name, or filename when null/blank). Both are omitted for body or
+absent snippets. The already highlighted snippet is never filtered again by `SearchTools`.
+No index/schema or disk-format changes, migration, reindexing or reprocessing are required.
 
 ## Rules and replacement
 
