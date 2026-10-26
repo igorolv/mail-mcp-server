@@ -278,4 +278,4 @@ Helper generators/validators stay under ignored `testdata/.work/`; only data is 
 They feed `MimeReaderTest`, `SearchControlSetTest` and `SecretRedactorTest`. The latter checks
 all 256 cases and eight mixed documents against the secrets-only output policy; PII is unchanged
 and two incomplete PEM examples intentionally differ from the old expectations. See
-`docs/redaction-agent.md` (plan.md section 4, Д6).
+`docs/redaction-agent.md`.

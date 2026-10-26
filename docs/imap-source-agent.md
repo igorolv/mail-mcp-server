@@ -91,8 +91,8 @@ removed and all present refs added. Cursors and download refs are checked before
 Gmail handling is added.
 
 Original MIME is kept on disk as downloaded. Under the 2026-10-25 decisions mail content and
-local paths may reach the model through tools, with an optional output filter later (plan.md 3.1,
-section 4 Д6). `mail-sync` prints folder paths and counts; anonymize folder paths before sharing
+local paths may reach the model through tools, with an optional output filter (plan.md 3.1,
+`docs/redaction-agent.md`). `mail-sync` prints folder paths and counts; anonymize folder paths before sharing
 its output. Only the user runs it; agents never open the real connections file or saved originals.
 
 Verified by user-run Mail.ru checks on 2026-10-25: LIST returned 41 folders and a 25831-byte

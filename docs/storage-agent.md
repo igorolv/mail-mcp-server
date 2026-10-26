@@ -53,8 +53,8 @@ See `docs/mime-agent.md` for parsing, naming and pandoc rules.
 Binary DOC/XLS/PPT (Office 97-2003) use the same `<file>.md` sidecars and index fields,
 including documents inside containers. No disk/API/schema change is required. Existing
 files need offline `mail-reprocess`, not merely `mail-reindex`, to create the newly supported
-Markdown; one pass covers containers and legacy Office text. IT-15 and IT-16 were accepted
-on 2026-10-27 after offline verification; user-run reprocessing and real-data checks are pending.
+Markdown; one pass covers containers and legacy Office text (pending real-data checks: plan.md
+2.4).
 
 Files inside EML, ZIP, MSG and TNEF containers share the same flat `attachments/` directory
 and numbering as MIME attachments. Their `AttachmentInfo.parent` points to the containing

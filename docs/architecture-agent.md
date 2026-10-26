@@ -27,8 +27,7 @@ Implemented and checked on the user's real mailboxes (plan.md section 2):
 `convert/PdfText`, `XlsxText`/`XlsText` and `PptxText`/`PptText` are adapted from redmine-mcp-server
 `extraction/parser/{PdfTextParser,XlsxTextParser,PptxTextParser}.java` at commit `f62b3e5`.
 
-Optional tool-output secret replacement for Д6 was accepted on 2026-10-26 after offline review;
-see `docs/redaction-agent.md`. Local files and the index remain unfiltered.
+Optional tool-output secret replacement is described in `docs/redaction-agent.md`. Local files and the index remain unfiltered.
 
 Not implemented: PII anonymization, MCP resources, threads, flags, embeddings, writing
 mail; see plan.md section 4.

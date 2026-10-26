@@ -248,9 +248,8 @@ rules; EML/ZIP/MSG/TNEF recognition still takes priority. A recognized legacy su
 fall through to plain text because of a conflicting `text/plain` declaration. No new
 dependency, option, size limit or state is introduced. Existing DOC/XLS/PPT files need
 `mail-reprocess` to create Markdown and indexed text, rather than `mail-reindex` alone.
-One reprocessing pass per connection covers both changes. IT-15 and IT-16 were accepted by
-the user on 2026-10-27 after offline verification; user-run reprocessing and real-data checks
-are still pending.
+One reprocessing pass per connection covers both changes; whether it was run on real data is
+tracked in plan.md 2.4.
 
 Images, ZIP archives themselves, calendars and S/MIME are never converted; no OCR or expansion
 of archive formats other than ZIP is added.

@@ -5,17 +5,18 @@ over EWS, Mail.ru and Gmail over IMAP. It keeps a full local copy of every messa
 metadata, body and attachments with Markdown text), indexes it with Lucene and answers tools from
 local data only. User-facing overview: `README.md`.
 
-**Current status (2026-10-26): the draft version is complete and checked on the user's real
+**Current status (2026-10-27): the draft version is complete and checked on the user's real
 mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/plan.md` section 2).
 - Eight MCP tools, background sync, offline reprocessing and reindexing work.
 - Gmail OAuth2 is implemented, but its real sign-in is unverified. The user deferred Gmail, so do
   not treat Gmail setup as a required next step.
-- EML/ZIP/MSG/TNEF expansion and DOC/XLS/PPT text (IT-14/IT-15/IT-16) were accepted by the user on
-  2026-10-27 after offline verification: 582 tests, one intentional skip, no failures or errors.
-  User-run reprocessing and real-data checks are still pending.
+- Features accepted offline but not yet checked by the user on real mail are listed in
+  `docs/plan.md` 2.4 (container expansion and legacy Office text need a user-run
+  `mail-reprocess`).
 
 Work now consists of polishing and optional improvements:
-- `docs/plan.md` section 4 lists them (`Д1`, `Д2`, …); the user chooses which to take.
+- `docs/plan.md` section 4 lists the open ones (`Д4`, `Д5`, …); the user chooses which to take.
+  Accepted items are removed from that table.
 - Add new tools or subsystems only when the task asks for them.
 - `docs/plan.md` 3.8 lists what no change may add without a user decision.
 - An offline MIME pipeline with shared limits (commit `d6534ca`) was reverted on 2026-10-25 by
@@ -116,8 +117,10 @@ one in this table.
   - a verified fact or a real-mailbox result goes to section 2, anonymized: numbers only, no
     folder names, addresses, file names or message content;
   - a design change goes to section 3;
-  - an improvement's status changes in the section 4 table: ⬜ → 🔨 when work starts, ✅ with
-    the date when accepted, ✖ with a reason when rejected. A new idea is a new row;
+  - an improvement's status changes in the section 4 table: ⬜ → 🔨 when work starts, ✖ with a
+    reason when rejected. When accepted, delete its row, add its number to the list of done items
+    above the table, describe the result in section 3 and list anything still awaiting a
+    real-mail check in 2.4. Numbers are never reused. A new idea is a new row with the next number;
   - section 5 gets a row **only for decisions the user made**; mark your own proposals
     «Предложено».
 - Delete an implementation brief once it is accepted and recorded, and update the task list in
@@ -176,7 +179,7 @@ code is listed in `docs/architecture-agent.md`.
 - **Optional output filter:** `MAIL_MCP_REDACT_SECRETS=true` replaces recognized secrets only in
   tool response text. Downloads, disk and index hold everything as is. Tools still return original
   file paths and stored filenames. This reduces accidental context exposure, not intentional
-  extraction. See `docs/redaction-agent.md` (Д6 accepted on 2026-10-26 after offline review).
+  extraction. See `docs/redaction-agent.md`.
 - **Synchronization:**
   - runs only on request: the `sync` tool in the background, or `mail-sync`;
   - always syncs everything, then incrementally;

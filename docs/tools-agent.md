@@ -55,8 +55,7 @@ Binary DOC/XLS/PPT support targets Office 97-2003 and also applies to files insi
 It uses the same saved-text lookup and snippet attribution; legacy text is never converted
 on demand. Encrypted or malformed documents retain their file without Markdown.
 One reprocessing pass creates both container children and legacy Office text; `mail-reindex`
-alone cannot create that text. IT-15 and IT-16 were accepted on 2026-10-27 after offline
-verification; user-run reprocessing and real-data checks are still pending.
+alone cannot create that text. Pending real-data checks are tracked in plan.md 2.4.
 
 Every message response includes an absolute `localPath` to its directory. An agent with local
 file access may read those files directly. All reading tools use local data only, without

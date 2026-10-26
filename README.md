@@ -14,9 +14,9 @@ Gmail with OAuth2 is implemented but has not been tried against a real account. 
 checks run on Windows. Possible improvements are listed in
 [docs/plan.md](docs/plan.md#4-возможные-доработки) (in Russian).
 
-EML/ZIP/MSG/TNEF extraction and DOC/XLS/PPT text were accepted on 2026-10-27 after offline verification
-(582 tests, one intentional skip, no failures or errors). Reprocessing existing data and checking
-these additions against real messages are still pending.
+EML/ZIP/MSG/TNEF extraction and DOC/XLS/PPT text are verified offline; data synced before them
+needs `mail-reprocess`, and their check on real messages is still pending
+([docs/plan.md](docs/plan.md#24-ещё-не-проверено-на-реальной-почте), section 2.4).
 
 **Contents:** [Features](#features) · [How it works](#how-it-works) · [Quickstart](#quickstart) ·
 [MCP tools](#mcp-tools) · [Commands](#commands) · [Read-only protection](#read-only-protection) ·

@@ -1,7 +1,7 @@
 # Implementation tasks — shared rules
 
 Each `IT-NN-*.md` file in this directory is a self-contained implementation brief for one agent
-session. A brief implements one improvement from `docs/plan.md` section 4 (`Д1`, `Д2`, …), or a
+session. A brief implements one improvement from `docs/plan.md` section 4 (`Д4`, `Д5`, …), or a
 part of it. The briefs are written for a capable but not top-tier model: they name the files, the
 types, the behavior, the tests and what not to build. When a brief and your own judgment disagree,
 follow the brief and say so in the report.
@@ -40,7 +40,7 @@ Non-interactive run with the Codex CLI (Windows PowerShell 5.1; set `$id` to the
 name without `.md`, and list in `-c` the MCP servers of your Codex config the task does not need):
 
 ```powershell
-$id = 'IT-09-<slug>'; "Read AGENTS.md, then docs/impl-tasks/README.md, then docs/impl-tasks/$id.md. Implement the task described there. Change only the files it allows. Do not commit. When done, reply with the implementation report from docs/impl-tasks/README.md." | codex exec -C C:\git\mail-mcp-server -s workspace-write -c 'mcp_servers.jdbc.enabled=false' -c 'mcp_servers.redmine.enabled=false' -c 'mcp_servers.sonar.enabled=false' -o "$env:TEMP\$id.last.txt" -
+$id = 'IT-17-<slug>'; "Read AGENTS.md, then docs/impl-tasks/README.md, then docs/impl-tasks/$id.md. Implement the task described there. Change only the files it allows. Do not commit. When done, reply with the implementation report from docs/impl-tasks/README.md." | codex exec -C C:\git\mail-mcp-server -s workspace-write -c 'mcp_servers.jdbc.enabled=false' -c 'mcp_servers.redmine.enabled=false' -c 'mcp_servers.sonar.enabled=false' -o "$env:TEMP\$id.last.txt" -
 ```
 
 ### 2. Review
@@ -97,9 +97,10 @@ The reviewer checks; it does not fix. Work through every point and report what y
 ## Recording an accepted brief
 
 1. `docs/plan.md` (Russian, current state only; see AGENTS.md "Working with the plan"):
-   - **Section 4:** set the brief's improvement to ✅ with the date in `YYYY-MM-DD` form in the
-     status column.
-   - **Section 2:** add the user-run results, numbers only. Skip this when there were none.
+   - **Section 4:** delete the improvement's row and add its number to the list of done items
+     above the table. A partly done improvement keeps its row with the remaining part.
+   - **Section 2:** add the user-run results, numbers only. If a real-mail check is still
+     pending, add it to 2.4 with the acceptance date.
    - **Section 3:** update any statement the change made untrue.
    - **Section 5:** add a row only for a decision the user made in this brief.
 2. Update every other document that still describes the old behavior. Check `README.md` and
@@ -111,17 +112,8 @@ The reviewer checks; it does not fix. Work through every point and report what y
 
 ## Task list
 
-No open implementation briefs.
-
-IT-09…IT-11 were accepted and recorded on 2026-10-26 in `docs/plan.md`
-section 4 (Д1, Д2, Д17). The real-mailbox check for Д2 is still pending.
-IT-13 (Д3) was accepted and recorded on 2026-10-26 after offline review:
-535 tests, one intentional skip, no failures. No user-run check was required.
-IT-12 (Д6) was accepted and recorded on 2026-10-26 after review fixes and offline
-verification: 538 tests, one intentional skip, no failures. No user-run check was required.
-IT-14/IT-15 (Д10, EML/ZIP/MSG/TNEF) and IT-16 (Д11, DOC/XLS/PPT text) were accepted by the user on
-2026-10-27 after review fixes and offline verification: 582 tests, one intentional skip,
-zero failures and zero errors. Shared user-run reprocessing and real-data checks are pending.
+No open implementation briefs. IT-01…IT-16 were accepted and deleted (2026-10-25…27); the
+next brief is IT-17. Checks still pending on real mail are in `docs/plan.md` 2.4.
 
 ## Rules for every implementation session
 

@@ -93,7 +93,7 @@ unlabeled short passwords are not comprehensively covered. False positives and m
 possible; this is best-effort context hygiene, not a guarantee that text contains no secrets.
 
 PII detectors D22/D23/D25/D28, phone/address anonymization, entropy-only detection, OCR,
-secret verification and filtering raw files are outside Д6.
+secret verification and filtering raw files are outside this filter.
 
 ## Verification
 
