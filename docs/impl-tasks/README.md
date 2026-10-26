@@ -111,7 +111,9 @@ The reviewer checks; it does not fix. Work through every point and report what y
 
 ## Task list
 
-No open briefs.
+| Brief | Improvement | Status |
+|---|---|---|
+| [IT-14](IT-14-nested-messages-and-zip.md) | Д10 part 1: files inside nested messages and ZIP archives as attachments | Written; limits approved on 2026-10-26; ready for implementation |
 
 IT-09…IT-11 were accepted and recorded on 2026-10-26 in `docs/plan.md`
 section 4 (Д1, Д2, Д17). The real-mailbox check for Д2 is still pending.
