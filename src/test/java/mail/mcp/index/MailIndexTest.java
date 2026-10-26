@@ -243,8 +243,8 @@ class MailIndexTest {
                 java.util.List.of(new mail.mcp.model.Address("Copy", "copy@example.com")), date,
                 "<message@example.com>", "<parent@example.com>",
                 java.util.List.of("<one@example.com>", "<two@example.com>"),
-                java.util.List.of(new mail.mcp.model.AttachmentInfo("1__part", null, "application/octet-stream", 1, null, false, null),
-                        new mail.mcp.model.AttachmentInfo("2__file.txt", "file.txt", "text/plain", 1, null, false, null)));
+                java.util.List.of(new mail.mcp.model.AttachmentInfo("1__part", null, "application/octet-stream", 1, null, false, null, null),
+                        new mail.mcp.model.AttachmentInfo("2__file.txt", "file.txt", "text/plain", 1, null, false, null, null)));
         try (var index = MailIndex.openWriter(connectionDir)) {
             index.put(meta, message, "Indexed body", null);
             index.commit();

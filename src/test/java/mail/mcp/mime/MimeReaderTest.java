@@ -146,6 +146,18 @@ class MimeReaderTest {
         try (var paths = Files.list(temp)) { assertThat(paths.toList()).containsExactly(temp.resolve("attachments")); }
     }
 
+    @Test void firstNumberContinuesNumbering() throws Exception {
+        var listed = MimeReader.read(fixture("M16", ".eml"), null, 7);
+        var written = MimeReader.read(fixture("M16", ".eml"), temp.resolve("attachments"), 7);
+        assertThat(written).isEqualTo(listed);
+        for (int i = 0; i < listed.message().attachments().size(); i++) {
+            var attachment = listed.message().attachments().get(i);
+            assertThat(attachment.file()).startsWith((7 + i) + "__");
+            assertThat(attachment.parent()).isNull();
+            assertThat(temp.resolve("attachments").resolve(attachment.file())).isRegularFile();
+        }
+    }
+
     @Test void onlyTheSelectedCandidateIsDecodedAndThreadHeadersAreKept() throws Exception {
         Path eml = temp.resolve("alternatives.eml");
         Files.writeString(eml, """

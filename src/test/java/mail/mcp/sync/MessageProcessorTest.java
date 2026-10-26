@@ -190,6 +190,50 @@ class MessageProcessorTest {
         assertThat(processor().load(result.meta()).attachmentText()).isNull();
     }
 
+    private MessageMeta archiveMessage() throws Exception {
+        var bytes = new java.io.ByteArrayOutputStream();
+        try (var zip = new java.util.zip.ZipOutputStream(bytes)) {
+            zip.putNextEntry(new java.util.zip.ZipEntry("folder/entry.txt"));
+            zip.write("Archive needle text".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            zip.closeEntry();
+        }
+        var meta = message("M01");
+        Files.writeString(store().messageDir(meta.key()).resolve(MessageStore.MESSAGE_FILE),
+                "Content-Type: application/zip\r\nContent-Disposition: attachment; filename=archive.zip\r\n"
+                        + "Content-Transfer-Encoding: base64\r\n\r\n"
+                        + java.util.Base64.getEncoder().encodeToString(bytes.toByteArray()));
+        return meta;
+    }
+
+    @Test void archiveEntriesGetMarkdownAndText() throws Exception {
+        var result = processor().process(archiveMessage());
+        assertThat(result.meta().state()).isEqualTo(MessageState.CONVERTED);
+        assertThat(result.message().attachments()).extracting(a -> a.file())
+                .containsExactly("1__archive.zip", "2__entry.txt");
+        assertThat(result.message().attachments().getLast().parent()).isEqualTo("1__archive.zip");
+        var attachments = store().messageDir(result.meta().key()).resolve(MessageStore.ATTACHMENTS_DIR);
+        assertThat(Files.readString(attachments.resolve("2__entry.txt.md"))).isEqualTo("Archive needle text");
+        assertThat(attachments.resolve("1__archive.zip.md")).doesNotExist();
+        assertThat(result.attachmentText()).isEqualTo("Archive needle text");
+    }
+
+    @Test void loadListsArchiveEntriesWithoutWriting() throws Exception {
+        var result = processor().process(archiveMessage());
+        var directory = store().messageDir(result.meta().key());
+        var before = snapshot(directory);
+        var loader = new MessageProcessor(store(), new Pandoc("unused"));
+        assertThat(loader.load(result.meta())).isEqualTo(result);
+        assertThat(snapshot(directory)).isEqualTo(before);
+        // Old messages can list an entry before reprocessing has saved it or its Markdown.
+        Files.delete(directory.resolve("attachments/2__entry.txt"));
+        Files.delete(directory.resolve("attachments/2__entry.txt.md"));
+        before = snapshot(directory);
+        var loaded = loader.load(result.meta());
+        assertThat(loaded.message()).isEqualTo(result.message());
+        assertThat(loaded.attachmentText()).isNull();
+        assertThat(snapshot(directory)).isEqualTo(before);
+    }
+
     private static Map<Path, String> snapshot(Path directory) throws Exception {
         Map<Path, String> result = new LinkedHashMap<>();
         try (var files = Files.walk(directory)) {

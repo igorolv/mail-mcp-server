@@ -11,6 +11,7 @@ import mail.mcp.api.MessageSummary;
 import mail.mcp.connections.ConnectionRegistry;
 import mail.mcp.index.MailIndexReader;
 import mail.mcp.mime.MimeReader;
+import mail.mcp.mime.Containers;
 import mail.mcp.model.Address;
 import mail.mcp.model.MailMessage;
 import mail.mcp.redaction.SecretRedactor;
@@ -104,8 +105,9 @@ public class MailTools {
         }
     }
 
-    @McpTool(description = "Read local message headers, a body.md chunk and attachment paths. maxChars " +
-            "defaults to 20000, capped at 100000; use nextOffset for the next chunk. localPath points at files " +
+    @McpTool(description = "Read local message headers, a body.md chunk and attachment paths. " +
+            "Attachments include files inside nested messages and ZIP archives, with their parent file. " +
+            "maxChars defaults to 20000, capped at 100000; use nextOffset for the next chunk. localPath points at files " +
             "the agent may read directly. Local data may be incomplete during sync; check listFolders.synced " +
             "and syncStatus. When secret filtering is enabled, body offsets refer to the filtered text; " +
             "original files stay unfiltered. No mailbox or pandoc access.", generateOutputSchema = true,
@@ -126,7 +128,8 @@ public class MailTools {
             MailMessage message = null;
             var eml = directory.resolve(MessageStore.MESSAGE_FILE);
             if (Files.exists(eml)) {
-                try { message = MimeReader.read(eml, null).message(); }
+                try { message = Containers.expand(MimeReader.read(eml, null).message(),
+                        directory.resolve(MessageStore.ATTACHMENTS_DIR), false); }
                 catch (MessagingException | IOException | RuntimeException e) { /* metadata/body remain readable */ }
             }
             var bodyFile = directory.resolve(MessageStore.BODY_FILE);
@@ -140,7 +143,7 @@ public class MailTools {
                 return new AttachmentRef(a.file(), redactor.text(a.name()), a.contentType(), a.size(), a.inline(),
                         Files.exists(path) ? path.toString() : null,
                         Files.exists(path.resolveSibling(a.file() + ".md"))
-                                ? path.resolveSibling(a.file() + ".md").toString() : null);
+                                ? path.resolveSibling(a.file() + ".md").toString() : null, a.parent());
             }).toList();
             var result = new GetMessageResult(key, redactor.text(meta.folder()), meta.state().id(), redactor.text(meta.error()),
                     message == null ? null : redactor.text(message.subject()), message == null ? null : display(message.from()),
@@ -160,7 +163,8 @@ public class MailTools {
     }
 
     @McpTool(description = "Read a local attachment and extracted text in chunks. Text exists only for DOCX, ODT, " +
-            "RTF, EPUB, HTML, CSV, PDF, XLSX, PPTX and plain text up to 20 MiB, when conversion succeeds. " +
+            "RTF, EPUB, HTML, CSV, PDF, XLSX, PPTX, EML and plain text up to 20 MiB, when conversion succeeds. " +
+            "Attachments include files inside nested messages and ZIP archives; accepts their exact file from getMessage. " +
             "path is the original file; textPath is the Markdown. maxChars defaults to 20000, capped at 100000; " +
             "use nextOffset for the next chunk. With secret filtering, offsets refer to filtered text; " +
             "original files stay unfiltered. No mailbox or pandoc access.", generateOutputSchema = true,
@@ -180,7 +184,8 @@ public class MailTools {
             var directory = store.messageDir(key).toAbsolutePath();
             store.readMeta(key).orElseThrow(() -> new IllegalArgumentException("Unknown message key"));
             final MailMessage message;
-            try { message = MimeReader.read(directory.resolve(MessageStore.MESSAGE_FILE), null).message(); }
+            try { message = Containers.expand(MimeReader.read(directory.resolve(MessageStore.MESSAGE_FILE), null)
+                    .message(), directory.resolve(MessageStore.ATTACHMENTS_DIR), false); }
             catch (MessagingException | IOException | RuntimeException e) {
                 throw new IllegalArgumentException("Attachment list is unavailable");
             }

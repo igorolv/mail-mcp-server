@@ -36,6 +36,8 @@ checks run on Windows. Possible improvements are listed in
   attachments, and `<attachment>.md` with the attachment's text.
   - Bodies, DOCX, ODT, RTF, EPUB, HTML and CSV are converted with sandboxed pandoc.
   - PDF goes through PDFBox, XLSX and PPTX through Apache POI.
+  - Files inside nested messages and ZIP archives are extracted as attachments and converted too;
+    nested message headers and bodies become Markdown. Use `mail-reprocess` for existing messages.
 - **Search:** Lucene with `RussianAnalyzer` plus an English field, exact address and file name
   terms, file name parts, phrases, and a highlighted snippet. It searches subject, body, sender,
   recipients, attachment names and attachment text.
@@ -155,8 +157,8 @@ opencode (`~/.config/opencode/opencode.jsonc`, section `mcp`):
 Arguments, bounds and errors: [docs/tools-agent.md](docs/tools-agent.md).
 
 For `any`, a body match supplies the snippet; otherwise search uses the first matching saved
-attachment Markdown in MIME order. `attachmentText` selects attachments first; other groups
-keep body snippets/context. Attachment snippets include `snippetAttachmentFile` (the exact
+attachment Markdown in expanded attachment list order. `attachmentText` selects attachments first;
+other groups keep body snippets/context. Attachment snippets include `snippetAttachmentFile` (the exact
 `file` for `getAttachment`) and `snippetAttachmentName` (display name, falling back to `file`).
 Both are omitted for body or absent snippets. Search reads local MIME and existing sidecars
 only for eligible page hits, without conversion or writes. Missing/unreadable MIME or sidecars

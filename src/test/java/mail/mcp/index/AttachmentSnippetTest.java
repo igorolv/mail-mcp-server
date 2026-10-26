@@ -219,6 +219,35 @@ class AttachmentSnippetTest {
         }
     }
 
+    @Test void snippetComesFromArchiveEntry() throws Exception {
+        var bytes = new java.io.ByteArrayOutputStream();
+        try (var zip = new java.util.zip.ZipOutputStream(bytes)) {
+            zip.putNextEntry(new java.util.zip.ZipEntry("folder/report.txt"));
+            zip.write("The archive needle is searchable.".getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+        }
+        String key = store.newKey();
+        var directory = store.createMessageDir(key);
+        Files.writeString(directory.resolve(MessageStore.MESSAGE_FILE),
+                "Content-Type: application/zip\r\nContent-Disposition: attachment; filename=archive.zip\r\n"
+                        + "Content-Transfer-Encoding: base64\r\n\r\n"
+                        + java.util.Base64.getEncoder().encodeToString(bytes.toByteArray()));
+        var result = new mail.mcp.sync.MessageProcessor(store, new mail.mcp.convert.Pandoc("unused"))
+                .process(meta(key, "f1"));
+        try (var writer = MailIndex.openWriter(dir)) {
+            writer.put(result.meta(), result.message(), result.body(), result.attachmentText());
+            writer.commit();
+        }
+        try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+            for (var field : List.of(SearchField.ANY, SearchField.ATTACHMENT_TEXT)) {
+                var page = reader.search("needle", field, null, 0, 20, null, store);
+                assertThat(page.total()).isEqualTo(1);
+                assertAttachment(page.hits().getFirst(), "2__report.txt", "folder/report.txt", "**needle**");
+            }
+            assertThat(reader.search("report", SearchField.ATTACHMENT_NAME, null, 0, 20).total()).isEqualTo(1);
+        }
+    }
+
     private SearchHit first(MailIndexReader reader, String query) {
         return reader.search(query, SearchField.ATTACHMENT_TEXT, null, 0, 20, null, store).hits().getFirst();
     }

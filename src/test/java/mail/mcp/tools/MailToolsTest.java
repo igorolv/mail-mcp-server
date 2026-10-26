@@ -124,6 +124,59 @@ class MailToolsTest {
         assertThat(tools.getMessage("local", key, null, null).attachments().getFirst().textPath()).isNull();
     }
 
+    private String archiveMessage() throws Exception {
+        var bytes = new java.io.ByteArrayOutputStream();
+        try (var zip = new java.util.zip.ZipOutputStream(bytes)) {
+            zip.putNextEntry(new java.util.zip.ZipEntry("folder/entry.txt"));
+            zip.write("Archive needle text".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            zip.closeEntry();
+        }
+        String key = keys.getFirst();
+        Files.writeString(store.messageDir(key).resolve(MessageStore.MESSAGE_FILE),
+                "Content-Type: application/zip\r\nContent-Disposition: attachment; filename=archive.zip\r\n"
+                        + "Content-Transfer-Encoding: base64\r\n\r\n"
+                        + java.util.Base64.getEncoder().encodeToString(bytes.toByteArray()));
+        new MessageProcessor(store, new Pandoc("unused")).process(store.readMeta(key).orElseThrow());
+        return key;
+    }
+
+    @Test void getMessageShowsArchiveEntriesWithParent() throws Exception {
+        String key = archiveMessage();
+        var result = tools.getMessage("local", key, null, null);
+        assertThat(result.attachments()).extracting(a -> a.file()).containsExactly("1__archive.zip", "2__entry.txt");
+        assertThat(result.attachments().getFirst().parent()).isNull();
+        var entry = result.attachments().getLast();
+        assertThat(entry.parent()).isEqualTo("1__archive.zip");
+        assertThat(entry.name()).isEqualTo("folder/entry.txt");
+        assertThat(Path.of(entry.path())).isRegularFile();
+        assertThat(Path.of(entry.textPath())).isRegularFile();
+        var mapper = new JsonConfig().mailMcpObjectMapper();
+        assertThat(mapper.writeValueAsString(entry)).contains("\"parent\":\"1__archive.zip\"");
+        assertThat(mapper.writeValueAsString(result.attachments().getFirst())).doesNotContain("\"parent\"");
+        Files.delete(Path.of(entry.path()));
+        Files.delete(Path.of(entry.textPath()));
+        entry = tools.getMessage("local", key, null, null).attachments().getLast();
+        assertThat(entry.parent()).isEqualTo("1__archive.zip");
+        assertThat(entry.path()).isNull();
+        assertThat(entry.textPath()).isNull();
+        assertThat(store.messageDir(key).resolve("attachments/2__entry.txt")).doesNotExist();
+    }
+
+    @Test void getAttachmentReadsArchiveEntry() throws Exception {
+        String key = archiveMessage();
+        var entry = tools.getMessage("local", key, null, null).attachments().getLast();
+        var result = tools.getAttachment("local", key, entry.file(), 8, 6);
+        assertThat(result.file()).isEqualTo("2__entry.txt");
+        assertThat(result.name()).isEqualTo("folder/entry.txt");
+        assertThat(result.path()).isEqualTo(entry.path());
+        assertThat(result.textPath()).isEqualTo(entry.textPath());
+        assertThat(result.text()).isEqualTo("needle");
+        assertThat(result.nextOffset()).isEqualTo(14);
+        assertThat(result.textLength()).isEqualTo("Archive needle text".length());
+        assertThatThrownBy(() -> tools.getAttachment("local", key, "folder/entry.txt", null, null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test void listFoldersCountsMessagesAndShowsSynced() {
         var result = tools.listFolders("local");
         assertThat(result.folders()).extracting(f -> f.key()).containsExactly("f1", "f2");

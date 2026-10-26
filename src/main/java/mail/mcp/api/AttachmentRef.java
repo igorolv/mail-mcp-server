@@ -17,5 +17,7 @@ public record AttachmentRef(
         @Schema(description = "Absolute attachment path; absent if the file does not exist.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String path,
         @Schema(description = "Absolute Markdown path; absent without extracted text.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
-        String textPath
+        String textPath,
+        @Schema(description = "Stored filename of the containing attachment; absent for the message's own attachments.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        String parent
 ) { }

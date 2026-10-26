@@ -29,10 +29,11 @@ Walk `multipart/*` depth first. All other parts are leaves. A body candidate is 
 or `text/html`, without a filename and without attachment disposition. Select the first plain
 candidate, otherwise the first HTML candidate, otherwise no body. Other candidates are ignored.
 Use the declared charset without guessing. Every other leaf is an attachment, including unnamed
-binary parts and inline images. Nested messages, MSG, TNEF, ZIP, S/MIME and calendars are never
-opened by the reader: they remain opaque attachment files.
+binary parts and inline images. The reader keeps nested messages and ZIP as opaque leaves;
+`Containers` expands their saved files afterward. MSG, TNEF, S/MIME and calendars remain opaque.
 
-Attachments are numbered from one in walk order. Stored names are `<n>__<sanitized name>` or
+Attachments are numbered from one in walk order; the three-argument `read` starts at its
+`firstNumber` argument. Stored names are `<n>__<sanitized name>` or
 `<n>__part`. Replace Windows-forbidden characters `<>:"/\|?*`, control characters, and trailing
 dots/spaces with `_`; truncate the sanitized name to 100 characters. Truncation also leaves no
 trailing dot or space. The prefix prevents collisions and bare reserved names such as `CON.txt`.
@@ -43,6 +44,45 @@ lowercase declared Content-Type charset parameter, or null when absent.
 `getInputStream()` supplies decoded attachment bytes. Size counts bytes read. Passing a null
 attachment directory still lists and counts attachments, but writes nothing. A non-null
 directory is created only when an attachment exists.
+
+## Containers
+
+`mime/Containers.expand(message, attachmentsDir, save)` appends files inside saved nested
+messages and ZIP archives to the original MIME attachment list. It walks the growing list by
+index (breadth first), opening appended containers when reached. One numbering continues
+after the MIME attachments. All files stay flat in `attachments/`; no archive path becomes
+a filesystem path. `AttachmentInfo.parent` is the containing attachment's stored filename,
+or null for the message's own attachments. Entries and parent links are derived on every read,
+without JSON or metadata additions. With `save=false`, no files are created, written or deleted;
+a missing saved container yields no entries.
+
+Nested messages are selected by extension `eml` (decoded name, or stored filename when unnamed)
+or type `message/rfc822`. The package-private `MimeReader.readAttachments` supplies their
+attachments with continuing numbering and the remaining file and byte allowances. It uses the
+same MIME walk without decoding the body or reading headers; the body is not an entry.
+ZIP is selected by extension `zip` or type `application/zip`,
+`application/x-zip-compressed` or `application/x-zip`. Directory entries are skipped. Entry display
+names retain the archive path with backslashes changed to `/`; storage uses only the sanitized
+last segment. ZIP entries have type `application/octet-stream`, no charset or content ID and
+`inline=false`. Office formats are converted as documents, never opened as ZIP containers.
+ZIP names without the UTF-8 flag use CP866 (`IBM866`); flagged names use UTF-8.
+
+A message's own attachments have depth 1. A container is opened only at depth at most 5;
+entries at depth 6 remain listed but unopened. Local constants allow at most 1,000 extracted
+files and 256 MiB extracted bytes per message, checked before containers and ZIP entries.
+Reaching either limit stops all later expansion. A ZIP entry over 20 MiB decoded is skipped
+without a number, and the next entry can still be extracted. An entry that would exceed the
+message byte limit stops expansion. Partial/skipped files are deleted when saving.
+For nested messages, the reader stops before opening the next leaf when either allowance is
+exhausted. Copying reads at most the remaining allowance plus one decoded byte to detect overflow;
+an overflowing attachment is not listed and its partial file is removed. Read-only enumeration
+uses the same limits. Completed entries survive a later MIME error; cleanup affects only the
+incomplete attachment. These checks do not impose new limits on the outer message's MIME walk.
+
+An I/O, messaging or runtime exception stops only that container. Earlier listed entries remain,
+the incomplete entry is removed, and later containers can still expand. Debug logs contain
+only the exception class name. Container failures never change message state. These local
+limits are the approved exception in `plan.md` 3.8, not settings or a shared budget.
 
 ## Pandoc and processing
 
@@ -63,7 +103,7 @@ a localhost-only option; therefore the sandboxed per-conversion mode applies (pl
 A run cost about 27 ms; unknown formats exited 21. The sandbox refused a local LaTeX `\input`.
 Tests cover UTF-8 Markdown, removal of styles/scripts and no inclusion of local image content.
 
-`MessageProcessor.process` removes previous body/attachments, parses MIME, converts HTML,
+`MessageProcessor.process` removes previous body/attachments, parses MIME, expands containers, converts HTML,
 writes UTF-8 `body.md` if there is a body, then writes converted metadata. MIME errors and
 pandoc failures write failed metadata with a fixed reason; the original MIME stays. Local
 cleanup/body-write errors propagate as local storage errors. `load` reads MIME and saved
@@ -86,10 +126,10 @@ as a contract. These differences follow the rules above and were accepted in rev
   statement that Angus strips it was wrong (the reviewer's console hid the character).
 - M17: the unnamed attachment is `1__part`, without a guessed extension.
 - M18: split encoded words retain U+FFFD as allowed by the fixture README.
-- M19: the opaque embedded-message stream is 3,381 bytes rather than 3,391; keep Angus output
-  and its pinned SHA-256 without traversing the nested message. Like M09, the difference is
-  probably the trailing CRLF lost at each nesting level; nested messages are not opened (plan.md
-  3.5), and `message.eml` keeps the original bytes.
+- M19: the reader's embedded-message stream is 3,381 bytes rather than 3,391; keep Angus output
+  and its pinned SHA-256. Like M09, the difference is probably the trailing CRLF lost at each
+  nesting level. The original `message.eml` is unchanged; `Containers` lists levels 1 through 6
+  and stops before opening level 6.
 - M20: the invalid date stays null and the recipient group stays a group address.
 
 ## Attachment text
@@ -102,7 +142,8 @@ debug level by class name only. Markdown write errors propagate as local storage
 `MessageProcessor.load` reads existing Markdown without running converters.
 
 The lowercase extension of the decoded name (stored filename when unnamed) selects the format;
-without a known extension the MIME base content type selects it.
+without a known extension the MIME base content type selects it. Type `message/rfc822` also
+selects EML when the filename has another extension. ZIP containers never get Markdown.
 
 | Extensions | Content types | Conversion |
 |---|---|---|
@@ -116,15 +157,22 @@ without a known extension the MIME base content type selects it.
 | xlsx | application/vnd.openxmlformats-officedocument.spreadsheetml.sheet | POI |
 | pptx | application/vnd.openxmlformats-officedocument.presentationml.presentation | POI |
 | txt | text/plain | decode, save as is |
+| eml | message/rfc822 | MIME headers and selected body |
 
 HTML, CSV and plain text use the declared charset, UTF-8 when absent, with malformed bytes
 replaced; no charset guessing. Text passed to pandoc stdin is UTF-8. DOCX/ODT/RTF/EPUB are
 passed as file arguments, with stdin closed. `htmlToMarkdown` delegates to the generic stdin
-method. There are no additional budgets, timeouts, counters or per-attachment states.
+method. Attachment conversion adds no budgets, timeouts, counters or per-attachment states.
+
+EML Markdown contains nonempty `Subject`, `From`, `To`, `Cc` and `Date` headers in that order,
+one per line. Addresses use `Name <address>` or a bare address, joined by `, `; dates use an
+ISO-8601 instant. A blank line separates headers from the selected body (plain text as is,
+HTML through `pandoc.htmlToMarkdown`). Missing headers and missing bodies are omitted.
+The same 20 MiB conversion threshold applies. ZIP archives themselves get no Markdown.
 
 The reviewer measured pandoc 3.1.11 on 2026-10-26: sandboxed file arguments work for DOCX, ODT,
 RTF and EPUB, while references inside a document remain sandboxed. Broken DOCX exits 63.
 Semicolon-separated CSV becomes one column; its text remains searchable, which is accepted.
 
-Images, archives, nested messages, MSG, TNEF, calendars, S/MIME and binary DOC/XLS/PPT are never
-converted; no OCR, archive expansion or embedded-message parsing is added.
+Images, archives themselves, MSG, TNEF, calendars, S/MIME and binary DOC/XLS/PPT are never
+converted; no OCR or expansion of archive formats other than ZIP is added.

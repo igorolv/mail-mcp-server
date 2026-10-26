@@ -51,6 +51,14 @@ size and SHA-256, with `state=failed` and a fixed error. Supported attachments u
 text never changes metadata or the converted message state.
 See `docs/mime-agent.md` for parsing, naming and pandoc rules.
 
+Files inside nested messages and ZIP archives share the same flat `attachments/` directory
+and numbering as MIME attachments. Their `AttachmentInfo.parent` points to the containing
+attachment's stored filename. The expanded list is derived from saved containers during
+processing and every read; there is no new JSON file or `meta.json` field. Existing messages
+need offline `mail-reprocess <connection>` to save extracted files and Markdown and update
+their indexed text. Until then, readers may list entries without paths or text paths.
+Index fields come from the expanded attachment list and saved Markdown; schema remains 3.
+
 `folders.json` example (synthetic):
 
 ```json
@@ -199,7 +207,8 @@ an optional folder ref prefix FILTER, exact counts and score descending/key asce
 filter. `any` prefers a real body highlight, then the first matching attachment; `attachmentText`
 selects attachments first. Other groups and overloads without a `MessageStore` keep body-only
 snippets. Only eligible page hits enumerate local MIME once without output and read saved UTF-8
-`attachments/<AttachmentInfo.file()>.md` in MIME order, one text at a time. Missing/broken MIME
+`attachments/<AttachmentInfo.file()>.md` in expanded list order, one text at a time. The list
+starts with MIME attachments and appends container entries breadth first. Missing/broken MIME
 or unusable sidecars keep the hit and body context fallback (null without a body). Original
 binaries are not needed for an existing sidecar; `.md` attachments use `.md.md` sidecars.
 The formatter uses `**` around matches and `… ` between passages, at most one passage. Body and

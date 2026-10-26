@@ -2,6 +2,7 @@ package mail.mcp.index;
 
 import jakarta.mail.MessagingException;
 import mail.mcp.mime.MimeReader;
+import mail.mcp.mime.Containers;
 import mail.mcp.model.AttachmentInfo;
 import mail.mcp.store.MessageStore;
 import org.apache.lucene.search.Query;
@@ -35,8 +36,8 @@ final class SearchSnippets {
             var directory = store.messageDir(key);
             final List<AttachmentInfo> attachments;
             try {
-                attachments = MimeReader.read(directory.resolve(MessageStore.MESSAGE_FILE), null)
-                        .message().attachments();
+                attachments = Containers.expand(MimeReader.read(directory.resolve(MessageStore.MESSAGE_FILE), null)
+                        .message(), directory.resolve(MessageStore.ATTACHMENTS_DIR), false).attachments();
             } catch (MessagingException | IOException | RuntimeException e) {
                 return render("body", body, null, null);
             }

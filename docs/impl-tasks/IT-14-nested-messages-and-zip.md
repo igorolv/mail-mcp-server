@@ -36,7 +36,7 @@ Fixed decisions:
      partial file is deleted, it gets no number and is not listed;
    - at most **1,000** extracted files and **256 MiB** extracted bytes per message. When either
      is reached, expansion stops for the rest of the message (the current archive and every later
-     container). Check before each container and before each ZIP entry, and stop copying a ZIP
+     container). Check before each container and before each extracted entry, and stop copying an
      entry that would pass the byte limit (delete its partial file).
 
    The user approved items 5 and 6 on 2026-10-26 (`docs/plan.md` section 5); they are the only
@@ -69,8 +69,14 @@ Add `String parent` as the last component and update its Javadoc. `MimeReader` p
 
 - Add `read(Path eml, Path attachmentsDir, int firstNumber)`: stored names start at
   `firstNumber` instead of 1. The existing two-argument `read` delegates with 1.
-- Make `safeName` package-private for the new class. No other change: the reader still treats
+- Make `safeName` package-private for the new class. The reader still treats
   `message/rfc822` and ZIP parts as opaque leaves.
+- Review correction authorized by the user on 2026-10-26: add package-private
+  `readAttachments(Path eml, Path attachmentsDir, int firstNumber, int fileLimit, long byteLimit,
+  List<AttachmentInfo> entries)`, returning whether a limit stopped expansion. Reuse the MIME
+  walk, but do not decode the body or headers. Apply the remaining allowances during extraction,
+  preserve completed entries on a later error and delete only the incomplete file. Keep the
+  public `read` overloads' parsing behavior and do not add a shared budget object.
 
 ### `mime/Containers` (new)
 
@@ -88,7 +94,7 @@ is created, written or deleted.
 
 - **Nested message:** content type `message/rfc822`, or extension `eml` of the decoded name
   (stored filename when unnamed). Entries are the attachments from
-  `MimeReader.read(file, save ? attachmentsDir : null, next)`, with `parent` set. The nested
+  the bounded `MimeReader.readAttachments` helper, with `parent` set. The nested
   message's body is not an entry; it goes to the container's `.md` (see `AttachmentText`).
   Checked on 2026-10-26: Angus parses the bytes `MimeReader` saves for `M09` (`forwarded.eml`,
   6,276 bytes, lists `nested.msg`) and for all six levels of `M19`.
@@ -165,6 +171,10 @@ and wrapped in synthetic MIME in `@TempDir`):
   first entry and throws nothing; a later container in the same message is still expanded.
 - `readingWithoutSavingGivesTheSameList`: `save` false after `save` true returns an equal list
   and leaves the directory snapshot unchanged.
+- Review regression tests: `nestedFileLimitStopsBeforeLaterAttachmentsAreDecoded` and
+  `nestedByteLimitStopsWhileDecodingAttachment` use malformed encoded content beyond the limit
+  to prove that extraction stops during reading, with saving both enabled and disabled.
+  `brokenNestedMessageKeepsEarlierEntries` verifies completed entries survive a later MIME error.
 
 Add:
 
@@ -187,7 +197,8 @@ Change `model/AttachmentInfo.java`, `mime/MimeReader.java`, `convert/AttachmentT
 `sync/MessageProcessor.java`, `index/SearchSnippets.java`, `tools/MailTools.java`,
 `api/AttachmentRef.java`, and the tests `MimeReaderTest`, `AttachmentTextTest`,
 `MessageProcessorTest`, `MailToolsTest`, `AttachmentSnippetTest`, `MailIndexReaderTest`,
-`SearchToolsTest` (the last two only for the `AttachmentInfo` constructor).
+`SearchToolsTest`, `MailIndexTest` (the last three only for the `AttachmentInfo` constructor;
+`MailIndexTest` was omitted originally and authorized by the user with the review fixes on 2026-10-26).
 
 Documents:
 

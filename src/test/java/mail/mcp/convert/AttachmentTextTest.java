@@ -28,7 +28,7 @@ class AttachmentTextTest {
     private final Pandoc pandoc = new Pandoc("pandoc");
 
     private AttachmentInfo info(Path file, String name, String type, String charset) throws Exception {
-        return new AttachmentInfo(file.getFileName().toString(), name, type, Files.size(file), null, false, charset);
+        return new AttachmentInfo(file.getFileName().toString(), name, type, Files.size(file), null, false, charset, null);
     }
 
     private String text(Path file) throws Exception {
@@ -111,6 +111,29 @@ class AttachmentTextTest {
         assertThat(AttachmentText.toMarkdown(file, info(file, "pdf", "text/plain", null), pandoc)).contains(source);
         Files.write(file, new byte[]{(byte) 0xff, 65});
         assertThat(text(file)).isEqualTo("\ufffdA");
+    }
+
+    @Test void nestedMessageBecomesHeadersAndBody() throws Exception {
+        Path file = dir.resolve("forwarded.eml");
+        String headers = "Subject: Forwarded subject\r\nFrom: Sender <sender@example.com>, bare@example.com\r\n"
+                + "To: Reader <reader@example.com>\r\nCc: copy@example.com\r\n"
+                + "Date: Mon, 26 Oct 2026 12:00:00 +0300\r\n";
+        Files.writeString(file, headers + "Content-Type: text/plain; charset=UTF-8\r\n\r\nPlain body\r\n");
+        assertThat(text(file)).isEqualTo("Subject: Forwarded subject\n"
+                + "From: Sender <sender@example.com>, bare@example.com\nTo: Reader <reader@example.com>\n"
+                + "Cc: copy@example.com\nDate: 2026-10-26T09:00:00Z\n\nPlain body\r\n");
+        assertThat(AttachmentText.toMarkdown(file, info(file, "part", "message/rfc822", null), pandoc))
+                .contains(text(file));
+        assertThat(AttachmentText.toMarkdown(file, info(file, "forwarded.txt", "message/rfc822", null), pandoc))
+                .contains(text(file));
+        Files.writeString(file, "Content-Type: application/octet-stream\r\n\r\nbytes");
+        assertThat(AttachmentText.toMarkdown(file, info(file, null, "message/rfc822", null), pandoc)).isEmpty();
+        Files.writeString(file, "Subject: Only header\r\nContent-Type: application/octet-stream\r\n\r\nbytes");
+        assertThat(text(file)).isEqualTo("Subject: Only header\n");
+        if (pandocAvailable()) {
+            Files.writeString(file, headers + "Content-Type: text/html; charset=UTF-8\r\n\r\n<p>HTML <b>body</b></p>");
+            assertThat(text(file)).contains("Subject: Forwarded subject\n", "\n\nHTML **body**");
+        }
     }
 
     @Test void unknownFormatHasNoText() throws Exception {

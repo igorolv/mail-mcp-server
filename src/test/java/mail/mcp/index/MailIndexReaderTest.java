@@ -21,7 +21,7 @@ class MailIndexReaderTest {
         writer.put(new MessageMeta(key, folder, "INBOX", key, 0, null, Instant.now(), MessageState.CONVERTED, null),
                 new MailMessage("Subject", List.of(new Address("Name", "user@example.com")), null, null,
                         date, null, null, null,
-                        List.of(new AttachmentInfo("1__a", "a", "text/plain", 1, null, false, null))), null, null);
+                        List.of(new AttachmentInfo("1__a", "a", "text/plain", 1, null, false, null, null))), null, null);
     }
 
     @Test void attachmentTextFieldFindsTheMessage() throws Exception {

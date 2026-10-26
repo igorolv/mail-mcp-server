@@ -5,6 +5,7 @@ import mail.mcp.convert.AttachmentText;
 import mail.mcp.convert.Pandoc;
 import mail.mcp.convert.PandocException;
 import mail.mcp.mime.MimeReader;
+import mail.mcp.mime.Containers;
 import mail.mcp.model.MessageMeta;
 import mail.mcp.model.MessageState;
 import mail.mcp.store.MessageStore;
@@ -40,13 +41,14 @@ public final class MessageProcessor {
         final Processed result;
         try {
             var parsed = MimeReader.read(directory.resolve(MessageStore.MESSAGE_FILE), attachments);
+            var message = Containers.expand(parsed.message(), attachments, true);
             String body = parsed.html() ? pandoc.htmlToMarkdown(parsed.body()) : parsed.body();
             if (body != null) {
                 try { Files.writeString(directory.resolve(MessageStore.BODY_FILE), body, StandardCharsets.UTF_8); }
                 catch (IOException e) { throw new UncheckedIOException(e); }
             }
             var texts = new ArrayList<String>();
-            for (var attachment : parsed.message().attachments()) {
+            for (var attachment : message.attachments()) {
                 var path = attachments.resolve(attachment.file());
                 var text = AttachmentText.toMarkdown(path, attachment, pandoc);
                 if (text.isPresent()) {
@@ -55,7 +57,7 @@ public final class MessageProcessor {
                     texts.add(text.get());
                 }
             }
-            result = new Processed(state(meta, MessageState.CONVERTED, null), parsed.message(), body,
+            result = new Processed(state(meta, MessageState.CONVERTED, null), message, body,
                     texts.isEmpty() ? null : String.join("\n\n", texts));
         } catch (MessagingException | IOException e) {
             return failed(meta, "MIME parsing failed (" + e.getClass().getSimpleName() + ")");
@@ -68,14 +70,15 @@ public final class MessageProcessor {
         var directory = store.messageDir(meta.key());
         try {
             var parsed = MimeReader.read(directory.resolve(MessageStore.MESSAGE_FILE), null);
+            var message = Containers.expand(parsed.message(), directory.resolve(MessageStore.ATTACHMENTS_DIR), false);
             var bodyFile = directory.resolve(MessageStore.BODY_FILE);
             String body = Files.exists(bodyFile) ? Files.readString(bodyFile, StandardCharsets.UTF_8) : null;
             var texts = new ArrayList<String>();
-            for (var attachment : parsed.message().attachments()) {
+            for (var attachment : message.attachments()) {
                 var path = directory.resolve(MessageStore.ATTACHMENTS_DIR).resolve(attachment.file() + ".md");
                 if (Files.exists(path)) { texts.add(Files.readString(path, StandardCharsets.UTF_8)); }
             }
-            return new Processed(meta, parsed.message(), body, texts.isEmpty() ? null : String.join("\n\n", texts));
+            return new Processed(meta, message, body, texts.isEmpty() ? null : String.join("\n\n", texts));
         } catch (MessagingException | IOException e) { return new Processed(meta, null, null, null); }
     }
 
