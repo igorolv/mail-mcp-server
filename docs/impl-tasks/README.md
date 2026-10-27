@@ -116,22 +116,23 @@ The reviewer checks; it does not fix. Work through every point and report what y
 
 ## Task list
 
-IT-01…IT-16 were accepted and deleted (2026-10-25…27). The user requested six briefs together
-on 2026-10-27, based on `d3fd516`. All six — IT-22 (Д25), IT-21 (Д24), IT-17 (Д5), IT-18 (Д8),
-IT-20 (Д21) and IT-19 (Д9) — were accepted offline and deleted on 2026-10-27. Background
-summaries, separate EWS rescan reporting, date filters, date-only search, local conversation
-cards, heuristic move reuse, the 5 MiB XLSX text threshold and read/star snapshots are implemented.
-No open briefs remain. Preserve the accepted behavior when preparing the next brief.
-Checks still pending on real mail are in `docs/plan.md` 2.4; applying the XLSX threshold to
-existing mail is optional and user-run. Flags need requested sync; old indexes rebuild offline
-to schema 4, while old metadata remains unknown until remote observation.
-Next unused number: IT-23.
+IT-01…IT-22 were accepted and deleted (2026-10-25…27). Checks still pending on real mail are in
+`docs/plan.md` 2.4. The user requested the following three briefs together on 2026-10-27. Their
+baseline is `d725d93`; no implementation is included in this batch. Next unused number: IT-26.
 
-Complete the implement → review → record cycle for each brief before starting the next;
-do not run these agents concurrently. Preserve interruption recovery and protocol allow-lists.
-Only the user runs credentialed validation. The D8 heuristic was explicitly selected by the
-user; other concrete defaults in the accepted batch are implementation choices, not additional
-recorded user decisions.
+| Order | Brief | Plan item | Scope and dependency |
+|---|---|---|---|
+| 1 | [IT-23](IT-23-message-copies.md) | Д4 | Copies of one message count once in search and getThread; read-time only, no schema change. Changes reader, search and thread records. |
+| 2 | [IT-24](IT-24-word-forms.md) | Д12 | Optional user `word-forms.txt`, `wordForms` commit entry, `mail-analyze`. Builds on IT-23's reader and `SearchTools`. |
+| 3 | [IT-25](IT-25-search-hints.md) | Д26 | `search` description hints only; refers to IT-23 copies and the IT-24 file, so it goes last. |
+
+Numbers follow the plan items, which here match the execution order. Complete the implement →
+review → record cycle for each before starting the next; do not run these agents concurrently.
+IT-24 is the largest: review that an absent file leaves the analyzer and commit data unchanged.
+The user decided the Д12 storage (an optional user file, no built-in list, no Hunspell,
+single-word synonyms allowed, `mail-analyze` included). The Д4 copy identity and the copies
+field are implementation proposals, not recorded user decisions. Recording one brief must
+preserve the remaining rows and their dependency notes.
 
 ## Rules for every implementation session
 
