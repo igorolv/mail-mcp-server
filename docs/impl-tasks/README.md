@@ -6,9 +6,13 @@ part of it. The briefs are written for a capable but not top-tier model: they na
 types, the behavior, the tests and what not to build. When a brief and your own judgment disagree,
 follow the brief and say so in the report.
 
-Briefs are written one at a time, after the previous one has been reviewed and accepted, so each
-brief matches the code as it really is. Small briefs that touch different files may be open at the
-same time; run them one after another, each from a clean working tree. A brief is deleted once it
+By default, briefs are written one at a time, after the previous one has been reviewed and
+accepted, so each brief matches the code as it really is. The user may explicitly request a
+batch; its task list must state the baseline, execution order and dependencies. Before starting
+each dependent brief, read the accepted predecessors' resulting code and current engineering
+documents; predecessor brief files may already have been deleted. Preserve their behavior and
+adapt mechanical signatures to it. A substantive conflict requires correcting the brief before
+implementation. Run briefs one after another, each from a clean working tree. A brief is deleted once it
 is accepted and recorded in the plan; git keeps it. The draft version was built by briefs
 IT-01…IT-08 (2026-10-25…26).
 
@@ -112,8 +116,26 @@ The reviewer checks; it does not fix. Work through every point and report what y
 
 ## Task list
 
-No open implementation briefs. IT-01…IT-16 were accepted and deleted (2026-10-25…27); the
-next brief is IT-17. Checks still pending on real mail are in `docs/plan.md` 2.4.
+IT-01…IT-16 were accepted and deleted (2026-10-25…27). The user requested the following six
+briefs together on 2026-10-27. Their baseline is `d3fd516`; no implementation is included in
+this batch. Checks still pending on real mail are in `docs/plan.md` 2.4. Next unused number: IT-23.
+
+| Order | Brief | Plan item | Scope and dependency |
+|---|---|---|---|
+| 1 | [IT-22](IT-22-sync-completion.md) | Д25 | Background summary and a separate EWS rescan signal; establishes the sync contract before moves. |
+| 2 | [IT-21](IT-21-date-filters.md) | Д24 | Date bounds and date-only search; establishes reader signatures before threads/flags. |
+| 3 | [IT-17](IT-17-message-threads.md) | Д5 | Local getThread; preserves IT-21 reader behavior. |
+| 4 | [IT-18](IT-18-message-moves.md) | Д8 | Heuristic move reuse without MIME download; preserves IT-22 and supplies metadata snapshots for IT-19. |
+| 5 | [IT-19](IT-19-message-flags.md) | Д9 | Read/star flags; depends on IT-18 metadata and IT-17 thread cards, preserves date-only search. |
+| 6 | [IT-20](IT-20-xlsx-size-limit.md) | Д21 | Independent 5 MiB XLSX text threshold; may be done earlier. |
+
+Numbers follow the user's requested items, not execution order. Complete the implement →
+review → record cycle for each before starting the next; do not run these agents concurrently.
+IT-18 is the riskiest brief: review its interruption tests and protocol allow-list changes
+carefully. All six can be accepted offline with real-mail checks explicitly pending; only the
+user runs credentialed validation. The D8 heuristic was explicitly selected by the user;
+other concrete defaults in the briefs are implementation proposals, not new recorded user
+decisions. Recording one brief must preserve the remaining rows and their dependency notes.
 
 ## Rules for every implementation session
 
