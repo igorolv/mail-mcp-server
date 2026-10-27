@@ -122,11 +122,11 @@ cli/ ──► sync/, connections/, source/, store/, index/  (user-run commands 
 | `source/imap/` | Read-only IMAP source and client. | `ImapMailSource`, `ImapClient` (one session across folders/downloads), `ReadOnlyImapStore` (wire command guard), `ImapSettings`, `ImapFolderInfo`, `FolderUids`, sanitized `ImapException`. See `docs/imap-source-agent.md`. |
 | `source/oauth/` | Provider-independent OAuth components. | `OAuthLoopbackReceiver` and sanitized `OAuthException`. No provider endpoints, settings or provider-specific messages. |
 | `source/oauth/google/` | Google Desktop OAuth and refresh credentials. | All `Google*` classes and the package-private `OAuthJson` helper. Depends on shared `source/oauth/` components. See `docs/gmail-oauth-agent.md`. |
-| `model/` | Shared disk records and lifecycle. | `MessageState`, `MessageMeta`, `MessageFingerprint`, `LocalFolder`, `MailMessage`, `Address`, `AttachmentInfo`, `MessageCard`, `SearchHit`, `SearchResults`, `ThreadResults`, `FolderProgress`, `SyncStatus`, one type per file. |
+| `model/` | Shared disk records and lifecycle. | `MessageState`, `MessageMeta`, `MessageFingerprint`, `LocalFolder`, `MailMessage`, `Address`, `AttachmentInfo`, `MessageCard`, `MessageCopy`, `SearchHit`, `SearchResults`, `ThreadResults`, `FolderProgress`, `SyncStatus`, one type per file. |
 | `store/` | Local message directories and metadata. | `MessageStore`: UUID paths, atomic `meta.json`, `folders.json` and `sync-status.json`, listing and deletion. See `docs/storage-agent.md`. |
 | `index/` | Derived Lucene catalog and committed readers. | `MailIndex`: schema 4, metadata, headers/body/attachment text fields, NRT key/ref lookups, commit and reconciliation; `IndexLockedException`. `MailAnalyzers` shares per-field analysis, `SearchField` defines groups. `MailIndexReader` reads committed counts, sorted cards and scored search hits without the writer lock. Package-private `SearchSnippets` selects a body or saved attachment passage after paging. See `docs/storage-agent.md`. |
 | `tools/` | Thin `@McpTool` adapters, Spring `@Service` beans. | `ConnectionTools` (`listConnections`), `SyncTools` (`sync`, `syncStatus`), `MailTools` (`listFolders`, `listMessages`, `getMessage`), `SearchTools` (`search`), `ThreadTools` (`getThread`), `ToolLogger`. |
-| `api/` | Stable MCP response records with `@Schema`. | Discovery, sync start/status, folder/message pages, body chunks, attachment references, `SearchResult`, `SearchHitInfo`, `GetThreadResult` and `ThreadMessageInfo`. Never expose `source/` or `model/` records or settings here. |
+| `api/` | Stable MCP response records with `@Schema`. | Discovery, sync start/status, folder/message pages, body chunks, attachment references, `SearchResult`, `SearchHitInfo`, `GetThreadResult`, `ThreadMessageInfo` and `MessageCopyInfo`. Never expose `source/` or `model/` records or settings here. |
 | `sync/` | One synchronization run and local conversion. | `SyncRunner`, `MessageProcessor`, `Processed`: reconcile by state/identity, discover all folders and metadata, reuse unique apparent moves before unmatched removals, download/convert in batches of 100, save all cursors after all changes commit. Caller owns the source and writer. `SyncService` owns background runs, `SyncStart` their immediate result; `SyncErrors` shares fixed CLI/status failure messages. |
 | `cli/` | User-run commands without Spring. | `GmailOAuthCommand`, `MailSyncCommand`, `MailReprocessCommand`, `MailReindexCommand`. Check pandoc before the index or sign-in; source closes before the index. Reprocessing and reindexing are offline. |
 | `mime/` | Local MIME and container reading. | `MimeReader`, `ParsedMessage`: decoded headers, selected body and MIME attachment files. `Containers` coordinates breadth-first EML/ZIP/MSG/TNEF expansion; package-private `MsgReader`/`TnefReader` enumerate immediate children using POI. See `docs/mime-agent.md`. |
@@ -149,10 +149,16 @@ attachment lookup/search because extracted filenames can be renumbered in mixed 
 It builds an undirected graph of local keys and case-sensitive IDs from stored Message-ID,
 In-Reply-To and References only. Nonempty angle-bracketed IDs cannot contain whitespace or
 nested brackets; Message-ID must be exactly one ID, while reply headers contribute all valid
-IDs. Missing parents still connect siblings; cycles terminate and copies keep separate cards.
-The complete component sorts oldest first, undated last, then key before paging. Only header
-fields are scanned, dates use doc values, and stored card fields are loaded for the page.
-No bodies, MIME, attachment text, source or pandoc are read. The writer lock does not block
+IDs. Missing parents still connect siblings and cycles terminate.
+The complete component sorts oldest first, undated last, then key and groups copies before
+paging. Search groups all matches after query/folder/date filters in score/date order then key.
+Both use equal valid stripped single Message-ID, known stored date and nonblank stored
+from/subject strings. Incomplete identities stay separate. The first member represents each
+group; other matching copies appear as key/folder pairs under optional `copies`. Totals and
+paging count groups, while stored copies, listMessages and folder counts stay unchanged.
+Stored key, ref, date, from, subject and header IDs are scanned; full card fields load only for
+the page. Grouping uses existing schema-4 fields without reindexing.
+Thread reading uses no bodies, MIME, attachment text, source or pandoc. The writer lock does not block
 reading. Conversations use schema 4 without persisted threads or additional fields for links.
 Only displayed subjects/senders are filtered; keys, paths, folder keys and dates stay original.
 

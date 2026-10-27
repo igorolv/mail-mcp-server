@@ -2,6 +2,7 @@ package mail.mcp.tools;
 
 import mail.mcp.api.GetThreadResult;
 import mail.mcp.api.ThreadMessageInfo;
+import mail.mcp.api.MessageCopyInfo;
 import mail.mcp.connections.ConnectionRegistry;
 import mail.mcp.index.MailIndexReader;
 import mail.mcp.redaction.SecretRedactor;
@@ -13,6 +14,8 @@ import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
+
+import java.util.List;
 
 /** Local conversations from committed header fields; never resolves a source or requires pandoc. */
 @Service
@@ -34,10 +37,11 @@ public class ThreadTools {
     }
 
     @McpTool(description = "Read local conversation cards across folders of one connection, anchored by a local UUID. " +
-            "Links use only case-sensitive Message-ID, In-Reply-To and References, including absent parents; " +
-            "copies remain separate. Oldest first, undated last, then key. limit defaults to 50, capped at 200; " +
+            "Links use only case-sensitive Message-ID, In-Reply-To and References, including absent parents. " +
+            "Oldest first, undated last, then key. limit defaults to 50, capped at 200; " +
             "use nextOffset to page. No bodies or raw header IDs. Data may be incomplete during sync; " +
-            "pages across calls may change. localPath is an absolute message directory. No mailbox or pandoc access.",
+            "pages across calls may change. localPath is an absolute message directory. No mailbox or pandoc access. " +
+            "Copies of one message in several folders are returned once, with the others under copies, and totals count them once.",
             generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public GetThreadResult getThread(
@@ -63,7 +67,9 @@ public class ThreadTools {
                 var page = reader.thread(key, position, size);
                 var messages = page.cards().stream().map(c -> new ThreadMessageInfo(c.key(), c.folderKey(),
                         c.date(), redactor.text(c.from()), redactor.text(c.subject()), c.hasAttachments(), c.state(),
-                        store.messageDir(c.key()).toAbsolutePath().toString(), c.read(), c.flagged())).toList();
+                        store.messageDir(c.key()).toAbsolutePath().toString(), c.read(), c.flagged(),
+                        page.copies().getOrDefault(c.key(), List.of()).stream()
+                                .map(copy -> new MessageCopyInfo(copy.key(), copy.folderKey())).toList())).toList();
                 Integer next = (long) position + messages.size() < page.total() ? position + messages.size() : null;
                 ToolLogger.completed(log, "getThread", start);
                 return new GetThreadResult(definition.name(), key, page.total(), position, next, messages);

@@ -2,6 +2,7 @@ package mail.mcp.tools;
 
 import mail.mcp.api.SearchHitInfo;
 import mail.mcp.api.SearchResult;
+import mail.mcp.api.MessageCopyInfo;
 import mail.mcp.connections.ConnectionRegistry;
 import mail.mcp.index.MailIndexReader;
 import mail.mcp.index.SearchField;
@@ -57,7 +58,8 @@ public class SearchTools {
             "context. Missing local texts fall back to body context. snippetAttachmentFile is the exact file for " +
             "getAttachment; snippetAttachmentName is its display name. localPath points at files " +
             "the agent may read. Optional secret filtering changes output text only, not matching or ranking; " +
-            "the complete selected text is filtered before highlighting. No reindexing is needed. Original files stay unfiltered.",
+            "the complete selected text is filtered before highlighting. No reindexing is needed. Original files stay unfiltered. " +
+            "Copies of one message in several folders are returned once, with the others under copies, and totals count them once.",
             generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public SearchResult search(
@@ -97,7 +99,8 @@ public class SearchTools {
                     return new SearchHitInfo(c.key(), c.folderKey(), c.date(), redactor.text(c.from()), redactor.text(c.subject()),
                             c.hasAttachments(), c.state(), hit.score(), hit.snippet(),
                             store.messageDir(c.key()).toAbsolutePath().toString(), hit.snippetAttachmentFile(),
-                            redactor.text(hit.snippetAttachmentName()), c.read(), c.flagged());
+                            redactor.text(hit.snippetAttachmentName()), c.read(), c.flagged(),
+                            hit.copies().stream().map(copy -> new MessageCopyInfo(copy.key(), copy.folderKey())).toList());
                 }).toList();
                 Integer next = (long) position + hits.size() < results.total() ? position + hits.size() : null;
                 ToolLogger.completed(log, "search", start);

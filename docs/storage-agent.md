@@ -305,16 +305,24 @@ search-hit fields. This changes no matches, scores, totals, pagination, files or
 See `docs/redaction-agent.md`; no reprocessing or migration is required for existing sidecars.
 The writer's NRT lookups remain separate; tools see only committed documents.
 
-`MailIndexReader.thread` scans only live documents' stored key, messageId, inReplyTo and
-references in that same snapshot. Local keys and header IDs are separate graph nodes: a key
-links to its own usable Message-ID and all usable reply/reference IDs. Matching is case-sensitive;
+`MailIndexReader.thread` scans live documents' stored key, ref, date, from, subject, messageId,
+inReplyTo and references in that same snapshot. Local keys and header IDs are separate graph
+nodes: a key links to its own usable Message-ID and all usable reply/reference IDs. Matching is case-sensitive;
 surrounding whitespace is trimmed. IDs must be nonempty and angle-bracketed without whitespace
 or nested brackets. Message-ID must consist of exactly one ID; reply headers contribute all
 valid IDs, deduplicated. Invalid/missing headers create no links; a failed card can be a singleton.
 The undirected component includes ancestors, descendants and missing-parent siblings; visited
 key/ID sets terminate cycles. Deleted documents contribute no links and copies retain their keys.
 No subject, participant, date or provider identifier creates a link.
-Dates are read from numeric doc values to sort the complete component ascending, undated last,
-then key. Only the returned page loads stored card fields, never bodies or attachment text/MIME.
+Stored dates sort the complete component ascending, undated last, then key. Copies group
+before paging by equal case-sensitive stripped single valid bracketed Message-ID, equal known
+stored date and equal nonblank stored from/subject strings. Missing/invalid identity stays
+separate. The first member (smallest key for copies sharing a date) represents the group;
+the rest appear under `copies` as key/folderKey pairs. Bodies, sizes, folders and flags are
+not compared. Search applies the same grouping after query/folder/date filters, with the first
+member in its score/date order representing the group; only matching copies are included.
+Totals and pagination count groups. No stored copy is merged or deleted, and folder counts
+and listMessages still count every document. Only the returned page loads full stored card
+fields, never bodies or attachment text/MIME for threads.
 The exact total is computed before paging. No writer lock, source or pandoc is needed; pages
 across calls can change during sync. No persisted thread data, schema change or reindex is needed.

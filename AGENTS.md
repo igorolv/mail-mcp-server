@@ -16,10 +16,11 @@ mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/plan.md` section 2).
   user-requested sync; date filters, date-only search and local conversations await local
   queries after schema-4 rebuild and restart; heuristic move reuse needs user-run seeding and a manual test move;
   applying the 5 MiB XLSX text threshold to existing mail needs optional user-run reprocessing;
-  read/star snapshots need user-requested sync and flag comparisons in the user's mail client).
+  read/star snapshots need user-requested sync and flag comparisons in the user's mail client;
+  copy grouping needs local search/thread queries after restart, without reindexing).
 
 Work now consists of polishing and optional improvements:
-- `docs/plan.md` section 4 lists the open ones (`Д4`, `Д7`, …); the user chooses which to take.
+- `docs/plan.md` section 4 lists the open ones (`Д7`, `Д12`, …); the user chooses which to take.
   Accepted items are removed from that table.
 - Add new tools or subsystems only when the task asks for them.
 - `docs/plan.md` 3.8 lists what no change may add without a user decision.
@@ -189,9 +190,15 @@ code is listed in `docs/architecture-agent.md`.
   file paths and stored filenames. This reduces accidental context exposure, not intentional
   extraction. See `docs/redaction-agent.md`.
 - **Local conversations:** `getThread` follows case-sensitive Message-ID, In-Reply-To and
-  References across folders of one connection in one committed index snapshot. Copies remain
-  separate; cards sort oldest first, undated last, then key before paging. No bodies, MIME,
+  References across folders of one connection in one committed index snapshot. Cards sort
+  oldest first, undated last, then key; copies group before paging. No bodies, MIME,
   source or pandoc are read; conversations use the schema-4 catalog without persisted threads.
+- **Message copies:** search and threads group equal valid stripped single Message-ID,
+  known stored date and nonblank stored sender/subject strings, within one connection.
+  Search groups only matching documents after filters; the first in score/date order then key
+  supplies the card, score and snippet. Threads use the smallest key as representative.
+  Other copies appear as unfiltered key/folder pairs under optional `copies`; totals and paging
+  count groups. Stored copies, listMessages and folder counts stay unchanged; no reindex is needed.
 - **Read/star snapshots:** nullable `read` and `flagged` represent the latest successful remote
   observation, not live state. Unknown is omitted; explicit false clears a known value.
   EWS reads IsRead and Flag/FlagStatus, IMAP reads Seen/Flagged in the existing metadata pass

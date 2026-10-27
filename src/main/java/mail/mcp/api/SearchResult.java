@@ -17,7 +17,7 @@ public record SearchResult(
         String field,
         @Schema(description = "Optional local folder key.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String folder,
-        @Schema(description = "Exact number of matching messages.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Exact number of matching messages; copies of one message count once.", requiredMode = Schema.RequiredMode.REQUIRED)
         int total,
         @Schema(description = "Requested starting position.", requiredMode = Schema.RequiredMode.REQUIRED)
         int offset,

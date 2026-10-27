@@ -47,6 +47,50 @@ class SearchToolsTest {
                 new LocalFolder("f2", "Archive", "Archive", null)));
     }
 
+    @Test void searchReturnsCopiesWithKeysAndFolders() {
+        var mapper = new JsonConfig().mailMcpObjectMapper();
+        var otherDir = dir.resolve("other");
+        var copyRegistry = new ConnectionRegistry(List.of(
+                new ConnectionDefinition("local", null, ConnectionType.IMAP, AuthKind.APP_PASSWORD, null, null, dir, null),
+                new ConnectionDefinition("other", null, ConnectionType.IMAP, AuthKind.APP_PASSWORD, null, null, otherDir, null)),
+                d -> { throw new AssertionError("no source"); });
+        var search = new SearchTools(copyRegistry, mapper);
+        var keys = java.util.stream.IntStream.range(1, 5).mapToObj(i -> new java.util.UUID(0, i).toString()).toList();
+        var message = new MailMessage("Subject", List.of(new Address(null, "user@example.com")), null, null,
+                Instant.parse("2026-10-26T00:00:00Z"), "<copy>", null, null, null);
+        try (var writer = MailIndex.openWriter(dir); var other = MailIndex.openWriter(otherDir)) {
+            for (int i = 0; i < 4; i++) {
+                var meta = new MessageMeta(keys.get(i), i < 2 ? "f1" : "f2", "INBOX", keys.get(i), i, null,
+                        Instant.now(), MessageState.CONVERTED, null, null, i == 0, i != 0);
+                writer.put(meta, i == 0 ? new MailMessage("Subject", message.from(), null, null, message.date(),
+                        "<first>", null, null, null) : message, "Needle", null);
+            }
+            other.put(new MessageMeta(keys.get(2), "f3", "INBOX", "remote", 0, null, Instant.now(), MessageState.CONVERTED, null),
+                    message, "Needle", null);
+            writer.commit();
+            other.commit();
+            var first = search.search("local", "Needle", "body", null, 0, 1);
+            assertThat(first.total()).isEqualTo(2);
+            assertThat(first.nextOffset()).isEqualTo(1);
+            assertThat(mapper.readTree(mapper.writeValueAsString(first)).at("/hits/0").has("copies")).isFalse();
+            var second = search.search("local", "Needle", "body", null, first.nextOffset(), 1);
+            assertThat(second.nextOffset()).isNull();
+            var hit = second.hits().getFirst();
+            assertThat(hit.key()).isEqualTo(keys.get(1));
+            assertThat(hit.copies()).containsExactly(new mail.mcp.api.MessageCopyInfo(keys.get(2), "f2"),
+                    new mail.mcp.api.MessageCopyInfo(keys.get(3), "f2"));
+            assertThat(hit.read()).isFalse();
+            assertThat(hit.flagged()).isTrue();
+            var json = mapper.readTree(mapper.writeValueAsString(hit));
+            assertThat(json.at("/copies/0/key").asString()).isEqualTo(keys.get(2));
+            assertThat(json.at("/copies/0/folder").asString()).isEqualTo("f2");
+            assertThat(search.search("other", "Needle", "body", null, 0, 10).total()).isEqualTo(1);
+            assertThat(search.search("other", "Needle", "body", null, 0, 10).hits().getFirst().copies()).isEmpty();
+        }
+        assertThat(copyRegistry.isInitialized("local")).isFalse();
+        assertThat(copyRegistry.isInitialized("other")).isFalse();
+    }
+
     @Test void attachmentSnippetIdentifiesAReadableAttachment() throws Exception {
         String key = store.newKey();
         var directory = store.createMessageDir(key);

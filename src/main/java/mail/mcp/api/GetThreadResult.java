@@ -11,7 +11,7 @@ public record GetThreadResult(
         String connection,
         @Schema(description = "Anchor local message UUID.", requiredMode = Schema.RequiredMode.REQUIRED)
         String key,
-        @Schema(description = "Exact number of local messages in the conversation at this commit.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Exact number of local messages in the conversation at this commit; copies of one message count once.", requiredMode = Schema.RequiredMode.REQUIRED)
         int total,
         @Schema(description = "Requested starting position.", requiredMode = Schema.RequiredMode.REQUIRED)
         int offset,

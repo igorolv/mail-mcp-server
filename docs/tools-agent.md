@@ -109,6 +109,8 @@ Real-server behavior remains to verify (проверить).
 messages)`. `ThreadMessageInfo` includes key, local folder key, date, displayed from, subject,
 hasAttachments, state and absolute message directory localPath. No bodies or raw header IDs
 are exposed. Subject/from use `SecretRedactor`; keys, folder keys, paths and dates stay original.
+Optional `copies` contains the other local copies as `{key, folder}` and is omitted when empty;
+copy keys and folder keys bypass `SecretRedactor`.
 
 One committed `MailIndexReader` snapshot supplies the anchor and live documents from one
 connection. Each local key is a node, separate from header-ID nodes, linked to its own
@@ -119,14 +121,15 @@ all valid IDs, deduplicated. Missing/malformed IDs contribute no links. A known 
 usable headers is a singleton, including failed messages.
 
 An undirected traversal with visited sets finds ancestors, descendants and missing-parent
-siblings and terminates on cycles. Different local keys remain separate cards, including
-duplicate Message-IDs in different folders. No subject, participant, date or provider-ID
-heuristic is used. The complete component sorts by ascending date, undated last, then key
-before paging. total is exact for the snapshot; offsets beyond the end return no cards and no
-nextOffset. Separate calls can see different commits, as with listMessages; no snapshot token
+siblings and terminates on cycles. No subject, participant, date or provider-ID creates links.
+The complete component sorts by ascending date, undated last, then key and groups copies
+using the identity rule in Search below. The first member (smallest key for equal-date copies)
+represents the group; other members appear in the same order under `copies`. Grouping happens
+before paging. total and offsets count groups, exactly for the snapshot; offsets beyond the end
+return no cards and no nextOffset. Separate calls can see different commits, as with listMessages; no snapshot token
 or cache is retained.
 
-Only key and the three stored header fields are scanned; dates use doc values and stored card
+Only key, ref, date, from, subject and the three stored header fields are scanned; full stored card
 fields are fetched for the returned page. No bodies, MIME, attachment text, source construction
 or pandoc are involved; reading works while the writer lock is held. Conversations use schema 4 without persisted thread data. Missing index/anchor raises
 `IllegalArgumentException("Message is not indexed; use listMessages")`. Old schemas raise the
@@ -137,6 +140,21 @@ same rebuild error as search below.
 `SearchTools.search` returns `SearchResult(connection, query, field, folder, total, offset,
 nextOffset, hits, since, until)`. Each `SearchHitInfo` includes key, folder key, date, displayed from, subject,
 hasAttachments, state, score, snippet and the absolute message directory `localPath`.
+Optional `copies` lists other matching local copies as `{key, folder}`; empty lists are omitted.
+Copies need the same stored Message-ID after `strip()`, exactly one nonempty bracketed ID
+without whitespace or nested brackets, compared case-sensitively; equal known stored dates;
+and equal nonblank stored from and subject strings, compared verbatim. Missing/invalid parts
+leave each document separate, including failed entries without headers. Bodies, sizes, folders
+and flags do not participate; grouping never crosses connections.
+
+The reader groups the complete matching set after query, folder and date filters, before paging.
+The first member in score-descending/key order (date-descending/key for date-only queries)
+represents the group with its card, score and snippet. Other members keep that order in `copies`;
+only documents matching the query and filters themselves participate. Exact total, offset,
+limit and nextOffset count groups. Small stored identity fields are read for all matches;
+full cards and snippets only for the returned page. Grouping uses existing schema-4 fields
+without reindexing. Stored messages, listMessages and listFolders counts remain unchanged.
+
 Snippets use Markdown `**matches**` and `… ` between passages, at most one passage per hit.
 For `any`, a real body highlight wins; otherwise the first attachment with a highlightable query
 clause supplies the passage. `attachmentText` selects attachments first, even when the body

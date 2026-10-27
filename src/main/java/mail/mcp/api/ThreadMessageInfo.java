@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.time.Instant;
+import java.util.List;
 
 @Schema(description = "Local conversation card with direct file access, without bodies or header IDs.")
 public record ThreadMessageInfo(
@@ -33,5 +34,9 @@ public record ThreadMessageInfo(
         @Schema(description = "User flag/star at the latest successful observation, not sender importance; absent when unknown.",
                 nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        Boolean flagged
+        Boolean flagged,
+        @Schema(description = "Other local copies of this message (same Message-ID, date, sender and subject) among the results; absent when none.",
+                requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @JsonInclude(JsonInclude.Include.NON_EMPTY)
+        List<MessageCopyInfo> copies
 ) { }

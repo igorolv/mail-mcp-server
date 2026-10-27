@@ -234,14 +234,25 @@ Arguments, bounds and errors: [docs/tools-agent.md](docs/tools-agent.md).
 Message-ID, In-Reply-To and References. It follows the complete undirected component, including
 siblings whose parent is absent locally. IDs must be nonempty and angle-bracketed, without
 whitespace or nested brackets; Message-ID must contain exactly one ID and no other text.
-Subject, participants and provider conversation IDs do not create links. Copies retain their
-separate local keys. Cards sort by ascending date, undated last, then key; paging follows the
-complete component, with exact total and nextOffset (default limit 50, maximum 200).
+Subject, participants and provider conversation IDs do not create links. After finding the
+complete component, copies of one message count once. Cards sort by ascending date, undated
+last, then key; the smallest key represents each copy group, with exact total and nextOffset
+(default limit 50, maximum 200).
 Only subject and displayed sender are optionally filtered; keys, folder keys, dates and local
 paths remain usable. The result contains no bodies or raw header IDs; reading uses no bodies,
 attachment text or MIME.
 Each call reads one committed snapshot without the writer lock, network or pandoc; pages can
 change during concurrent sync. Conversations use the schema-4 catalog without separate thread data.
+
+In `search` and `getThread`, copies require the same valid single bracketed Message-ID
+(case-sensitive after trimming outer whitespace), a known equal date, and equal nonblank
+stored sender and subject. Incomplete identities stay separate. Other copies appear under
+`copies` as `{key, folder}`; the field is absent when empty. Search groups all matches after
+query, folder and date filters, before paging. The first match in score order (date order for
+date-only searches), then key, supplies the card, score and snippet. Only copies that match
+themselves are listed. Totals and page offsets count groups. Grouping uses existing index
+fields; no reindex is needed. All stored copies retain their keys and files; `listMessages`
+and folder counts still include each copy.
 
 Both `search` and `listMessages` accept optional `since` and `until` MIME header dates.
 Use strict `YYYY-MM-DD` (UTC midnight) or an ISO-8601 datetime with `Z` or a numeric

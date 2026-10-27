@@ -5,6 +5,8 @@ import mail.mcp.model.AttachmentInfo;
 import mail.mcp.model.MailMessage;
 import mail.mcp.model.MessageMeta;
 import mail.mcp.model.MessageState;
+import mail.mcp.model.MessageCopy;
+import mail.mcp.model.DateRange;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -17,6 +19,168 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class MailIndexReaderTest {
     @TempDir Path dir;
+
+    private void putCopy(MailIndex writer, String key, String folder, Instant date,
+                         String messageId, String from, String subject, String body) {
+        writer.put(new MessageMeta(key, folder, "INBOX", key, 0, null, Instant.now(), MessageState.CONVERTED, null),
+                new MailMessage(subject, from == null ? null : List.of(new Address(null, from)), null, null,
+                        date, messageId, null, null, null), body, null);
+    }
+
+    @Test void searchGroupsCopiesBeforePagingWithExactTotal() {
+        var date = Instant.parse("2026-10-26T00:00:00Z");
+        try (var writer = MailIndex.openWriter(dir)) {
+            // Insert out of key order; all scores tie. The copy group starts on page two.
+            putCopy(writer, "d", "f3", date, "<copy>", "user@example.com", "Subject", "Needle");
+            putCopy(writer, "c", "f2", date, " <copy> ", "user@example.com", "Subject", "Needle");
+            putCopy(writer, "a", "f1", date, "<first>", "user@example.com", "Subject", "Needle");
+            putCopy(writer, "b", "f1", date, "<copy>", "user@example.com", "Subject", "Needle");
+            writer.commit();
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                var first = reader.search("Needle", SearchField.BODY, null, 0, 1);
+                assertThat(first.total()).isEqualTo(2);
+                assertThat(first.hits()).extracting(h -> h.card().key()).containsExactly("a");
+                assertThat(first.hits().getFirst().copies()).isEmpty();
+                var second = reader.search("Needle", SearchField.BODY, null, 1, 1);
+                assertThat(second.total()).isEqualTo(2);
+                var hit = second.hits().getFirst();
+                assertThat(hit.card().key()).isEqualTo("b");
+                assertThat(hit.score()).isEqualTo(first.hits().getFirst().score());
+                assertThat(hit.snippet()).isEqualTo("**Needle**");
+                assertThat(hit.copies()).containsExactly(new MessageCopy("c", "f2"), new MessageCopy("d", "f3"));
+                assertThat(reader.search("Needle", SearchField.BODY, null, 2, 1).hits()).isEmpty();
+                assertThat(reader.search("Needle", SearchField.BODY, null, Integer.MAX_VALUE, 1).total()).isEqualTo(2);
+                assertThat(reader.count("f1")).isEqualTo(2);
+                assertThat(reader.cards("f1", 0, 10)).hasSize(2);
+            }
+        }
+    }
+
+    @Test void searchKeepsDistinctMessagesThatShareAMessageId() {
+        var date = Instant.parse("2026-10-26T00:00:00Z");
+        try (var writer = MailIndex.openWriter(dir)) {
+            putCopy(writer, "base", "f1", date, "<Same>", "user@example.com", "Subject", "Needle");
+            putCopy(writer, "date", "f2", date.plusSeconds(1), "<Same>", "user@example.com", "Subject", "Needle");
+            putCopy(writer, "sender", "f2", date, "<Same>", "other@example.com", "Subject", "Needle");
+            putCopy(writer, "subject", "f2", date, "<Same>", "user@example.com", "Different", "Needle");
+            putCopy(writer, "case", "f2", date, "<same>", "user@example.com", "Subject", "Needle");
+            int number = 0;
+            for (String id : new String[] {null, "", "Same", "<>", "<bad id>", "<<Same>>", "<Same> <other>", "junk <Same>", "<bad\u2003id>"}) {
+                for (int copy = 0; copy < 2; copy++) {
+                    putCopy(writer, "invalid" + number++, "f1", date, id, "user@example.com", "Subject", "Needle");
+                }
+            }
+            for (int copy = 0; copy < 2; copy++) {
+                putCopy(writer, "undated" + copy, "f1", null, "<Same>", "user@example.com", "Subject", "Needle");
+                putCopy(writer, "noSender" + copy, "f1", date, "<Same>", null, "Subject", "Needle");
+                putCopy(writer, "blankSender" + copy, "f1", date, "<Same>", " ", "Subject", "Needle");
+                putCopy(writer, "noSubject" + copy, "f1", date, "<Same>", "user@example.com", null, "Needle");
+                putCopy(writer, "blankSubject" + copy, "f1", date, "<Same>", "user@example.com", " ", "Needle");
+                writer.put(new MessageMeta("failed" + copy, "f1", "INBOX", "failed" + copy, 0, null,
+                        Instant.now(), MessageState.FAILED, "Unavailable"), null, "Needle", null);
+            }
+            writer.commit();
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                var result = reader.search("Needle", SearchField.BODY, null, 0, 100);
+                assertThat(result.total()).isEqualTo(35);
+                assertThat(result.hits()).hasSize(35).allSatisfy(h -> assertThat(h.copies()).isEmpty());
+                assertThat(reader.thread("base", 0, 100).total()).isEqualTo(14);
+            }
+        }
+    }
+
+    @Test void searchRepresentativeKeepsTheHighestScoringCopyAndItsSnippet() {
+        var date = Instant.parse("2026-10-26T00:00:00Z");
+        try (var writer = MailIndex.openWriter(dir)) {
+            putCopy(writer, "a", "f1", date, "<copy>", "user@example.com", "Subject",
+                    "Needle " + "Unrelated context. ".repeat(100));
+            putCopy(writer, "z", "f2", date, "<copy>", "user@example.com", "Subject", "Needle ".repeat(10));
+            writer.commit();
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                var expected = reader.search("Needle", SearchField.BODY, "f2", 0, 10).hits().getFirst();
+                var lower = reader.search("Needle", SearchField.BODY, "f1", 0, 10).hits().getFirst();
+                var result = reader.search("Needle", SearchField.BODY, null, 0, 10);
+                var hit = result.hits().getFirst();
+                assertThat(result.total()).isEqualTo(1);
+                assertThat(hit.card()).isEqualTo(expected.card());
+                assertThat(hit.score()).isEqualTo(expected.score()).isGreaterThan(lower.score());
+                assertThat(hit.snippet()).isEqualTo(expected.snippet());
+                assertThat(hit.copies()).containsExactly(new MessageCopy("a", "f1"));
+            }
+        }
+    }
+
+    @Test void dateOnlySearchGroupsCopiesInDateOrder() {
+        var date = Instant.parse("2026-10-26T00:00:00Z");
+        try (var writer = MailIndex.openWriter(dir)) {
+            putThread(writer, "z", "f1", date.plusSeconds(1), "<latest>", null);
+            putThread(writer, "b", "f2", date, "<copy>", null);
+            putThread(writer, "a", "f1", date, "<copy>", null);
+            putThread(writer, "c", "f3", date, "<copy>", null);
+            putThread(writer, "undated", "f1", null, "<copy>", null);
+            writer.commit();
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                var range = DateRange.parse("2026-10-26", "2026-10-27");
+                var page = reader.search(null, SearchField.ANY, null, 1, 1,
+                        text -> { throw new AssertionError("no snippets"); }, null, range);
+                assertThat(page.total()).isEqualTo(2);
+                assertThat(page.hits()).extracting(h -> h.card().key()).containsExactly("a");
+                var hit = page.hits().getFirst();
+                assertThat(hit.copies()).containsExactly(new MessageCopy("b", "f2"), new MessageCopy("c", "f3"));
+                assertThat(hit.score()).isZero();
+                assertThat(hit.snippet()).isNull();
+                assertThat(hit.snippetAttachmentFile()).isNull();
+                assertThat(hit.snippetAttachmentName()).isNull();
+                assertThat(reader.search(null, SearchField.ANY, null, 0, 10).hits())
+                        .extracting(h -> h.card().key()).containsExactly("z", "a", "undated");
+                assertThat(reader.search(null, SearchField.ANY, null, 0, 1, null, null,
+                        DateRange.parse("2026-10-27", null)).total()).isZero();
+            }
+        }
+    }
+
+    @Test void folderFilteredSearchListsOnlyMatchingCopies() {
+        var date = Instant.parse("2026-10-26T00:00:00Z");
+        try (var writer = MailIndex.openWriter(dir)) {
+            putCopy(writer, "a", "f1", date, "<copy>", "user@example.com", "Subject", "Needle");
+            putCopy(writer, "b", "f1", date, "<copy>", "user@example.com", "Subject", "Needle");
+            putCopy(writer, "c", "f10", date, "<copy>", "user@example.com", "Subject", "Needle");
+            putCopy(writer, "d", "f1", date, "<copy>", "user@example.com", "Subject", "Unrelated");
+            writer.commit();
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                var page = reader.search("Needle", SearchField.BODY, "f1", 0, 10);
+                assertThat(page.total()).isEqualTo(1);
+                assertThat(page.hits().getFirst().card().key()).isEqualTo("a");
+                assertThat(page.hits().getFirst().copies()).containsExactly(new MessageCopy("b", "f1"));
+                assertThat(reader.search("Needle", SearchField.BODY, "f10", 0, 10).hits().getFirst().copies()).isEmpty();
+                assertThat(reader.search("Needle", SearchField.BODY, null, 0, 10).hits().getFirst().copies())
+                        .containsExactly(new MessageCopy("b", "f1"), new MessageCopy("c", "f10"));
+            }
+        }
+    }
+
+    @Test void threadGroupsCopiesAndCountsThemOnce() {
+        var date = Instant.parse("2026-10-26T00:00:00Z");
+        try (var writer = MailIndex.openWriter(dir)) {
+            putThread(writer, "z", "f1", date.minusSeconds(1), "<root>", null);
+            putThread(writer, "c", "f3", date, "<copy>", "<root>");
+            putThread(writer, "b", "f2", date, "<copy>", null);
+            putThread(writer, "a", "f1", date, " <copy> ", null);
+            putThread(writer, "undated", "f1", null, null, "<root>");
+            writer.commit();
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                var page = reader.thread("c", 1, 1);
+                assertThat(page.total()).isEqualTo(3);
+                assertThat(page.cards()).extracting(c -> c.key()).containsExactly("a");
+                assertThat(page.copies()).containsOnlyKeys("a");
+                assertThat(page.copies().get("a")).containsExactly(new MessageCopy("b", "f2"), new MessageCopy("c", "f3"));
+                assertThat(reader.thread("b", 0, 10).cards()).extracting(c -> c.key()).containsExactly("z", "a", "undated");
+                assertThat(reader.thread("c", 0, 1).copies()).isEmpty();
+                assertThat(reader.thread("c", 3, 1).cards()).isEmpty();
+                assertThat(reader.thread("c", Integer.MAX_VALUE, 1).total()).isEqualTo(3);
+            }
+        }
+    }
 
     private void putThread(MailIndex writer, String key, String folder, Instant date,
                            String messageId, String inReplyTo, String... references) {

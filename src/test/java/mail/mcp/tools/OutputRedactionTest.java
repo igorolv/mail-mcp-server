@@ -257,7 +257,7 @@ class OutputRedactionTest {
         var original = new ThreadTools(threadRegistry, mapper).getThread("local", key, null, null);
         var result = new ThreadTools(threadRegistry, mapper, redactor).getThread("local", key, null, null);
         assertThat(result.key()).isEqualTo(key);
-        assertThat(result.total()).isEqualTo(2).isEqualTo(original.total());
+        assertThat(result.total()).isEqualTo(1).isEqualTo(original.total());
         assertThat(result.offset()).isEqualTo(original.offset());
         assertThat(result.nextOffset()).isEqualTo(original.nextOffset());
         for (int i = 0; i < result.messages().size(); i++) {
@@ -273,6 +273,33 @@ class OutputRedactionTest {
             assertThat(card.from()).isEqualTo(redactor.text(rawCard.from())).contains("[redacted:password]").doesNotContain(SECRET);
         }
         assertThat(mapper.writeValueAsString(result)).doesNotContain(SECRET, "messageId", "inReplyTo", "references", "body", "<" + token + ">");
+        assertUnchanged(before);
+    }
+
+    @Test void copiesKeepKeysAndFolderKeysUnfiltered() throws Exception {
+        String token = "ghp_" + "B".repeat(36);
+        String representative = "00000000-0000-0000-0000-000000000001";
+        // The reader preserves lookup keys verbatim, even for a synthetic detector-shaped key.
+        var message = new mail.mcp.model.MailMessage("Password: " + SECRET,
+                List.of(new mail.mcp.model.Address("Password: " + SECRET, "sender@example.com")), null, null,
+                Instant.parse("2026-10-26T00:00:00Z"), "<copy>", null, null, null);
+        try (var writer = MailIndex.openWriter(dir)) {
+            for (String member : List.of(representative, token)) {
+                writer.put(new MessageMeta(member, token, "INBOX", member, 0, null, Instant.now(), MessageState.CONVERTED, null),
+                        message, "Needle", null);
+            }
+            writer.commit();
+        }
+        var before = snapshot();
+        var search = new SearchTools(registry, mapper, redactor).search("local", "Needle", "body", null, null, null);
+        var thread = new ThreadTools(registry, mapper, redactor).getThread("local", representative, null, null);
+        var expected = new mail.mcp.api.MessageCopyInfo(token, token);
+        assertThat(search.hits().getFirst().copies()).containsExactly(expected);
+        assertThat(thread.messages().getFirst().copies()).containsExactly(expected);
+        assertThat(search.hits().getFirst().subject()).doesNotContain(SECRET);
+        assertThat(thread.messages().getFirst().from()).doesNotContain(SECRET);
+        assertThat(mapper.readTree(mapper.writeValueAsString(search)).at("/hits/0/copies/0/key").asString()).isEqualTo(token);
+        assertThat(mapper.readTree(mapper.writeValueAsString(thread)).at("/messages/0/copies/0/folder").asString()).isEqualTo(token);
         assertUnchanged(before);
     }
 

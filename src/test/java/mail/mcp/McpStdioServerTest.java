@@ -126,6 +126,15 @@ class McpStdioServerTest {
             assertThat(hitSchema.at("/properties/snippetAttachmentFile").isMissingNode()).isFalse();
             assertThat(hitSchema.at("/properties/snippetAttachmentName").isMissingNode()).isFalse();
             assertThat(hitSchema.path("required").toString()).doesNotContain("snippetAttachmentFile", "snippetAttachmentName");
+            for (var schema : List.of(hitSchema, threadTool.at("/outputSchema/properties/messages/items"))) {
+                assertThat(schema.at("/properties/copies/type").asString()).isEqualTo("array");
+                assertThat(schema.path("required").toString()).doesNotContain("\"copies\"");
+                var copy = schema.at("/properties/copies/items");
+                for (String property : List.of("key", "folder")) {
+                    assertThat(copy.at("/properties/" + property + "/type").asString()).isEqualTo("string");
+                    assertThat(copy.path("required").toString()).contains("\"" + property + "\"");
+                }
+            }
 
             send(requests, "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\","
                     + "\"params\":{\"name\":\"listConnections\",\"arguments\":{}}}");
@@ -148,6 +157,7 @@ class McpStdioServerTest {
             assertThat(dateOnly.at("/hits/0/score").asDouble()).isZero(); assertThat(dateOnly.at("/hits/0").has("snippet")).isFalse();
             assertThat(dateOnly.at("/hits/0").has("snippetAttachmentFile")).isFalse();
             assertThat(dateOnly.at("/hits/0").has("snippetAttachmentName")).isFalse();
+            assertThat(dateOnly.at("/hits/0").has("copies")).isFalse();
             for (var card : messages.path("messages")) {
                 var detail = call(requests, io, replies, stderr, stdout, 40, "getMessage",
                         "{\"connection\":\"local\",\"key\":\"" + card.path("key").asString() + "\"}");
@@ -182,6 +192,7 @@ class McpStdioServerTest {
             assertThat(thread.at("/messages/0/from")).isEqualTo(messages.at("/messages/0/from"));
             assertThat(thread.at("/messages/0/state").asString()).isEqualTo("converted");
             assertThat(thread.at("/messages/0/hasAttachments").asBoolean()).isTrue();
+            assertThat(thread.at("/messages/0").has("copies")).isFalse();
             assertThat(Path.of(thread.at("/messages/0/localPath").asString())).isDirectory();
             assertThat(thread.toString()).doesNotContain("messageId", "inReplyTo", "references", "body");
             var threadResponse = JSON.readTree(stdout.getLast());
@@ -262,6 +273,32 @@ class McpStdioServerTest {
             assertThat(Files.readString(Path.of(fullMessage.path("localPath").asString()).resolve("body.md")))
                     .contains(BODY_SECRET);
             assertThat(Files.readString(Path.of(fullAttachment.path("textPath").asString()))).contains(BODY_SECRET);
+
+            var copyKeys = java.util.stream.IntStream.range(1, 4)
+                    .mapToObj(i -> new java.util.UUID(0, i).toString()).toList();
+            for (int i = 0; i < copyKeys.size(); i++) {
+                liveWriter.put(new MessageMeta(copyKeys.get(i), "f" + (i + 2), "INBOX", "copy" + i, 0, null,
+                                Instant.now(), MessageState.CONVERTED, null),
+                        new mail.mcp.model.MailMessage("Copies", List.of(new mail.mcp.model.Address(null, "user@example.com")),
+                                null, null, Instant.parse("2026-10-26T00:00:00Z"), "<copies@example.com>", null, null, null),
+                        "Copyneedle", null);
+            }
+            liveWriter.commit();
+            var groupedSearch = call(requests, io, replies, stderr, stdout, 50, "search",
+                    "{\"connection\":\"local\",\"query\":\"Copyneedle\",\"field\":\"body\"}");
+            assertThat(groupedSearch.path("total").asInt()).isEqualTo(1);
+            assertThat(groupedSearch.at("/hits/0/key").asString()).isEqualTo(copyKeys.getFirst());
+            assertThat(groupedSearch.at("/hits/0/copies").size()).isEqualTo(2);
+            assertThat(groupedSearch.at("/hits/0/copies/0/key").asString()).isEqualTo(copyKeys.get(1));
+            assertThat(groupedSearch.at("/hits/0/copies/0/folder").asString()).isEqualTo("f3");
+            assertThat(groupedSearch.path("nextOffset").isNull()).isTrue();
+            assertThat(JSON.readTree(JSON.readTree(stdout.getLast()).at("/result/content/0/text").asString())).isEqualTo(groupedSearch);
+            var groupedThread = call(requests, io, replies, stderr, stdout, 51, "getThread",
+                    "{\"connection\":\"local\",\"key\":\"" + copyKeys.getLast() + "\"}");
+            assertThat(groupedThread.path("total").asInt()).isEqualTo(1);
+            assertThat(groupedThread.at("/messages/0/copies")).isEqualTo(groupedSearch.at("/hits/0/copies"));
+            assertThat(groupedThread.at("/messages/0/key").asString()).isEqualTo(copyKeys.getFirst());
+            assertThat(JSON.readTree(JSON.readTree(stdout.getLast()).at("/result/content/0/text").asString())).isEqualTo(groupedThread);
 
             assertThat(stdout).allSatisfy(line -> assertThat(JSON.readTree(line).get("jsonrpc").asString()).isEqualTo("2.0"));
             assertThat(String.join("\n", stdout)).doesNotContain(SECRET, "webmail.example.com", "imap.mail.ru");
@@ -360,6 +397,11 @@ class McpStdioServerTest {
         } catch (IOException ignored) {
             // the process ended
         }
+    }
+
+    @org.junit.jupiter.api.Test
+    void copiesAreOptionalInSearchAndThreadSchemas(@TempDir Path dir) throws Exception {
+        listConnectionsWorksOverStdioAndStdoutIsPureJsonRpc(false, dir);
     }
 
     @org.junit.jupiter.api.Test

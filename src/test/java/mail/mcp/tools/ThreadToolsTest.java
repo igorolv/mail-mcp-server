@@ -25,6 +25,46 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ThreadToolsTest {
     @TempDir Path dir;
 
+    @Test void threadReturnsCopiesWithKeysAndFolders() {
+        var mapper = new JsonConfig().mailMcpObjectMapper();
+        var tools = new ThreadTools(registry(), mapper);
+        var keys = IntStream.range(1, 5).mapToObj(i -> new UUID(0, i).toString()).toList();
+        var date = Instant.parse("2026-10-26T00:00:00Z");
+        try (var writer = MailIndex.openWriter(dir.resolve("local"));
+             var other = MailIndex.openWriter(dir.resolve("other"))) {
+            for (int i = 0; i < 4; i++) {
+                writer.put(new MessageMeta(keys.get(i), "f" + (i + 1), "INBOX", keys.get(i), i, null,
+                                Instant.now(), MessageState.CONVERTED, null, null, i == 0, i == 0),
+                        new MailMessage("Subject", List.of(new mail.mcp.model.Address(null, "user@example.com")), null, null,
+                                i == 0 ? date.minusSeconds(1) : date, i == 0 ? "<root>" : "<copy>",
+                                i == 0 ? null : "<root>", null, null), null, null);
+            }
+            other.put(new MessageMeta(keys.get(3), "f9", "INBOX", "remote", 0, null, Instant.now(), MessageState.CONVERTED, null),
+                    new MailMessage("Subject", List.of(new mail.mcp.model.Address(null, "user@example.com")), null, null,
+                            date, "<copy>", "<root>", null, null), null, null);
+            writer.commit();
+            other.commit();
+            var first = tools.getThread("local", keys.get(3), 0, 1);
+            assertThat(first.total()).isEqualTo(2);
+            assertThat(first.nextOffset()).isEqualTo(1);
+            assertThat(mapper.readTree(mapper.writeValueAsString(first)).at("/messages/0").has("copies")).isFalse();
+            var second = tools.getThread("local", keys.get(3), first.nextOffset(), 1);
+            assertThat(second.key()).isEqualTo(keys.get(3));
+            assertThat(second.nextOffset()).isNull();
+            var card = second.messages().getFirst();
+            assertThat(card.key()).isEqualTo(keys.get(1));
+            assertThat(card.folder()).isEqualTo("f2");
+            assertThat(card.copies()).containsExactly(new mail.mcp.api.MessageCopyInfo(keys.get(2), "f3"),
+                    new mail.mcp.api.MessageCopyInfo(keys.get(3), "f4"));
+            var json = mapper.readTree(mapper.writeValueAsString(card));
+            assertThat(json.at("/copies/0/key").asString()).isEqualTo(keys.get(2));
+            assertThat(json.at("/copies/0/folder").asString()).isEqualTo("f3");
+            var separate = tools.getThread("other", keys.get(3), null, null);
+            assertThat(separate.total()).isEqualTo(1);
+            assertThat(separate.messages().getFirst().copies()).isEmpty();
+        }
+    }
+
     private ConnectionRegistry registry() {
         return new ConnectionRegistry(List.of(
                 new ConnectionDefinition("local", null, ConnectionType.IMAP, AuthKind.APP_PASSWORD, null, null, dir.resolve("local"), "unconfigured"),

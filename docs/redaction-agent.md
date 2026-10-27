@@ -52,6 +52,10 @@ retaining the selected attachment identity. Blank transformed text returns no sn
 separately (original display name, or filename when null/blank). Both are omitted for body or
 absent snippets. The already highlighted snippet is never filtered again by `SearchTools`.
 Date-only searches return no snippet; normalized date bounds are unchanged by filtering.
+Search and thread copy grouping compares raw stored Message-ID, date, sender and subject before
+paging. Filtering does not change representatives, copy membership, totals or order.
+The optional `copies` array contains lookup keys and folder keys; both stay unfiltered,
+even when they match a detector. Empty copies are omitted from responses.
 No index/schema or disk-format changes, migration, reindexing or reprocessing are required.
 
 `getThread` matches the raw stored Message-ID, In-Reply-To and References locally in one

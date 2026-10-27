@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
+import java.util.List;
 
 /** A scored message with an optional body or saved attachment Markdown passage and its identity. */
 @Schema(description = "A matching local message with a score and body or attachment snippet.")
@@ -46,5 +47,9 @@ public record SearchHitInfo(
         @Schema(description = "User flag/star at the latest successful observation, not sender importance; absent when unknown.",
                 nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        Boolean flagged
+        Boolean flagged,
+        @Schema(description = "Other local copies of this message (same Message-ID, date, sender and subject) among the results; absent when none.",
+                requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @JsonInclude(JsonInclude.Include.NON_EMPTY)
+        List<MessageCopyInfo> copies
 ) { }

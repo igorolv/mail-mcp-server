@@ -1,6 +1,7 @@
 package mail.mcp.index;
 
 import mail.mcp.model.MessageCard;
+import mail.mcp.model.MessageCopy;
 import mail.mcp.model.DateRange;
 import mail.mcp.model.SearchHit;
 import mail.mcp.model.SearchResults;
@@ -13,9 +14,9 @@ import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.index.MultiDocValues;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.MatchNoDocsQuery;
 import org.apache.lucene.search.PrefixQuery;
@@ -35,7 +36,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.List;
-import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.Optional;
@@ -46,7 +46,8 @@ import java.util.function.UnaryOperator;
 public final class MailIndexReader implements AutoCloseable {
     private static final Pattern FULL_ADDRESS = Pattern.compile("[^\\s\"@]+@[^\\s\"@]+\\.[^\\s\"@]+");
     private static final Pattern HEADER_ID = Pattern.compile("<[^<>\\s]+>", Pattern.UNICODE_CHARACTER_CLASS);
-    private static final Set<String> THREAD_FIELDS = Set.of("key", "messageId", "inReplyTo", "references");
+    private static final Set<String> COPY_FIELDS = Set.of("key", "ref", "messageId", "date", "from", "subject");
+    private static final Set<String> THREAD_FIELDS = Set.of("key", "ref", "messageId", "date", "from", "subject", "inReplyTo", "references");
     private static final Set<String> CARD_FIELDS = Set.of("key", "ref", "date", "from", "subject", "attachmentNames", "state", "read", "flagged");
     private final FSDirectory directory;
     private final DirectoryReader reader;
@@ -112,20 +113,33 @@ public final class MailIndexReader implements AutoCloseable {
         Query highlightQuery = parsed;
         Query filtered = filtered(parsed, folderKey, range);
         try {
-            int total = searcher.count(filtered);
-            if (offset >= total) { return new SearchResults(total, List.of()); }
-            int size = (int) Math.min(total, (long) offset + limit);
             var sort = dateOnly ? dateSort() : new Sort(SortField.FIELD_SCORE, new SortField("keySort", SortField.Type.STRING));
-            var top = searcher.search(filtered, size, sort, !dateOnly);
-            var page = Arrays.copyOfRange(top.scoreDocs, offset, top.scoreDocs.length);
+            var top = searcher.search(filtered, Math.max(1, reader.numDocs()), sort, !dateOnly);
+            List<String> ordered = new ArrayList<>();
+            Map<String, Document> identities = new HashMap<>();
+            Map<String, ScoreDoc> documents = new HashMap<>();
+            var fields = searcher.storedFields();
+            for (var hit : top.scoreDocs) {
+                var doc = fields.document(hit.doc, COPY_FIELDS);
+                String key = doc.get("key");
+                ordered.add(key);
+                identities.put(key, doc);
+                documents.put(key, hit);
+            }
+            var groups = groups(ordered, identities);
+            int total = groups.size();
+            if (offset >= total) { return new SearchResults(total, List.of()); }
+            int end = (int) Math.min(total, (long) offset + limit);
             var snippets = dateOnly ? null : new SearchSnippets(highlightQuery, outputText);
             List<SearchHit> hits = new ArrayList<>();
-            for (var hit : page) {
-                var doc = searcher.storedFields().document(hit.doc);
-                if (dateOnly) { hits.add(new SearchHit(card(doc), 0, null, null, null)); }
+            for (var group : groups.subList(offset, end)) {
+                var hit = documents.get(group.getFirst());
+                var doc = fields.document(hit.doc);
+                var copies = copies(group, identities);
+                if (dateOnly) { hits.add(new SearchHit(card(doc), 0, null, null, null, copies)); }
                 else {
                     var snippet = snippets.select(doc.get("key"), doc.get("body"), field, store);
-                    hits.add(new SearchHit(card(doc), hit.score, snippet.text(), snippet.file(), snippet.name()));
+                    hits.add(new SearchHit(card(doc), hit.score, snippet.text(), snippet.file(), snippet.name(), copies));
                 }
             }
             return new SearchResults(total, List.copyOf(hits));
@@ -192,6 +206,7 @@ public final class MailIndexReader implements AutoCloseable {
         if (offset < 0 || limit < 1) { throw new IllegalArgumentException("Invalid offset or limit"); }
         try {
             Map<String, Integer> documents = new HashMap<>();
+            Map<String, Document> identities = new HashMap<>();
             Map<String, Set<String>> keyIds = new HashMap<>();
             Map<String, Set<String>> idKeys = new HashMap<>();
             for (var leaf : reader.leaves()) {
@@ -202,6 +217,7 @@ public final class MailIndexReader implements AutoCloseable {
                     var doc = fields.document(i, THREAD_FIELDS);
                     String localKey = doc.get("key");
                     documents.put(localKey, leaf.docBase + i);
+                    identities.put(localKey, doc);
                     Set<String> ids = new HashSet<>();
                     String own = doc.get("messageId");
                     if (own != null && HEADER_ID.matcher(own.strip()).matches()) { ids.add(own.strip()); }
@@ -228,27 +244,64 @@ public final class MailIndexReader implements AutoCloseable {
                     }
                 }
             }
-            int total = component.size();
-            if (offset >= total) { return new ThreadResults(total, List.of()); }
-            // Read dates from doc values, without loading off-page stored cards or bodies.
-            var dateValues = MultiDocValues.getNumericValues(reader, "date");
-            Map<String, Long> dates = new HashMap<>();
-            for (String member : component.stream().sorted(Comparator.comparingInt(documents::get)).toList()) {
-                if (dateValues != null && dateValues.advanceExact(documents.get(member))) {
-                    dates.put(member, dateValues.longValue());
-                }
-            }
             var ordered = component.stream().sorted(Comparator
-                    .comparing((String member) -> dates.get(member), Comparator.nullsLast(Comparator.naturalOrder()))
+                    .comparing((String member) -> date(identities.get(member)), Comparator.nullsLast(Comparator.naturalOrder()))
                     .thenComparing(Comparator.naturalOrder())).toList();
+            var groups = groups(ordered, identities);
+            int total = groups.size();
+            if (offset >= total) { return new ThreadResults(total, List.of()); }
             int end = (int) Math.min(total, (long) offset + limit);
             List<MessageCard> cards = new ArrayList<>();
+            Map<String, List<MessageCopy>> copies = new HashMap<>();
             var fields = searcher.storedFields();
-            for (String member : ordered.subList(offset, end)) {
+            for (var group : groups.subList(offset, end)) {
+                String member = group.getFirst();
                 cards.add(card(fields.document(documents.get(member), CARD_FIELDS)));
+                if (group.size() > 1) { copies.put(member, copies(group, identities)); }
             }
-            return new ThreadResults(total, List.copyOf(cards));
+            return new ThreadResults(total, List.copyOf(cards), Map.copyOf(copies));
         } catch (IOException e) { throw new UncheckedIOException(e); }
+    }
+
+    private record CopyIdentity(String messageId, long date, String from, String subject) { }
+
+    private static CopyIdentity copyIdentity(Document doc) {
+        String id = doc.get("messageId");
+        Long date = date(doc);
+        String from = doc.get("from");
+        String subject = doc.get("subject");
+        if (id == null || !HEADER_ID.matcher(id.strip()).matches() || date == null
+                || from == null || from.isBlank() || subject == null || subject.isBlank()) { return null; }
+        return new CopyIdentity(id.strip(), date, from, subject);
+    }
+
+    private static Long date(Document doc) {
+        var field = doc.getField("date");
+        return field == null ? null : field.numericValue().longValue();
+    }
+
+    /** Keeps the first member as representative and preserves the caller's ordering. */
+    private static List<List<String>> groups(List<String> ordered, Map<String, Document> identities) {
+        List<List<String>> groups = new ArrayList<>();
+        Map<CopyIdentity, List<String>> byIdentity = new HashMap<>();
+        for (String key : ordered) {
+            var identity = copyIdentity(identities.get(key));
+            var group = identity == null ? null : byIdentity.get(identity);
+            if (group == null) {
+                group = new ArrayList<>();
+                groups.add(group);
+                if (identity != null) { byIdentity.put(identity, group); }
+            }
+            group.add(key);
+        }
+        return groups;
+    }
+
+    private static List<MessageCopy> copies(List<String> group, Map<String, Document> identities) {
+        return group.stream().skip(1).map(key -> {
+            String ref = identities.get(key).get("ref");
+            return new MessageCopy(key, ref.substring(0, ref.indexOf('/')));
+        }).toList();
     }
 
     private static Set<String> replyIds(String header) {

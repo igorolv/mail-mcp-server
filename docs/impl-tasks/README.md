@@ -116,13 +116,12 @@ The reviewer checks; it does not fix. Work through every point and report what y
 
 ## Task list
 
-IT-01…IT-22 were accepted and deleted (2026-10-25…27). Checks still pending on real mail are in
-`docs/plan.md` 2.4. The user requested the following three briefs together on 2026-10-27. Their
-baseline is `d725d93`; no implementation is included in this batch. Next unused number: IT-26.
+IT-01…IT-23 were accepted and deleted (2026-10-25…27). Checks still pending on real mail are in
+`docs/plan.md` 2.4. The user requested IT-23…IT-25 together on 2026-10-27, based on `d725d93`.
+IT-23 is accepted; the remaining briefs build on its implementation. Next unused number: IT-26.
 
 | Order | Brief | Plan item | Scope and dependency |
 |---|---|---|---|
-| 1 | [IT-23](IT-23-message-copies.md) | Д4 | Copies of one message count once in search and getThread; read-time only, no schema change. Changes reader, search and thread records. |
 | 2 | [IT-24](IT-24-word-forms.md) | Д12 | Optional user `word-forms.txt`, `wordForms` commit entry, `mail-analyze`. Builds on IT-23's reader and `SearchTools`. |
 | 3 | [IT-25](IT-25-search-hints.md) | Д26 | `search` description hints only; refers to IT-23 copies and the IT-24 file, so it goes last. |
 
@@ -130,8 +129,8 @@ Numbers follow the plan items, which here match the execution order. Complete th
 review → record cycle for each before starting the next; do not run these agents concurrently.
 IT-24 is the largest: review that an absent file leaves the analyzer and commit data unchanged.
 The user decided the Д12 storage (an optional user file, no built-in list, no Hunspell,
-single-word synonyms allowed, `mail-analyze` included). The Д4 copy identity and the copies
-field are implementation proposals, not recorded user decisions. Recording one brief must
+single-word synonyms allowed, `mail-analyze` included). IT-23's Д4 copy identity and copies
+field are accepted implementation details, not separately recorded user decisions. Recording one brief must
 preserve the remaining rows and their dependency notes.
 
 ## Rules for every implementation session
