@@ -13,6 +13,7 @@ import mail.mcp.index.MailIndexReader;
 import mail.mcp.mime.MimeReader;
 import mail.mcp.mime.Containers;
 import mail.mcp.model.Address;
+import mail.mcp.model.DateRange;
 import mail.mcp.model.MailMessage;
 import mail.mcp.redaction.SecretRedactor;
 import mail.mcp.store.MessageStore;
@@ -70,7 +71,11 @@ public class MailTools {
         }
     }
 
-    @McpTool(description = "List local message cards newest first, undated last. limit defaults to 50, " +
+    public ListMessagesResult listMessages(String connection, String folder, Integer offset, Integer limit) {
+        return listMessages(connection, folder, offset, limit, null, null);
+    }
+
+    @McpTool(description = "List local message cards newest first, undated last. Optional since (inclusive) and until (exclusive) select MIME header dates; dates are UTC midnight or datetimes with explicit offset. limit defaults to 50, " +
             "capped at 200. Use nextOffset to page. Data may be incomplete during sync; check listFolders.synced " +
             "and syncStatus. localPath is an absolute directory whose files may be read directly. No network access.",
             generateOutputSchema = true,
@@ -79,9 +84,12 @@ public class MailTools {
             @McpToolParam(description = "Connection name from listConnections") String connection,
             @McpToolParam(description = "Folder key from listFolders") String folder,
             @McpToolParam(description = "Nonnegative starting position; default 0", required = false) Integer offset,
-            @McpToolParam(description = "Positive page size; default 50, at most 200", required = false) Integer limit) {
+            @McpToolParam(description = "Positive page size; default 50, at most 200", required = false) Integer limit,
+            @McpToolParam(description = "Inclusive UTC date or datetime with offset", required = false) String since,
+            @McpToolParam(description = "Exclusive UTC date or datetime with offset", required = false) String until) {
         long start = System.nanoTime();
         try {
+            var range = DateRange.parse(since, until);
             int position = offset(offset);
             int size = bounded(limit, 50, 200, "limit");
             var definition = registry.definition(connection);
@@ -90,14 +98,19 @@ public class MailTools {
                 throw new IllegalArgumentException("Unknown folder key; use listFolders");
             }
             try (var reader = MailIndexReader.open(definition.connectionDir()).orElse(null)) {
-                int total = reader == null ? 0 : reader.count(folder);
-                var messages = reader == null ? List.<MessageSummary>of()
-                        : reader.cards(folder, position, size).stream().map(c -> new MessageSummary(c.key(),
+                if (reader != null && !reader.current()) {
+                    throw new IllegalStateException("The index was built by an older version; " +
+                            "run 'mail-reindex <connection>' in a terminal or start a sync to rebuild it");
+                }
+                var page = reader == null ? null : reader.cards(folder, position, size, range);
+                int total = page == null ? 0 : page.total();
+                var messages = page == null ? List.<MessageSummary>of()
+                        : page.cards().stream().map(c -> new MessageSummary(c.key(),
                         c.date(), redactor.text(c.from()), redactor.text(c.subject()), c.hasAttachments(), c.state(),
                         store.messageDir(c.key()).toAbsolutePath().toString())).toList();
                 Integer next = (long) position + messages.size() < total ? position + messages.size() : null;
                 ToolLogger.completed(log, "listMessages", start);
-                return new ListMessagesResult(definition.name(), folder, total, position, next, messages);
+                return new ListMessagesResult(definition.name(), folder, total, position, next, messages, range.since(), range.until());
             }
         } catch (RuntimeException e) {
             ToolLogger.failed(log, "listMessages", start, e.getClass().getSimpleName());

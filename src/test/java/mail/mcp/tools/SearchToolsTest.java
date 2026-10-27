@@ -199,4 +199,19 @@ class SearchToolsTest {
             assertThat(pastEnd.nextOffset()).isNull();
         }
     }
+
+    @Test void dateOnlyQueryRequiresAtLeastOneBound() {
+        assertThatThrownBy(() -> tools.search("local", null, null, null, null, null, null, null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> tools.search("local", " ".repeat(1001), null, null, null, null, "2026-10-26", null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> tools.search("local", null, "bad", null, null, null, "2026-10-26", null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> tools.search("local", null, null, "bad", null, null, "2026-10-26", null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> tools.search("local", null, null, null, null, null, "bad", null)).isInstanceOf(IllegalArgumentException.class);
+        var empty = tools.search("local", " ", null, null, null, null, "2026-10-26", null);
+        assertThat(empty.query()).isNull(); assertThat(empty.total()).isZero(); assertThat(empty.since()).isEqualTo(Instant.parse("2026-10-26T00:00:00Z"));
+        try (var index = MailIndex.openWriter(dir)) { put(index, "f1"); put(index, "f2"); index.commit(); assertThat(tools.search("local", null, null, null, null, null, "2026-10-26", "2026-10-27").total()).isEqualTo(2); }
+    }
+    @Test void stopWordsWithDatesRemainAnEmptyTextSearch() {
+        try (var index = MailIndex.openWriter(dir)) { put(index, "f1"); index.commit(); assertThat(tools.search("local", "the and", "body", null, null, null, "2026-10-26", null).total()).isZero(); }
+    }
+
 }

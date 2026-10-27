@@ -333,4 +333,19 @@ class MailToolsTest {
         Files.delete(Path.of(first.path()));
         assertThat(tools.getMessage("local", key, null, null).attachments().getFirst().path()).isNull();
     }
+
+    @Test void listMessagesDateBoundsPreserveUnfilteredBehavior() throws Exception {
+        var all = tools.listMessages("local", "f1", null, null); assertThat(all.total()).isEqualTo(2); assertThat(all.since()).isNull();
+        assertThat(tools.listMessages("local", "f2", null, null, "2026-10-26", null).total()).isZero();
+        assertThat(tools.listMessages("local", "f1", Integer.MAX_VALUE, 1, "1900-01-01", "2100-01-01").messages()).isEmpty();
+        assertThatThrownBy(() -> tools.listMessages("local", "f1", null, null, "bad", null)).isInstanceOf(IllegalArgumentException.class);
+        try (var paths = Files.walk(dir.resolve("index"))) {
+            for (var path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) { Files.delete(path); }
+        }
+        assertThat(tools.listMessages("local", "f1", null, null, "2026-10-26", null).total()).isZero();
+        Files.createDirectory(dir.resolve("index"));
+        try (var d = org.apache.lucene.store.FSDirectory.open(dir.resolve("index")); var w = new org.apache.lucene.index.IndexWriter(d, new org.apache.lucene.index.IndexWriterConfig().setOpenMode(org.apache.lucene.index.IndexWriterConfig.OpenMode.CREATE))) { w.commit(); }
+        assertThatThrownBy(() -> tools.listMessages("local", "f1", null, null, "2026-10-26", null)).isInstanceOf(IllegalStateException.class);
+    }
+
 }

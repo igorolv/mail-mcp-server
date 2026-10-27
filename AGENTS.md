@@ -13,7 +13,7 @@ mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/plan.md` section 2).
 - Features accepted offline but not yet checked by the user on real mail are listed in
   `docs/plan.md` 2.4 (container expansion and legacy Office text need a user-run
   `mail-reprocess`; background summaries and EWS rescan reporting await observation during
-  user-requested sync).
+  user-requested sync; date filters and date-only search await a local query after restart).
 
 Work now consists of polishing and optional improvements:
 - `docs/plan.md` section 4 lists the open ones (`Д4`, `Д5`, …); the user chooses which to take.

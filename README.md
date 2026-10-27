@@ -171,6 +171,15 @@ opencode (`~/.config/opencode/opencode.jsonc`, section `mcp`):
 
 Arguments, bounds and errors: [docs/tools-agent.md](docs/tools-agent.md).
 
+Both `search` and `listMessages` accept optional `since` and `until` MIME header dates.
+Use strict `YYYY-MM-DD` (UTC midnight) or an ISO-8601 datetime with `Z` or a numeric
+offset, at millisecond precision. `since` is inclusive and `until` exclusive; for October
+26–27 UTC use `since: "2026-10-26"`, `until: "2026-10-28"`. Undated messages are excluded
+when a bound is supplied. `search` may omit `query` when a bound is present: it searches all
+folders unless `folder` is supplied, returns newest first then key, with score 0 and no snippet.
+Bounds are returned as normalized UTC instants. The existing index schema is unchanged; no
+reindex is needed.
+
 For `any`, a body match supplies the snippet; otherwise search uses the first matching saved
 attachment Markdown in expanded attachment list order. `attachmentText` selects attachments first;
 other groups keep body snippets/context. Attachment snippets include `snippetAttachmentFile` (the exact

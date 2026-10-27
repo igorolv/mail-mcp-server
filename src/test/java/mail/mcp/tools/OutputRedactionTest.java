@@ -56,6 +56,7 @@ class OutputRedactionTest {
         key = store.newKey();
         Path directory = store.createMessageDir(key);
         Files.writeString(directory.resolve(MessageStore.MESSAGE_FILE), """
+                Date: Mon, 26 Oct 2026 00:00:00 +0000
                 Subject: Password: %s
                 From: "Password: %s" <sender@example.com>
                 To: "Token: %s" <recipient@example.com>
@@ -226,4 +227,12 @@ class OutputRedactionTest {
         assertThat(after.keySet()).isEqualTo(before.keySet());
         before.forEach((path, bytes) -> assertThat(after.get(path)).as(path.getFileName().toString()).isEqualTo(bytes));
     }
+
+    @Test void dateFiltersPreserveMatchingAndFilteredTextSnippets() {
+        var search = new SearchTools(registry, mapper, redactor);
+        var result = search.search("local", "Reporting", "body", "f1", null, null, "2026-10-26", "2026-10-27");
+        assertThat(result.total()).isEqualTo(1); assertThat(result.hits().getFirst().snippet()).contains("**Reporting**").doesNotContain(SECRET);
+        assertThat(search.search("local", "Reporting", "body", "f1", null, null, "2026-10-27", null).total()).isZero();
+    }
+
 }

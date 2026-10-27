@@ -216,10 +216,13 @@ opens one snapshot of the latest commit per call. It counts folder messages with
 on ref, and pages stored MessageCard fields by date descending (missing dates last), then key.
 New documents have sorted `keySort` doc values; documents without them still sort by date.
 The separate field preserves the `key` field's doc values type NONE.
-`current()` checks commit schema; search tools reject old schemas until a rebuild.
+`current()` checks commit schema; search and listMessages reject old schemas until a rebuild.
+Optional date bounds filter the existing MIME-header `date` LongPoint, with inclusive since and
+exclusive until; undated documents are excluded. Date-only search sorts by date descending then
+key with score 0 and no snippets. No schema change or reindex is needed.
 Search uses equal-weight field groups, required words and phrases through `SimpleQueryParser`,
 an optional folder ref prefix FILTER, exact counts and score descending/key ascending sorting.
-`SearchSnippets` uses in-memory `UnifiedHighlighter` with the parsed query without the folder
+`SearchSnippets` uses in-memory `UnifiedHighlighter` with the parsed query without the folder or date
 filter. `any` prefers a real body highlight, then the first matching attachment; `attachmentText`
 selects attachments first. Other groups and overloads without a `MessageStore` keep body-only
 snippets. Only eligible page hits enumerate local MIME once without output and read saved UTF-8

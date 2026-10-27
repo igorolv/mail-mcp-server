@@ -15,10 +15,20 @@ and rethrown; `IllegalArgumentException` becomes an MCP tool error with its mess
 | `sync` | Required `connection` | Immediate `started`, `alreadyRunning`, `lockedByOtherProcess` or `refused`, with explanation. Unknown/missing connection or unusable definition raises `IllegalArgumentException`. Missing pandoc raises `IllegalStateException`. |
 | `syncStatus` | Required `connection` | Current/last local run, per-folder progress, summed downloaded/failed/removed counts, timestamps, error and `signInRejected`. No file means `never`. |
 | `listFolders` | Required `connection` | Stored folder keys and paths, committed catalog counts and `synced` (cursor exists), in stored order. No index means zero counts. |
-| `listMessages` | Required `connection`, `folder`; optional `offset`, `limit` | Folder cards sorted by descending date (undated last), then key; total, offset, optional nextOffset. Offset defaults to 0; limit to 50, capped at 200. Unknown folder is an error. |
+| `listMessages` | Required `connection`, `folder`; optional `offset`, `limit`, `since`, `until` | Folder cards sorted by descending date (undated last), then key; total, offset, optional nextOffset. Offset defaults to 0; limit to 50, capped at 200. Unknown folder is an error. |
 | `getMessage` | Required `connection`, `key`; optional `offset`, `maxChars` | Metadata, MIME headers, body.md chunk, bodyLength, optional nextOffset and attachment file paths and optional Markdown `textPath`. Offset defaults to 0; maxChars to 20,000, capped at 100,000. Invalid/nonexistent UUID is an error. |
 | `getAttachment` | Required `connection`, `key`, `file`; optional `offset`, `maxChars` | Original file path and saved Markdown chunk, textPath, textLength and optional nextOffset. `file` must exactly match a stored filename in that message's expanded attachment list, including files inside EML, ZIP, MSG and TNEF containers. Unknown file (including traversal or another message's filename) is an error. Offset defaults to 0; maxChars to 20,000, capped at 100,000. |
-| `search` | Required `connection`, `query`; optional `field`, `folder`, `offset`, `limit` | Local cards with BM25 score and body or saved attachment snippet, sorted by score descending then key. Exact total, offset and optional nextOffset. Query must be nonblank and at most 1,000 characters. Offset defaults to 0; limit to 20, capped at 100. Unknown field/folder is an error. No index means zero hits. |
+| `search` | Required `connection`; optional `query`, `field`, `folder`, `offset`, `limit`, `since`, `until` | Local cards with BM25 score and body or saved attachment snippet, sorted by score descending then key. Exact total, offset and optional nextOffset. Query is at most 1,000 characters and may be omitted or blank only with a date bound. Offset defaults to 0; limit to 20, capped at 100. Unknown field/folder is an error. No index means zero hits. |
+
+`since` and `until` select the MIME header date, as strict `YYYY-MM-DD` at UTC midnight or
+ISO-8601 datetime with explicit offset and no sub-millisecond precision. Bounds are normalized
+to UTC instants in responses. `since` is inclusive and `until` exclusive: October 26–27 UTC
+uses `since=2026-10-26`, `until=2026-10-28`. Either may be omitted; together they must be
+ordered. Undated messages match only without bounds. Date-only search uses all folders unless
+one is specified, sorts by descending date then key, returns score 0 and no snippet or attachment
+attribution, and reads no MIME or sidecars. Text queries retain scoring and snippets. Folder and
+field are validated in both modes, and a stop-word-only query remains a text query with zero hits.
+Both readers reject old schemas; the existing schema and index remain unchanged.
 
 Offsets must be nonnegative and sizes positive; invalid values raise `IllegalArgumentException`.
 Offsets at or beyond the end yield an empty page/chunk with no nextOffset. Body and attachment text offsets
@@ -70,7 +80,7 @@ MCP resources, mail flags and mail writing are not implemented here.
 ## Search
 
 `SearchTools.search` returns `SearchResult(connection, query, field, folder, total, offset,
-nextOffset, hits)`. Each `SearchHitInfo` includes key, folder key, date, displayed from, subject,
+nextOffset, hits, since, until)`. Each `SearchHitInfo` includes key, folder key, date, displayed from, subject,
 hasAttachments, state, score, snippet and the absolute message directory `localPath`.
 Snippets use Markdown `**matches**` and `… ` between passages, at most one passage per hit.
 For `any`, a real body highlight wins; otherwise the first attachment with a highlightable query

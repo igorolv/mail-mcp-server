@@ -208,4 +208,42 @@ class MailIndexReaderTest {
             }
         }
     }
+
+    @Test void dateFilterUsesInclusiveSinceExclusiveUntilAndExcludesUndated() {
+        try (var w = MailIndex.openWriter(dir)) {
+            put(w, "a", "f1", Instant.parse("2026-10-26T00:00:00Z"));
+            put(w, "b", "f1", Instant.parse("2026-10-27T23:59:59.999Z"));
+            put(w, "c", "f1", Instant.parse("2026-10-28T00:00:00Z")); put(w, "d", "f1", null); w.commit();
+            try (var r = MailIndexReader.open(dir).orElseThrow()) {
+                assertThat(r.cards("f1", 0, 10, mail.mcp.model.DateRange.parse("2026-10-26", "2026-10-28")).cards()).extracting(c -> c.key()).containsExactly("b", "a");
+                assertThat(r.cards("f1", 0, 10, mail.mcp.model.DateRange.parse(null, "2026-10-26T03:00:00+03:00")).total()).isZero();
+                assertThat(r.cards("f1", 0, 10, mail.mcp.model.DateRange.parse("2026-10-28", null)).total()).isEqualTo(1);
+                assertThat(r.cards("f1", 0, 10, mail.mcp.model.DateRange.parse(null, Instant.ofEpochMilli(Long.MIN_VALUE).toString())).total()).isZero();
+                assertThat(r.cards("f1", 0, 10)).hasSize(4);
+            }
+        }
+    }
+    @Test void dateFilterCombinesFolderAndTextWithExactPagedTotal() {
+        try (var w = MailIndex.openWriter(dir)) {
+            put(w, "a", "f1", Instant.parse("2026-10-26T00:00:00Z")); put(w, "b", "f1", Instant.parse("2026-10-26T00:00:00Z")); put(w, "c", "f2", Instant.parse("2026-10-26T00:00:00Z")); w.commit();
+            try (var r = MailIndexReader.open(dir).orElseThrow()) {
+                var range = mail.mcp.model.DateRange.parse("2026-10-26", "2026-10-27");
+                var page = r.search("subject", SearchField.SUBJECT, "f1", 1, 1, null, null, range);
+                assertThat(page.total()).isEqualTo(2); assertThat(page.hits()).extracting(h -> h.card().key()).containsExactly("b");
+                assertThat(r.search("subject", SearchField.SUBJECT, "f1", 9, 1, null, null, range).hits()).isEmpty();
+                assertThat(r.search("subject", SearchField.SUBJECT, "f2", 0, 1, null, null, mail.mcp.model.DateRange.parse("2026-10-27", null)).total()).isZero();
+            }
+        }
+    }
+    @Test void dateOnlySearchSortsByDateAndDoesNotReadSidecars() {
+        try (var w = MailIndex.openWriter(dir)) {
+            put(w, "b", "f1", Instant.parse("2026-10-26T00:00:00Z")); put(w, "a", "f2", Instant.parse("2026-10-26T00:00:00Z")); put(w, "c", "f1", Instant.parse("2026-10-27T00:00:00Z")); w.commit();
+            try (var r = MailIndexReader.open(dir).orElseThrow()) {
+                var result = r.search(null, SearchField.ANY, null, 0, 10, text -> { throw new AssertionError("no snippets"); }, new mail.mcp.store.MessageStore(dir, new mail.mcp.config.JsonConfig().mailMcpObjectMapper()), mail.mcp.model.DateRange.parse("2026-10-26", null));
+                assertThat(result.hits()).extracting(h -> h.card().key()).containsExactly("c", "a", "b");
+                assertThat(result.hits()).allSatisfy(h -> { assertThat(h.score()).isZero(); assertThat(h.snippet()).isNull(); assertThat(h.snippetAttachmentFile()).isNull(); });
+            }
+        }
+    }
+
 }

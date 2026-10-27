@@ -6,6 +6,7 @@ import mail.mcp.connections.ConnectionRegistry;
 import mail.mcp.index.MailIndexReader;
 import mail.mcp.index.SearchField;
 import mail.mcp.model.SearchResults;
+import mail.mcp.model.DateRange;
 import mail.mcp.redaction.SecretRedactor;
 import mail.mcp.store.MessageStore;
 import org.slf4j.Logger;
@@ -37,7 +38,11 @@ public class SearchTools {
         this.redactor = redactor;
     }
 
-    @McpTool(description = "Search local messages by words. field: any (default; every field below, including " +
+    public SearchResult search(String connection, String query, String field, String folder, Integer offset, Integer limit) {
+        return search(connection, query, field, folder, offset, limit, null, null);
+    }
+
+    @McpTool(description = "Search local messages by words or date bounds. since is inclusive, until exclusive; dates are UTC midnight or datetimes with explicit offset. A date-only search sorts newest first, with score 0 and no snippet. field: any (default; every field below, including " +
             "attachment text), subject, body, from, to (including cc), attachmentName, attachmentText (text " +
             "extracted from DOCX, ODT, RTF, EPUB, HTML, CSV, PDF, XLSX, PPTX and plain-text attachments up to " +
             "20 MiB). Every word is required; \"...\" means a phrase. Russian and English word forms are matched; " +
@@ -54,14 +59,17 @@ public class SearchTools {
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public SearchResult search(
             @McpToolParam(description = "Connection name from listConnections") String connection,
-            @McpToolParam(description = "Nonblank query, at most 1000 characters") String query,
+            @McpToolParam(description = "Text query, at most 1000 characters; optional with a date bound", required = false) String query,
             @McpToolParam(description = "any, subject, body, from, to, attachmentName, attachmentText; default any", required = false) String field,
             @McpToolParam(description = "Optional folder key from listFolders", required = false) String folder,
             @McpToolParam(description = "Nonnegative starting position; default 0", required = false) Integer offset,
-            @McpToolParam(description = "Positive page size; default 20, at most 100", required = false) Integer limit) {
+            @McpToolParam(description = "Positive page size; default 20, at most 100", required = false) Integer limit,
+            @McpToolParam(description = "Inclusive UTC date or datetime with offset", required = false) String since,
+            @McpToolParam(description = "Exclusive UTC date or datetime with offset", required = false) String until) {
         long start = System.nanoTime();
         try {
-            if (query == null || query.isBlank() || query.length() > 1_000) {
+            var range = DateRange.parse(since, until);
+            if (((query == null || query.isBlank()) && !range.present()) || (query != null && query.length() > 1_000)) {
                 throw new IllegalArgumentException("query must be nonblank and at most 1000 characters");
             }
             var group = SearchField.of(field);
@@ -80,7 +88,7 @@ public class SearchTools {
                             "run 'mail-reindex <connection>' in a terminal or start a sync to rebuild it");
                 }
                 var results = reader == null ? new SearchResults(0, List.of())
-                        : reader.search(query, group, folder, position, size, redactor.enabled() ? redactor::text : null, store);
+                        : reader.search(query, group, folder, position, size, redactor.enabled() ? redactor::text : null, store, range);
                 var hits = results.hits().stream().map(hit -> {
                     var c = hit.card();
                     return new SearchHitInfo(c.key(), c.folderKey(), c.date(), redactor.text(c.from()), redactor.text(c.subject()),
@@ -90,7 +98,7 @@ public class SearchTools {
                 }).toList();
                 Integer next = (long) position + hits.size() < results.total() ? position + hits.size() : null;
                 ToolLogger.completed(log, "search", start);
-                return new SearchResult(definition.name(), redactor.text(query), group.id(), folder, results.total(), position, next, hits);
+                return new SearchResult(definition.name(), query == null || query.isBlank() ? null : redactor.text(query), group.id(), folder, results.total(), position, next, hits, range.since(), range.until());
             }
         } catch (RuntimeException e) {
             ToolLogger.failed(log, "search", start, e.getClass().getSimpleName());

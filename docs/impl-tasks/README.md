@@ -117,14 +117,14 @@ The reviewer checks; it does not fix. Work through every point and report what y
 ## Task list
 
 IT-01…IT-16 were accepted and deleted (2026-10-25…27). The user requested six briefs together
-on 2026-10-27, based on `d3fd516`. IT-22 (Д25) was accepted offline and deleted on 2026-10-27:
-background summaries and separate EWS rescan reporting are implemented. The remaining briefs
-are listed below in their original execution order; preserve the accepted IT-22 behavior.
+on 2026-10-27, based on `d3fd516`. IT-22 (Д25) and IT-21 (Д24) were accepted offline and
+deleted on 2026-10-27: background summaries, separate EWS rescan reporting, date filters and
+date-only search are implemented. The remaining briefs are listed below in their original
+execution order; preserve the accepted IT-22 and IT-21 behavior.
 Checks still pending on real mail are in `docs/plan.md` 2.4. Next unused number: IT-23.
 
 | Order | Brief | Plan item | Scope and dependency |
 |---|---|---|---|
-| 2 | [IT-21](IT-21-date-filters.md) | Д24 | Date bounds and date-only search; establishes reader signatures before threads/flags. |
 | 3 | [IT-17](IT-17-message-threads.md) | Д5 | Local getThread; preserves IT-21 reader behavior. |
 | 4 | [IT-18](IT-18-message-moves.md) | Д8 | Heuristic move reuse without MIME download; preserves IT-22 and supplies metadata snapshots for IT-19. |
 | 5 | [IT-19](IT-19-message-flags.md) | Д9 | Read/star flags; depends on IT-18 metadata and IT-17 thread cards, preserves date-only search. |

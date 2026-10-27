@@ -26,6 +26,7 @@ public record SearchHitInfo(
         float score,
         @Schema(description = "Markdown passage from the body or one saved attachment text, with **matches**; optional.", nullable = true,
                 requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @JsonInclude(JsonInclude.Include.NON_NULL)
         String snippet,
         @Schema(description = "Absolute message directory; files may be read directly.", requiredMode = Schema.RequiredMode.REQUIRED)
         String localPath,

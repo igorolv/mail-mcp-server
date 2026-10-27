@@ -97,6 +97,9 @@ class McpStdioServerTest {
             assertThat(toolNames).containsExactlyInAnyOrder("listConnections", "sync", "syncStatus", "listFolders", "listMessages", "getMessage", "search", "getAttachment");
             JsonNode searchTool = java.util.stream.StreamSupport.stream(tools.at("/result/tools").spliterator(), false)
                     .filter(tool -> tool.path("name").asString().equals("search")).findFirst().orElseThrow();
+            assertThat(searchTool.at("/inputSchema/required").toString()).doesNotContain("query", "since", "until");
+            JsonNode listTool = java.util.stream.StreamSupport.stream(tools.at("/result/tools").spliterator(), false).filter(tool -> tool.path("name").asString().equals("listMessages")).findFirst().orElseThrow();
+            assertThat(listTool.at("/inputSchema/required").toString()).doesNotContain("since", "until");
             JsonNode hitSchema = searchTool.at("/outputSchema/properties/hits/items");
             assertThat(hitSchema.at("/properties/snippetAttachmentFile").isMissingNode()).isFalse();
             assertThat(hitSchema.at("/properties/snippetAttachmentName").isMissingNode()).isFalse();
@@ -118,6 +121,11 @@ class McpStdioServerTest {
             JsonNode messages = call(requests, io, replies, stderr, stdout, 5, "listMessages",
                     "{\"connection\":\"local\",\"folder\":\"f1\"}");
             assertThat(messages.at("/messages").size()).isEqualTo(2);
+            JsonNode dateOnly = call(requests, io, replies, stderr, stdout, 30, "search", "{\"connection\":\"local\",\"since\":\"1900-01-01\",\"until\":\"2100-01-01\"}");
+            assertThat(dateOnly.has("query")).isFalse(); assertThat(dateOnly.path("total").asInt()).isEqualTo(2);
+            assertThat(dateOnly.at("/hits/0/score").asDouble()).isZero(); assertThat(dateOnly.at("/hits/0").has("snippet")).isFalse();
+            assertThat(dateOnly.at("/hits/0").has("snippetAttachmentFile")).isFalse();
+            assertThat(dateOnly.at("/hits/0").has("snippetAttachmentName")).isFalse();
             String key = messages.at("/messages/0/key").asString();
             JsonNode message = call(requests, io, replies, stderr, stdout, 6, "getMessage",
                     "{\"connection\":\"local\",\"key\":\"" + key + "\",\"maxChars\":10}");
@@ -202,6 +210,11 @@ class McpStdioServerTest {
         assertThat(Files.readString(dataDir.resolve("logs").resolve("mail-mcp-server.log")))
                 .contains("Configured connections: work -> ews/ntlm")
                 .doesNotContain(SECRET);
+    }
+
+    @org.junit.jupiter.api.Test
+    void dateArgumentsAreOptionalAndDateOnlySearchWorks(@TempDir Path dir) throws Exception {
+        listConnectionsWorksOverStdioAndStdoutIsPureJsonRpc(false, dir);
     }
 
     private static void prepareLocalData(Path dir) throws Exception {

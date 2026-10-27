@@ -43,13 +43,14 @@ With filtering, it transforms the **complete selected body or attachment text** 
 `UnifiedHighlighter.highlightWithoutSearcher` to reanalyze the changed text. Both detection and
 rendering see the full supplied text, including occurrences after character 10,000. Do not filter
 already shortened/highlighted snippets: their labels may be outside the passage, and `**`
-can split a token. The highlighting query excludes the folder filter, which is irrelevant to
+can split a token. The highlighting query excludes the folder and date filters, which are irrelevant to
 the in-memory text. Body and attachment fields mask only their own English companion field.
 Searching for a secret can still find the message while its snippet shows safe leading context,
 retaining the selected attachment identity. Blank transformed text returns no snippet or identity.
 `snippetAttachmentFile` remains the exact lookup filename; `snippetAttachmentName` is filtered
 separately (original display name, or filename when null/blank). Both are omitted for body or
 absent snippets. The already highlighted snippet is never filtered again by `SearchTools`.
+Date-only searches return no snippet; normalized date bounds are unchanged by filtering.
 No index/schema or disk-format changes, migration, reindexing or reprocessing are required.
 
 ## Rules and replacement
