@@ -4,6 +4,7 @@ import mail.mcp.model.MessageMeta;
 import mail.mcp.model.MailMessage;
 import mail.mcp.model.Address;
 import mail.mcp.store.MessageStore;
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StoredField;
@@ -39,10 +40,16 @@ public final class MailIndex implements AutoCloseable {
     public static final String SCHEMA = "4";
     private final FSDirectory directory;
     private final IndexWriter writer;
+    private final WordForms forms;
+    private final Analyzer analyzer;
+    private final boolean wordFormsChanged;
 
-    private MailIndex(FSDirectory directory, IndexWriter writer) {
+    private MailIndex(FSDirectory directory, IndexWriter writer, WordForms forms, boolean wordFormsChanged) {
         this.directory = directory;
         this.writer = writer;
+        this.forms = forms;
+        this.analyzer = writer.getAnalyzer();
+        this.wordFormsChanged = wordFormsChanged;
     }
 
     public static MailIndex openWriter(Path connectionDir) {
@@ -50,22 +57,36 @@ public final class MailIndex implements AutoCloseable {
     }
 
     public static MailIndex openWriter(Path connectionDir, boolean recreate) {
+        return openWriter(connectionDir, recreate, WordForms.none());
+    }
+
+    public static MailIndex openWriter(Path connectionDir, boolean recreate, WordForms forms) {
         try {
             Path path = Files.createDirectories(connectionDir.resolve("index"));
             FSDirectory directory = FSDirectory.open(path);
             try {
                 boolean current = false;
+                boolean wordFormsChanged = false;
                 if (DirectoryReader.indexExists(directory)) {
                     try (var reader = DirectoryReader.open(directory)) {
-                        current = SCHEMA.equals(reader.getIndexCommit().getUserData().get("schema"));
+                        var data = reader.getIndexCommit().getUserData();
+                        wordFormsChanged = !java.util.Objects.equals(data.get("wordForms"), forms.hash());
+                        current = SCHEMA.equals(data.get("schema")) && !wordFormsChanged;
                     }
                 }
-                var config = new IndexWriterConfig(MailAnalyzers.analyzer());
+                var analyzer = MailAnalyzers.analyzer(forms);
+                var config = new IndexWriterConfig(analyzer);
                 if (recreate || !current) { config.setOpenMode(IndexWriterConfig.OpenMode.CREATE); }
-                var writer = new IndexWriter(directory, config);
-                writer.setLiveCommitData(Map.of("schema", SCHEMA).entrySet());
-                return new MailIndex(directory, writer);
-            } catch (IOException e) {
+                final IndexWriter writer;
+                try { writer = new IndexWriter(directory, config); }
+                catch (IOException | RuntimeException e) {
+                    if (!forms.empty()) { analyzer.close(); }
+                    throw e;
+                }
+                var index = new MailIndex(directory, writer, forms, wordFormsChanged);
+                writer.setLiveCommitData(index.commitData().entrySet());
+                return index;
+            } catch (IOException | RuntimeException e) {
                 try { directory.close(); }
                 catch (IOException closeError) { e.addSuppressed(closeError); }
                 if (e instanceof LockObtainFailedException) { throw new IndexLockedException(); }
@@ -73,6 +94,9 @@ public final class MailIndex implements AutoCloseable {
             }
         } catch (IOException e) { throw new UncheckedIOException(e); }
     }
+
+    /** Whether opening this writer replaced an existing catalog with different word rules. */
+    public boolean wordFormsChanged() { return wordFormsChanged; }
 
     public void put(MessageMeta meta, MailMessage message, String body, String attachmentText) {
         Document document = new Document();
@@ -142,10 +166,15 @@ public final class MailIndex implements AutoCloseable {
 
     public void commit() {
         try {
-            writer.setLiveCommitData(Map.of("schema", SCHEMA).entrySet());
+            writer.setLiveCommitData(commitData().entrySet());
             writer.commit();
         }
         catch (IOException e) { throw new UncheckedIOException(e); }
+    }
+
+    private Map<String, String> commitData() {
+        String hash = forms.hash();
+        return hash == null ? Map.of("schema", SCHEMA) : Map.of("schema", SCHEMA, "wordForms", hash);
     }
 
     public Set<String> keys() {
@@ -207,7 +236,10 @@ public final class MailIndex implements AutoCloseable {
     @Override public void close() {
         try {
             try { writer.close(); }
-            finally { directory.close(); }
+            finally {
+                try { directory.close(); }
+                finally { if (!forms.empty()) { analyzer.close(); } }
+            }
         } catch (IOException e) { throw new UncheckedIOException(e); }
     }
 }

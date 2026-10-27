@@ -34,6 +34,7 @@ Bound from `mail-mcp.*` in `application.yml` into `config/MailMcpProperties`:
 |---|---|---|
 | `MAIL_MCP_DATA_DIR` | `%USERPROFILE%\.mail-mcp-server` | Root of local data: `<data-dir>\<connection>\`, `logs\` |
 | `MAIL_MCP_CONNECTIONS_FILE` | `<data-dir>\connections.json` | The connections file |
+| `MAIL_MCP_WORD_FORMS_FILE` | `<data-dir>\word-forms.txt` | Optional UTF-8 word groups, shared by all connections; missing/empty keeps ordinary analysis. Reloaded per text search and requested sync. |
 | `MAIL_MCP_REDACT_SECRETS` | `false` | Optional secret replacement in tool response text; restart to apply. CLI output and local data stay unfiltered. See `docs/redaction-agent.md`. |
 
 To add a setting: add a component to `MailMcpProperties` (or a nested record), a line under
@@ -113,6 +114,48 @@ Add or edit entries only in your local editor; agents must not modify an existin
 file to append connections. Do not paste it into chat. For IMAP app-password authentication,
 use the provider's app password. Placeholder references are optional; a literal password in this
 owner-only external file is supported by the loader too.
+
+## Word forms and analysis
+
+`MailMcpProperties.resolvedWordFormsFile()` resolves `MAIL_MCP_WORD_FORMS_FILE` (including
+leading `~`), or `<data-dir>/word-forms.txt`. The file is optional and never created automatically.
+`index/WordForms` reads UTF-8 with an optional BOM. `#` starts comments; whitespace separates
+letter-only words in a group. Each group needs two distinct words after lowercasing and `ё`→`е`;
+within-group repeats are allowed, cross-group repeats fail with both line numbers. The first
+word's Russian Snowball stem is used for every listed word. Explicitly listed words are
+excluded from the Russian stop set, so `человек люди` also works; unlisted stop words and
+English analysis stay unchanged. Single-word synonyms widen results.
+See README.md "Optional word forms" for the edit → analyze → reindex cycle.
+
+All three writer commands (`mail-sync`, `mail-reprocess`, `mail-reindex`) validate the file after
+argument checking and before opening the index, locating pandoc or constructing a connection.
+Invalid rules print `RESULT: FAILED (<filename> line <n>: <reason>)` and exit 2.
+A missing/empty file uses ordinary analysis and does not add a `wordForms` commit entry.
+The commands pass the loaded snapshot to the writer; changes require a rebuild per connection.
+A requested sync also recreates an index with a different rule hash and restores from disk.
+
+`cli/MailAnalyzeCommand` dispatches before Spring, independently of connections, index,
+pandoc and network:
+
+```powershell
+java -jar build\libs\mail-mcp-server.jar mail-analyze писем договоры и
+```
+
+Example with `письмо писем` on line 1 of the optional file:
+
+```text
+Word forms: <data-dir>/word-forms.txt
+писем -> письм (word-forms.txt line 1)
+договоры -> договор (Snowball)
+и -> stop word
+RESULT: OK
+```
+
+With a missing file the first line adds `(none found; using Snowball)`. Each argument is
+standard-tokenized and lowercased; every token prints its Russian body stem, rule source or
+stop-word status. Exit 0 means success or `--help`/`-h`; exit 2 means usage, invalid rules or
+file reading errors. Invalid rules print `RESULT: FAILED (<filename> line <n>: <reason>)`;
+file I/O errors use `RESULT: FAILED (local file error; details withheld)`.
 
 ## Mail sync
 
@@ -208,7 +251,8 @@ java -jar build\libs\mail-mcp-server.jar mail-reprocess work
 
 The command processes sorted message keys with both metadata and `message.eml`, including
 previous conversion failures. Download failures without MIME and incomplete directories stay
-unchanged. Old `body.md` and `attachments/` are replaced, metadata becomes converted/failed,
+unchanged on disk; failed metadata-only catalog entries are retained if a rules change recreated
+the index, without increasing the processed counter. Old `body.md` and `attachments/` are replaced, metadata becomes converted/failed,
 and the index entry is replaced. Commit every 100 processed messages and at the end. Progress
 prints every 1,000 messages. Before the result, distinct failure reasons are printed in
 descending count order (ties by reason):
@@ -242,7 +286,8 @@ No sync or other writer may be running for the same connection. The command forc
 in place, then calls `SyncRunner.restore`: converted messages load headers and saved body.md,
 downloaded messages are processed, failed messages get metadata only. Incomplete directories
 are removed. Originals and converted output remain unchanged for converted messages.
-The index commits every 100 entries and at the end, with commit data `schema=4`.
+The index commits every 100 entries and at the end, with commit data `schema=4` and
+`wordForms=<hash>` only when nonempty rules are active.
 Progress goes to the command's output only; server restoration stays silent.
 
 ```text

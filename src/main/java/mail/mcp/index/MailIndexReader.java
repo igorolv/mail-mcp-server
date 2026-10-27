@@ -8,6 +8,7 @@ import mail.mcp.model.SearchResults;
 import mail.mcp.model.ThreadResults;
 import mail.mcp.store.MessageStore;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.queryparser.simple.SimpleQueryParser;
 import org.apache.lucene.search.BooleanClause;
@@ -52,22 +53,30 @@ public final class MailIndexReader implements AutoCloseable {
     private final FSDirectory directory;
     private final DirectoryReader reader;
     private final IndexSearcher searcher;
+    private final WordForms forms;
+    private final Analyzer analyzer;
 
-    private MailIndexReader(FSDirectory directory, DirectoryReader reader) {
+    private MailIndexReader(FSDirectory directory, DirectoryReader reader, WordForms forms) {
         this.directory = directory;
         this.reader = reader;
         this.searcher = new IndexSearcher(reader);
+        this.forms = forms;
+        this.analyzer = MailAnalyzers.analyzer(forms);
     }
 
     /** Empty when index/ has no commit yet. Opens the last commit; one reader per tool call. */
     public static Optional<MailIndexReader> open(Path connectionDir) {
+        return open(connectionDir, WordForms.none());
+    }
+
+    public static Optional<MailIndexReader> open(Path connectionDir, WordForms forms) {
         Path path = connectionDir.resolve("index");
         if (!Files.isDirectory(path)) { return Optional.empty(); }
         try {
             FSDirectory directory = FSDirectory.open(path);
             try {
                 if (DirectoryReader.indexExists(directory)) {
-                    return Optional.of(new MailIndexReader(directory, DirectoryReader.open(directory)));
+                    return Optional.of(new MailIndexReader(directory, DirectoryReader.open(directory), forms));
                 }
             } catch (IOException | RuntimeException e) {
                 try { directory.close(); } catch (IOException closeError) { e.addSuppressed(closeError); }
@@ -85,6 +94,11 @@ public final class MailIndexReader implements AutoCloseable {
 
     public boolean current() {
         try { return MailIndex.SCHEMA.equals(reader.getIndexCommit().getUserData().get("schema")); }
+        catch (IOException e) { throw new UncheckedIOException(e); }
+    }
+
+    public boolean wordFormsCurrent() {
+        try { return java.util.Objects.equals(reader.getIndexCommit().getUserData().get("wordForms"), forms.hash()); }
         catch (IOException e) { throw new UncheckedIOException(e); }
     }
 
@@ -130,7 +144,7 @@ public final class MailIndexReader implements AutoCloseable {
             int total = groups.size();
             if (offset >= total) { return new SearchResults(total, List.of()); }
             int end = (int) Math.min(total, (long) offset + limit);
-            var snippets = dateOnly ? null : new SearchSnippets(highlightQuery, outputText);
+            var snippets = dateOnly ? null : new SearchSnippets(highlightQuery, outputText, analyzer);
             List<SearchHit> hits = new ArrayList<>();
             for (var group : groups.subList(offset, end)) {
                 var hit = documents.get(group.getFirst());
@@ -146,10 +160,10 @@ public final class MailIndexReader implements AutoCloseable {
         } catch (IOException e) { throw new UncheckedIOException(e); }
     }
 
-    private static Query parseText(String query, SearchField field) {
+    private Query parseText(String query, SearchField field) {
         // Phrase and whitespace syntax only; fuzzy and wildcard operators are not enabled.
         boolean fullAddress = isFullAddress(query);
-        var parser = new SimpleQueryParser(MailAnalyzers.analyzer(),
+        var parser = new SimpleQueryParser(analyzer,
                 field.fields().stream()
                         .filter(name -> !fullAddress || !Set.of("fromName", "toName", "ccName").contains(name))
                         .collect(Collectors.toMap(name -> name, name -> 1.0f)),
@@ -342,7 +356,10 @@ public final class MailIndexReader implements AutoCloseable {
     @Override public void close() {
         try {
             try { reader.close(); }
-            finally { directory.close(); }
+            finally {
+                try { directory.close(); }
+                finally { if (!forms.empty()) { analyzer.close(); } }
+            }
         } catch (IOException e) { throw new UncheckedIOException(e); }
     }
 }

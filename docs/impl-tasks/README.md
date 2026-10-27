@@ -116,18 +116,22 @@ The reviewer checks; it does not fix. Work through every point and report what y
 
 ## Task list
 
-IT-01…IT-23 were accepted and deleted (2026-10-25…27). Checks still pending on real mail are in
+IT-01…IT-24 were accepted and deleted (2026-10-25…27). Checks still pending on real mail are in
 `docs/plan.md` 2.4. The user requested IT-23…IT-25 together on 2026-10-27, based on `d725d93`.
-IT-23 is accepted; the remaining briefs build on its implementation. Next unused number: IT-26.
+IT-23 and IT-24 are accepted; the remaining brief builds on their implementation. Next unused
+number: IT-26.
 
 | Order | Brief | Plan item | Scope and dependency |
 |---|---|---|---|
-| 2 | [IT-24](IT-24-word-forms.md) | Д12 | Optional user `word-forms.txt`, `wordForms` commit entry, `mail-analyze`. Builds on IT-23's reader and `SearchTools`. |
-| 3 | [IT-25](IT-25-search-hints.md) | Д26 | `search` description hints only; refers to IT-23 copies and the IT-24 file, so it goes last. |
+| 3 | [IT-25](IT-25-search-hints.md) | Д26 | `search` description hints only; builds on accepted IT-23 copies and IT-24 word forms, so it goes last. |
 
 Numbers follow the plan items, which here match the execution order. Complete the implement →
 review → record cycle for each before starting the next; do not run these agents concurrently.
-IT-24 is the largest: review that an absent file leaves the analyzer and commit data unchanged.
+IT-24 was accepted offline on 2026-10-27: an absent file leaves the analyzer and commit data
+unchanged; all 13 named tests pass. The full build has 681 tests, one expected skip and no failures.
+Listed words override the Russian stop set so the required `человек люди` group works; unlisted
+stop words and English analysis are unchanged. Reprocessing retains failed metadata-only entries
+when changed rules recreate the index. These implementation details are covered by tests.
 The user decided the Д12 storage (an optional user file, no built-in list, no Hunspell,
 single-word synonyms allowed, `mail-analyze` included). IT-23's Д4 copy identity and copies
 field are accepted implementation details, not separately recorded user decisions. Recording one brief must

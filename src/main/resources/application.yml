@@ -19,3 +19,5 @@ mail-mcp:
   connections-file: ${MAIL_MCP_CONNECTIONS_FILE:}
   # Tool output only. Downloads, disk, index and original paths stay unchanged.
   redact-secrets: ${MAIL_MCP_REDACT_SECRETS:false}
+  # Optional user word groups; a missing file leaves analysis unchanged.
+  word-forms-file: ${MAIL_MCP_WORD_FORMS_FILE:}

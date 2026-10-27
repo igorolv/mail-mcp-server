@@ -17,10 +17,12 @@ mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/plan.md` section 2).
   queries after schema-4 rebuild and restart; heuristic move reuse needs user-run seeding and a manual test move;
   applying the 5 MiB XLSX text threshold to existing mail needs optional user-run reprocessing;
   read/star snapshots need user-requested sync and flag comparisons in the user's mail client;
-  copy grouping needs local search/thread queries after restart, without reindexing).
+  copy grouping needs local search/thread queries after restart, without reindexing;
+  optional user word forms need user-created rules, `mail-analyze`, per-connection `mail-reindex`
+  and local search checks).
 
 Work now consists of polishing and optional improvements:
-- `docs/plan.md` section 4 lists the open ones (`Д7`, `Д12`, …); the user chooses which to take.
+- `docs/plan.md` section 4 lists the open ones (`Д7`, `Д13`, …); the user chooses which to take.
   Accepted items are removed from that table.
 - Add new tools or subsystems only when the task asks for them.
 - `docs/plan.md` 3.8 lists what no change may add without a user decision.
@@ -199,6 +201,13 @@ code is listed in `docs/architecture-agent.md`.
   supplies the card, score and snippet. Threads use the smallest key as representative.
   Other copies appear as unfiltered key/folder pairs under optional `copies`; totals and paging
   count groups. Stored copies, listMessages and folder counts stay unchanged; no reindex is needed.
+- **Optional word forms:** shared user UTF-8 `word-forms.txt` under the data directory, overridden
+  by `MAIL_MCP_WORD_FORMS_FILE`; no built-in dictionary. Groups map listed words to the first
+  word's Russian Snowball stem, including explicitly listed Russian stop words. Unlisted words,
+  English and exact fields keep their behavior. Text search and requested sync reload per call;
+  differing `wordForms` commit hashes block text search until offline reindex or requested sync
+  rebuilds from disk. Date-only search, lists and threads ignore the hash. Missing/empty rules
+  preserve the analyzer and commit data. `mail-analyze` diagnoses rules without mail or pandoc.
 - **Read/star snapshots:** nullable `read` and `flagged` represent the latest successful remote
   observation, not live state. Unknown is omitted; explicit false clears a known value.
   EWS reads IsRead and Flag/FlagStatus, IMAP reads Seen/Flagged in the existing metadata pass

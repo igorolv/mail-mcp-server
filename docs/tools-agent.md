@@ -137,6 +137,19 @@ same rebuild error as search below.
 
 ## Search
 
+Text search reloads optional user rules through a `Supplier<WordForms>` on every call and
+opens its reader with that snapshot. Invalid rules raise `IllegalArgumentException` naming
+the file and line. After the schema check, a changed effective mapping raises
+`IllegalStateException("The word forms list changed since the index was built; run 'mail-reindex <connection>' in a terminal or start a sync to rebuild it")`.
+Text queries and highlighting share that analyzer. Explicitly listed words override Russian
+stop words as well; English fields and unlisted stop words keep their existing behavior.
+Missing/empty rules keep the existing
+analyzer and require no reindex for indexes built without rules. Date-only searches do not
+load or validate the file, and ignore its commit hash; listMessages and getThread also keep
+working. No reader call triggers a rebuild. `SyncService.start` loads and validates the rules
+on every call before opening the writer or signing in; a differing hash rebuilds through
+existing disk reconciliation. Spring supplies the configured path lazily, so edits need no restart.
+
 `SearchTools.search` returns `SearchResult(connection, query, field, folder, total, offset,
 nextOffset, hits, since, until)`. Each `SearchHitInfo` includes key, folder key, date, displayed from, subject,
 hasAttachments, state, score, snippet and the absolute message directory `localPath`.
@@ -227,6 +240,11 @@ Misses: Q011:S010, Q012:S009, Q012:S011, Q013:S010, Q014:S013, Q015:S015, Q016:S
 Wrong matches: Q025:S024, Q028:S025, Q029:S024, Q067:S037, Q068:S041,
 Q079:S047, Q080:S048. Snowball misses irregular Russian forms and conflates some names;
 precision collisions and raw synthetic secret matches remain accepted limitations.
+This baseline stays unchanged without a word forms file. The 2026-10-27 offline test with
+`src/test/resources/word-forms/control-set.txt` (four groups, including `человек люди`) reaches
+**7/7** irregular matches and **86/86** overall, with the same **7 false positives**.
+Explicitly listed stop words are retained only in Russian analysis; other stop words and
+English fields keep their original behavior.
 
 ## Status file and writer ownership
 

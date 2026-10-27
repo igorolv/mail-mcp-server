@@ -272,6 +272,44 @@ fall back to body context, or no snippet without a body. The complete selected t
 before highlighting when secret filtering is enabled. No reindexing or reprocessing is needed
 when attachment Markdown already exists; the disk format and index schema remain unchanged.
 
+## Optional word forms
+
+Search works without any word forms setup. With no file (or an empty/comment-only file),
+the existing Russian/English analysis and index commit data stay unchanged; no reindex is needed.
+To join irregular forms or single-word synonyms, optionally create UTF-8
+`<data-dir>/word-forms.txt`, shared by all connections:
+
+```text
+# First word chooses the Snowball stem for the whole group
+письмо писем
+ребёнок дети
+```
+
+Each line is a group of at least two distinct letter-only words separated by whitespace.
+`#` starts a comment; a leading UTF-8 BOM is accepted. Case and `ё`/`е` are normalized.
+Repeats within one group are allowed; a word cannot belong to two groups. No dictionary is
+built into the jar. Single-word synonyms are allowed, but widen results and can reduce precision.
+The first word determines the stem: reordering groups is harmless; changing their first words
+can change the rules. Listed words override Russian stop words too (for example, `человек`
+in `человек люди`); unlisted stop words and English analysis stay unchanged. Only listed forms
+are overridden; other forms still use Snowball.
+
+After editing, inspect the analysis and rebuild each connection's index offline:
+
+```powershell
+java -jar build\libs\mail-mcp-server.jar mail-analyze письмо писем договоры
+java -jar build\libs\mail-mcp-server.jar mail-reindex work
+java -jar build\libs\mail-mcp-server.jar mail-reindex mailru
+```
+
+`mail-analyze` needs no connections, mail, pandoc or network. It shows the applied rule and
+line number, ordinary Snowball stems and stop words. `MAIL_MCP_WORD_FORMS_FILE` can override
+the path. Text search and requested sync reload the file on each call, without restarting.
+When the effective mapping changes (including removal), text search asks for `mail-reindex`
+or a requested sync rebuild; date-only search, message lists and conversations keep working.
+Comments, spacing and group order do not require rebuilding. An invalid file reports its
+filename and line; it blocks text search and writers before index access or sign-in.
+
 ## Commands
 
 The same jar has user-run modes; none of them starts the MCP transport.
@@ -281,6 +319,7 @@ The same jar has user-run modes; none of them starts the MCP transport.
 | `mail-sync <connection>` | Synchronizes one mailbox and prints a line per folder |
 | `mail-reprocess <connection>` | Offline: parses every stored message again, rewrites `body.md` and attachment text, reindexes |
 | `mail-reindex <connection>` | Offline: rebuilds the index from disk |
+| `mail-analyze <word>...` | Offline: shows Russian stems, word rule sources and stop words |
 | `gmail-oauth <connection>` | Gets the first Gmail OAuth2 consent in the browser and stores the refresh token |
 
 Exit codes:
@@ -293,6 +332,8 @@ Exit codes:
 | 3 | Sign-in rejected; there is no retry |
 | 4 | Network, protocol or local storage error |
 | 5 | Another process is syncing this mailbox |
+
+For `mail-analyze`, file reading errors also use exit code 2.
 
 Details: [docs/build-config-agent.md](docs/build-config-agent.md).
 
@@ -335,6 +376,7 @@ Disk space is not saved: expect roughly the size of the mailbox plus its text.
 |---|---|---|
 | `MAIL_MCP_DATA_DIR` | `%USERPROFILE%\.mail-mcp-server` | Root of local data and logs |
 | `MAIL_MCP_CONNECTIONS_FILE` | `<data-dir>\connections.json` | The connections file |
+| `MAIL_MCP_WORD_FORMS_FILE` | `<data-dir>\word-forms.txt` | Optional user word groups; absent means ordinary analysis |
 | `MAIL_MCP_REDACT_SECRETS` | `false` | Replace recognized secrets in tool response text only; restart to apply |
 
 Everything about a mailbox lives in its `connections.json` entry.

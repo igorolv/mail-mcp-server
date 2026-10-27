@@ -7,6 +7,7 @@ import mail.mcp.convert.Pandoc;
 import mail.mcp.convert.PandocException;
 import mail.mcp.index.IndexLockedException;
 import mail.mcp.index.MailIndex;
+import mail.mcp.index.WordForms;
 import mail.mcp.mime.MimeReader;
 import mail.mcp.model.MessageState;
 import mail.mcp.store.MessageStore;
@@ -50,6 +51,15 @@ public final class MailReprocessCommand {
             return args.length == 1 ? 0 : 2;
         }
         out.println("Mail reprocess (offline)");
+        final WordForms forms;
+        try { forms = WordForms.load(properties.resolvedWordFormsFile()); }
+        catch (IllegalArgumentException e) {
+            out.println("RESULT: FAILED (" + e.getMessage() + ")");
+            return 2;
+        } catch (UncheckedIOException e) {
+            out.println("RESULT: FAILED (local storage error; details withheld)");
+            return 4;
+        }
         final mail.mcp.connections.ConnectionDefinition selected;
         try {
             selected = ConnectionsLoader.load(properties, new JsonConfig().mailMcpObjectMapper(), env)
@@ -72,12 +82,16 @@ public final class MailReprocessCommand {
                 out.println("RESULT: FAILED (pandoc not found; install pandoc and put it on PATH)");
                 return 2;
             }
-            try (var index = MailIndex.openWriter(selected.connectionDir())) {
+            try (var index = MailIndex.openWriter(selected.connectionDir(), false, forms)) {
                 var store = new MessageStore(selected.connectionDir(), new JsonConfig().mailMcpObjectMapper());
                 var processor = new MessageProcessor(store, pandoc);
                 for (String key : store.keys()) {
                     var meta = store.readMeta(key);
                     if (meta.isEmpty() || !Files.exists(store.messageDir(key).resolve(MessageStore.MESSAGE_FILE))) {
+                        // A changed rules hash may have recreated the catalog; retain download failures too.
+                        if (index.wordFormsChanged() && meta.isPresent() && meta.orElseThrow().state() == MessageState.FAILED) {
+                            index.put(meta.orElseThrow(), null, null, null);
+                        }
                         continue;
                     }
                     var processed = processor.process(meta.orElseThrow());

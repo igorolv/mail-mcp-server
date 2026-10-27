@@ -175,7 +175,8 @@ and conversion failures. Reused moves count as neither downloaded, failed nor re
 downloads can include recognized moves. Conversion failures are not automatically retried. The offline
 `mail-reprocess` command processes every message with metadata and MIME, replacing output and
 index fields, including creating attachment `.md` files for messages already on disk; entries
-without MIME remain unchanged.
+without MIME remain unchanged on disk. Reprocessing also retains failed metadata-only catalog
+entries when a word-rules change recreates the index, without increasing its counters.
 
 Metadata, folders and sync status JSON files are written to a temporary file in the target
 directory, then moved with `ATOMIC_MOVE` and `REPLACE_EXISTING`. Temporary files are cleaned up
@@ -183,8 +184,14 @@ after a write. File I/O failures become `UncheckedIOException`; Jackson exceptio
 
 ## Lucene catalog and reconciliation
 
+`MailIndexReader.open(dir, forms)` keeps one rule snapshot per call. `current()` checks only
+schema; `wordFormsCurrent()` separately compares the commit hash with the supplied rules.
+Thus date-only search, listMessages and getThread continue reading current-schema commits
+after rule edits. Reader tools never rebuild an index.
+
 `MailIndex.openWriter` creates `index/` and opens an `IndexWriter` on `FSDirectory`, using
-`MailAnalyzers.analyzer()`. Lucene core, analysis-common, queryparser and highlighter use 10.5.2.
+`MailAnalyzers.analyzer(forms)`. Missing/empty forms use the unchanged shared analyzer.
+Lucene core, analysis-common, queryparser and highlighter use 10.5.2.
 Fields come from metadata,
 parsed MIME headers/attachment descriptions and saved Markdown:
 
@@ -209,7 +216,8 @@ parsed MIME headers/attachment descriptions and saved Markdown:
 | `attachmentNames` | Decoded names, or stored filenames when unnamed, joined by newline | `StoredField` only |
 | `attachmentName`, `attachmentFile` | One decoded name per attachment, falling back to its stored filename | `TextField`, not stored |
 
-`MailAnalyzers` builds one shared `PerFieldAnalyzerWrapper`. The default is `RussianAnalyzer`.
+`MailAnalyzers` uses one shared `PerFieldAnalyzerWrapper` without rules; nonempty rules get
+an analyzer for the loaded snapshot. The ordinary default is `RussianAnalyzer`.
 The `_en` fields use `EnglishAnalyzer` with both English and Russian default stop words.
 Address fields and `attachmentFile` use `KeywordTokenizer` and `LowerCaseFilter`, preserving
 complete addresses and filenames. `attachmentName` uses `PatternTokenizer("[^\\p{L}\\p{N}]+", -1)`,
@@ -218,9 +226,23 @@ Attachment contents use the Russian default analyzer and English analyzer for `a
 They are indexed without being stored. Snippets can read individual saved Markdown sidecars
 after paging; index fields and schema remain unchanged, with no migration or reindexing needed.
 
-Every commit, including closing the writer, carries user data `schema=4` (`MailIndex.SCHEMA`).
-Opening an existing index with another schema or no schema uses `OpenMode.CREATE`, rebuilding
-in place. `openWriter(dir, true)` always recreates it. No second generation is kept.
+`WordForms` holds immutable normalized word→stem and source-line maps loaded from the optional
+user file. Its hash is lowercase SHA-256 over UTF-8 `<word>\t<stem>\n` lines sorted by word;
+empty rules have a null hash. Comments, spacing and group order do not affect the hash.
+Nonempty rules insert `WordFormsFilter` before Russian Snowball in the default analyzer and
+attachment-name parts analyzer. Listed words are excluded from the Russian stop set before
+filtering, so user rules override stop words such as `человек`; unlisted stops stay unchanged.
+It preserves offsets and marks replacements as keywords;
+English and exact fields are unchanged. Query parsing and snippets use the reader's analyzer.
+
+Every commit, including closing the writer, carries user data `schema=4` (`MailIndex.SCHEMA`)
+and `wordForms=<hash>` for nonempty rules only. Without rules, the analyzer and commit data
+are unchanged. Opening an index with another/missing schema or a differing `wordForms` entry
+uses `OpenMode.CREATE`, rebuilding in place (both absent hashes count as equal).
+`openWriter(dir, true, forms)` always recreates it. Legacy writer/reader overloads use
+`WordForms.none()`. `wordFormsChanged()` reports whether an existing commit had a different
+rule hash; reprocessing uses it to retain metadata-only failures specifically on that rebuild.
+No second generation is kept.
 The next `SyncRunner.restore` reconciles every missing entry from disk before network access:
 converted entries load MIME headers and saved body/attachment Markdown, downloaded entries
 are processed,

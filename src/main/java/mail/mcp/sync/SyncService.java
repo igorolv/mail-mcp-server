@@ -5,6 +5,7 @@ import mail.mcp.convert.Pandoc;
 import mail.mcp.convert.PandocException;
 import mail.mcp.index.IndexLockedException;
 import mail.mcp.index.MailIndex;
+import mail.mcp.index.WordForms;
 import mail.mcp.model.FolderProgress;
 import mail.mcp.source.MailSource;
 import mail.mcp.store.MessageStore;
@@ -22,16 +23,24 @@ public final class SyncService {
     private final ConnectionRegistry registry;
     private final Supplier<Pandoc> pandocLocator;
     private final ObjectMapper mapper;
+    private final Supplier<WordForms> wordForms;
     private final Map<String, Thread> running = new HashMap<>();
 
     public SyncService(ConnectionRegistry registry, Supplier<Pandoc> pandocLocator, ObjectMapper mapper) {
+        this(registry, pandocLocator, mapper, WordForms::none);
+    }
+
+    public SyncService(ConnectionRegistry registry, Supplier<Pandoc> pandocLocator, ObjectMapper mapper,
+                       Supplier<WordForms> wordForms) {
         this.registry = registry;
         this.pandocLocator = pandocLocator;
         this.mapper = mapper;
+        this.wordForms = wordForms;
     }
 
     /** Returns at once; the run continues on its own thread. */
     public synchronized SyncStart start(String connection) {
+        var forms = wordForms.get();
         var definition = registry.definition(connection);
         if (!definition.usable()) { throw new IllegalArgumentException(definition.configError()); }
         String name = definition.name();
@@ -50,7 +59,7 @@ public final class SyncService {
             throw new IllegalStateException("pandoc not found; install pandoc and put it on PATH");
         }
         final MailIndex index;
-        try { index = MailIndex.openWriter(definition.connectionDir()); }
+        try { index = MailIndex.openWriter(definition.connectionDir(), false, forms); }
         catch (IndexLockedException e) {
             return new SyncStart(SyncStart.Status.LOCKED_BY_OTHER_PROCESS, e.getMessage());
         }

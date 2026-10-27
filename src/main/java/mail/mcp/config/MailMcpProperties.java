@@ -18,15 +18,20 @@ import java.util.function.UnaryOperator;
  * @param connectionsFile JSON file with the named mailboxes; {@code <data-dir>/connections.json}
  *                        when blank
  * @param redactSecrets   optional tool-output secret replacement; never changes local data
+ * @param wordFormsFile   optional word rules; defaults to {@code <data-dir>/word-forms.txt}
  */
 @ConfigurationProperties(prefix = "mail-mcp")
-public record MailMcpProperties(String dataDir, String connectionsFile, boolean redactSecrets) {
+public record MailMcpProperties(String dataDir, String connectionsFile, boolean redactSecrets, String wordFormsFile) {
 
     @ConstructorBinding
     public MailMcpProperties { }
 
     public MailMcpProperties(String dataDir, String connectionsFile) {
         this(dataDir, connectionsFile, false);
+    }
+
+    public MailMcpProperties(String dataDir, String connectionsFile, boolean redactSecrets) {
+        this(dataDir, connectionsFile, redactSecrets, null);
     }
 
     /** Environment variable that overrides {@link #dataDir()}. */
@@ -36,6 +41,7 @@ public record MailMcpProperties(String dataDir, String connectionsFile, boolean 
     public static final String CONNECTIONS_FILE_ENV = "MAIL_MCP_CONNECTIONS_FILE";
 
     public static final String REDACT_SECRETS_ENV = "MAIL_MCP_REDACT_SECRETS";
+    public static final String WORD_FORMS_FILE_ENV = "MAIL_MCP_WORD_FORMS_FILE";
 
     /**
      * Settings read straight from the environment, for user-run commands without Spring.
@@ -47,7 +53,7 @@ public record MailMcpProperties(String dataDir, String connectionsFile, boolean 
             throw new IllegalArgumentException("MAIL_MCP_REDACT_SECRETS must be true or false");
         }
         return new MailMcpProperties(env.apply(DATA_DIR_ENV), env.apply(CONNECTIONS_FILE_ENV),
-                Boolean.parseBoolean(redaction));
+                Boolean.parseBoolean(redaction), env.apply(WORD_FORMS_FILE_ENV));
     }
 
     public Path resolvedDataDir() {
@@ -64,6 +70,13 @@ public record MailMcpProperties(String dataDir, String connectionsFile, boolean 
             return resolvedDataDir().resolve("connections.json");
         }
         return Paths.get(expandHome(connectionsFile.trim())).normalize();
+    }
+
+    public Path resolvedWordFormsFile() {
+        if (wordFormsFile == null || wordFormsFile.isBlank()) {
+            return resolvedDataDir().resolve("word-forms.txt");
+        }
+        return Paths.get(expandHome(wordFormsFile.trim())).normalize();
     }
 
     /** Local data of one connection: {@code <data-dir>/<connection>}. */

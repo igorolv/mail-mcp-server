@@ -8,6 +8,7 @@ import mail.mcp.connections.MailConnection;
 import mail.mcp.connections.MailConnectionFactory;
 import mail.mcp.index.IndexLockedException;
 import mail.mcp.index.MailIndex;
+import mail.mcp.index.WordForms;
 import mail.mcp.convert.Pandoc;
 import mail.mcp.convert.PandocException;
 import mail.mcp.mime.MimeReader;
@@ -58,6 +59,15 @@ public final class MailSyncCommand {
             return args.length == 1 ? 0 : 2;
         }
         out.println("Mail sync (read-only; one sign-in attempt)");
+        final WordForms forms;
+        try { forms = WordForms.load(properties.resolvedWordFormsFile()); }
+        catch (IllegalArgumentException e) {
+            out.println("RESULT: FAILED (" + e.getMessage() + ")");
+            return 2;
+        } catch (UncheckedIOException e) {
+            out.println("RESULT: FAILED (local storage error; details withheld)");
+            return 4;
+        }
         List<ConnectionDefinition> definitions;
         try {
             definitions = ConnectionsLoader.load(properties, new JsonConfig().mailMcpObjectMapper(), env);
@@ -81,7 +91,7 @@ public final class MailSyncCommand {
         }
         try (MailConnection connection = factory.create(selected)) {
             MailSource source = connection.openSource();
-            try (MailIndex index = MailIndex.openWriter(selected.connectionDir()); source) {
+            try (MailIndex index = MailIndex.openWriter(selected.connectionDir(), false, forms); source) {
                 var store = new MessageStore(selected.connectionDir(), new JsonConfig().mailMcpObjectMapper());
                 new SyncRunner(store, index, source, new MessageProcessor(store, pandoc)).run(progress -> {
                     out.println("  " + progress.path() + ": " + progress.downloaded() + " downloaded, "

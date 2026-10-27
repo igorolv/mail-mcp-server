@@ -28,6 +28,70 @@ class MailReindexCommandTest {
     @TempDir Path temp;
     private final ByteArrayOutputStream output = new ByteArrayOutputStream();
 
+    @Test void reindexAppliesWordFormsAndRejectsAnInvalidFile() throws Exception {
+        configuration();
+        var meta = save("Subject: Forms\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nНесколько писем");
+        new MessageProcessor(store(), new Pandoc("unused")).process(meta);
+        assertThat(run()).isZero();
+        try (var reader = MailIndexReader.open(temp.resolve("test")).orElseThrow()) {
+            assertThat(reader.search("письмо", SearchField.BODY, null, 0, 20).total()).isZero();
+        }
+        var file = temp.resolve("word-forms.txt");
+        Files.writeString(file, "письмо писем");
+        assertThat(run()).isZero();
+        try (var reader = MailIndexReader.open(temp.resolve("test"), mail.mcp.index.WordForms.load(file)).orElseThrow()) {
+            assertThat(reader.wordFormsCurrent()).isTrue();
+            assertThat(reader.search("письмо", SearchField.BODY, null, 0, 20).hits())
+                    .extracting(hit -> hit.card().key()).containsExactly(meta.key());
+        }
+        Files.writeString(file, "invalid");
+        Supplier<Pandoc> forbidden = () -> { throw new AssertionError("no pandoc or index access"); };
+        // Holding the writer proves all three commands reject rules before trying the index.
+        try (var writer = MailIndex.openWriter(temp.resolve("test"), false,
+                new mail.mcp.index.WordForms(java.util.Map.of("письмо", "письм", "писем", "письм"), java.util.Map.of()))) {
+            output.reset();
+            assertThat(run(forbidden, "test")).isEqualTo(2);
+            var properties = new MailMcpProperties(temp.toString(), null);
+            var out = new PrintStream(output, true, StandardCharsets.UTF_8);
+            assertThat(MailReprocessCommand.run(new String[] {"test"}, properties, out, forbidden,
+                    key -> "SYNTHETIC_TEST_CREDENTIAL")).isEqualTo(2);
+            assertThat(MailSyncCommand.run(new String[] {"test"}, properties, out,
+                    definition -> { throw new AssertionError("no connection or sign-in"); }, forbidden,
+                    key -> "SYNTHETIC_TEST_CREDENTIAL")).isEqualTo(2);
+            assertThat(writer.keys()).containsExactly(meta.key());
+        }
+        assertThat(output().lines().filter(line -> line.startsWith("RESULT: FAILED (word-forms.txt line 1:")))
+                .hasSize(3);
+    }
+
+    @Test void reprocessKeepsFailedMetadataWhenRulesRecreateIndex() throws Exception {
+        configuration();
+        var failed = save(null);
+        save("Subject: Forms\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nНесколько писем");
+        assertThat(run()).isZero();
+        Files.writeString(temp.resolve("word-forms.txt"), "письмо писем");
+        assertThat(MailReprocessCommand.run(new String[] {"test"}, new MailMcpProperties(temp.toString(), null),
+                new PrintStream(output, true, StandardCharsets.UTF_8), () -> new Pandoc("unused"),
+                key -> "SYNTHETIC_TEST_CREDENTIAL")).isZero();
+        var forms = mail.mcp.index.WordForms.load(temp.resolve("word-forms.txt"));
+        try (var reader = MailIndexReader.open(temp.resolve("test"), forms).orElseThrow()) {
+            assertThat(reader.wordFormsCurrent()).isTrue();
+            assertThat(reader.count("f1")).isEqualTo(2);
+            assertThat(reader.search("письмо", SearchField.BODY, null, 0, 20).total()).isEqualTo(1);
+        }
+        assertThat(store().readMeta(failed.key())).contains(failed);
+        assertThat(output()).contains("RESULT: OK (1 messages, 1 converted, 0 failed)");
+        Files.delete(temp.resolve("word-forms.txt"));
+        assertThat(MailReprocessCommand.run(new String[] {"test"}, new MailMcpProperties(temp.toString(), null),
+                new PrintStream(output, true, StandardCharsets.UTF_8), () -> new Pandoc("unused"),
+                key -> "SYNTHETIC_TEST_CREDENTIAL")).isZero();
+        try (var reader = MailIndexReader.open(temp.resolve("test")).orElseThrow()) {
+            assertThat(reader.wordFormsCurrent()).isTrue();
+            assertThat(reader.count("f1")).isEqualTo(2);
+            assertThat(reader.search("письмо", SearchField.BODY, null, 0, 20).total()).isZero();
+        }
+    }
+
     private void configuration() throws Exception {
         Files.writeString(temp.resolve("connections.json"), """
                 {"connections":{"test":{"type":"imap","host":"imap.example.com",

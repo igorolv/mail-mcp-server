@@ -6,6 +6,8 @@ import mail.mcp.api.MessageCopyInfo;
 import mail.mcp.connections.ConnectionRegistry;
 import mail.mcp.index.MailIndexReader;
 import mail.mcp.index.SearchField;
+import mail.mcp.index.WordForms;
+import mail.mcp.config.MailMcpProperties;
 import mail.mcp.model.SearchResults;
 import mail.mcp.model.DateRange;
 import mail.mcp.redaction.SecretRedactor;
@@ -19,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 /** Local search only; never resolves a source or requires pandoc. */
 @Service
@@ -27,16 +30,28 @@ public class SearchTools {
     private final ConnectionRegistry registry;
     private final ObjectMapper mapper;
     private final SecretRedactor redactor;
+    private final Supplier<WordForms> wordForms;
 
     public SearchTools(ConnectionRegistry registry, ObjectMapper mapper) {
         this(registry, mapper, new SecretRedactor(false));
     }
 
-    @Autowired
     public SearchTools(ConnectionRegistry registry, ObjectMapper mapper, SecretRedactor redactor) {
+        this(registry, mapper, redactor, WordForms::none);
+    }
+
+    @Autowired
+    public SearchTools(ConnectionRegistry registry, ObjectMapper mapper, SecretRedactor redactor,
+                       MailMcpProperties properties) {
+        this(registry, mapper, redactor, () -> WordForms.load(properties.resolvedWordFormsFile()));
+    }
+
+    public SearchTools(ConnectionRegistry registry, ObjectMapper mapper, SecretRedactor redactor,
+                       Supplier<WordForms> wordForms) {
         this.registry = registry;
         this.mapper = mapper;
         this.redactor = redactor;
+        this.wordForms = wordForms;
     }
 
     public SearchResult search(String connection, String query, String field, String folder, Integer offset, Integer limit) {
@@ -87,10 +102,16 @@ public class SearchTools {
             if (folder != null && store.folders().stream().noneMatch(f -> f.key().equals(folder))) {
                 throw new IllegalArgumentException("Unknown folder key; use listFolders");
             }
-            try (var reader = MailIndexReader.open(definition.connectionDir()).orElse(null)) {
+            boolean textQuery = query != null && !query.isBlank();
+            var forms = textQuery ? wordForms.get() : WordForms.none();
+            try (var reader = MailIndexReader.open(definition.connectionDir(), forms).orElse(null)) {
                 if (reader != null && !reader.current()) {
                     throw new IllegalStateException("The index was built by an older version; " +
                             "run 'mail-reindex <connection>' in a terminal or start a sync to rebuild it");
+                }
+                if (reader != null && textQuery && !reader.wordFormsCurrent()) {
+                    throw new IllegalStateException("The word forms list changed since the index was built; run " +
+                            "'mail-reindex <connection>' in a terminal or start a sync to rebuild it");
                 }
                 var results = reader == null ? new SearchResults(0, List.of())
                         : reader.search(query, group, folder, position, size, redactor.enabled() ? redactor::text : null, store, range);

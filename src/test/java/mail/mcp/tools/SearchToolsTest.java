@@ -36,6 +36,69 @@ class SearchToolsTest {
     private SearchTools tools;
     private ConnectionRegistry registry;
 
+    @Test void changedWordFormsAskForReindexOnlyForTextSearch() throws Exception {
+        var file = dir.resolve("word-forms.txt");
+        var mapper = new JsonConfig().mailMcpObjectMapper();
+        var search = new SearchTools(registry, mapper, new mail.mcp.redaction.SecretRedactor(false),
+                () -> mail.mcp.index.WordForms.load(file));
+        try (var index = MailIndex.openWriter(dir)) { put(index, "f1"); index.commit(); }
+        assertThat(search.search("local", "договор", "body", null, null, null).total()).isEqualTo(1);
+        Files.writeString(file, "письмо писем");
+        assertThatThrownBy(() -> search.search("local", "договор", "body", null, null, null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("The word forms list changed since the index was built; run " +
+                        "'mail-reindex <connection>' in a terminal or start a sync to rebuild it");
+        assertThat(search.search("local", null, null, null, null, null, "2026-10-26", null).total()).isEqualTo(1);
+        Files.writeString(file, "invalid");
+        assertThat(search.search("local", null, null, null, null, null, "2026-10-26", null).total()).isEqualTo(1);
+        assertThatThrownBy(() -> search.search("local", "договор", "body", null, null, null))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageStartingWith("word-forms.txt line 1:");
+        var sync = new SyncService(registry, () -> { throw new AssertionError("no pandoc or sign-in"); }, mapper,
+                () -> mail.mcp.index.WordForms.load(file));
+        assertThatThrownBy(() -> sync.start("local")).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageStartingWith("word-forms.txt line 1:");
+        Files.delete(file);
+        assertThat(search.search("local", "договор", "body", null, null, null).total()).isEqualTo(1);
+        assertThat(registry.isInitialized("local")).isFalse();
+    }
+
+    @Test void wordFormsMatchAndHighlightBothDirections() throws Exception {
+        var file = dir.resolve("word-forms.txt");
+        Files.writeString(file, "письмо писем\nребёнок дети\nчеловек люди");
+        var forms = mail.mcp.index.WordForms.load(file);
+        var search = new SearchTools(registry, new JsonConfig().mailMcpObjectMapper(),
+                new mail.mcp.redaction.SecretRedactor(false), () -> mail.mcp.index.WordForms.load(file));
+        try (var writer = MailIndex.openWriter(dir, false, forms)) {
+            for (String word : List.of("письмо", "писем", "РЕБЁНОК", "дети", "человек", "люди")) {
+                String key = store.newKey();
+                writer.put(new MessageMeta(key, "f1", "INBOX", key, 0, null, Instant.now(),
+                        MessageState.CONVERTED, null), null, "Контекст " + word + " здесь.", null);
+            }
+            writer.commit();
+        }
+        for (String query : List.of("письмо", "писем")) {
+            var hits = search.search("local", query, "body", null, null, null).hits();
+            assertThat(hits).hasSize(2);
+            assertThat(hits).extracting(hit -> hit.snippet()).containsExactlyInAnyOrder(
+                    "Контекст **письмо** здесь.", "Контекст **писем** здесь.");
+        }
+        for (String query : List.of("ребенок", "дети")) {
+            var hits = search.search("local", query, "body", null, null, null).hits();
+            assertThat(hits).hasSize(2);
+            assertThat(hits).extracting(hit -> hit.snippet()).containsExactlyInAnyOrder(
+                    "Контекст **РЕБЁНОК** здесь.", "Контекст **дети** здесь.");
+        }
+        for (String query : List.of("человек", "люди")) {
+            var hits = search.search("local", query, "body", null, null, null).hits();
+            assertThat(hits).hasSize(2);
+            assertThat(hits).extracting(hit -> hit.snippet()).containsExactlyInAnyOrder(
+                    "Контекст **человек** здесь.", "Контекст **люди** здесь.");
+        }
+        Files.delete(file);
+        assertThatThrownBy(() -> search.search("local", "письмо", "body", null, null, null))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("word forms list changed");
+    }
+
     @BeforeEach void prepare() {
         var mapper = new JsonConfig().mailMcpObjectMapper();
         store = new MessageStore(dir, mapper);

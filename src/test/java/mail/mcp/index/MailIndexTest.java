@@ -24,6 +24,116 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class MailIndexTest {
     @TempDir Path connectionDir;
 
+    @Test void emptyWordFormsKeepTheExistingAnalyzerAndCommitData() throws Exception {
+        var file = connectionDir.resolve("word-forms.txt");
+        assertThat(MailAnalyzers.analyzer(WordForms.load(file))).isSameAs(MailAnalyzers.analyzer());
+        try (var index = MailIndex.openWriter(connectionDir)) {
+            index.put(meta("a", "f1", "101"), null, "договоры писем", null);
+            index.commit();
+        }
+        try (var directory = FSDirectory.open(connectionDir.resolve("index"));
+             var reader = DirectoryReader.open(directory)) {
+            assertThat(reader.getIndexCommit().getUserData()).containsExactlyEntriesOf(Map.of("schema", MailIndex.SCHEMA));
+        }
+        Files.writeString(file, "# optional, no rules\n");
+        var empty = WordForms.load(file);
+        assertThat(MailAnalyzers.analyzer(empty)).isSameAs(MailAnalyzers.analyzer());
+        try (var index = MailIndex.openWriter(connectionDir, false, empty)) {
+            assertThat(index.keys()).containsExactly("a");
+            index.commit();
+        }
+        try (var directory = FSDirectory.open(connectionDir.resolve("index"));
+             var reader = DirectoryReader.open(directory)) {
+            assertThat(reader.getIndexCommit().getUserData()).containsExactlyEntriesOf(Map.of("schema", MailIndex.SCHEMA));
+        }
+        try (var reader = MailIndexReader.open(connectionDir, empty).orElseThrow()) {
+            assertThat(reader.wordFormsCurrent()).isTrue();
+            assertThat(reader.search("договор", SearchField.BODY, null, 0, 20).total()).isEqualTo(1);
+            assertThat(reader.search("письмо", SearchField.BODY, null, 0, 20).total()).isZero();
+        }
+    }
+
+    @Test void wordFormsAnalyzerMatchesRussianAnalyzerForUnlistedWords() throws Exception {
+        var file = connectionDir.resolve("word-forms.txt");
+        Files.writeString(file, "письмо писем");
+        try (var configured = MailAnalyzers.analyzer(WordForms.load(file));
+             var russian = new org.apache.lucene.analysis.ru.RussianAnalyzer()) {
+            String text = "ДОГОВОРЫ и договором Ёлками, подъезд! людей 123 Testing running; O'Reilly";
+            assertThat(tokens(configured, "body", text)).isEqualTo(tokens(russian, "body", text));
+            assertThat(configured.normalize("body", "ЁЛКА")).isEqualTo(russian.normalize("body", "ЁЛКА"));
+            for (String field : java.util.List.of("body_en", "attachmentName", "fromAddress", "attachmentFile")) {
+                assertThat(tokens(configured, field, text)).isEqualTo(tokens(MailAnalyzers.analyzer(), field, text));
+            }
+            assertThat(tokens(configured, "attachmentName", "ПИСЕМ.pdf")).contains("письм:0:5", "pdf:6:9");
+        }
+    }
+
+    @Test void listedStopWordsOverrideOnlyTheRussianStopSet() throws Exception {
+        var file = connectionDir.resolve("word-forms.txt");
+        Files.writeString(file, "человек люди");
+        assertThat(org.apache.lucene.analysis.ru.RussianAnalyzer.getDefaultStopSet().contains("человек")).isTrue();
+        try (var analyzer = MailAnalyzers.analyzer(WordForms.load(file))) {
+            assertThat(tokens(analyzer, "body", "ЧЕЛОВЕК люди и"))
+                    .containsExactly("человек:0:7", "человек:8:12");
+            assertThat(tokens(analyzer, "attachmentName", "ЛЮДИ.txt")).containsExactly("человек:0:4", "txt:5:8");
+            assertThat(tokens(analyzer, "body_en", "человек люди и"))
+                    .isEqualTo(tokens(MailAnalyzers.analyzer(), "body_en", "человек люди и"));
+        }
+        assertThat(tokens(MailAnalyzers.analyzer(), "body", "человек и")).isEmpty();
+    }
+
+    private static java.util.List<String> tokens(org.apache.lucene.analysis.Analyzer analyzer,
+                                                 String field, String text) throws Exception {
+        var result = new java.util.ArrayList<String>();
+        try (var stream = analyzer.tokenStream(field, text)) {
+            var term = stream.addAttribute(org.apache.lucene.analysis.tokenattributes.CharTermAttribute.class);
+            var offset = stream.addAttribute(org.apache.lucene.analysis.tokenattributes.OffsetAttribute.class);
+            stream.reset();
+            while (stream.incrementToken()) { result.add(term + ":" + offset.startOffset() + ":" + offset.endOffset()); }
+            stream.end();
+        }
+        return result;
+    }
+
+    @Test void changedWordFormsRecreateTheIndexOnOpen() throws Exception {
+        var file = connectionDir.resolve("word-forms.txt");
+        Files.writeString(file, "письмо писем");
+        var first = WordForms.load(file);
+        try (var index = MailIndex.openWriter(connectionDir, false, first)) {
+            index.put(meta("a", "f1", "101"), null, "писем", null);
+            index.commit();
+        }
+        Files.writeString(file, "# same rules\nписьмо  писем писем\n");
+        try (var index = MailIndex.openWriter(connectionDir, false, WordForms.load(file))) {
+            assertThat(index.keys()).containsExactly("a");
+        }
+        Files.writeString(file, "ребенок дети");
+        var changed = WordForms.load(file);
+        try (var reader = MailIndexReader.open(connectionDir, changed).orElseThrow()) {
+            assertThat(reader.current()).isTrue();
+            assertThat(reader.wordFormsCurrent()).isFalse();
+        }
+        try (var index = MailIndex.openWriter(connectionDir, false, changed)) {
+            assertThat(index.keys()).isEmpty();
+            index.put(meta("b", "f1", "102"), null, "дети", null);
+            index.commit();
+        }
+        try (var directory = FSDirectory.open(connectionDir.resolve("index"));
+             var reader = DirectoryReader.open(directory)) {
+            assertThat(reader.getIndexCommit().getUserData()).containsExactlyInAnyOrderEntriesOf(
+                    Map.of("schema", MailIndex.SCHEMA, "wordForms", changed.hash()));
+        }
+        try (var reader = MailIndexReader.open(connectionDir, changed).orElseThrow()) {
+            assertThat(reader.wordFormsCurrent()).isTrue();
+            assertThat(reader.search("ребенок", SearchField.BODY, null, 0, 20).total()).isEqualTo(1);
+        }
+        try (var index = MailIndex.openWriter(connectionDir)) { assertThat(index.keys()).isEmpty(); }
+        try (var directory = FSDirectory.open(connectionDir.resolve("index"));
+             var reader = DirectoryReader.open(directory)) {
+            assertThat(reader.getIndexCommit().getUserData()).doesNotContainKey("wordForms");
+        }
+    }
+
     private MessageStore store() {
         return new MessageStore(connectionDir, new JsonConfig().mailMcpObjectMapper());
     }

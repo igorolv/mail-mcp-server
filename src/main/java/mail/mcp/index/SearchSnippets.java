@@ -5,6 +5,7 @@ import mail.mcp.mime.MimeReader;
 import mail.mcp.mime.Containers;
 import mail.mcp.model.AttachmentInfo;
 import mail.mcp.store.MessageStore;
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.uhighlight.DefaultPassageFormatter;
 import org.apache.lucene.search.uhighlight.UnifiedHighlighter;
@@ -20,12 +21,14 @@ import java.util.function.UnaryOperator;
 final class SearchSnippets {
     private final Query query;
     private final UnaryOperator<String> outputText;
-    private final UnifiedHighlighter candidates = highlighter(0);
-    private final UnifiedHighlighter renderer = highlighter(1);
+    private final UnifiedHighlighter candidates;
+    private final UnifiedHighlighter renderer;
 
-    SearchSnippets(Query query, UnaryOperator<String> outputText) {
+    SearchSnippets(Query query, UnaryOperator<String> outputText, Analyzer analyzer) {
         this.query = query;
         this.outputText = outputText == null ? UnaryOperator.identity() : outputText;
+        this.candidates = highlighter(0, analyzer);
+        this.renderer = highlighter(1, analyzer);
     }
 
     Result select(String key, String body, SearchField field, MessageStore store) throws IOException {
@@ -68,8 +71,8 @@ final class SearchSnippets {
         return new Result((String) renderer.highlightWithoutSearcher(field, query, text, 1), file, name);
     }
 
-    private static UnifiedHighlighter highlighter(int fallbackPassages) {
-        return UnifiedHighlighter.builderWithoutSearcher(MailAnalyzers.analyzer())
+    private static UnifiedHighlighter highlighter(int fallbackPassages, Analyzer analyzer) {
+        return UnifiedHighlighter.builderWithoutSearcher(analyzer)
                 .withFormatter(new DefaultPassageFormatter("**", "**", "… ", false))
                 .withMaskedFieldsFunc(field -> switch (field) {
                     case "body" -> Set.of("body_en");

@@ -62,11 +62,19 @@ synchronization — runs in the background and returns at once (plan.md 3.6).
 2.1.0 on 2026-10-24, which is not yet a reason to drop the setting.
 
 The non-server modes are `gmail-oauth`, `mail-sync`, `mail-reprocess`
-and `mail-reindex`: `MailMcpServerApplication.main`
+and `mail-reindex`, plus offline `mail-analyze`: `MailMcpServerApplication.main`
 dispatches to their commands before Spring starts, so the stdio transport is never opened.
-All four select `logback-cli.xml` (stderr only) through the `logback.configurationFile`
+The four mail/OAuth commands select `logback-cli.xml` (stderr only) through the `logback.configurationFile`
 system property. `mail-sync` runs synchronously and prints progress; MCP `sync` starts a daemon
 platform thread through `SyncService` and returns at once.
+`MailAnalyzeCommand` needs only properties, `WordForms` and Lucene analysis; no connections,
+index, pandoc or network. `WordForms` parses an optional user file and fingerprints its mapping;
+`WordFormsFilter` replaces listed tokens before Snowball and preserves source offsets.
+Listed words override the Russian stop set; unlisted stop words and English analysis stay unchanged.
+`SearchTools` and `SyncService` receive lazy rule suppliers and reload per call. Readers use
+one analyzer for queries and snippets; a separate commit-hash check blocks stale text searches
+while schema-current catalog/date readers remain usable. Missing/empty rules retain the
+existing shared analyzer and omit the `wordForms` commit entry.
 
 ## Tech stack and version sources
 
@@ -124,11 +132,11 @@ cli/ ──► sync/, connections/, source/, store/, index/  (user-run commands 
 | `source/oauth/google/` | Google Desktop OAuth and refresh credentials. | All `Google*` classes and the package-private `OAuthJson` helper. Depends on shared `source/oauth/` components. See `docs/gmail-oauth-agent.md`. |
 | `model/` | Shared disk records and lifecycle. | `MessageState`, `MessageMeta`, `MessageFingerprint`, `LocalFolder`, `MailMessage`, `Address`, `AttachmentInfo`, `MessageCard`, `MessageCopy`, `SearchHit`, `SearchResults`, `ThreadResults`, `FolderProgress`, `SyncStatus`, one type per file. |
 | `store/` | Local message directories and metadata. | `MessageStore`: UUID paths, atomic `meta.json`, `folders.json` and `sync-status.json`, listing and deletion. See `docs/storage-agent.md`. |
-| `index/` | Derived Lucene catalog and committed readers. | `MailIndex`: schema 4, metadata, headers/body/attachment text fields, NRT key/ref lookups, commit and reconciliation; `IndexLockedException`. `MailAnalyzers` shares per-field analysis, `SearchField` defines groups. `MailIndexReader` reads committed counts, sorted cards and scored search hits without the writer lock. Package-private `SearchSnippets` selects a body or saved attachment passage after paging. See `docs/storage-agent.md`. |
+| `index/` | Derived Lucene catalog and committed readers. | `MailIndex`: schema 4, metadata, headers/body/attachment text fields, NRT key/ref lookups, commit and reconciliation; `IndexLockedException`. `WordForms` loads optional user rules; `WordFormsFilter` protects mapped stems from Snowball. `MailAnalyzers` shares per-field analysis, `SearchField` defines groups. `MailIndexReader` reads committed counts, sorted cards and scored search hits without the writer lock. Package-private `SearchSnippets` selects a body or saved attachment passage after paging. See `docs/storage-agent.md`. |
 | `tools/` | Thin `@McpTool` adapters, Spring `@Service` beans. | `ConnectionTools` (`listConnections`), `SyncTools` (`sync`, `syncStatus`), `MailTools` (`listFolders`, `listMessages`, `getMessage`), `SearchTools` (`search`), `ThreadTools` (`getThread`), `ToolLogger`. |
 | `api/` | Stable MCP response records with `@Schema`. | Discovery, sync start/status, folder/message pages, body chunks, attachment references, `SearchResult`, `SearchHitInfo`, `GetThreadResult`, `ThreadMessageInfo` and `MessageCopyInfo`. Never expose `source/` or `model/` records or settings here. |
 | `sync/` | One synchronization run and local conversion. | `SyncRunner`, `MessageProcessor`, `Processed`: reconcile by state/identity, discover all folders and metadata, reuse unique apparent moves before unmatched removals, download/convert in batches of 100, save all cursors after all changes commit. Caller owns the source and writer. `SyncService` owns background runs, `SyncStart` their immediate result; `SyncErrors` shares fixed CLI/status failure messages. |
-| `cli/` | User-run commands without Spring. | `GmailOAuthCommand`, `MailSyncCommand`, `MailReprocessCommand`, `MailReindexCommand`. Check pandoc before the index or sign-in; source closes before the index. Reprocessing and reindexing are offline. |
+| `cli/` | User-run commands without Spring. | `GmailOAuthCommand`, `MailSyncCommand`, `MailReprocessCommand`, `MailReindexCommand`, `MailAnalyzeCommand`. The three writer commands check rules and pandoc before the index or sign-in; analysis needs neither; source closes before the index. Reprocessing and reindexing are offline. |
 | `mime/` | Local MIME and container reading. | `MimeReader`, `ParsedMessage`: decoded headers, selected body and MIME attachment files. `Containers` coordinates breadth-first EML/ZIP/MSG/TNEF expansion; package-private `MsgReader`/`TnefReader` enumerate immediate children using POI. See `docs/mime-agent.md`. |
 | `convert/` | Body and attachment text. | `Pandoc`, `PandocException`: sandboxed process per conversion; `AttachmentText` dispatches formats. `PdfText`, `XlsxText`/`XlsText`, `PptxText`/`PptText` adapt sibling extraction methods; `DocText` uses HWPF `WordExtractor`. |
 | `redaction/` | Tool-output text only. | `SecretRedactor`: offline detectors and merged replacement; wired by `config/RedactionConfig`. Never called by storage, index writers, MIME parsing, conversion or synchronization. |
