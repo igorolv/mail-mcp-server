@@ -44,6 +44,7 @@ final class FakeImapServer implements AutoCloseable {
     volatile String metadataFlags;
     volatile boolean omitMetadataFlags;
     volatile boolean malformedMetadataFlags;
+    volatile Long malformedMetadataUid;
     volatile boolean rejectMetadata;
 
     FakeImapServer() throws IOException { this(false, false, "login"); }
@@ -141,7 +142,8 @@ final class FakeImapServer implements AutoCloseable {
                             var item = current.messages().get(i);
                             send(out, "* " + (i + 1) + " FETCH (ENVELOPE " + item.envelope()
                                     + " INTERNALDATE \"25-Oct-2026 12:00:00 +0000\" RFC822.SIZE " + item.declaredSize()
-                                    + (omitMetadataFlags ? "" : malformedMetadataFlags ? " FLAGS NIL"
+                                    + (omitMetadataFlags ? "" : malformedMetadataFlags
+                                    || Long.valueOf(item.uid()).equals(malformedMetadataUid) ? " FLAGS NIL"
                                     : " FLAGS (" + (metadataFlags == null ? item.flags() : metadataFlags) + ")")
                                     + " UID " + item.uid() + ")\r\n");
                         }

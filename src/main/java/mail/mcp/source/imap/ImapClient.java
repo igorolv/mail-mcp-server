@@ -42,6 +42,8 @@ import java.util.function.Supplier;
 
 /** Lazy, single-connection Angus source. No mail or provider object escapes this wrapper. */
 public final class ImapClient implements AutoCloseable {
+    // Diagnostics only: class names and fixed reasons, never server text or mailbox data.
+    private static final org.slf4j.Logger diagnostics = org.slf4j.LoggerFactory.getLogger(ImapClient.class);
     public static final long DEFAULT_MAX_MIME_BYTES = 64L * 1024 * 1024;
     private final ImapSettings settings;
     private final ReadOnlyImapStore store;
@@ -128,7 +130,7 @@ public final class ImapClient implements AutoCloseable {
                         List.of(((IMAPFolder) folder).getAttributes())));
             }
             return List.copyOf(result);
-        } catch (MessagingException e) { throw fail(e); }
+        } catch (MessagingException e) { throw fail("listFolders", e); }
     }
 
     private IMAPFolder open(String name) throws MessagingException {
@@ -146,7 +148,7 @@ public final class ImapClient implements AutoCloseable {
         try {
             var folder = open(folderName);
             long uidValidity = folder.getUIDValidity();
-            if (uidValidity <= 0) { throw new ImapException(ImapException.Kind.PROTOCOL); }
+            if (uidValidity <= 0) { throw protocol("folderUids", "non-positive UIDVALIDITY"); }
             var uids = new ArrayList<Long>();
             if (folder.getMessageCount() > 0) {
                 var messages = folder.getMessages();
@@ -155,13 +157,13 @@ public final class ImapClient implements AutoCloseable {
                 folder.fetch(messages, profile);
                 for (var message : messages) {
                     long uid = folder.getUID(message);
-                    if (uid <= 0) { throw new ImapException(ImapException.Kind.PROTOCOL); }
+                    if (uid <= 0) { throw protocol("folderUids", "non-positive UID"); }
                     uids.add(uid);
                 }
                 uids.sort(Long::compareTo);
             }
             return new FolderUids(uidValidity, uids);
-        } catch (MessagingException e) { throw fail(e); }
+        } catch (MessagingException e) { throw fail("folderUids", e); }
         catch (ImapException e) { close(); throw e; }
     }
 
@@ -173,12 +175,14 @@ public final class ImapClient implements AutoCloseable {
             throw new IllegalArgumentException("Metadata requires a folder, UIDVALIDITY and positive UIDs");
         }
         var ids = List.copyOf(uids);
+        String operation = "metadata (" + ids.size() + " UIDs)";
         try {
             if (currentFolder != null) { currentFolder.close(false); currentFolder = null; }
             var folder = open(folderName);
-            if (folder.getUIDValidity() != expectedUidValidity) { throw new ImapException(ImapException.Kind.PROTOCOL); }
+            if (folder.getUIDValidity() != expectedUidValidity) { throw protocol(operation, "UIDVALIDITY changed"); }
             var result = new LinkedHashMap<String, RemoteMessageInfo>();
             for (int i = 0; i < ids.size(); i += 100) {
+                operation = "metadata batch " + (i / 100 + 1) + "/" + ((ids.size() + 99) / 100);
                 long[] batch = ids.subList(i, Math.min(i + 100, ids.size())).stream().mapToLong(Long::longValue).toArray();
                 var messages = java.util.Arrays.stream(folder.getMessagesByUID(batch))
                         .filter(java.util.Objects::nonNull).filter(m -> !m.isExpunged()).toArray(Message[]::new);
@@ -187,15 +191,22 @@ public final class ImapClient implements AutoCloseable {
                 profile.add(FetchProfile.Item.ENVELOPE);
                 profile.add(FetchProfile.Item.FLAGS);
                 profile.add(UIDFolder.FetchProfileItem.UID);
-                store.clearMetadataFlags();
+                store.clearMetadataObservations();
                 folder.fetch(messages, profile);
+                int unknown = 0;
                 for (var entry : messages) {
                     var message = (IMAPMessage) entry;
                     try {
                         if (message.isExpunged()) { continue; }
                         long uid = folder.getUID(message);
                         if (uid <= 0 || java.util.Arrays.stream(batch).noneMatch(id -> id == uid)) {
-                            throw new ImapException(ImapException.Kind.PROTOCOL);
+                            throw protocol(operation, "UID outside the requested batch");
+                        }
+                        // No parsed response: leave the message out (metadata unknown, stored values kept);
+                        // its getters would make Angus fetch the same unparsable response again.
+                        if (!store.metadataParsed(uid)) {
+                            unknown++;
+                            continue;
                         }
                         String ref = Long.toString(uid);
                         var senders = message.getFrom();
@@ -208,14 +219,18 @@ public final class ImapClient implements AutoCloseable {
                         if (result.putIfAbsent(ref, new RemoteMessageInfo(ref, fingerprint,
                                 flags == null ? null : flags.contains(Flags.Flag.SEEN),
                                 flags == null ? null : flags.contains(Flags.Flag.FLAGGED))) != null) {
-                            throw new ImapException(ImapException.Kind.PROTOCOL);
+                            throw protocol(operation, "duplicate UID in the response");
                         }
                     } catch (MessageRemovedException e) { /* vanished since UID discovery */ }
                 }
+                if (unknown > 0 || store.metadataUnparsable() > 0) {
+                    diagnostics.warn("IMAP {}: {} of {} messages have no parsed metadata response ({} responses unparsable); "
+                            + "their metadata stays unknown", operation, unknown, messages.length, store.metadataUnparsable());
+                }
             }
-            if (folder.getUIDValidity() != expectedUidValidity) { throw new ImapException(ImapException.Kind.PROTOCOL); }
+            if (folder.getUIDValidity() != expectedUidValidity) { throw protocol(operation, "UIDVALIDITY changed"); }
             return Map.copyOf(result);
-        } catch (MessagingException e) { throw fail(e); }
+        } catch (MessagingException e) { throw fail(operation, e); }
         catch (ImapException e) { close(); throw e; }
     }
 
@@ -252,12 +267,16 @@ public final class ImapClient implements AutoCloseable {
                     digest.update(buffer, 0, n);
                 }
             }
-            if (bytes == 0) { throw new ImapException(ImapException.Kind.PROTOCOL); }
+            if (bytes == 0) { throw protocol("download", "empty MIME"); }
             Files.move(partial, absolute); // no replacement: never overwrite another original
             partial = null;
             return new Downloaded(bytes, HexFormat.of().formatHex(digest.digest()));
-        } catch (MessagingException e) { throw fail(e); }
-        catch (IOException e) { close(); throw new ImapException(ImapException.Kind.LOCAL_IO); }
+        } catch (MessagingException e) { throw fail("download", e); }
+        catch (IOException e) {
+            diagnostics.warn("IMAP download failed locally: {}", causes(e));
+            close();
+            throw new ImapException(ImapException.Kind.LOCAL_IO);
+        }
         catch (ImapException e) { close(); throw e; }
         finally {
             if (partial != null) {
@@ -266,13 +285,47 @@ public final class ImapClient implements AutoCloseable {
         }
     }
 
-    private ImapException fail(MessagingException e) {
+    private ImapException fail(String operation, MessagingException e) {
         ImapException.Kind kind = e instanceof AuthenticationFailedException
                 ? ImapException.Kind.AUTHENTICATION
                 : connected ? ImapException.Kind.PROTOCOL : ImapException.Kind.CONNECTION;
+        diagnostics.warn("IMAP {} failed ({}): {}", operation, kind, causes(e));
         close();
         return new ImapException(kind);
     }
+
+    /** A response this client refuses to trust; the caller closes the session. */
+    private static ImapException protocol(String operation, String reason) {
+        diagnostics.warn("IMAP {} failed (PROTOCOL): {}", operation, reason);
+        return new ImapException(ImapException.Kind.PROTOCOL);
+    }
+
+    /**
+     * Exception class names along the cause chain, plus the fixed reasons this package writes itself.
+     * Messages from Angus or the server are left out: they can quote mailbox data.
+     */
+    static String causes(Throwable failure) {
+        var parts = new ArrayList<String>();
+        var seen = new java.util.HashSet<Throwable>();
+        Throwable current = failure;
+        while (current != null && parts.size() < 8 && seen.add(current)) {
+            String part = current.getClass().getSimpleName();
+            String message = current.getMessage();
+            if (message != null && OWN_REASONS.stream().anyMatch(message::startsWith)) {
+                part += " \"" + message + "\"";
+            }
+            parts.add(part);
+            Throwable next = current.getCause();
+            if (next == null && current instanceof MessagingException messaging) { next = messaging.getNextException(); }
+            current = next;
+        }
+        return String.join(" <- ", parts);
+    }
+
+    /** Messages written by {@link ReadOnlyImapStore}; they hold no server text. */
+    private static final List<String> OWN_REASONS = List.of("Metadata fetch failed",
+            ReadOnlyImapStore.OUTSIDE_ALLOW_LIST, "Invalid IMAP command", "Automatic IMAP reauthentication is disabled",
+            "Password authentication is disabled for OAuth connections");
 
     private static MessageDigest sha256() {
         try { return MessageDigest.getInstance("SHA-256"); }

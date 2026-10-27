@@ -306,6 +306,8 @@ restored messages, like `mail-reindex`. The MCP `sync` tool restores silently.
 A reset adds `, folder reset` to the folder line. Batch lines are cumulative; the result sums
 only completed folder lines, including folders deleted locally. Errors print
 `RESULT: FAILED (<fixed message>)`; configuration and unexpected local details are withheld.
+An IMAP failure also prints one WARN line to stderr with the failed operation and exception class
+names, never server text (`docs/imap-source-agent.md`, "Failure diagnostics").
 Lucene may print its `jdk.incubator.vector` warning to stderr.
 
 EWS failures print only these lines, without the host or server message:

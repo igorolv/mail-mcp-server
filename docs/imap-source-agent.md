@@ -139,8 +139,13 @@ ReadOnlyImapStore observes UID and FLAGS directly in the batch FetchResponse bef
 updates its cache. ImapClient never calls getFlags/isSet: absent FLAGS must stay unknown and
 must not trigger an extra request. The per-batch observation map is cleared before fetch.
 A present empty list means read=false and flagged=false; Seen and Flagged set their respective
-booleans. Missing FLAGS yields null for both; malformed parsed responses abort with a sanitized
-protocol error and no retry, including parse errors Angus would otherwise discard.
+booleans. Missing FLAGS yields null for both. A response Angus cannot parse (it skips it) leaves
+that message out of the batch result: ReadOnlyImapStore records which UIDs returned a parsed
+FETCH response with ENVELOPE, and ImapClient skips the others without calling getters, which
+would make Angus fetch the same response again. A known message keeps its stored fingerprint and
+flags; a new one is downloaded without move reuse or flags. One WARN line per affected batch gives
+the counts only (user decision 2026-10-27, after the first Mail.ru run aborted on batch 1).
+A tagged NO or BAD for the whole FETCH still aborts with a sanitized protocol error, no retry.
 No STORE, SELECT, body retrieval or additional authentication is enabled.
 
 All present refs refresh on requested sync, including known mail. Null fields preserve stored
@@ -150,6 +155,21 @@ state, independent of Gmail Important. Flag-only changes update metadata/index w
 MIME/body/attachments or changing state, error, time or counters. Schema 4 rebuilds offline
 from saved data; old metadata stays unknown until a requested sync. Real-server flag behavior
 remains to verify (проверить).
+
+## Failure diagnostics
+
+Every sanitized `ImapException` from `ImapClient` first logs one WARN line (stderr in the user-run
+commands, the log file in the server). It names the operation (`listFolders`, `folderUids`,
+`metadata (<n> UIDs)` or `metadata batch <i>/<n>`, `download`), the kind, and either a fixed reason
+(`UIDVALIDITY changed`, `UID outside the requested batch`, `duplicate UID in the response`, ...)
+or the cause chain as exception class names (`MessagingException <- ProtocolException`). Messages
+are added only for this package's own fixed texts: `Metadata fetch failed: <class>` (CommandFailedException for NO, BadCommandException for BAD) and
+the allow-list refusal, which carries the command shape with numbers replaced by `n`
+(`UID STORE n +FLAGS (\SEEN)`). Server text, folder names, addresses and subjects never appear.
+Skipped metadata responses are not failures; they log
+`IMAP metadata batch <i>/<n>: <k> of <m> messages have no parsed metadata response (<u> responses
+unparsable); their metadata stays unknown`. The first real failure that motivated this:
+2026-10-27, the first Mail.ru run with the metadata pass (plan.md 2.2).
 
 ## Offline verification and primary references
 

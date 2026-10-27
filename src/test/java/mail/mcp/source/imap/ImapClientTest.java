@@ -363,14 +363,70 @@ class ImapClientTest {
             assertThat(server.commands.stream().filter(c -> c.startsWith("LOGIN "))).hasSize(1);
             assertThat(server.commands).noneMatch(c -> c.contains("BODY") || c.startsWith("SELECT") || c.contains("STORE"));
         }
-        try (var server = new FakeImapServer(); var client = new ImapClient(settings(server.port()), false)) {
+    }
+
+    @Test void unparsableMetadataResponseLeavesOnlyThatMessageUnknown() throws Exception {
+        var logs = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ImapClient.class);
+        logs.start();
+        logger.addAppender(logs);
+        try (var server = new FakeImapServer(new FakeImapServer.MailFolder("INBOX",
+                new FakeImapServer.Item(1, MIME), new FakeImapServer.Item(2, MIME), new FakeImapServer.Item(3, MIME)));
+             var client = new ImapClient(settings(server.port()), false)) {
+            var uids = client.folderUids("INBOX");
+            server.malformedMetadataUid = 2L;
+            var result = client.metadata("INBOX", uids.uidValidity(), uids.uids());
+
+            assertThat(result).containsOnlyKeys("1", "3");
+            assertThat(result.get("1").fingerprint()).isNotNull();
+            assertThat(server.commands.stream().filter(c -> c.contains("ENVELOPE")))
+                    .as("no replacement fetch for the skipped message").hasSize(1);
+            assertThat(logs.list).extracting(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                    .containsExactly("IMAP metadata batch 1/1: 1 of 3 messages have no parsed metadata response "
+                            + "(1 responses unparsable); their metadata stays unknown");
+
+            server.malformedMetadataUid = null;
             server.malformedMetadataFlags = true;
-            assertThatThrownBy(() -> client.metadata("INBOX", 7, List.of(42L)))
-                    .isInstanceOf(ImapException.class).hasNoCause();
+            assertThat(client.metadata("INBOX", uids.uidValidity(), uids.uids())).isEmpty();
             assertThat(server.commands.stream().filter(c -> c.startsWith("LOGIN "))).hasSize(1);
+        } finally {
+            logger.detachAppender(logs);
         }
     }
 
+
+    @Test void failuresLogOperationAndCauseClassesWithoutServerText() throws Exception {
+        var logs = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ImapClient.class);
+        logs.start();
+        logger.addAppender(logs);
+        try {
+            try (var server = new FakeImapServer(); var client = new ImapClient(settings(server.port()), false)) {
+                server.rejectMetadata = true;
+                assertThatThrownBy(() -> client.metadata("INBOX", 7, List.of(42L))).isInstanceOf(ImapException.class);
+            }
+            try (var server = new FakeImapServer(); var client = new ImapClient(settings(server.port()), false)) {
+                assertThatThrownBy(() -> client.metadata("INBOX", 8, List.of(42L))).isInstanceOf(ImapException.class);
+            }
+            var lines = logs.list.stream().map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage).toList();
+            assertThat(lines).hasSize(2);
+            assertThat(lines.get(0)).startsWith("IMAP metadata batch 1/1 failed (PROTOCOL): MessagingException")
+                    .contains("\"Metadata fetch failed: CommandFailedException\"");
+            assertThat(lines.get(1)).isEqualTo("IMAP metadata (1 UIDs) failed (PROTOCOL): UIDVALIDITY changed");
+            assertThat(lines).noneMatch(line -> line.contains("private-server-text") || line.contains("INBOX"));
+        } finally {
+            logger.detachAppender(logs);
+        }
+    }
+
+    @Test void allowListRefusalNamesOnlyTheCommandShape() {
+        assertThatThrownBy(() -> ReadOnlyImapStore.requireReadCommand("UID STORE 17,19:25 +FLAGS (\\Seen)"))
+                .isInstanceOf(ProtocolException.class)
+                .hasMessage("IMAP command is outside the read-only allow-list: UID STORE n +FLAGS (\\SEEN)");
+        var wrapped = new jakarta.mail.MessagingException("A7 NO private-server-text",
+                new ProtocolException("private-server-text"));
+        assertThat(ImapClient.causes(wrapped)).isEqualTo("MessagingException <- ProtocolException");
+    }
 
     @Test void metadataFetchRefusalIsSanitizedAndNeverRetried() throws Exception {
         try (var server = new FakeImapServer(); var client = new ImapClient(settings(server.port()), false)) {

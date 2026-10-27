@@ -6,6 +6,7 @@ import org.eclipse.angus.mail.imap.protocol.FetchResponse;
 import org.eclipse.angus.mail.imap.protocol.MessageSet;
 import org.eclipse.angus.mail.imap.protocol.UID;
 import org.eclipse.angus.mail.imap.protocol.FLAGS;
+import org.eclipse.angus.mail.imap.protocol.ENVELOPE;
 import org.eclipse.angus.mail.iap.Argument;
 import org.eclipse.angus.mail.iap.ProtocolException;
 import org.eclipse.angus.mail.iap.Response;
@@ -19,6 +20,7 @@ import java.io.PrintStream;
 import java.util.Locale;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -31,9 +33,20 @@ final class ReadOnlyImapStore extends IMAPStore {
     private final boolean implicitTls;
     private final boolean oauth;
     private final Map<Long, Flags> metadataFlags = new HashMap<>();
+    private final Set<Long> metadataParsed = new HashSet<>();
+    private int metadataUnparsable;
 
-    void clearMetadataFlags() { metadataFlags.clear(); }
+    /** Forgets the previous batch before the next metadata fetch. */
+    void clearMetadataObservations() {
+        metadataFlags.clear();
+        metadataParsed.clear();
+        metadataUnparsable = 0;
+    }
     Flags metadataFlags(long uid) { return metadataFlags.get(uid); }
+    /** True when this batch returned a parsed FETCH response with ENVELOPE for the UID. */
+    boolean metadataParsed(long uid) { return metadataParsed.contains(uid); }
+    /** Responses of this batch that Angus could not parse and skipped. */
+    int metadataUnparsable() { return metadataUnparsable; }
 
     ReadOnlyImapStore(Session session, boolean implicitTls, boolean oauth) {
         super(session, null, "imaps", implicitTls);
@@ -47,32 +60,39 @@ final class ReadOnlyImapStore extends IMAPStore {
                 new PrintStream(OutputStream.nullOutputStream()));
         return new IMAPProtocol("imaps", host, port, session.getProperties(), implicitTls, logger) {
             private boolean oauthAuthenticated;
-            private boolean malformedResponse;
+            private int malformedResponses;
 
+            // Angus skips a response it cannot parse; count it so the batch knows what is missing.
             @Override public Response readResponse() throws IOException, ProtocolException {
                 try { return super.readResponse(); }
                 catch (org.eclipse.angus.mail.iap.ParsingException e) {
-                    malformedResponse = true;
+                    malformedResponses++;
                     throw e;
                 }
             }
 
             // Observe the actual batch response before Angus updates its message cache. Never
             // call getFlags(): an absent FLAGS item would trigger another fetch or use stale data.
+            // A message whose response could not be parsed is left out of metadataParsed, and the
+            // client skips it instead of calling getters that would fetch it again.
             @Override public Response[] fetch(MessageSet[] messages, String items) throws ProtocolException {
-                malformedResponse = false;
+                malformedResponses = 0;
                 Response[] responses = super.fetch(messages, items);
                 if (items.contains("FLAGS") && items.contains("ENVELOPE")) {
-                    if (malformedResponse) { throw new ProtocolException("Malformed metadata response"); }
+                    metadataUnparsable = malformedResponses;
                     // IMAPFolder.fetch ignores CommandFailedException; surface it as a generic
                     // protocol failure so getters cannot silently issue replacement requests.
                     try { handleResult(responses[responses.length - 1]); }
-                    catch (ProtocolException e) { throw new ProtocolException("Metadata fetch failed"); }
+                    catch (ProtocolException e) {
+                        // The class tells NO from BAD or BYE; the server's text stays out.
+                        throw new ProtocolException("Metadata fetch failed: " + e.getClass().getSimpleName());
+                    }
                     for (var response : responses) {
                         if (response instanceof FetchResponse fetch) {
                             var uid = fetch.getItem(UID.class);
                             var flags = fetch.getItem(FLAGS.class);
                             if (uid != null && flags != null) { metadataFlags.put(uid.uid, new Flags(flags)); }
+                            if (uid != null && fetch.getItem(ENVELOPE.class) != null) { metadataParsed.add(uid.uid); }
                         }
                     }
                 }
@@ -140,6 +160,8 @@ final class ReadOnlyImapStore extends IMAPStore {
         };
     }
 
+    static final String OUTSIDE_ALLOW_LIST = "IMAP command is outside the read-only allow-list";
+
     static void requireReadCommand(String command) throws ProtocolException {
         String upper = command.toUpperCase(Locale.ROOT);
         if (upper.indexOf('\r') >= 0 || upper.indexOf('\n') >= 0) {
@@ -156,6 +178,8 @@ final class ReadOnlyImapStore extends IMAPStore {
         if (upper.matches("(?:UID )?FETCH [0-9:,]+ \\(" + item + "(?: " + item + ")*\\)")) {
             return;
         }
-        throw new ProtocolException("IMAP command is outside the read-only allow-list");
+        // The command line holds the verb, message numbers and item names; folder names are arguments.
+        String shape = upper.replaceAll("[0-9][0-9:,*]*", "n");
+        throw new ProtocolException(OUTSIDE_ALLOW_LIST + ": " + shape.substring(0, Math.min(120, shape.length())));
     }
 }
