@@ -67,7 +67,9 @@ Folder names are passed as encoded Angus arguments, never interpolated into comm
 with `FETCH 1:N (UID)` (no FETCH for an empty folder). Non-positive UIDVALIDITY or UID is a
 protocol failure. UIDs are returned sorted and copied. `ImapMailSource.changes` compares those
 refs with the known local refs. A changed UIDVALIDITY resets the folder: all known refs are
-removed and all present refs added. Cursors and download refs are checked before any I/O.
+removed and all present refs added (`reset=true`, `rescanned=false`). EWS uses `rescanned`
+separately for invalid SyncState recovery without invalidating known refs. Old status JSON without
+`rescanned` reads as false. Cursors and download refs are checked before any I/O.
 
 `download(folderName, uid, target, maxBytes)`:
 

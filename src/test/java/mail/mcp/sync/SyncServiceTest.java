@@ -141,4 +141,99 @@ class SyncServiceTest {
             @Override public void close() { fake.close(); }
         };
     }
+    private void withLogs(java.util.function.Consumer<ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>> test) {
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(SyncService.class);
+        var appender = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        appender.start();
+        logger.addAppender(appender);
+        try { test.accept(appender); }
+        finally { logger.detachAppender(appender); appender.stop(); }
+    }
+
+    private List<ch.qos.logback.classic.spi.ILoggingEvent> summaries(
+            ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender) {
+        return appender.list.stream().filter(e -> e.getMessage().startsWith("Background sync finished:")).toList();
+    }
+
+    @Test void backgroundCompletionLogsFinalTotalsOnce() {
+        withLogs(logs -> {
+            try {
+                String[] refs = java.util.stream.IntStream.rangeClosed(1, 101).mapToObj(String::valueOf).toArray(String[]::new);
+                fake.putFolder("first", "synthetic-folder", "7", refs);
+                fake.putFolder("second", "other", "8", "one");
+                fake.markTooLarge("second", "one");
+                var service = service(() -> fake, () -> new Pandoc("unused"));
+                service.start("local"); awaitDone(service);
+                var events = summaries(logs);
+                assertThat(events).hasSize(1);
+                assertThat(events.getFirst().getLevel()).isEqualTo(ch.qos.logback.classic.Level.INFO);
+                assertThat(events.getFirst().getArgumentArray()).containsExactly("completed", events.getFirst().getArgumentArray()[1], 101, 1, 0);
+                fake.removeFolder("first"); fake.removeFolder("second");
+                service.start("local"); awaitDone(service);
+                assertThat(summaries(logs).getLast().getArgumentArray()).containsExactly("completed", summaries(logs).getLast().getArgumentArray()[1], 0, 0, 102);
+                service.start("local"); awaitDone(service);
+                assertThat(summaries(logs)).hasSize(3);
+                assertThat(summaries(logs).getLast().getArgumentArray()).containsExactly("completed", summaries(logs).getLast().getArgumentArray()[1], 0, 0, 0);
+            } catch (Exception e) { throw new AssertionError(e); }
+        });
+    }
+
+    @Test void backgroundFailureLogsPartialTotalsWithoutMailData() {
+        withLogs(logs -> {
+            try {
+                String[] refs = java.util.stream.IntStream.rangeClosed(1, 102).mapToObj(String::valueOf).toArray(String[]::new);
+                fake.putFolder("synthetic-ref", "sentinel-mail-data", "7", refs);
+                fake.failOnDownload(102);
+                var service = service(() -> fake, () -> new Pandoc("unused"));
+                service.start("local"); awaitDone(service);
+                var events = summaries(logs);
+                assertThat(events).hasSize(1);
+                assertThat(events.getFirst().getArgumentArray()).containsExactly("failed", events.getFirst().getArgumentArray()[1], 100, 0, 0);
+                assertThat(java.util.Arrays.toString(events.getFirst().getArgumentArray())).doesNotContain("sentinel", "synthetic", "local");
+                assertThat(logs.list.stream().filter(e -> e.getLevel() == ch.qos.logback.classic.Level.WARN)).hasSize(1);
+            } catch (Exception e) { throw new AssertionError(e); }
+        });
+    }
+
+    @Test void nonStartedRunsDoNotLogCompletion() {
+        withLogs(logs -> {
+            try {
+                var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+                var service = service(() -> blocking(entered, release), () -> new Pandoc("unused"));
+                try {
+                    service.start("local");
+                    assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+                    assertThat(service.start("local").status()).isEqualTo(SyncStart.Status.ALREADY_RUNNING);
+                    assertThat(service(() -> fake, () -> new Pandoc("unused")).start("local").status()).isEqualTo(SyncStart.Status.LOCKED_BY_OTHER_PROCESS);
+                    assertThat(summaries(logs)).isEmpty();
+                } finally { release.countDown(); awaitDone(service); }
+                var rejected = new mail.mcp.model.SyncStatus("failed", 1, java.time.Instant.now(), java.time.Instant.now(), List.of(), "rejected", true);
+                store().writeSyncStatus(rejected);
+                assertThat(service.start("local").status()).isEqualTo(SyncStart.Status.REFUSED);
+                assertThat(summaries(logs)).hasSize(1);
+                store().writeSyncStatus(new mail.mcp.model.SyncStatus("completed", 1, java.time.Instant.now(), java.time.Instant.now(), List.of(), null, false));
+                assertThatThrownBy(() -> service(() -> fake, () -> { throw new PandocException("missing"); }).start("local"))
+                        .isInstanceOf(IllegalStateException.class);
+                assertThat(summaries(logs)).hasSize(1);
+            } catch (Exception e) { throw new AssertionError(e); }
+        });
+    }
+
+    @Test void closeFailureDoesNotLogSuccessfulCompletion() {
+        withLogs(logs -> {
+            try {
+                var service = service(() -> new MailSource() {
+                    @Override public List<RemoteFolder> folders() { return List.of(); }
+                    @Override public FolderChanges changes(RemoteFolder f, String c, Set<String> k) { throw new AssertionError(); }
+                    @Override public Downloaded download(RemoteFolder f, String r, Path t) { throw new AssertionError(); }
+                    @Override public void close() { throw new IllegalStateException("sentinel-mail-data"); }
+                }, () -> new Pandoc("unused"));
+                service.start("local"); awaitDone(service);
+                assertThat(store().readSyncStatus().orElseThrow().state()).isEqualTo("completed");
+                assertThat(summaries(logs)).hasSize(1);
+                assertThat(summaries(logs).getFirst().getArgumentArray()[0]).isEqualTo("failed");
+            } catch (Exception e) { throw new AssertionError(e); }
+        });
+    }
+
 }

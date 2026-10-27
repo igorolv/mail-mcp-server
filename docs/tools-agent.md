@@ -150,7 +150,9 @@ precision collisions and raw synthetic secret matches remain accepted limitation
 `sync-status.json` is atomically replaced by `SyncRunner`, which runs only while its caller holds
 the connection's Lucene writer lock. Fields: `state` (running/completed/failed), `pid`,
 `startedAt`, optional `finishedAt`, ordered `folders`, optional `error`, `signInRejected`.
-Each folder entry contains `path`, cumulative `downloaded`, `failed`, `removed`, `reset`, `done`.
+Each folder entry contains `path`, cumulative `downloaded`, `failed`, `removed`, `reset`, `done`, `rescanned`. `reset` means IMAP UIDVALIDITY invalidated remote refs;
+`rescanned` means EWS recovered an invalid SyncState by a full traversal without invalidating
+known refs. Old status JSON without `rescanned` reads as false.
 Progress replaces an entry without changing its first-appearance order. Status is written before
 reconciliation, after each progress report, and on completion/failure. Run errors use fixed
 `SyncErrors` descriptions; a final status-write failure is suppressed onto the original error.
@@ -169,6 +171,13 @@ has changed. Tools do not automatically retry a rejected sign-in.
 then opens the Lucene writer before constructing a lazy source. A competing writer returns
 `lockedByOtherProcess` without opening a source or changing status. One daemon platform thread
 named `sync-<connection>` owns the source and index for its run; it closes both, logs failures by
-exception class only and removes itself from the running map. There is no scheduler or queue.
+exception class only and removes itself from the running map. After resources close, one INFO
+summary reports state, durationMs, downloaded, failed and removed. Downloaded counts converted
+new messages; failed counts per-message failures; removed counts removed local messages. Totals
+use the latest cumulative report for each folder, so on failure an unreported partial batch may
+be missing. Run-level errors do not increase failed. No summary is emitted for a start that does
+not reach the worker. A close failure makes the summary failed even if the runner already saved
+completed status. The summary contains no mail data or connection identifiers. There is no
+scheduler or queue.
 The `SyncTools` Spring service uses bean name `mailSyncTools` because Spring AI defines its own
 `syncTools` bean. `SyncConfig` supplies `SyncService` with `Pandoc::locate`.

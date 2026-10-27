@@ -199,6 +199,12 @@ rebuild offline.
 holds the writer lock, writes production status. It records running before reconciliation,
 latest per-folder progress in first-appearance order, then completed or failed with finishedAt.
 `SyncStatus` contains state, pid, startedAt, finishedAt, folders, error and signInRejected.
+Folder progress distinguishes `reset` (IMAP UIDVALIDITY invalidated remote refs) from `rescanned`
+(EWS recovered an invalid SyncState without invalidating known refs); old JSON without
+`rescanned` reads as false. `done` retains its cursor-saved or folder-deleted meaning.
+The background summary uses the latest progress per folder: converted new messages, per-message
+failures and removed local messages. A failure can leave an unreported partial batch out of those
+totals; a close failure can yield a failed summary after completed status was persisted.
 Failures use fixed `SyncErrors.describe` text and authentication failures set signInRejected.
 A final status-write failure is suppressed onto the original exception. A successful explicit
 `mail-sync` clears the rejection flag; MCP starts refuse a persisted rejection. Readers report

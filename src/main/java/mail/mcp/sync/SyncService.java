@@ -5,6 +5,7 @@ import mail.mcp.convert.Pandoc;
 import mail.mcp.convert.PandocException;
 import mail.mcp.index.IndexLockedException;
 import mail.mcp.index.MailIndex;
+import mail.mcp.model.FolderProgress;
 import mail.mcp.source.MailSource;
 import mail.mcp.store.MessageStore;
 import org.slf4j.Logger;
@@ -58,11 +59,23 @@ public final class SyncService {
             source = registry.resolve(name).openSource();
             MailSource session = source;
             Thread thread = Thread.ofPlatform().daemon().name("sync-" + name).unstarted(() -> {
-                try (index; session) {
-                    new SyncRunner(store, index, session, new MessageProcessor(store, pandoc)).run(p -> { });
+                long started = System.nanoTime();
+                Map<String, FolderProgress> progress = new HashMap<>();
+                String state = "failed";
+                try {
+                    try (index; session) {
+                        new SyncRunner(store, index, session, new MessageProcessor(store, pandoc))
+                                .run(p -> progress.put(p.path(), p));
+                    }
+                    state = "completed";
                 } catch (RuntimeException e) {
                     log.warn("Background sync failed: {}", e.getClass().getSimpleName());
                 } finally {
+                    log.info("Background sync finished: state={}, durationMs={}, downloaded={}, failed={}, removed={}",
+                            state, (System.nanoTime() - started) / 1_000_000,
+                            progress.values().stream().mapToInt(FolderProgress::downloaded).sum(),
+                            progress.values().stream().mapToInt(FolderProgress::failed).sum(),
+                            progress.values().stream().mapToInt(FolderProgress::removed).sum());
                     synchronized (this) { running.remove(name); }
                 }
             });

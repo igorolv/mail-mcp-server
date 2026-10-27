@@ -333,4 +333,46 @@ class SyncRunnerTest {
             assertThat(document.get("state")).isEqualTo("converted");
         }
     }
+    @Test void ewsRescanPreservesKnownFilesAndReportsRescanned() throws Exception {
+        source.putFolder("inbox", "INBOX", "7", "1");
+        run();
+        String key = refs("f1").get("1");
+        byte[] before = Files.readAllBytes(store().messageDir(key).resolve(MessageStore.MESSAGE_FILE));
+        source.putFolder("inbox", "INBOX", "7", messageRefs(102));
+        source.resetCounts();
+        MailSource rescan = new MailSource() {
+            @Override public List<RemoteFolder> folders() { return source.folders(); }
+            @Override public FolderChanges changes(RemoteFolder f, String c, Set<String> known) {
+                var result = source.changes(f, c, known);
+                return new FolderChanges(result.added(), result.removed(), result.cursor(), false, true);
+            }
+            @Override public Downloaded download(RemoteFolder f, String r, Path t) { return source.download(f, r, t); }
+            @Override public void close() { }
+        };
+        List<FolderProgress> progress = new ArrayList<>();
+        try (var index = MailIndex.openWriter(connectionDir)) {
+            new SyncRunner(store(), index, rescan, processor()).run(progress::add);
+        }
+        assertThat(progress).hasSize(2).allSatisfy(p -> {
+            assertThat(p.rescanned()).isTrue();
+            assertThat(p.reset()).isFalse();
+        });
+        assertThat(store().readSyncStatus().orElseThrow().folders().getFirst().rescanned()).isTrue();
+        assertThat(refs("f1")).containsEntry("1", key);
+        assertThat(Files.readAllBytes(store().messageDir(key).resolve(MessageStore.MESSAGE_FILE))).isEqualTo(before);
+        assertThat(source.downloadCalls).isEqualTo(101);
+    }
+
+    @Test void uidValidityResetStillReplacesKnownMessages() {
+        source.putFolder("inbox", "INBOX", "7", "1");
+        run();
+        String old = refs("f1").get("1");
+        source.putFolder("inbox", "INBOX", "8", "1");
+        var progress = run().getFirst();
+        assertThat(progress.reset()).isTrue();
+        assertThat(progress.rescanned()).isFalse();
+        assertThat(store().messageDir(old)).doesNotExist();
+        assertThat(refs("f1").get("1")).isNotEqualTo(old);
+    }
+
 }

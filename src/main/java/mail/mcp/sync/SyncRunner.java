@@ -148,13 +148,13 @@ public final class SyncRunner {
                 if ((downloaded + failed) % 100 == 0) {
                     index.commit();
                     progress.accept(new FolderProgress(folder.path(), downloaded, failed, removed,
-                            changes.reset(), false));
+                            changes.reset(), false, changes.rescanned()));
                 }
             }
             index.commit();
             folders.set(i, new LocalFolder(folder.key(), folder.remoteId(), folder.path(), changes.cursor()));
             store.saveFolders(folders);
-            progress.accept(new FolderProgress(folder.path(), downloaded, failed, removed, changes.reset(), true));
+            progress.accept(new FolderProgress(folder.path(), downloaded, failed, removed, changes.reset(), true, changes.rescanned()));
         }
     }
 }

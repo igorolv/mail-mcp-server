@@ -52,4 +52,16 @@ class SyncToolsTest {
         assertThat(result.removed()).isEqualTo(3);
         assertThat(store.readSyncStatus().orElseThrow().state()).isEqualTo("running");
     }
+    @Test void syncStatusExposesRescannedSeparatelyFromReset() {
+        var store = new MessageStore(dir, new JsonConfig().mailMcpObjectMapper());
+        store.writeSyncStatus(new SyncStatus("completed", 1, Instant.now(), Instant.now(), List.of(
+                new FolderProgress("ews", 1, 0, 0, false, true, true),
+                new FolderProgress("imap", 2, 0, 1, true, true, false)), null, false));
+        var folders = tools().syncStatus("local").folders();
+        assertThat(folders.get(0).rescanned()).isTrue();
+        assertThat(folders.get(0).reset()).isFalse();
+        assertThat(folders.get(1).rescanned()).isFalse();
+        assertThat(folders.get(1).reset()).isTrue();
+    }
+
 }

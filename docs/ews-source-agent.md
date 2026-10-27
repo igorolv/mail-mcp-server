@@ -64,7 +64,9 @@ A first sync (null state) enumerates all items, so known refs absent from the cr
 also removed. A later sync applies only reported additions/deletions. If the first request with
 a non-null state returns `ErrorInvalidSyncStateData`, the source starts once without a state
 and applies first-sync rules. This is not a reset: EWS item ids remain valid, and known messages
-must not be downloaded again. EWS always returns `reset=false`. An invalid state on a later page
+must not be downloaded again. Successful recovery returns `rescanned=true` and `reset=false`;
+an ordinary first sync has `rescanned=false`. Progress and status preserve this separate signal;
+old status JSON without it reads as false. An invalid state on a later page
 or after starting without a state propagates.
 
 Downloads use one `GetItem` per message and return the decoded size and SHA-256.

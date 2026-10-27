@@ -80,7 +80,7 @@ public class SyncTools {
                     state = "interrupted";
                 }
                 var folders = status.folders().stream().map(p -> new FolderSyncInfo(redactor.text(p.path()), p.downloaded(),
-                        p.failed(), p.removed(), p.reset(), p.done())).toList();
+                        p.failed(), p.removed(), p.reset(), p.done(), p.rescanned())).toList();
                 result = new SyncStatusResult(definition.name(), state, status.startedAt(), status.finishedAt(),
                         folders.stream().mapToInt(FolderSyncInfo::downloaded).sum(),
                         folders.stream().mapToInt(FolderSyncInfo::failed).sum(),

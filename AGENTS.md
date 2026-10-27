@@ -12,7 +12,8 @@ mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/plan.md` section 2).
   not treat Gmail setup as a required next step.
 - Features accepted offline but not yet checked by the user on real mail are listed in
   `docs/plan.md` 2.4 (container expansion and legacy Office text need a user-run
-  `mail-reprocess`).
+  `mail-reprocess`; background summaries and EWS rescan reporting await observation during
+  user-requested sync).
 
 Work now consists of polishing and optional improvements:
 - `docs/plan.md` section 4 lists the open ones (`Д4`, `Д5`, …); the user chooses which to take.

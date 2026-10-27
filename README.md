@@ -52,7 +52,12 @@ needs `mail-reprocess`, and their check on real messages is still pending
   terms, file name parts, phrases, and a highlighted snippet. It searches subject, body, sender,
   recipients, attachment names and attachment text.
 - **Background sync** on request. The tool returns at once, `syncStatus` shows progress, and
-  several server processes can share one data directory.
+  several server processes can share one data directory. Folder progress distinguishes an IMAP
+  UIDVALIDITY `reset` from an EWS `rescanned` recovery of an invalid SyncState; old status files
+  default `rescanned` to false. Each finished background run logs its state, elapsed milliseconds,
+  and cumulative downloaded (converted), failed and removed message counts. On failure, counts
+  reflect the latest reported progress and may omit part of an unfinished batch. A resource close
+  failure can leave the saved status completed while the summary says failed.
 - **Bounded answers:** pages of message cards, message bodies and attachment text in chunks with
   `nextOffset`. Every message carries `localPath`, so an agent with file access can open the
   files directly.

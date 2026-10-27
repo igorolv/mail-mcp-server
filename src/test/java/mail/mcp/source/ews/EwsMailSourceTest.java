@@ -256,4 +256,23 @@ class EwsMailSourceTest {
         first.assertDrained();
         second.assertDrained();
     }
+    @Test void invalidSyncStateReportsRescanWithoutResetOrKnownDownloads() {
+        var transport = new ScriptedEwsTransport().answer(SYNC_FOLDER_ITEMS, "sync-invalid-state.xml")
+                .answer(SYNC_FOLDER_ITEMS, "sync-changes.xml");
+        try (var source = new EwsMailSource(new EwsClient(transport))) {
+            var changes = source.changes(INBOX, "invalid", Set.of("AAMkSYNTH-a"));
+            assertThat(changes.rescanned()).isTrue();
+            assertThat(changes.reset()).isFalse();
+            assertThat(changes.added()).containsExactly("AAMkSYNTH-b");
+        }
+        transport.assertDrained();
+    }
+
+    @Test void initialFullSyncIsNotARescan() {
+        var transport = new ScriptedEwsTransport().answer(SYNC_FOLDER_ITEMS, "sync-changes.xml");
+        try (var source = new EwsMailSource(new EwsClient(transport))) {
+            assertThat(source.changes(INBOX, null, Set.of()).rescanned()).isFalse();
+        }
+    }
+
 }

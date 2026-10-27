@@ -60,6 +60,7 @@ public final class EwsMailSource implements MailSource {
 
     @Override public FolderChanges changes(RemoteFolder folder, String cursor, Set<String> known) {
         boolean firstSync = cursor == null;
+        boolean rescanned = false;
         EwsSyncPage page;
         try {
             page = client.syncFolderItems(folder.remoteId(), cursor);
@@ -68,6 +69,7 @@ public final class EwsMailSource implements MailSource {
                 throw e;
             }
             firstSync = true;
+            rescanned = true;
             page = client.syncFolderItems(folder.remoteId(), null);
         }
         var created = new LinkedHashSet<String>();
@@ -90,7 +92,7 @@ public final class EwsMailSource implements MailSource {
             known.stream().filter(ref -> !created.contains(ref)).forEach(removed::add);
         }
         return new FolderChanges(created.stream().filter(ref -> !known.contains(ref)).toList(),
-                removed.stream().sorted().toList(), page.syncState(), false);
+                removed.stream().sorted().toList(), page.syncState(), false, rescanned);
     }
 
     @Override public Downloaded download(RemoteFolder folder, String ref, Path target) {

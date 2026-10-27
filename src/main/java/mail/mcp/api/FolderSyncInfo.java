@@ -12,8 +12,14 @@ public record FolderSyncInfo(
         int failed,
         @Schema(description = "Removed messages.", requiredMode = Schema.RequiredMode.REQUIRED)
         int removed,
-        @Schema(description = "Whether the folder cursor was reset.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Whether remote references were invalidated (IMAP UIDVALIDITY change).", requiredMode = Schema.RequiredMode.REQUIRED)
         boolean reset,
         @Schema(description = "Whether the folder finished.", requiredMode = Schema.RequiredMode.REQUIRED)
-        boolean done
-) { }
+        boolean done,
+        @Schema(description = "Whether EWS recovered an invalid SyncState by rescanning.", requiredMode = Schema.RequiredMode.REQUIRED)
+        boolean rescanned
+) {
+    public FolderSyncInfo(String path, int downloaded, int failed, int removed, boolean reset, boolean done) {
+        this(path, downloaded, failed, removed, reset, done, false);
+    }
+}

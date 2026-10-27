@@ -116,13 +116,14 @@ The reviewer checks; it does not fix. Work through every point and report what y
 
 ## Task list
 
-IT-01…IT-16 were accepted and deleted (2026-10-25…27). The user requested the following six
-briefs together on 2026-10-27. Their baseline is `d3fd516`; no implementation is included in
-this batch. Checks still pending on real mail are in `docs/plan.md` 2.4. Next unused number: IT-23.
+IT-01…IT-16 were accepted and deleted (2026-10-25…27). The user requested six briefs together
+on 2026-10-27, based on `d3fd516`. IT-22 (Д25) was accepted offline and deleted on 2026-10-27:
+background summaries and separate EWS rescan reporting are implemented. The remaining briefs
+are listed below in their original execution order; preserve the accepted IT-22 behavior.
+Checks still pending on real mail are in `docs/plan.md` 2.4. Next unused number: IT-23.
 
 | Order | Brief | Plan item | Scope and dependency |
 |---|---|---|---|
-| 1 | [IT-22](IT-22-sync-completion.md) | Д25 | Background summary and a separate EWS rescan signal; establishes the sync contract before moves. |
 | 2 | [IT-21](IT-21-date-filters.md) | Д24 | Date bounds and date-only search; establishes reader signatures before threads/flags. |
 | 3 | [IT-17](IT-17-message-threads.md) | Д5 | Local getThread; preserves IT-21 reader behavior. |
 | 4 | [IT-18](IT-18-message-moves.md) | Д8 | Heuristic move reuse without MIME download; preserves IT-22 and supplies metadata snapshots for IT-19. |
