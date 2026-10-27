@@ -58,34 +58,28 @@ public class SearchTools {
         return search(connection, query, field, folder, offset, limit, null, null);
     }
 
-    @McpTool(description = "Search local messages by words or date bounds. since is inclusive, until exclusive; dates are UTC midnight or datetimes with explicit offset. A date-only search sorts newest first, with score 0 and no snippet. field: any (default; every field below, including " +
-            "attachment text), subject, body, from, to (including cc), attachmentName, attachmentText (text " +
-            "extracted from DOCX, ODT, RTF, EPUB, HTML, CSV, PDF, XLSX, PPTX and plain-text attachments up to " +
-            "20 MiB of decoded bytes, except XLSX up to 5 MiB; conversion is best effort). Compressed XLSX size " +
-            "does not bound POI memory and smaller files can still be expensive. Existing text stays searchable " +
-            "until mail-reprocess replaces it; mail-reindex alone retains saved text. " +
-            "Every word is required; \"...\" means a phrase. Russian and English word forms are matched; " +
-            "full addresses must be complete; a query that is a single full address is matched against " +
-            "addresses only, not display names; file names match whole or by parts split at non-letters. " +
-            "Results use local data only; listFolders.synced shows coverage. limit defaults to 20, capped at 100. " +
-            "Use nextOffset to page. snippet marks matches with **. For any, body matches win, otherwise the first " +
-            "matching saved attachment text is used; attachmentText uses attachments first. Other fields keep body " +
-            "context. Missing local texts fall back to body context. snippetAttachmentFile is the exact file for " +
-            "getAttachment; snippetAttachmentName is its display name. localPath points at files " +
-            "the agent may read. Optional secret filtering changes output text only, not matching or ranking; " +
-            "the complete selected text is filtered before highlighting. No reindexing is needed. Original files stay unfiltered. " +
-            "Copies of one message in several folders are returned once, with the others under copies, and totals count them once.",
+    @McpTool(description = "Search the synced messages of a connection by words, dates or both, in all folders " +
+            "or one. Text results come by relevance, with a snippet marking matches as **word**; without a " +
+            "query, since/until list messages newest first. Query syntax: every word is required; " +
+            "\"double quotes\" make a phrase; there is no OR, NOT or wildcard, so search alternatives " +
+            "separately. Russian and English word forms match. An email address matches only when complete, " +
+            "and a query of one address ignores display names. File names match whole or by parts. " +
+            "When the snippet comes from an attachment, snippetAttachmentFile is the file for getAttachment. " +
+            "A message stored in several folders is returned once, with the other copies under copies.",
             generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public SearchResult search(
             @McpToolParam(description = "Connection name from listConnections") String connection,
-            @McpToolParam(description = "Text query, at most 1000 characters; optional with a date bound", required = false) String query,
-            @McpToolParam(description = "any, subject, body, from, to, attachmentName, attachmentText; default any", required = false) String field,
-            @McpToolParam(description = "Optional folder key from listFolders", required = false) String folder,
-            @McpToolParam(description = "Nonnegative starting position; default 0", required = false) Integer offset,
-            @McpToolParam(description = "Positive page size; default 20, at most 100", required = false) Integer limit,
-            @McpToolParam(description = "Inclusive UTC date or datetime with offset", required = false) String since,
-            @McpToolParam(description = "Exclusive UTC date or datetime with offset", required = false) String until) {
+            @McpToolParam(description = "Words to find, at most 1000 characters; may be omitted when since or until is given", required = false) String query,
+            @McpToolParam(description = "Where to look: any (default; all of the following), subject, body, from, " +
+                    "to (also cc), attachmentName, attachmentText", required = false) String field,
+            @McpToolParam(description = "Folder key from listFolders; default all folders", required = false) String folder,
+            @McpToolParam(description = "Start position: nextOffset of the previous page; default 0", required = false) Integer offset,
+            @McpToolParam(description = "Page size; default 20, at most 100", required = false) Integer limit,
+            @McpToolParam(description = "Only messages dated at or after this: YYYY-MM-DD (UTC midnight) or " +
+                    "ISO-8601 datetime with offset, e.g. 2026-10-01T09:00:00+03:00", required = false) String since,
+            @McpToolParam(description = "Only messages dated before this (exclusive); same format as since",
+                    required = false) String until) {
         long start = System.nanoTime();
         try {
             var range = DateRange.parse(since, until);

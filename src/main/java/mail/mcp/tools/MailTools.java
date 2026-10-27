@@ -50,9 +50,9 @@ public class MailTools {
         this.redactor = redactor;
     }
 
-    @McpTool(description = "List locally stored folders and committed message counts. synced is true after " +
-            "a folder has completed at least one pass. Data may be incomplete during sync; check syncStatus. " +
-            "No mailbox or pandoc access.", generateOutputSchema = true,
+    @McpTool(description = "List the folders of a connection's local copy: key (the folder argument of " +
+            "listMessages and search), path, local message count, and synced (false until the folder's " +
+            "first sync finished, so its messages may be missing).", generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public ListFoldersResult listFolders(@McpToolParam(description = "Connection name from listConnections") String connection) {
         long start = System.nanoTime();
@@ -75,18 +75,20 @@ public class MailTools {
         return listMessages(connection, folder, offset, limit, null, null);
     }
 
-    @McpTool(description = "List local message cards newest first, undated last. Optional since (inclusive) and until (exclusive) select MIME header dates; dates are UTC midnight or datetimes with explicit offset. limit defaults to 50, " +
-            "capped at 200. Use nextOffset to page. Data may be incomplete during sync; check listFolders.synced " +
-            "and syncStatus. localPath is an absolute directory whose files may be read directly. No network access.",
+    @McpTool(description = "Page through the messages of one folder, newest first, optionally within a date " +
+            "range. Each card has key, date, sender, subject, read/flagged state and attachment presence; " +
+            "pass key to getMessage or getThread.",
             generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public ListMessagesResult listMessages(
             @McpToolParam(description = "Connection name from listConnections") String connection,
             @McpToolParam(description = "Folder key from listFolders") String folder,
-            @McpToolParam(description = "Nonnegative starting position; default 0", required = false) Integer offset,
-            @McpToolParam(description = "Positive page size; default 50, at most 200", required = false) Integer limit,
-            @McpToolParam(description = "Inclusive UTC date or datetime with offset", required = false) String since,
-            @McpToolParam(description = "Exclusive UTC date or datetime with offset", required = false) String until) {
+            @McpToolParam(description = "Start position: nextOffset of the previous page; default 0", required = false) Integer offset,
+            @McpToolParam(description = "Page size; default 50, at most 200", required = false) Integer limit,
+            @McpToolParam(description = "Only messages dated at or after this: YYYY-MM-DD (UTC midnight) or " +
+                    "ISO-8601 datetime with offset, e.g. 2026-10-01T09:00:00+03:00", required = false) String since,
+            @McpToolParam(description = "Only messages dated before this (exclusive); same format as since",
+                    required = false) String until) {
         long start = System.nanoTime();
         try {
             var range = DateRange.parse(since, until);
@@ -118,18 +120,16 @@ public class MailTools {
         }
     }
 
-    @McpTool(description = "Read local message headers, a body.md chunk and attachment paths. " +
-            "Attachments include files inside EML, ZIP, MSG and TNEF containers, with their parent file. " +
-            "maxChars defaults to 20000, capped at 100000; use nextOffset for the next chunk. localPath points at files " +
-            "the agent may read directly. Local data may be incomplete during sync; check listFolders.synced " +
-            "and syncStatus. When secret filtering is enabled, body offsets refer to the filtered text; " +
-            "original files stay unfiltered. No mailbox or pandoc access.", generateOutputSchema = true,
+    @McpTool(description = "Read one message: headers, the body as Markdown in chunks, and its attachments. " +
+            "attachments also lists files unpacked from attached EML, ZIP, MSG and TNEF files; parent names " +
+            "the containing attachment. Read attachment text with getAttachment. A long body continues at " +
+            "nextOffset.", generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public GetMessageResult getMessage(
             @McpToolParam(description = "Connection name from listConnections") String connection,
-            @McpToolParam(description = "Local message UUID from listMessages") String key,
-            @McpToolParam(description = "Nonnegative body character offset; default 0", required = false) Integer offset,
-            @McpToolParam(description = "Positive chunk size; default 20000, at most 100000", required = false) Integer maxChars) {
+            @McpToolParam(description = "Message key from listMessages, search or getThread") String key,
+            @McpToolParam(description = "Body character position: nextOffset of the previous chunk; default 0", required = false) Integer offset,
+            @McpToolParam(description = "Chunk size in characters; default 20000, at most 100000", required = false) Integer maxChars) {
         long start = System.nanoTime();
         try {
             int position = offset(offset);
@@ -175,22 +175,17 @@ public class MailTools {
         }
     }
 
-    @McpTool(description = "Read a local attachment and extracted text in chunks. Text exists only for DOCX, ODT, " +
-            "RTF, EPUB, HTML, CSV, PDF, DOC, XLS, PPT, XLSX, PPTX, EML, MSG, TNEF and plain text up to 20 MiB " +
-            "of decoded bytes, except XLSX up to 5 MiB, when conversion succeeds. Conversion is best effort; " +
-            "compressed XLSX size does not bound POI memory and smaller files can still be expensive. " +
-            "Existing text stays readable until mail-reprocess replaces it; mail-reindex alone retains saved text. " +
-            "Attachments include files inside EML, ZIP, MSG and TNEF containers; accepts their exact file from getMessage. " +
-            "path is the original file; textPath is the Markdown. maxChars defaults to 20000, capped at 100000; " +
-            "use nextOffset for the next chunk. With secret filtering, offsets refer to filtered text; " +
-            "original files stay unfiltered. No mailbox or pandoc access.", generateOutputSchema = true,
+    @McpTool(description = "Read the text of an attachment as Markdown, in chunks. Text exists for PDF, Word, " +
+            "Excel, PowerPoint, OpenDocument, RTF, HTML, CSV, EPUB, plain text and attached messages up to " +
+            "20 MiB (XLSX up to 5 MiB) when conversion succeeded; otherwise text is absent and only path, " +
+            "the original file, is returned. Long text continues at nextOffset.", generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public GetAttachmentResult getAttachment(
             @McpToolParam(description = "Connection name from listConnections") String connection,
-            @McpToolParam(description = "Local message UUID") String key,
-            @McpToolParam(description = "Exact stored attachment filename from getMessage") String file,
-            @McpToolParam(description = "Nonnegative text character offset; default 0", required = false) Integer offset,
-            @McpToolParam(description = "Positive chunk size; default 20000, at most 100000", required = false) Integer maxChars) {
+            @McpToolParam(description = "Message key") String key,
+            @McpToolParam(description = "Exact attachments[].file from getMessage, or snippetAttachmentFile from search") String file,
+            @McpToolParam(description = "Text character position: nextOffset of the previous chunk; default 0", required = false) Integer offset,
+            @McpToolParam(description = "Chunk size in characters; default 20000, at most 100000", required = false) Integer maxChars) {
         long start = System.nanoTime();
         try {
             int position = offset(offset);

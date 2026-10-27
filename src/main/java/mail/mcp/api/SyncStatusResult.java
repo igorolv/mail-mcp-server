@@ -6,26 +6,27 @@ import java.time.Instant;
 
 import java.util.List;
 
-@Schema(description = "Current or last synchronization status, read from local disk.")
+@Schema(description = "Status of the current or last sync.")
 public record SyncStatusResult(
         @Schema(description = "Connection name.", requiredMode = Schema.RequiredMode.REQUIRED)
         String connection,
-        @Schema(description = "never, running, completed, failed or interrupted.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "running, completed, failed, interrupted (the syncing process stopped before finishing) or never (no sync yet).", requiredMode = Schema.RequiredMode.REQUIRED)
         String state,
-        @Schema(description = "Run start time.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "When the sync started.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         Instant startedAt,
-        @Schema(description = "Run end time, absent while running.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "When the sync ended; absent while running.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         Instant finishedAt,
-        @Schema(description = "Total new converted messages.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "New messages saved, all folders.", requiredMode = Schema.RequiredMode.REQUIRED)
         int downloaded,
-        @Schema(description = "Total new failed messages.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "New messages that failed to download or convert, all folders.", requiredMode = Schema.RequiredMode.REQUIRED)
         int failed,
-        @Schema(description = "Total removed messages.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Local messages removed because they are gone from the mailbox, all folders.", requiredMode = Schema.RequiredMode.REQUIRED)
         int removed,
-        @Schema(description = "Latest progress in order of first appearance.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Progress per folder.", requiredMode = Schema.RequiredMode.REQUIRED)
         List<FolderSyncInfo> folders,
-        @Schema(description = "Fixed run failure explanation.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Why the sync failed.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String error,
-        @Schema(description = "An explicit user-run mail-sync is needed after fixing rejected credentials.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "True when the mailbox rejected the sign-in; sync works again only after the user fixes the " +
+                "credentials and runs mail-sync in a terminal.", requiredMode = Schema.RequiredMode.REQUIRED)
         boolean signInRejected
 ) { }

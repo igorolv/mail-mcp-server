@@ -2,22 +2,22 @@ package mail.mcp.api;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-@Schema(description = "Attachment description and its local file when available.")
+@Schema(description = "An attachment of the message.")
 public record AttachmentRef(
-        @Schema(description = "Stored filename relative to attachments/.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Identifier to pass to getAttachment as file; also its name in attachments/.", requiredMode = Schema.RequiredMode.REQUIRED)
         String file,
-        @Schema(description = "Original decoded filename.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Original file name.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String name,
-        @Schema(description = "MIME base content type.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "MIME type, e.g. application/pdf.", requiredMode = Schema.RequiredMode.REQUIRED)
         String contentType,
-        @Schema(description = "Decoded size in bytes.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Size in bytes.", requiredMode = Schema.RequiredMode.REQUIRED)
         long size,
-        @Schema(description = "Whether disposition is inline.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "True for parts shown inside the body, such as embedded images.", requiredMode = Schema.RequiredMode.REQUIRED)
         boolean inline,
-        @Schema(description = "Absolute attachment path; absent if the file does not exist.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Absolute path of the original file; absent when it is not saved.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String path,
-        @Schema(description = "Absolute Markdown path; absent without extracted text.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Absolute path of the extracted Markdown text; absent when there is no text.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String textPath,
-        @Schema(description = "Stored filename of the containing attachment; absent for the message's own attachments.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "file of the attachment this one was unpacked from; absent for the message's own attachments.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String parent
 ) { }

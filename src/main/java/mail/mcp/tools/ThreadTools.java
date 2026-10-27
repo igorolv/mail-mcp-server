@@ -36,19 +36,17 @@ public class ThreadTools {
         this.redactor = redactor;
     }
 
-    @McpTool(description = "Read local conversation cards across folders of one connection, anchored by a local UUID. " +
-            "Links use only case-sensitive Message-ID, In-Reply-To and References, including absent parents. " +
-            "Oldest first, undated last, then key. limit defaults to 50, capped at 200; " +
-            "use nextOffset to page. No bodies or raw header IDs. Data may be incomplete during sync; " +
-            "pages across calls may change. localPath is an absolute message directory. No mailbox or pandoc access. " +
-            "Copies of one message in several folders are returned once, with the others under copies, and totals count them once.",
+    @McpTool(description = "List the conversation a message belongs to, across all folders, oldest first, as " +
+            "cards without bodies; read a body with getMessage. Messages are linked by their reply headers " +
+            "(Message-ID, In-Reply-To, References), not by subject. A message stored in several folders is " +
+            "returned once, with the other copies under copies.",
             generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public GetThreadResult getThread(
             @McpToolParam(description = "Connection name from listConnections") String connection,
-            @McpToolParam(description = "Local message UUID from listMessages or search") String key,
-            @McpToolParam(description = "Nonnegative starting position; default 0", required = false) Integer offset,
-            @McpToolParam(description = "Positive page size; default 50, at most 200", required = false) Integer limit) {
+            @McpToolParam(description = "Key of any message in the conversation, from listMessages or search") String key,
+            @McpToolParam(description = "Start position: nextOffset of the previous page; default 0", required = false) Integer offset,
+            @McpToolParam(description = "Page size; default 50, at most 200", required = false) Integer limit) {
         long start = System.nanoTime();
         try {
             if (offset != null && offset < 0) { throw new IllegalArgumentException("offset must be nonnegative"); }

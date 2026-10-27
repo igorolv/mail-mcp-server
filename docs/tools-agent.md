@@ -7,6 +7,13 @@ Downloads, files, index, lookup IDs, stored filenames and original local paths s
 Only JSON-RPC is written to stdout. Failures are logged through `ToolLogger.failed`
 and rethrown; `IllegalArgumentException` becomes an MCP tool error with its message.
 
+Tool and parameter descriptions are read by the calling model, so they hold only what it needs
+to choose and call a tool: what the tool returns, where each argument comes from, its format,
+default and cap, query syntax, and results that would otherwise be misread (partial data during
+sync, grouped copies, missing attachment text). Keep converters, size-limit rationale,
+`mail-reprocess`/`mail-reindex`, secret filtering, tie-break order and wording that repeats the
+output schema in this document instead.
+
 ## Tools
 
 | Tool | Arguments | Result and errors |

@@ -7,49 +7,49 @@ import java.time.Instant;
 
 import java.util.List;
 
-@Schema(description = "Local message headers, a body chunk and attachment file paths.")
+@Schema(description = "A message: headers, a body chunk and attachments.")
 public record GetMessageResult(
-        @Schema(description = "Local message UUID.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Message key.", requiredMode = Schema.RequiredMode.REQUIRED)
         String key,
-        @Schema(description = "Folder path from metadata.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Folder path in the mailbox.", requiredMode = Schema.RequiredMode.REQUIRED)
         String folder,
-        @Schema(description = "downloaded, converted or failed.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "converted (complete), downloaded (saved, text not processed yet) or failed (see error).", requiredMode = Schema.RequiredMode.REQUIRED)
         String state,
-        @Schema(description = "Message failure explanation.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Why the message failed; present when state is failed.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String error,
-        @Schema(description = "Decoded subject.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Subject.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String subject,
-        @Schema(description = "Displayed sender addresses.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Senders as Name <address>.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         List<String> from,
-        @Schema(description = "Displayed recipient addresses.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "To recipients as Name <address>.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         List<String> to,
-        @Schema(description = "Displayed copied addresses.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Cc recipients as Name <address>.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         List<String> cc,
-        @Schema(description = "Message date when available.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Date from the message header; absent when missing.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         Instant date,
         @Schema(description = "Message-ID header.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String messageId,
         @Schema(description = "In-Reply-To header.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String inReplyTo,
-        @Schema(description = "References header identifiers.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "References header message IDs.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         List<String> references,
-        @Schema(description = "Body chunk, with optional secret replacement; absent without a saved body.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Chunk of the body as Markdown; [redacted:<kind>] marks a hidden secret. Absent when there is no body.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String body,
-        @Schema(description = "Requested character position in the returned view (after optional filtering).", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Character position of this chunk.", requiredMode = Schema.RequiredMode.REQUIRED)
         int offset,
-        @Schema(description = "Next character position; absent at the end.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Pass as offset to get the next chunk; absent at the end.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         Integer nextOffset,
-        @Schema(description = "Full returned body length in Java characters, after optional filtering; zero without a body.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Length of the whole body in characters; 0 without a body.", requiredMode = Schema.RequiredMode.REQUIRED)
         int bodyLength,
-        @Schema(description = "Attachments parsed from MIME; empty if unavailable.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Attachments, including files unpacked from attached archives and messages; empty when none.", requiredMode = Schema.RequiredMode.REQUIRED)
         List<AttachmentRef> attachments,
-        @Schema(description = "Absolute message directory; files may be read directly.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Absolute message directory, readable directly: message.eml (original), body.md, attachments/.", requiredMode = Schema.RequiredMode.REQUIRED)
         String localPath,
-        @Schema(description = "Read state at the latest successful observation; absent when unknown.",
+        @Schema(description = "Read in the mailbox as of the last sync; absent when unknown.",
                 nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @JsonInclude(JsonInclude.Include.NON_NULL)
         Boolean read,
-        @Schema(description = "User flag/star at the latest successful observation, not sender importance; absent when unknown.",
+        @Schema(description = "Flagged or starred in the mailbox as of the last sync (not sender importance); absent when unknown.",
                 nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @JsonInclude(JsonInclude.Include.NON_NULL)
         Boolean flagged

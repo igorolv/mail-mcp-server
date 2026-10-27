@@ -42,9 +42,9 @@ public class ConnectionTools {
     }
 
     @McpTool(
-            description = "Discover the mailboxes served here and the valid name to pass as 'connection'. Call " +
-                    "when the target mailbox is not already established; returns purpose, source type, sign-in " +
-                    "method and configuration errors without contacting any mail server.",
+            description = "List the configured mailboxes. Call first when the mailbox to use is not known yet: " +
+                    "name is the value for the 'connection' argument of every other tool, description says " +
+                    "what the mailbox is for, configError explains why an entry cannot be used.",
             generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true)
     )

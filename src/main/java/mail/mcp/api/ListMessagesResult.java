@@ -6,24 +6,24 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 import java.time.Instant;
 
-@Schema(description = "One page of messages in the committed local catalog.")
+@Schema(description = "A page of a folder's messages.")
 public record ListMessagesResult(
         @Schema(description = "Connection name.", requiredMode = Schema.RequiredMode.REQUIRED)
         String connection,
-        @Schema(description = "Local folder key.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Folder key.", requiredMode = Schema.RequiredMode.REQUIRED)
         String folder,
-        @Schema(description = "Messages in this folder at this commit.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Messages in the folder within the date bounds.", requiredMode = Schema.RequiredMode.REQUIRED)
         int total,
-        @Schema(description = "Requested starting position.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Position of this page.", requiredMode = Schema.RequiredMode.REQUIRED)
         int offset,
-        @Schema(description = "Next page position; absent at the end.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Pass as offset to get the next page; absent at the end.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         Integer nextOffset,
-        @Schema(description = "Messages sorted by descending date, undated last, then key.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Messages, newest first; undated last.", requiredMode = Schema.RequiredMode.REQUIRED)
         List<MessageSummary> messages,
-        @Schema(description = "Inclusive UTC lower date bound.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Applied since bound, in UTC.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @JsonInclude(JsonInclude.Include.NON_NULL)
         Instant since,
-        @Schema(description = "Exclusive UTC upper date bound.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Applied until bound, in UTC.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @JsonInclude(JsonInclude.Include.NON_NULL)
         Instant until
 ) { }

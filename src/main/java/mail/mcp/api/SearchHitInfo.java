@@ -7,48 +7,47 @@ import java.time.Instant;
 import java.util.List;
 
 /** A scored message with an optional body or saved attachment Markdown passage and its identity. */
-@Schema(description = "A matching local message with a score and body or attachment snippet.")
+@Schema(description = "A matching message.")
 public record SearchHitInfo(
-        @Schema(description = "Local message UUID.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Message key for getMessage and getThread.", requiredMode = Schema.RequiredMode.REQUIRED)
         String key,
-        @Schema(description = "Local folder key.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Folder key.", requiredMode = Schema.RequiredMode.REQUIRED)
         String folder,
-        @Schema(description = "Message date when available.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Date from the message header; absent when missing.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         Instant date,
-        @Schema(description = "Displayed sender addresses.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Senders as Name <address>.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String from,
-        @Schema(description = "Decoded subject.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Subject.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String subject,
-        @Schema(description = "Whether attachment names are present.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "True when the message has named attachments.", requiredMode = Schema.RequiredMode.REQUIRED)
         boolean hasAttachments,
-        @Schema(description = "downloaded, converted or failed.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "converted (complete), downloaded (saved, text not processed yet) or failed (see getMessage error).", requiredMode = Schema.RequiredMode.REQUIRED)
         String state,
-        @Schema(description = "BM25 relevance score.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Relevance score, higher is better; 0 for date-only search.", requiredMode = Schema.RequiredMode.REQUIRED)
         float score,
-        @Schema(description = "Markdown passage from the body or one saved attachment text, with **matches**; optional.", nullable = true,
+        @Schema(description = "Passage from the body or an attachment text with matches in **bold**; absent for date-only search or without text.", nullable = true,
                 requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @JsonInclude(JsonInclude.Include.NON_NULL)
         String snippet,
-        @Schema(description = "Absolute message directory; files may be read directly.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Absolute message directory, readable directly: message.eml (original), body.md, attachments/.", requiredMode = Schema.RequiredMode.REQUIRED)
         String localPath,
-        @Schema(description = "Exact AttachmentInfo.file() lookup identifier, without the sidecar .md suffix; " +
-                "pass to getAttachment(connection, key, file, ...). Absent for body or missing snippets.",
+        @Schema(description = "Attachment the snippet comes from; pass as file to getAttachment. " +
+                "Absent when the snippet is from the body.",
                 nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @JsonInclude(JsonInclude.Include.NON_NULL)
         String snippetAttachmentFile,
-        @Schema(description = "Attachment display name, falling back to its exact filename when null or blank; " +
-                "present only with an attachment snippet.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Original name of the attachment the snippet comes from.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @JsonInclude(JsonInclude.Include.NON_NULL)
         String snippetAttachmentName,
-        @Schema(description = "Read state at the latest successful observation; absent when unknown.",
+        @Schema(description = "Read in the mailbox as of the last sync; absent when unknown.",
                 nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @JsonInclude(JsonInclude.Include.NON_NULL)
         Boolean read,
-        @Schema(description = "User flag/star at the latest successful observation, not sender importance; absent when unknown.",
+        @Schema(description = "Flagged or starred in the mailbox as of the last sync (not sender importance); absent when unknown.",
                 nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @JsonInclude(JsonInclude.Include.NON_NULL)
         Boolean flagged,
-        @Schema(description = "Other local copies of this message (same Message-ID, date, sender and subject) among the results; absent when none.",
+        @Schema(description = "Other stored copies of this message (same Message-ID, date, sender and subject) that also match; absent when none.",
                 requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @JsonInclude(JsonInclude.Include.NON_EMPTY)
         List<MessageCopyInfo> copies

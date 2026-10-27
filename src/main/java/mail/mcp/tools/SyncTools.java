@@ -38,9 +38,12 @@ public class SyncTools {
         this.redactor = redactor;
     }
 
-    @McpTool(description = "Start a read-only mailbox synchronization in the background and return at once. " +
-            "Use syncStatus to watch progress. A rejected sign-in requires fixing the connection locally and " +
-            "running mail-sync in a terminal before another tool start is allowed.", generateOutputSchema = true,
+    @McpTool(description = "Download new and changed mail into the local copy that all other tools read; " +
+            "nothing in the mailbox is changed. Call when the user needs mail newer than the local copy. " +
+            "Returns at once and runs in the background; poll syncStatus until it finishes. The first run " +
+            "of a mailbox can take long. When status is refused, relay message to the user: after a " +
+            "rejected sign-in only the user can recover, by fixing the credentials and running mail-sync " +
+            "in a terminal.", generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = false))
     public SyncStartResult sync(@McpToolParam(description = "Connection name from listConnections") String connection) {
         long start = System.nanoTime();
@@ -61,9 +64,10 @@ public class SyncTools {
         }
     }
 
-    @McpTool(description = "Read progress of the current or last sync from local disk, without contacting " +
-            "the mailbox. never means no recorded run; interrupted means its process exited. Reading tools " +
-            "may show incomplete data while a sync runs; also check listFolders.synced.", generateOutputSchema = true,
+    @McpTool(description = "Progress or result of the current or last sync of a connection, with counts " +
+            "per folder. state: running, completed, failed, interrupted (the syncing process stopped " +
+            "before finishing) or never (no sync yet). While running, other tools see partial data.",
+            generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public SyncStatusResult syncStatus(@McpToolParam(description = "Connection name from listConnections") String connection) {
         long start = System.nanoTime();
