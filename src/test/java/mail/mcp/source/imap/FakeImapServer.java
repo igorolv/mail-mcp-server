@@ -41,6 +41,10 @@ final class FakeImapServer implements AutoCloseable {
     private final Future<?> task;
     private volatile Socket socket;
     volatile Long nextUidValidity;
+    volatile String metadataFlags;
+    volatile boolean omitMetadataFlags;
+    volatile boolean malformedMetadataFlags;
+    volatile boolean rejectMetadata;
 
     FakeImapServer() throws IOException { this(false, false, "login"); }
 
@@ -128,14 +132,17 @@ final class FakeImapServer implements AutoCloseable {
                             send(out, "* " + (i + 1) + " FETCH (UID " + current.messages().get(i).uid() + ")\r\n");
                         }
                     }
-                } else if (command.matches("FETCH [0-9:,]+ \\(ENVELOPE INTERNALDATE RFC822\\.SIZE UID\\)")) {
+                } else if (command.matches("FETCH [0-9:,]+ \\(ENVELOPE INTERNALDATE RFC822\\.SIZE FLAGS UID\\)")) {
                     assertThat(current).isNotNull();
+                    if (rejectMetadata) { send(out, tag + " NO private-server-text\r\n"); continue; }
                     String set = command.split(" ")[1];
                     for (int i = 0; i < current.messages().size(); i++) {
                         if (inSet(i + 1, set)) {
                             var item = current.messages().get(i);
                             send(out, "* " + (i + 1) + " FETCH (ENVELOPE " + item.envelope()
                                     + " INTERNALDATE \"25-Oct-2026 12:00:00 +0000\" RFC822.SIZE " + item.declaredSize()
+                                    + (omitMetadataFlags ? "" : malformedMetadataFlags ? " FLAGS NIL"
+                                    : " FLAGS (" + (metadataFlags == null ? item.flags() : metadataFlags) + ")")
                                     + " UID " + item.uid() + ")\r\n");
                         }
                     }

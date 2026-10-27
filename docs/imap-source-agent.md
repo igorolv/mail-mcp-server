@@ -100,8 +100,8 @@ UIDVALIDITY still matches before trusting reused UIDs, then resolves and fetches
 of at most 100. A mismatch closes the client and aborts the run without retry. Missing/expunged
 items are omitted; other protocol/authentication/transport errors abort.
 
-The Angus 2.0.5 profile uses ENVELOPE and UID. Offline fake-server tests verify the exact emitted
-attributes `(ENVELOPE INTERNALDATE RFC822.SIZE UID)`; ENVELOPE already supplies the date and size
+The Angus 2.0.5 profile uses ENVELOPE, FLAGS and UID. Offline fake-server tests verify the exact emitted
+attributes `(ENVELOPE INTERNALDATE RFC822.SIZE FLAGS UID)`; ENVELOPE already supplies the date and size
 fetch attributes, so adding SIZE to the profile would duplicate RFC822.SIZE. Cached envelope
 values provide Message-ID, sent date, decoded subject and From. Exactly one non-group sender
 address is required; optional missing fields disable identity matching. No body or arbitrary
@@ -115,7 +115,7 @@ a heuristic: different bytes may share it. A matched move preserves UUID, direct
 MIME SHA-256/time and all saved content; reused moves increase no downloaded, failed or removed
 counter. Both ends of UIDVALIDITY resets are excluded. The runner discovers all folders before
 removal, writes matches first and commits before saving all cursors; reconciliation repairs an
-interrupted metadata/index reassignment. See `docs/storage-agent.md` for exact matching/recovery
+interrupted metadata/index reassignment or flag update. See `docs/storage-agent.md` for exact matching/recovery
 rules. Availability on the user's servers remains to verify (проверить); only synthetic protocol
 tests have been run for this metadata path.
 
@@ -130,6 +130,26 @@ MIME download succeeded with EXAMINE and BODY.PEEK. A later check through `MailS
 one session. The downloaded message was already read; unread behavior was not tested.
 See plan.md 2.2. Gmail has no successful user-run result; the user deferred its setup on
 2026-10-25. Gmail and OAuth2 support remain available for later use.
+
+## Read/star observations
+
+The existing batch profile now adds FLAGS. The renewed EXAMINE creates fresh message objects,
+so a cached envelope/flag set from an earlier observation cannot suppress the metadata fetch.
+ReadOnlyImapStore observes UID and FLAGS directly in the batch FetchResponse before Angus
+updates its cache. ImapClient never calls getFlags/isSet: absent FLAGS must stay unknown and
+must not trigger an extra request. The per-batch observation map is cleared before fetch.
+A present empty list means read=false and flagged=false; Seen and Flagged set their respective
+booleans. Missing FLAGS yields null for both; malformed parsed responses abort with a sanitized
+protocol error and no retry, including parse errors Angus would otherwise discard.
+No STORE, SELECT, body retrieval or additional authentication is enabled.
+
+All present refs refresh on requested sync, including known mail. Null fields preserve stored
+values; explicit false clears them. Destination flags apply after move reuse but are excluded
+from its identity; a UIDVALIDITY reset uses only fresh observations. Flags are user read/star
+state, independent of Gmail Important. Flag-only changes update metadata/index without writing
+MIME/body/attachments or changing state, error, time or counters. Schema 4 rebuilds offline
+from saved data; old metadata stays unknown until a requested sync. Real-server flag behavior
+remains to verify (проверить).
 
 ## Offline verification and primary references
 

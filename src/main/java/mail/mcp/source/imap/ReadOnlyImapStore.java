@@ -1,6 +1,11 @@
 package mail.mcp.source.imap;
 
 import jakarta.mail.Session;
+import jakarta.mail.Flags;
+import org.eclipse.angus.mail.imap.protocol.FetchResponse;
+import org.eclipse.angus.mail.imap.protocol.MessageSet;
+import org.eclipse.angus.mail.imap.protocol.UID;
+import org.eclipse.angus.mail.imap.protocol.FLAGS;
 import org.eclipse.angus.mail.iap.Argument;
 import org.eclipse.angus.mail.iap.ProtocolException;
 import org.eclipse.angus.mail.iap.Response;
@@ -12,6 +17,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.Locale;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Set;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -23,6 +30,10 @@ final class ReadOnlyImapStore extends IMAPStore {
     private final AtomicBoolean authenticationStarted = new AtomicBoolean();
     private final boolean implicitTls;
     private final boolean oauth;
+    private final Map<Long, Flags> metadataFlags = new HashMap<>();
+
+    void clearMetadataFlags() { metadataFlags.clear(); }
+    Flags metadataFlags(long uid) { return metadataFlags.get(uid); }
 
     ReadOnlyImapStore(Session session, boolean implicitTls, boolean oauth) {
         super(session, null, "imaps", implicitTls);
@@ -36,6 +47,37 @@ final class ReadOnlyImapStore extends IMAPStore {
                 new PrintStream(OutputStream.nullOutputStream()));
         return new IMAPProtocol("imaps", host, port, session.getProperties(), implicitTls, logger) {
             private boolean oauthAuthenticated;
+            private boolean malformedResponse;
+
+            @Override public Response readResponse() throws IOException, ProtocolException {
+                try { return super.readResponse(); }
+                catch (org.eclipse.angus.mail.iap.ParsingException e) {
+                    malformedResponse = true;
+                    throw e;
+                }
+            }
+
+            // Observe the actual batch response before Angus updates its message cache. Never
+            // call getFlags(): an absent FLAGS item would trigger another fetch or use stale data.
+            @Override public Response[] fetch(MessageSet[] messages, String items) throws ProtocolException {
+                malformedResponse = false;
+                Response[] responses = super.fetch(messages, items);
+                if (items.contains("FLAGS") && items.contains("ENVELOPE")) {
+                    if (malformedResponse) { throw new ProtocolException("Malformed metadata response"); }
+                    // IMAPFolder.fetch ignores CommandFailedException; surface it as a generic
+                    // protocol failure so getters cannot silently issue replacement requests.
+                    try { handleResult(responses[responses.length - 1]); }
+                    catch (ProtocolException e) { throw new ProtocolException("Metadata fetch failed"); }
+                    for (var response : responses) {
+                        if (response instanceof FetchResponse fetch) {
+                            var uid = fetch.getItem(UID.class);
+                            var flags = fetch.getItem(FLAGS.class);
+                            if (uid != null && flags != null) { metadataFlags.put(uid.uid, new Flags(flags)); }
+                        }
+                    }
+                }
+                return responses;
+            }
 
             @Override public boolean isAuthenticated() { return oauthAuthenticated || super.isAuthenticated(); }
 

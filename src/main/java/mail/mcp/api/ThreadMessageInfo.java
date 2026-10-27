@@ -25,5 +25,13 @@ public record ThreadMessageInfo(
         @Schema(description = "downloaded, converted or failed.", requiredMode = Schema.RequiredMode.REQUIRED)
         String state,
         @Schema(description = "Absolute message directory; files may be read directly.", requiredMode = Schema.RequiredMode.REQUIRED)
-        String localPath
+        String localPath,
+        @Schema(description = "Read state at the latest successful observation; absent when unknown.",
+                nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        Boolean read,
+        @Schema(description = "User flag/star at the latest successful observation, not sender importance; absent when unknown.",
+                nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        Boolean flagged
 ) { }

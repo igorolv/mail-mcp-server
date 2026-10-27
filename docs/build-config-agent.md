@@ -146,11 +146,13 @@ See `docs/tools-agent.md` for status fields and cross-process reading.
 The first run downloads the whole mailbox and may take a while (EWS uses one `GetItem` per
 message). Run the same command again:
 with no new mail it ends with `0 downloaded`; reused moves also increase no downloaded, failed
-or removed count. Each run reads identity metadata for all present refs in batches of at most
-100, without MIME/body retrieval; the first run seeds old stores without repeat downloads or
-reprocessing. Matching remains heuristic and can conceal different remote content; see
+or removed count. Each run reads identity and read/star metadata for all present refs in batches
+of at most 100, without MIME/body retrieval; the first run seeds old stores without repeat
+downloads or reprocessing. Flag-only changes also increase no counter and preserve content,
+state/error and download time. Missing flag fields retain known values; explicit false clears
+them. Matching remains heuristic and can conceal different remote content; see
 `docs/storage-agent.md`. After an interruption, the next run removes
-incomplete directories, restores missing or identity-mismatched index entries from metadata and resumes without
+incomplete directories, restores missing or identity/flag-mismatched index entries from metadata and resumes without
 downloading messages already stored. Failures end the run without automatic retries.
 
 Output (folder paths are shown; addresses, subjects and credentials are hidden):
@@ -240,7 +242,7 @@ No sync or other writer may be running for the same connection. The command forc
 in place, then calls `SyncRunner.restore`: converted messages load headers and saved body.md,
 downloaded messages are processed, failed messages get metadata only. Incomplete directories
 are removed. Originals and converted output remain unchanged for converted messages.
-The index commits every 100 entries and at the end, with commit data `schema=2`.
+The index commits every 100 entries and at the end, with commit data `schema=4`.
 Progress goes to the command's output only; server restoration stays silent.
 
 ```text
@@ -254,7 +256,9 @@ metadata entries. Exit codes: 0 success/help; 2 arguments/configuration/selectio
 pandoc; 4 local storage error; 5 connection index locked; 1 unexpected local error.
 The missing-pandoc message is the same as for reprocessing. Local error details are withheld.
 Old-schema indexes also recreate automatically when a writer opens during sync; until then,
-the search tool asks for reindexing. Reader tools never initiate a rebuild.
+search, listMessages and getThread ask for reindexing. Reader tools never initiate a rebuild.
+Saved read/star observations survive the offline rebuild; old metadata without flags remains
+unknown until a user-requested sync. Reindexing alone cannot obtain remote flag state.
 
 ## Gmail OAuth2
 

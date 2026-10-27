@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 
 /** Derived catalog for one connection, owned by the process holding Lucene's write lock. */
 public final class MailIndex implements AutoCloseable {
-    public static final String SCHEMA = "3";
+    public static final String SCHEMA = "4";
     private final FSDirectory directory;
     private final IndexWriter writer;
 
@@ -81,6 +81,8 @@ public final class MailIndex implements AutoCloseable {
         document.add(new StringField("ref", meta.folderKey() + "/" + meta.ref(), Field.Store.YES));
         document.add(new StringField("folder", meta.folder(), Field.Store.YES));
         document.add(new StringField("state", meta.state().id(), Field.Store.YES));
+        if (meta.read() != null) { document.add(new StringField("read", meta.read().toString(), Field.Store.YES)); }
+        if (meta.flagged() != null) { document.add(new StringField("flagged", meta.flagged().toString(), Field.Store.YES)); }
         if (meta.error() != null) { document.add(new StoredField("error", meta.error())); }
         if (message != null) {
             if (message.date() != null) {
@@ -190,7 +192,9 @@ public final class MailIndex implements AutoCloseable {
                 if (diskKeys.contains(key)) {
                     var meta = store.readMeta(key).orElseThrow();
                     if (!(meta.folderKey() + "/" + meta.ref()).equals(document.get("ref"))
-                            || !meta.folder().equals(document.get("folder"))) { changedKeys.add(key); }
+                            || !meta.folder().equals(document.get("folder"))
+                            || !java.util.Objects.equals(meta.read() == null ? null : meta.read().toString(), document.get("read"))
+                            || !java.util.Objects.equals(meta.flagged() == null ? null : meta.flagged().toString(), document.get("flagged"))) { changedKeys.add(key); }
                 }
             }
         } catch (IOException e) { throw new UncheckedIOException(e); }

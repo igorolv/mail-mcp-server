@@ -106,6 +106,17 @@ class McpStdioServerTest {
                 assertThat(threadCardSchema.has(field)).as("thread card field %s", field).isTrue();
             }
             assertThat(threadCardSchema.toString()).doesNotContain("messageId", "inReplyTo", "references", "body");
+            for (String name : List.of("listMessages", "getMessage", "search", "getThread")) {
+                var tool = java.util.stream.StreamSupport.stream(tools.at("/result/tools").spliterator(), false)
+                        .filter(t -> t.path("name").asString().equals(name)).findFirst().orElseThrow();
+                var schema = tool.path("outputSchema");
+                if (name.equals("listMessages") || name.equals("getThread")) { schema = schema.at("/properties/messages/items"); }
+                if (name.equals("search")) { schema = schema.at("/properties/hits/items"); }
+                for (String flag : List.of("read", "flagged")) {
+                    assertThat(schema.at("/properties/" + flag + "/type").toString()).contains("boolean");
+                    assertThat(schema.path("required").toString()).doesNotContain("\"" + flag + "\"");
+                }
+            }
             JsonNode searchTool = java.util.stream.StreamSupport.stream(tools.at("/result/tools").spliterator(), false)
                     .filter(tool -> tool.path("name").asString().equals("search")).findFirst().orElseThrow();
             assertThat(searchTool.at("/inputSchema/required").toString()).doesNotContain("query", "since", "until");
@@ -137,6 +148,24 @@ class McpStdioServerTest {
             assertThat(dateOnly.at("/hits/0/score").asDouble()).isZero(); assertThat(dateOnly.at("/hits/0").has("snippet")).isFalse();
             assertThat(dateOnly.at("/hits/0").has("snippetAttachmentFile")).isFalse();
             assertThat(dateOnly.at("/hits/0").has("snippetAttachmentName")).isFalse();
+            for (var card : messages.path("messages")) {
+                var detail = call(requests, io, replies, stderr, stdout, 40, "getMessage",
+                        "{\"connection\":\"local\",\"key\":\"" + card.path("key").asString() + "\"}");
+                var conversation = call(requests, io, replies, stderr, stdout, 41, "getThread",
+                        "{\"connection\":\"local\",\"key\":\"" + card.path("key").asString() + "\"}");
+                var dated = java.util.stream.StreamSupport.stream(dateOnly.path("hits").spliterator(), false)
+                        .filter(c -> c.path("key").equals(card.path("key"))).findFirst().orElseThrow();
+                for (String flag : List.of("read", "flagged")) {
+                    assertThat(detail.path(flag)).isEqualTo(card.path(flag));
+                    assertThat(conversation.at("/messages/0").path(flag)).isEqualTo(card.path(flag));
+                    assertThat(dated.path(flag)).isEqualTo(card.path(flag));
+                    if (card.has(flag)) { assertThat(card.path(flag).isBoolean()).isTrue(); }
+                }
+            }
+            assertThat(java.util.stream.StreamSupport.stream(messages.path("messages").spliterator(), false)
+                    .filter(c -> c.has("read")).count()).isEqualTo(1);
+            assertThat(java.util.stream.StreamSupport.stream(messages.path("messages").spliterator(), false)
+                    .filter(c -> c.path("flagged").isBoolean() && !c.path("flagged").asBoolean()).count()).isEqualTo(1);
             String key = messages.at("/messages/0/key").asString();
             JsonNode thread = call(requests, io, replies, stderr, stdout, 31, "getThread",
                     "{\"connection\":\"local\",\"key\":\"" + key + "\"}");
@@ -175,6 +204,12 @@ class McpStdioServerTest {
             JsonNode search = call(requests, io, replies, stderr, stdout, 9, "search",
                     "{\"connection\":\"local\",\"query\":\"sender@example.com\",\"field\":\"from\"}");
             assertThat(search.get("total").asInt()).isEqualTo(2);
+            for (var hit : search.path("hits")) {
+                var card = java.util.stream.StreamSupport.stream(messages.path("messages").spliterator(), false)
+                        .filter(c -> c.path("key").equals(hit.path("key"))).findFirst().orElseThrow();
+                assertThat(hit.path("read")).isEqualTo(card.path("read"));
+                assertThat(hit.path("flagged")).isEqualTo(card.path("flagged"));
+            }
             assertThat(search.at("/hits/0/folder").asString()).isEqualTo("f1");
             assertThat(Path.of(search.at("/hits/0/localPath").asString())).isDirectory();
 
@@ -259,7 +294,8 @@ class McpStdioServerTest {
             for (String fixture : List.of("M01-rfc2231-continuations.eml", "M16-unsafe-filenames.eml")) {
                 String key = store.newKey();
                 Files.copy(Path.of("testdata/mime", fixture), store.createMessageDir(key).resolve(MessageStore.MESSAGE_FILE));
-                var meta = new MessageMeta(key, "f1", "INBOX", fixture, 0, null, Instant.now(), MessageState.DOWNLOADED, null);
+                var meta = new MessageMeta(key, "f1", "INBOX", fixture, 0, null, Instant.now(), MessageState.DOWNLOADED, null, null,
+                        fixture.startsWith("M01") ? Boolean.TRUE : null, fixture.startsWith("M01") ? Boolean.FALSE : Boolean.TRUE);
                 store.writeMeta(meta);
                 var processed = new MessageProcessor(store, new Pandoc("unused")).process(meta);
                 var attachment = processed.message().attachments().getFirst();
@@ -325,4 +361,10 @@ class McpStdioServerTest {
             // the process ended
         }
     }
+
+    @org.junit.jupiter.api.Test
+    void messageFlagsAreOptionalBooleansInSchemaAndContent(@TempDir Path dir) throws Exception {
+        listConnectionsWorksOverStdioAndStdoutIsPureJsonRpc(false, dir);
+    }
+
 }

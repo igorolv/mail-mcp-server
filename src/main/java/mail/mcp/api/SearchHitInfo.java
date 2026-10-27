@@ -38,5 +38,13 @@ public record SearchHitInfo(
         @Schema(description = "Attachment display name, falling back to its exact filename when null or blank; " +
                 "present only with an attachment snippet.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        String snippetAttachmentName
+        String snippetAttachmentName,
+        @Schema(description = "Read state at the latest successful observation; absent when unknown.",
+                nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        Boolean read,
+        @Schema(description = "User flag/star at the latest successful observation, not sender importance; absent when unknown.",
+                nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        Boolean flagged
 ) { }

@@ -19,7 +19,8 @@ needs `mail-reprocess`, and their check on real messages is still pending
 ([docs/plan.md](docs/plan.md#24-ещё-не-проверено-на-реальной-почте), section 2.4).
 
 Local conversations (`getThread`) are accepted offline; checking a known conversation on real
-mail after restarting the server is still pending. No sync or reindex is needed.
+mail after restarting the server is still pending. Flags are verified offline and need a
+user-requested sync to populate existing mail; the schema-4 index rebuilds from disk.
 
 **Contents:** [Features](#features) · [How it works](#how-it-works) · [Quickstart](#quickstart) ·
 [MCP tools](#mcp-tools) · [Commands](#commands) · [Read-only protection](#read-only-protection) ·
@@ -67,6 +68,9 @@ mail after restarting the server is still pending. No sync or reindex is needed.
 - **Heuristic move reuse:** an unambiguous move between included folders can keep the local
   UUID, directory and all saved content without downloading or converting MIME again.
   This is verified offline; availability on the user's servers remains to verify (проверить).
+- **Read and star snapshots:** optional `read` and `flagged` booleans in message details, lists,
+  searches and conversations. Missing means unknown; false means observed unset. `flagged` is
+  the user flag/star, independent of sender importance and Gmail Important.
 - **Background sync** on request. The tool returns at once, `syncStatus` shows progress, and
   several server processes can share one data directory. Folder progress distinguishes an IMAP
   UIDVALIDITY `reset` from an EWS `rescanned` recovery of an invalid SyncState; old status files
@@ -91,12 +95,13 @@ MailSource (EWS | IMAP)  ──download .eml──▶  SyncRunner  ──▶  <d
 ```
 
 - Synchronization runs only when asked: the `sync` tool or the `mail-sync` command.
-- It always takes everything, then only changes: new messages, deletions, vanished folders.
+- It always takes everything, then updates additions, deletions, vanished folders and flag snapshots.
 - One sign-in per run and no retries: a stale password must not lock a domain account.
 - The disk is the full copy; the index is derived and can be rebuilt offline (`mail-reindex`).
 
 Each sync reads identity metadata for all present messages, including known ones, in batches of
-at most 100: EWS `GetItem` properties or IMAP `ENVELOPE`, UID and `RFC822.SIZE`, without bodies.
+at most 100: EWS `GetItem` identity and flag properties or IMAP `ENVELOPE`, UID, `RFC822.SIZE`
+and `FLAGS`, without bodies. Known mail refreshes on every requested sync.
 The first sync after upgrading seeds old local metadata without downloading known MIME or
 reprocessing it. A message moved before seeding uses the normal download path.
 
@@ -111,9 +116,23 @@ is not verified.
 
 All folders are discovered before applying changes. Matches update metadata and the index
 before unmatched removals. Old cursors and vanished-folder identities remain until all planned
-changes commit; the next run repairs an index whose folder/ref disagrees with metadata and uses
+changes commit; the next run repairs an index whose folder/ref or flags disagree with metadata and uses
 current local refs to resume. Content paths stay unchanged. Reused messages count as neither
 downloaded, failed nor removed, so `0 downloaded` can include recognized moves.
+
+The same metadata pass refreshes `read` and `flagged` independently. Missing/unsupported flag
+data keeps the last known value; explicit false clears it. Flag-only updates and reused moves
+increase no download/failure/removal counter and leave MIME, body, attachments, SHA-256, download
+time and processing state unchanged. EWS Update/ReadFlagChange events need no special handling:
+the full pass sees final state even without additions or removals, at the cost of metadata traffic
+for all present messages on every requested sync.
+
+Schema 4 adds stored flag fields. Opening the writer automatically rebuilds older indexes
+offline from disk; `mail-reindex <connection>` also rebuilds without network access. Old metadata
+has unknown flags until the next requested sync; reindexing alone cannot obtain remote state.
+`listMessages`, text/date-only `search` and `getThread` use committed index values;
+`getMessage` uses metadata even when MIME parsing fails. Real-server flag refresh remains
+to verify (проверить); only the user changes flags in their client and runs credentialed checks.
 
 Design, decisions and real-mailbox results: [docs/plan.md](docs/plan.md) (in Russian).
 
@@ -222,7 +241,7 @@ Only subject and displayed sender are optionally filtered; keys, folder keys, da
 paths remain usable. The result contains no bodies or raw header IDs; reading uses no bodies,
 attachment text or MIME.
 Each call reads one committed snapshot without the writer lock, network or pandoc; pages can
-change during concurrent sync. Schema 3 is unchanged and no reindex is needed.
+change during concurrent sync. Conversations use the schema-4 catalog without separate thread data.
 
 Both `search` and `listMessages` accept optional `since` and `until` MIME header dates.
 Use strict `YYYY-MM-DD` (UTC midnight) or an ISO-8601 datetime with `Z` or a numeric
@@ -230,8 +249,7 @@ offset, at millisecond precision. `since` is inclusive and `until` exclusive; fo
 26–27 UTC use `since: "2026-10-26"`, `until: "2026-10-28"`. Undated messages are excluded
 when a bound is supplied. `search` may omit `query` when a bound is present: it searches all
 folders unless `folder` is supplied, returns newest first then key, with score 0 and no snippet.
-Bounds are returned as normalized UTC instants. The existing index schema is unchanged; no
-reindex is needed.
+Bounds are returned as normalized UTC instants; date filtering uses the existing date fields.
 
 For `any`, a body match supplies the snippet; otherwise search uses the first matching saved
 attachment Markdown in expanded attachment list order. `attachmentText` selects attachments first;

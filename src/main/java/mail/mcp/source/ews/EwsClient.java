@@ -123,7 +123,7 @@ public final class EwsClient implements AutoCloseable {
         return transport.exchange(EwsOperation.SYNC_FOLDER_ITEMS, request, EwsResponseReader::readSyncPage);
     }
 
-    /** Identity properties only, in one batch; no MIME or body is requested. */
+    /** Identity and flag properties in one batch; no MIME or body is requested. */
     public Map<String, RemoteMessageInfo> metadata(List<String> refs) {
         if (refs.isEmpty() || refs.size() > 100 || refs.stream().anyMatch(id -> id == null || id.isBlank())
                 || new java.util.HashSet<>(refs).size() != refs.size()) {
@@ -134,7 +134,7 @@ public final class EwsClient implements AutoCloseable {
             EwsXml.typesElement(w, "BaseShape", "IdOnly");
             w.writeStartElement("t", "AdditionalProperties", EwsXml.TYPES_NS);
             for (String field : List.of("message:InternetMessageId", "item:Size", "item:DateTimeSent",
-                    "message:From", "item:Subject")) { EwsXml.fieldUri(w, field); }
+                    "message:From", "item:Subject", "message:IsRead", "item:Flag")) { EwsXml.fieldUri(w, field); }
             w.writeEndElement();
             w.writeEndElement();
             w.writeStartElement("m", "ItemIds", EwsXml.MESSAGES_NS);

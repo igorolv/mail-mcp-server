@@ -144,7 +144,7 @@ class EwsRequestTest {
                 "FieldURI=\"message:InternetMessageId\"", "FieldURI=\"item:Size\"",
                 "FieldURI=\"item:DateTimeSent\"", "FieldURI=\"message:From\"", "FieldURI=\"item:Subject\"",
                 "Id=\"id&quot;&lt;&gt;&amp;\"", "Id=\"second\"")
-                .doesNotContain("IncludeMimeContent", "item:Body", "<t:Body", "InternetMessageHeaders", "IsRead");
+                .doesNotContain("IncludeMimeContent", "item:Body", "<t:Body", "InternetMessageHeaders");
     }
 
     /** Captures the request and refuses to answer. */
@@ -172,4 +172,14 @@ class EwsRequestTest {
         public void close() {
         }
     }
+
+    @Test void metadataRequestsReadAndFlagWithoutMime() {
+        var transport = new RecordingTransport();
+        try (var client = new EwsClient(transport)) {
+            assertThatThrownBy(() -> client.metadata(List.of("item"))).isInstanceOf(UnsupportedOperationException.class);
+        }
+        assertThat(transport.lastRequest()).contains("FieldURI=\"message:IsRead\"", "FieldURI=\"item:Flag\"")
+                .doesNotContain("MimeContent", "item:Body", "Importance");
+    }
+
 }

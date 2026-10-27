@@ -83,7 +83,25 @@ completed folder pass and `syncStatus` for current progress. A committed catalog
 being processed. `MailIndexReader` opens the latest commit once per call.
 
 All tools advertise read-only and non-destructive hints. `sync` is not idempotent.
-MCP resources, mail flags and mail writing are not implemented here.
+MCP resources and mail writing are not implemented here.
+
+## Message flags
+
+`MessageSummary`, `SearchHitInfo`, `GetMessageResult` and `ThreadMessageInfo` append optional
+Boolean `read` and `flagged`. True and false are JSON booleans; unknown is omitted.
+They describe the latest successful remote observation, not live state. `flagged` means the
+user flag/star, not sender importance or Gmail Important. Booleans bypass SecretRedactor.
+
+`getMessage` reads flags from metadata even without readable MIME; list, text/date-only search
+and thread cards read the committed schema-4 index. Existing date bounds, conversation links,
+sorting and pagination are unchanged. Opening the writer rebuilds old schemas offline, or the
+user runs `mail-reindex <connection>`; old metadata remains unknown until a requested sync.
+Every sync refreshes flags on known mail through the existing full metadata pass without MIME
+downloads or conversion. Missing fields preserve known values independently; false clears them.
+Original files, state/error, SHA-256 and download time remain unchanged. Flags do not participate
+in move matching; destination observations apply after reuse. Flag-only updates and moves count
+as zero downloaded, failed and removed, preserving rescan reports and the background summary.
+Real-server behavior remains to verify (проверить).
 
 ## Threads
 
@@ -110,8 +128,7 @@ or cache is retained.
 
 Only key and the three stored header fields are scanned; dates use doc values and stored card
 fields are fetched for the returned page. No bodies, MIME, attachment text, source construction
-or pandoc are involved; reading works while the writer lock is held. Schema 3 remains unchanged,
-without reindexing. Missing index/anchor raises
+or pandoc are involved; reading works while the writer lock is held. Conversations use schema 4 without persisted thread data. Missing index/anchor raises
 `IllegalArgumentException("Message is not indexed; use listMessages")`. Old schemas raise the
 same rebuild error as search below.
 
@@ -141,8 +158,8 @@ occurrences beyond 10,000 characters. Selection uses raw text regardless of the 
 with filtering enabled, the complete selected text is filtered before passage selection and
 highlighting. If the match is removed, safe leading context retains the attachment identity;
 blank transformed text has no snippet or attachment fields. Raw matches, scores, totals and
-pagination stay unchanged. The query echo is filtered too. Schema 3 and disk format remain
-unchanged; existing Markdown needs no migration, reindexing or reprocessing.
+pagination stay unchanged. The query echo is filtered too. Snippets use the current schema-4
+fields and existing saved Markdown without reprocessing.
 
 | Field group | Index fields |
 |---|---|
@@ -197,7 +214,7 @@ precision collisions and raw synthetic secret matches remain accepted limitation
 
 Requested syncs now read one source metadata snapshot for every present ref, including known
 messages, in batches of at most 100 without MIME/body fetches. EWS uses IdOnly GetItem identity
-properties; IMAP uses ENVELOPE/size/UID and verifies UIDVALIDITY after reopening with EXAMINE.
+and flag properties; IMAP uses ENVELOPE/size/UID/FLAGS and verifies UIDVALIDITY after reopening with EXAMINE.
 The first ordinary sync seeds old `meta.json` fingerprints without repeat downloads or
 reprocessing. Before seeding, an apparent move uses normal download. No reader tool initiates
 these metadata requests.
@@ -210,7 +227,7 @@ Reused messages keep UUID and all original paths/content; cards gain the new fol
 commit. All folders are discovered before removal; matches commit first and removals check the
 old identity. Folder identities retain old/null cursors, including vanished folders, until the
 final replacement after all planned changes commit. On interruption, reconciliation repairs an
-indexed folder/ref/path differing from disk metadata and reruns skip current local refs.
+indexed folder/ref/path or flags differing from disk metadata and reruns skip current local refs.
 Final reports for retained folders follow the final cursor save; batch reports still mark
 `done=false`. See `docs/storage-agent.md` for exact eligibility and recovery rules. This path is
 verified offline; availability on the user's servers remains to verify (проверить).

@@ -48,9 +48,9 @@ class ImapClientTest {
             assertThat(fingerprint.sentAt()).isEqualTo(java.time.Instant.parse("2026-10-25T12:00:00Z"));
             assertThatThrownBy(result::clear).isInstanceOf(UnsupportedOperationException.class);
             assertThat(server.commands.stream().filter(s -> s.contains("ENVELOPE"))).containsExactly(
-                    "FETCH 1:100 (ENVELOPE INTERNALDATE RFC822.SIZE UID)",
-                    "FETCH 101:200 (ENVELOPE INTERNALDATE RFC822.SIZE UID)",
-                    "FETCH 201:205 (ENVELOPE INTERNALDATE RFC822.SIZE UID)");
+                    "FETCH 1:100 (ENVELOPE INTERNALDATE RFC822.SIZE FLAGS UID)",
+                    "FETCH 101:200 (ENVELOPE INTERNALDATE RFC822.SIZE FLAGS UID)",
+                    "FETCH 201:205 (ENVELOPE INTERNALDATE RFC822.SIZE FLAGS UID)");
             assertThat(server.commands).noneMatch(s -> s.matches("(?i).*(BODY|RFC822[^.]|SELECT |STORE |EXPUNGE|APPEND ).*"));
             assertThat(server.commands.stream().filter(s -> s.startsWith("LOGIN "))).hasSize(1);
         }
@@ -343,4 +343,44 @@ class ImapClientTest {
             assertThatThrownBy(client::listFolders).isInstanceOf(ImapException.class).hasMessageContaining("closed");
         }
     }
+
+    @Test void metadataRefreshesSeenAndFlaggedWithoutWrites() throws Exception {
+        try (var server = new FakeImapServer(); var client = new ImapClient(settings(server.port()), false)) {
+            var uids = client.folderUids("INBOX");
+            server.metadataFlags = "\\Seen \\Flagged";
+            var first = client.metadata("INBOX", uids.uidValidity(), uids.uids()).get("42");
+            assertThat(first.read()).isTrue();
+            assertThat(first.flagged()).isTrue();
+            server.metadataFlags = "";
+            var cleared = client.metadata("INBOX", 7, List.of(42L)).get("42");
+            assertThat(cleared.read()).isFalse();
+            assertThat(cleared.flagged()).isFalse();
+            server.omitMetadataFlags = true;
+            var absent = client.metadata("INBOX", 7, List.of(42L)).get("42");
+            assertThat(absent.read()).isNull();
+            assertThat(absent.flagged()).isNull();
+            assertThat(server.commands.stream().filter(c -> c.contains("ENVELOPE"))).hasSize(3);
+            assertThat(server.commands.stream().filter(c -> c.startsWith("LOGIN "))).hasSize(1);
+            assertThat(server.commands).noneMatch(c -> c.contains("BODY") || c.startsWith("SELECT") || c.contains("STORE"));
+        }
+        try (var server = new FakeImapServer(); var client = new ImapClient(settings(server.port()), false)) {
+            server.malformedMetadataFlags = true;
+            assertThatThrownBy(() -> client.metadata("INBOX", 7, List.of(42L)))
+                    .isInstanceOf(ImapException.class).hasNoCause();
+            assertThat(server.commands.stream().filter(c -> c.startsWith("LOGIN "))).hasSize(1);
+        }
+    }
+
+
+    @Test void metadataFetchRefusalIsSanitizedAndNeverRetried() throws Exception {
+        try (var server = new FakeImapServer(); var client = new ImapClient(settings(server.port()), false)) {
+            server.rejectMetadata = true;
+            assertThatThrownBy(() -> client.metadata("INBOX", 7, List.of(42L)))
+                    .isInstanceOf(ImapException.class).hasNoCause().hasMessage("IMAP operation failed; no automatic retry");
+            assertThat(server.commands.stream().filter(c -> c.contains("ENVELOPE"))).hasSize(1);
+            assertThat(server.commands.stream().filter(c -> c.startsWith("LOGIN "))).hasSize(1);
+            assertThatThrownBy(client::listFolders).isInstanceOf(ImapException.class).hasMessageContaining("closed");
+        }
+    }
+
 }

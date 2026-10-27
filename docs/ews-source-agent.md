@@ -78,7 +78,8 @@ when Exchange throttles it; a later user-run sync resumes using known refs and s
 
 `EwsMailSource.metadata(folder, expectedCursor, refs)` reads every resulting present ref,
 including known ones, in batches of at most 100 on the same session. Its `IdOnly` ItemShape adds
-`message:InternetMessageId`, `item:Size`, `item:DateTimeSent`, `message:From`, `item:Subject`.
+`message:InternetMessageId`, `item:Size`, `item:DateTimeSent`, `message:From`, `item:Subject`,
+`message:IsRead` and `item:Flag`.
 It requests neither IncludeMimeContent nor Body. The cursor remains opaque; EWS has no IMAP
 UIDVALIDITY check. A dedicated reader uses the shared safe parser and SOAP-fault checks,
 validates each GetItemResponseMessage and the response count, omits ErrorItemNotFound, and
@@ -91,13 +92,34 @@ retained copies before matching apparent moves. Unique complete Message-ID/metad
 can still hide different content: this is heuristic evidence, not remote byte identity. Reuse
 preserves UUID, paths, original SHA-256/time and every content file, and changes metadata/index
 before unmatched removals. All cursors advance only after planned changes commit; reconciliation
-repairs a metadata/index folder/ref mismatch on restart. Reused moves contribute no downloaded,
+repairs metadata/index folder/ref and flag mismatches on restart. Reused moves contribute no downloaded,
 failed or removed count. See `docs/storage-agent.md` for exact eligibility and recovery rules.
 Synthetic protocol tests cover these requests; availability on the user's EWS server remains
 to verify (проверить), not a real-mail result.
 
 Primary references checked 2026-10-27: [ItemShape](https://learn.microsoft.com/en-us/exchange/client-developer/web-service-reference/itemshape)
 and [FieldURI](https://learn.microsoft.com/en-us/exchange/client-developer/web-service-reference/fielduri).
+
+## Flag snapshots
+
+The same metadata GetItem reads nullable IsRead and Flag/FlagStatus for every present item,
+including unchanged refs. Explicit true/false (also XML boolean 1/0) maps to read.
+Flagged maps to flagged=true; NotFlagged and Complete map to false. Missing/unsupported
+values are unknown; fields update independently and missing data preserves a stored value.
+Importance:High is unrelated and is not requested or mapped. This implements the brief's
+user flag/star interpretation, not an additional user decision.
+
+Update/ReadFlagChange entries still need no separate interpretation: the full metadata pass
+observes final flags even without additions/removals. The tradeoff is batched metadata traffic
+for all present refs on every requested sync. It requests no MIME/body, adds no sign-in or retry
+and writes nothing to the mailbox. Known flag changes leave local content and download/state
+metadata unchanged, rebuild only the affected document and increase no message counter.
+Flags are excluded from move identity; destination observations apply on reuse. Schema 4 stores
+known values, with offline rebuild from disk; old data stays unknown until sync. Real-server
+availability remains to verify (проверить).
+
+Primary references: [Flag](https://learn.microsoft.com/en-us/exchange/client-developer/web-service-reference/flag)
+and [FlagStatus](https://learn.microsoft.com/en-us/exchange/client-developer/web-service-reference/flagstatus).
 
 ## Transport and NTLM
 

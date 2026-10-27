@@ -445,4 +445,26 @@ class MessageProcessorTest {
         }
         return result;
     }
+
+    @Test void reprocessingPreservesKnownAndUnknownFlags() throws Exception {
+        for (Boolean value : new Boolean[] {true, false, null}) {
+            var old = message("M01");
+            var meta = new MessageMeta(old.key(), old.folderKey(), old.folder(), old.ref(), old.size(), old.sha256(),
+                    old.downloadedAt(), old.state(), old.error(), old.fingerprint(), value, value);
+            var converted = processor().process(meta);
+            assertThat(converted.meta().read()).isEqualTo(value);
+            assertThat(converted.meta().flagged()).isEqualTo(value);
+            var repeated = processor().process(converted.meta());
+            assertThat(repeated.meta()).isEqualTo(converted.meta());
+            assertThat(processor().load(repeated.meta()).meta()).isEqualTo(repeated.meta());
+            Files.writeString(store().messageDir(meta.key()).resolve(MessageStore.MESSAGE_FILE),
+                    "Content-Type: multipart/mixed; boundary=missing\r\n\r\nnot a multipart");
+            var failed = processor().process(converted.meta());
+            assertThat(failed.meta().state()).isEqualTo(MessageState.FAILED);
+            assertThat(failed.meta().read()).isEqualTo(value);
+            assertThat(failed.meta().flagged()).isEqualTo(value);
+            assertThat(store().readMeta(meta.key())).contains(failed.meta());
+        }
+    }
+
 }

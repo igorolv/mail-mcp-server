@@ -15,7 +15,7 @@ Implemented and checked on the user's real mailboxes (plan.md section 2):
 - Read-only IMAP client on Angus Mail and `ImapMailSource`; Gmail Desktop OAuth2 with PKCE and
   XOAUTH2 (supported, real sign-in unverified; the user deferred Gmail).
 - Message directories with `meta.json`, `body.md`, attachment files and their `.md`; MIME
-  reading (`docs/mime-agent.md`); a derived Lucene index, schema 3, with Russian/English search
+  reading (`docs/mime-agent.md`); a derived Lucene index, schema 4, with Russian/English search
   (`docs/storage-agent.md`).
 - `SyncRunner`, background `SyncService` and `sync-status.json`.
 - Nine MCP tools (`docs/tools-agent.md`): `listConnections`, `sync`, `syncStatus`,
@@ -30,8 +30,24 @@ Implemented and checked on the user's real mailboxes (plan.md section 2):
 
 Optional tool-output secret replacement is described in `docs/redaction-agent.md`. Local files and the index remain unfiltered.
 
-Not implemented: PII anonymization, MCP resources, flags, embeddings, writing
+Not implemented: PII anonymization, MCP resources, embeddings, writing
 mail; see plan.md section 4.
+
+Read/star flags are implemented and verified offline; real-server behavior remains to verify
+(проверить). `RemoteMessageInfo`, `MessageMeta` and `MessageCard` carry nullable `read`/`flagged`.
+Unknown is omitted, while false clears an observed value. The existing metadata pass refreshes
+all present refs on every requested sync. EWS uses IsRead and Flag/FlagStatus; IMAP uses
+Seen/Flagged from the actual batch response after a renewed EXAMINE, never cached flag getters.
+The user flag/star is separate from sender importance and Gmail Important.
+
+Metadata-only flag updates atomically save changed metadata and rebuild its document from saved
+content without conversion or content writes. Reconciliation repairs flag mismatches too.
+Flags do not affect move identity; reused moves take destination observations, and UIDVALIDITY
+resets use fresh metadata. Counters, rescans, background summaries, dates and conversations keep
+their behavior. Schema 4 adds stored true/false string fields; old indexes rebuild offline on
+writer open, and old metadata stays unknown until requested sync. Reprocessing preserves flags.
+Local tools expose optional booleans from metadata (getMessage, even if MIME is broken) or the
+committed index (list/search/thread), without SecretRedactor.
 
 ## Transport and execution
 
@@ -108,7 +124,7 @@ cli/ ──► sync/, connections/, source/, store/, index/  (user-run commands 
 | `source/oauth/google/` | Google Desktop OAuth and refresh credentials. | All `Google*` classes and the package-private `OAuthJson` helper. Depends on shared `source/oauth/` components. See `docs/gmail-oauth-agent.md`. |
 | `model/` | Shared disk records and lifecycle. | `MessageState`, `MessageMeta`, `MessageFingerprint`, `LocalFolder`, `MailMessage`, `Address`, `AttachmentInfo`, `MessageCard`, `SearchHit`, `SearchResults`, `ThreadResults`, `FolderProgress`, `SyncStatus`, one type per file. |
 | `store/` | Local message directories and metadata. | `MessageStore`: UUID paths, atomic `meta.json`, `folders.json` and `sync-status.json`, listing and deletion. See `docs/storage-agent.md`. |
-| `index/` | Derived Lucene catalog and committed readers. | `MailIndex`: schema 3, metadata, headers/body/attachment text fields, NRT key/ref lookups, commit and reconciliation; `IndexLockedException`. `MailAnalyzers` shares per-field analysis, `SearchField` defines groups. `MailIndexReader` reads committed counts, sorted cards and scored search hits without the writer lock. Package-private `SearchSnippets` selects a body or saved attachment passage after paging. See `docs/storage-agent.md`. |
+| `index/` | Derived Lucene catalog and committed readers. | `MailIndex`: schema 4, metadata, headers/body/attachment text fields, NRT key/ref lookups, commit and reconciliation; `IndexLockedException`. `MailAnalyzers` shares per-field analysis, `SearchField` defines groups. `MailIndexReader` reads committed counts, sorted cards and scored search hits without the writer lock. Package-private `SearchSnippets` selects a body or saved attachment passage after paging. See `docs/storage-agent.md`. |
 | `tools/` | Thin `@McpTool` adapters, Spring `@Service` beans. | `ConnectionTools` (`listConnections`), `SyncTools` (`sync`, `syncStatus`), `MailTools` (`listFolders`, `listMessages`, `getMessage`), `SearchTools` (`search`), `ThreadTools` (`getThread`), `ToolLogger`. |
 | `api/` | Stable MCP response records with `@Schema`. | Discovery, sync start/status, folder/message pages, body chunks, attachment references, `SearchResult`, `SearchHitInfo`, `GetThreadResult` and `ThreadMessageInfo`. Never expose `source/` or `model/` records or settings here. |
 | `sync/` | One synchronization run and local conversion. | `SyncRunner`, `MessageProcessor`, `Processed`: reconcile by state/identity, discover all folders and metadata, reuse unique apparent moves before unmatched removals, download/convert in batches of 100, save all cursors after all changes commit. Caller owns the source and writer. `SyncService` owns background runs, `SyncStart` their immediate result; `SyncErrors` shares fixed CLI/status failure messages. |
@@ -125,7 +141,7 @@ body highlight wins; otherwise the first matching attachment is used. `attachmen
 attachments first. Other field groups and legacy reader overloads keep body-only snippets.
 Missing local candidates retain body context. The complete selected text is transformed before
 rendering. Search hits expose the exact lookup filename and a separately filtered display name
-only for attachment snippets. Schema 3 and disk layout are unchanged. Existing data requires
+only for attachment snippets. Attachment snippets use the current schema-4 fields and existing disk layout. Existing data requires
 `mail-reprocess` to create newly supported children/Markdown; finish a connection before using
 attachment lookup/search because extracted filenames can be renumbered in mixed lists.
 
@@ -137,14 +153,14 @@ IDs. Missing parents still connect siblings; cycles terminate and copies keep se
 The complete component sorts oldest first, undated last, then key before paging. Only header
 fields are scanned, dates use doc values, and stored card fields are loaded for the page.
 No bodies, MIME, attachment text, source or pandoc are read. The writer lock does not block
-reading. Schema 3 and disk layout remain unchanged, without reindexing or persisted threads.
+reading. Conversations use schema 4 without persisted threads or additional fields for links.
 Only displayed subjects/senders are filtered; keys, paths, folder keys and dates stay original.
 
 Move reuse is verified offline. Each sync reads metadata for all present refs in batches of at
-most 100, through EWS IdOnly GetItem with five identity properties or IMAP ENVELOPE/size/UID
+most 100, through EWS IdOnly GetItem identity/flag properties or IMAP ENVELOPE/size/UID/FLAGS
 with a renewed EXAMINE and UIDVALIDITY check. This first seeds old stores without repeat MIME
 downloads or reprocessing. `MessageMeta.fingerprint` is nullable for old JSON; processing and
-reindexing preserve it, and schema 3 remains unchanged. A move before seeding falls back to
+reindexing preserve it; it is independent of the schema-4 flag fields. A move before seeding falls back to
 normal download. Missing/incomplete refreshed identity clears the fingerprint.
 
 Matching uses a pre-run snapshot, an explicitly removed converted entry with MIME, and exactly
@@ -159,7 +175,7 @@ downloaded, failed nor removed; zero downloads may include moves.
 Before applying changes, folder identities are saved with old/null cursors, including vanished
 folders. Matches commit before unmatched removals, which check the original folder/ref before
 deleting. Only the final folder-list replacement advances all cursors and drops vanished entries.
-Reconciliation compares indexed folder/ref/path with disk metadata and restores just mismatched
+Reconciliation compares indexed folder/ref/path and flags with disk metadata and restores just mismatched
 documents without reconversion. Current local refs make reruns after metadata reassignment,
 index commit or interrupted downloads/cursor save idempotent. No journal or second store is
 used. Protocol availability on the user's servers remains to verify (проверить).

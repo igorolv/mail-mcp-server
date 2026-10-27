@@ -1,6 +1,6 @@
 # docs/storage-agent.md — message directories and the derived catalog
 
-Message directories, the derived Lucene index (schema 3), synchronization, MIME/body
+Message directories, the derived Lucene index (schema 4), synchronization, MIME/body
 processing, search and attachment text. See `docs/plan.md` 3.2–3.6 for the design.
 `MessageStore` and `MailIndex` take one connection directory; neither contacts a mailbox.
 
@@ -66,8 +66,7 @@ source-reported metadata. Its nullable Long size is independent of `MessageMeta.
 bytes); EWS item size can differ. Matching needs one nonempty angle-bracketed Message-ID without
 whitespace/nested brackets, positive size, known Instant, nonblank sender and subject. Only
 ID/address outer whitespace is stripped; comparison preserves case and the exact decoded subject.
-Processing, reprocessing and reindexing preserve the fingerprint. It is not indexed and schema 3
-is unchanged.
+Processing, reprocessing and reindexing preserve the fingerprint. It is not indexed; flags have separate schema-4 fields.
 Binary DOC/XLS/PPT (Office 97-2003) use the same `<file>.md` sidecars and index fields,
 including documents inside containers. No disk/API/schema change is required. Existing
 files need offline `mail-reprocess`, not merely `mail-reindex`, to create the newly supported
@@ -123,10 +122,29 @@ All present refs, including known messages, receive one metadata snapshot per fo
 protocol batches of at most 100 without MIME/body downloads. The first ordinary sync seeds old
 stores without reprocessing or repeat MIME downloads; moves before seeding fall back to download.
 A refreshed incomplete fingerprint clears the saved fingerprint to null. Reuse atomically
-rewrites only the folder key/path, remote ref and fingerprint, then rebuilds that index document
+rewrites the folder key/path, remote ref, fingerprint and observed destination flags, then rebuilds that index document
 with `MessageProcessor.load`. UUID, physical directory, state/error, MIME size/SHA-256/time,
 body, attachments and sidecars stay unchanged. Equal metadata can conceal different bytes:
 this heuristic does not verify remote byte identity; SHA-256 describes the saved original only.
+
+Nullable `MessageMeta.read` and `flagged` store the latest successful observations.
+Old JSON and compatibility constructors default both to null; null is omitted, while false
+serializes as a boolean false. `flagged` means the user flag/star, not sender importance or
+Gmail Important. Processing, failures, offline reprocessing and reindexing preserve both.
+
+Every metadata pass refreshes each known field independently: missing/unsupported data retains
+the old value, explicit false clears it. Added messages receive observed flags even when download
+fails. Retained entries rewrite metadata atomically only when it changes; changed flags rebuild
+that index document from saved content without download, conversion or content writes.
+State, error, download time, SHA-256, body and attachments remain unchanged. Unchanged flags
+cause no metadata/document rewrites. Flags are excluded from move fingerprints; reused moves
+take observed destination flags. UIDVALIDITY resets use only fresh metadata.
+Flag-only updates and moves add no downloaded/failed/removed count; rescan reporting is unchanged.
+
+Schema 4 adds stored string flag fields and automatically rebuilds older indexes from disk
+through the existing restore path. Old metadata restores unknown flags; an offline reindex
+cannot observe remote state. Reconciliation repairs a flag mismatch after metadata was saved
+before an interrupted index write, just as for folder/ref mismatches.
 
 ## Write order and failures
 
@@ -177,6 +195,7 @@ parsed MIME headers/attachment descriptions and saved Markdown:
 | `ref` | `folderKey + "/" + ref` | `StringField`, stored |
 | `folder` | Folder path | `StringField`, stored |
 | `state` | Lowercase state | `StringField`, stored |
+| `read`, `flagged` | Literal `true` or `false`; omitted when unknown | `StringField`, stored |
 | `error` | Failure explanation, only when non-null | `StoredField` |
 | `date` | Epoch milliseconds, absent when null | `LongPoint`, `StoredField`, `NumericDocValuesField` |
 | `subject`, `body` | Decoded subject and Markdown body, absent when null | `TextField`, stored |
@@ -199,7 +218,7 @@ Attachment contents use the Russian default analyzer and English analyzer for `a
 They are indexed without being stored. Snippets can read individual saved Markdown sidecars
 after paging; index fields and schema remain unchanged, with no migration or reindexing needed.
 
-Every commit, including closing the writer, carries user data `schema=3` (`MailIndex.SCHEMA`).
+Every commit, including closing the writer, carries user data `schema=4` (`MailIndex.SCHEMA`).
 Opening an existing index with another schema or no schema uses `OpenMode.CREATE`, rebuilding
 in place. `openWriter(dir, true)` always recreates it. No second generation is kept.
 The next `SyncRunner.restore` reconciles every missing entry from disk before network access:
@@ -219,11 +238,11 @@ There is no retry or additional lock. Closing commits the writer and closes the 
 Other Lucene I/O failures become `UncheckedIOException`.
 
 `reconcile(store)` deletes incomplete message directories, removes indexed keys absent from
-disk, reads existing metadata to compare the stored folder path and combined folder/ref, and
-returns sorted keys missing from the index or with a changed identity. It does not index or
+disk, reads existing metadata to compare the stored folder path, combined folder/ref and flags, and
+returns sorted keys missing from the index or with mismatched identity or flags. It does not index or
 commit them itself. `SyncRunner` processes downloaded entries, loads converted entries using
 MIME headers, saved `body.md` and attachment Markdown without writes, and indexes failed
-entries with null headers, body and attachment text. Matching index identities are left alone;
+entries with null headers, body and attachment text. Matching index identities and flags are left alone;
 no full rebuild or reconversion is needed. This closes an interruption after metadata reassignment
 before its index write. Interruptions after index commit and before cursor save also resume
 with the same destination key and content, without repeating the MIME download. Failed

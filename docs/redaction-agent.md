@@ -18,7 +18,8 @@ MIME parsing, conversion or synchronization. It has no network, file or logging 
 The five tool adapters filter human-readable response values: connection descriptions and
 configuration errors, folder paths, status messages, message subjects and displayed addresses,
 message header values, failure descriptions, attachment display names, body/attachment text,
-search subjects/senders, snippets and the query echo. Numeric values and dates are unchanged.
+search subjects/senders, snippets and the query echo. Numeric values, dates and nullable
+`read`/`flagged` booleans are unchanged; booleans never pass through SecretRedactor.
 
 Connection names, local keys, stored attachment filenames (`file`), MIME content types,
 `localPath`, `path` and `textPath` remain unchanged and usable. In particular, paths and stored
@@ -59,7 +60,7 @@ pagination. Only the returned cards' subject and displayed from are filtered. Co
 anchor/message keys, folder keys, dates, states and original localPath values are preserved,
 even when paths or folder keys contain detector matches. No raw header IDs or bodies are in
 the thread result. Thread reading loads no MIME, body or attachment text and performs no writes;
-schema 3 is unchanged and no reindex is required.
+threads use the schema-4 catalog without extra link fields or persisted thread data.
 
 ## Rules and replacement
 

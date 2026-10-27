@@ -63,7 +63,7 @@ public class ThreadTools {
                 var page = reader.thread(key, position, size);
                 var messages = page.cards().stream().map(c -> new ThreadMessageInfo(c.key(), c.folderKey(),
                         c.date(), redactor.text(c.from()), redactor.text(c.subject()), c.hasAttachments(), c.state(),
-                        store.messageDir(c.key()).toAbsolutePath().toString())).toList();
+                        store.messageDir(c.key()).toAbsolutePath().toString(), c.read(), c.flagged())).toList();
                 Integer next = (long) position + messages.size() < page.total() ? position + messages.size() : null;
                 ToolLogger.completed(log, "getThread", start);
                 return new GetThreadResult(definition.name(), key, page.total(), position, next, messages);

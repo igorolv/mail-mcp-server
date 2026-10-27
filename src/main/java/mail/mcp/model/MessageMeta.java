@@ -6,10 +6,17 @@ import java.time.Instant;
  * Contents of meta.json: what the .eml does not say about a message.
  * size and sha256: of message.eml; 0 and null when the download failed.
  * error: why the state is failed, otherwise null.
+ * read and flagged: latest successful remote observations; null when unknown.
  */
 public record MessageMeta(String key, String folderKey, String folder, String ref, long size,
                           String sha256, Instant downloadedAt, MessageState state, String error,
-                          MessageFingerprint fingerprint) {
+                          MessageFingerprint fingerprint, Boolean read, Boolean flagged) {
+    public MessageMeta(String key, String folderKey, String folder, String ref, long size,
+                       String sha256, Instant downloadedAt, MessageState state, String error,
+                       MessageFingerprint fingerprint) {
+        this(key, folderKey, folder, ref, size, sha256, downloadedAt, state, error, fingerprint, null, null);
+    }
+
     public MessageMeta(String key, String folderKey, String folder, String ref, long size,
                        String sha256, Instant downloadedAt, MessageState state, String error) {
         this(key, folderKey, folder, ref, size, sha256, downloadedAt, state, error, null);

@@ -38,7 +38,7 @@ class AttachmentSnippetTest {
                     new Part("report.pdf", "The needle appears in this saved Markdown."));
             try (var reader = MailIndexReader.open(dir).orElseThrow()) {
                 assertThat(reader.current()).isTrue();
-                assertThat(MailIndex.SCHEMA).isEqualTo("3");
+                assertThat(MailIndex.SCHEMA).isEqualTo("4");
                 for (var field : List.of(SearchField.ANY, SearchField.ATTACHMENT_TEXT)) {
                     var hit = reader.search("needle", field, null, 0, 20, null, store).hits().stream()
                             .filter(h -> h.card().key().equals(key)).findFirst().orElseThrow();
@@ -269,7 +269,7 @@ class AttachmentSnippetTest {
                 assertAttachment(hit, child.file(), child.name(), "**");
                 assertThat(hit.snippet()).containsIgnoringCase(query);
                 assertThat(child.parent()).isNotNull();
-                assertThat(MailIndex.SCHEMA).isEqualTo("3");
+                assertThat(MailIndex.SCHEMA).isEqualTo("4");
             }
         }
     }
@@ -302,7 +302,7 @@ class AttachmentSnippetTest {
                 assertThat(page.total()).isEqualTo(1);
                 assertAttachment(page.hits().getFirst(), "3__ledger.xls", "folder/ledger.xls", "**cobaltneedle**");
             }
-            assertThat(MailIndex.SCHEMA).isEqualTo("3");
+            assertThat(MailIndex.SCHEMA).isEqualTo("4");
         }
     }
 

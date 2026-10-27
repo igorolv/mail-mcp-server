@@ -280,6 +280,7 @@ final class EwsResponseReader {
         String ref = null, messageId = null, from = null, subject = null;
         Long size = null;
         Instant sentAt = null;
+        Boolean read = null, flagged = null;
         var fields = new java.util.HashSet<String>();
         while (r.hasNext()) {
             int event = r.next();
@@ -290,6 +291,28 @@ final class EwsResponseReader {
             if (!fields.add(field)) { throw new EwsProtocolException("Duplicate metadata field"); }
             switch (field) {
                 case "ItemId" -> { ref = r.getAttributeValue(null, "Id"); skipElement(r); }
+                case "IsRead" -> read = switch (r.getElementText().strip()) {
+                    case "true", "1" -> true;
+                    case "false", "0" -> false;
+                    default -> null;
+                };
+                case "Flag" -> {
+                    boolean seen = false;
+                    while (r.hasNext()) {
+                        int child = r.next();
+                        if (child == END_ELEMENT) { break; }
+                        if (child != START_ELEMENT) { continue; }
+                        if (EwsXml.TYPES_NS.equals(r.getNamespaceURI()) && "FlagStatus".equals(r.getLocalName())) {
+                            if (seen) { throw new EwsProtocolException("Duplicate metadata flag status"); }
+                            seen = true;
+                            flagged = switch (r.getElementText().strip()) {
+                                case "Flagged" -> true;
+                                case "NotFlagged", "Complete" -> false;
+                                default -> null;
+                            };
+                        } else { skipElement(r); }
+                    }
+                }
                 case "InternetMessageId" -> messageId = r.getElementText();
                 case "Subject" -> subject = r.getElementText();
                 case "Size" -> {
@@ -316,7 +339,7 @@ final class EwsResponseReader {
                 default -> skipElement(r);
             }
         }
-        return new RemoteMessageInfo(ref, new MessageFingerprint(messageId, size, sentAt, from, subject));
+        return new RemoteMessageInfo(ref, new MessageFingerprint(messageId, size, sentAt, from, subject), read, flagged);
     }
 
     @FunctionalInterface

@@ -14,8 +14,9 @@ mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/plan.md` section 2).
   `docs/plan.md` 2.4 (container expansion and legacy Office text need a user-run
   `mail-reprocess`; background summaries and EWS rescan reporting await observation during
   user-requested sync; date filters, date-only search and local conversations await local
-  queries after restart; heuristic move reuse needs user-run seeding and a manual test move;
-  applying the 5 MiB XLSX text threshold to existing mail needs optional user-run reprocessing).
+  queries after schema-4 rebuild and restart; heuristic move reuse needs user-run seeding and a manual test move;
+  applying the 5 MiB XLSX text threshold to existing mail needs optional user-run reprocessing;
+  read/star snapshots need user-requested sync and flag comparisons in the user's mail client).
 
 Work now consists of polishing and optional improvements:
 - `docs/plan.md` section 4 lists the open ones (`Д4`, `Д7`, …); the user chooses which to take.
@@ -190,7 +191,15 @@ code is listed in `docs/architecture-agent.md`.
 - **Local conversations:** `getThread` follows case-sensitive Message-ID, In-Reply-To and
   References across folders of one connection in one committed index snapshot. Copies remain
   separate; cards sort oldest first, undated last, then key before paging. No bodies, MIME,
-  source or pandoc are read; schema 3 is unchanged and no reindex is needed.
+  source or pandoc are read; conversations use the schema-4 catalog without persisted threads.
+- **Read/star snapshots:** nullable `read` and `flagged` represent the latest successful remote
+  observation, not live state. Unknown is omitted; explicit false clears a known value.
+  EWS reads IsRead and Flag/FlagStatus, IMAP reads Seen/Flagged in the existing metadata pass
+  for all present refs. Sender importance and Gmail Important are unrelated. Changed flags
+  update only metadata and the derived document, preserving content, state/error, download time
+  and counters. Flags are excluded from move identity; destination observations apply on reuse,
+  while UIDVALIDITY resets use fresh values. Schema 4 rebuilds old indexes offline from disk;
+  old metadata stays unknown until requested sync. Reconciliation repairs flag mismatches too.
 - **Synchronization:**
   - runs only on request: the `sync` tool in the background, or `mail-sync`;
   - always syncs everything, then incrementally;

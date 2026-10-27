@@ -114,4 +114,29 @@ class ThreadToolsTest {
             assertThat(tools.getThread("local", pending, null, null).total()).isEqualTo(206);
         }
     }
+
+    @Test void threadExposesStoredFlags() {
+        var tools = new ThreadTools(registry(), new JsonConfig().mailMcpObjectMapper());
+        var values = new Boolean[] {true, false, null};
+        var keys = new java.util.ArrayList<String>();
+        try (var writer = MailIndex.openWriter(dir.resolve("local"))) {
+            for (Boolean value : values) {
+                String key = UUID.randomUUID().toString();
+                keys.add(key);
+                writer.put(new MessageMeta(key, "f1", "INBOX", key, 0, null, Instant.now(),
+                                MessageState.CONVERTED, null, null, value, value),
+                        new MailMessage("Flags", null, null, null, null, "<shared@example.com>", null, null, null), null, null);
+            }
+            writer.commit();
+            for (int i = 0; i < values.length; i++) {
+                String key = keys.get(i);
+                var card = tools.getThread("local", keys.getFirst(), null, null).messages().stream()
+                        .filter(c -> c.key().equals(key)).findFirst().orElseThrow();
+                assertThat(card.read()).isEqualTo(values[i]);
+                assertThat(card.flagged()).isEqualTo(values[i]);
+            }
+        }
+        assertThat(dir.resolve("local/messages")).doesNotExist();
+    }
+
 }

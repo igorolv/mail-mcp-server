@@ -2,6 +2,7 @@ package mail.mcp.source.imap;
 
 import jakarta.mail.AuthenticationFailedException;
 import jakarta.mail.FetchProfile;
+import jakarta.mail.Flags;
 import jakarta.mail.Folder;
 import jakarta.mail.Message;
 import jakarta.mail.MessagingException;
@@ -183,7 +184,9 @@ public final class ImapClient implements AutoCloseable {
                 var profile = new FetchProfile();
                 // Angus 2.0.5 ENVELOPE already includes INTERNALDATE and RFC822.SIZE.
                 profile.add(FetchProfile.Item.ENVELOPE);
+                profile.add(FetchProfile.Item.FLAGS);
                 profile.add(UIDFolder.FetchProfileItem.UID);
+                store.clearMetadataFlags();
                 folder.fetch(messages, profile);
                 for (var entry : messages) {
                     var message = (IMAPMessage) entry;
@@ -200,7 +203,10 @@ public final class ImapClient implements AutoCloseable {
                         var date = message.getSentDate();
                         var fingerprint = new MessageFingerprint(message.getMessageID(), message.getSizeLong(),
                                 date == null ? null : date.toInstant(), from, message.getSubject());
-                        if (result.putIfAbsent(ref, new RemoteMessageInfo(ref, fingerprint)) != null) {
+                        var flags = store.metadataFlags(uid);
+                        if (result.putIfAbsent(ref, new RemoteMessageInfo(ref, fingerprint,
+                                flags == null ? null : flags.contains(Flags.Flag.SEEN),
+                                flags == null ? null : flags.contains(Flags.Flag.FLAGGED))) != null) {
                             throw new ImapException(ImapException.Kind.PROTOCOL);
                         }
                     } catch (MessageRemovedException e) { /* vanished since UID discovery */ }

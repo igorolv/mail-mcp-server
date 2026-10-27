@@ -724,4 +724,131 @@ class SyncRunnerTest {
         assertThat(refs("f1").get("1")).isNotEqualTo(old);
     }
 
+
+    @Test void flagOnlySyncUpdatesExistingMessageWithoutDownloadOrConversion() throws Exception {
+        String key = seedMove(false);
+        var old = store().readMeta(key).orElseThrow();
+        var before = content(key);
+        source.flags("a", "1", true, false);
+        assertThat(run()).allSatisfy(p -> {
+            assertThat(p.downloaded()).isZero(); assertThat(p.failed()).isZero(); assertThat(p.removed()).isZero();
+        });
+        var updated = store().readMeta(key).orElseThrow();
+        assertThat(updated.read()).isTrue();
+        assertThat(updated.flagged()).isFalse();
+        assertThat(updated.sha256()).isEqualTo(old.sha256());
+        assertThat(updated.downloadedAt()).isEqualTo(old.downloadedAt());
+        assertThat(updated.state()).isEqualTo(old.state());
+        assertThat(updated.error()).isEqualTo(old.error());
+        assertThat(content(key)).isEqualTo(before);
+        assertThat(source.downloadCalls).isZero();
+        assertThat(source.metadataCalls).isEqualTo(2);
+        try (var reader = mail.mcp.index.MailIndexReader.open(connectionDir).orElseThrow()) {
+            assertThat(reader.cards("f1", 0, 10).getFirst().read()).isTrue();
+            assertThat(reader.cards("f1", 0, 10).getFirst().flagged()).isFalse();
+        }
+        var metaTime = Files.getLastModifiedTime(store().messageDir(key).resolve(MessageStore.META_FILE));
+        int documentCount;
+        try (var directory = org.apache.lucene.store.FSDirectory.open(connectionDir.resolve("index"));
+             var reader = org.apache.lucene.index.DirectoryReader.open(directory)) {
+            documentCount = reader.maxDoc();
+        }
+        run();
+        assertThat(Files.getLastModifiedTime(store().messageDir(key).resolve(MessageStore.META_FILE))).isEqualTo(metaTime);
+        try (var directory = org.apache.lucene.store.FSDirectory.open(connectionDir.resolve("index"));
+             var reader = org.apache.lucene.index.DirectoryReader.open(directory)) {
+            assertThat(reader.maxDoc()).isEqualTo(documentCount);
+        }
+        source.flags("a", "1", false, true);
+        try (var index = MailIndex.openWriter(connectionDir)) {
+            assertThatThrownBy(() -> new SyncRunner(store(), index, source, processor(), point -> {
+                if (point.equals("metadataRefreshed")) { throw new IllegalStateException("synthetic stop"); }
+            }).run(p -> { })).isInstanceOf(IllegalStateException.class);
+        }
+        assertThat(store().readMeta(key).orElseThrow().read()).isFalse();
+        try (var reader = mail.mcp.index.MailIndexReader.open(connectionDir).orElseThrow()) {
+            assertThat(reader.cards("f1", 0, 10).getFirst().read()).isTrue();
+        }
+        try (var index = MailIndex.openWriter(connectionDir)) {
+            SyncRunner.restore(store(), index, processor());
+            assertThat(index.reconcile(store())).isEmpty();
+        }
+        try (var reader = mail.mcp.index.MailIndexReader.open(connectionDir).orElseThrow()) {
+            assertThat(reader.cards("f1", 0, 10).getFirst().read()).isFalse();
+            assertThat(reader.cards("f1", 0, 10).getFirst().flagged()).isTrue();
+        }
+        assertThat(content(key)).isEqualTo(before);
+    }
+
+    @Test void missingFlagDataDoesNotClearKnownValues() {
+        source.putFolder("a", "A", "7", "1", "2");
+        source.flags("a", "1", true, true);
+        source.flags("a", "2", false, true);
+        source.markTooLarge("a", "2");
+        run();
+        String key = refs("f1").get("1");
+        var failed = store().readMeta(refs("f1").get("2")).orElseThrow();
+        assertThat(failed.read()).isFalse();
+        assertThat(failed.flagged()).isTrue();
+        source.flags("a", "1", null, null);
+        source.missingMetadata.add("a/2");
+        source.resetCounts();
+        run();
+        assertThat(store().readMeta(key).orElseThrow().read()).isTrue();
+        assertThat(store().readMeta(key).orElseThrow().flagged()).isTrue();
+        assertThat(store().readMeta(failed.key())).contains(failed);
+        source.flags("a", "1", false, null);
+        run();
+        assertThat(store().readMeta(key).orElseThrow().read()).isFalse();
+        assertThat(store().readMeta(key).orElseThrow().flagged()).isTrue();
+        source.flags("a", "1", null, false);
+        run();
+        assertThat(store().readMeta(key).orElseThrow().read()).isFalse();
+        assertThat(store().readMeta(key).orElseThrow().flagged()).isFalse();
+        assertThat(source.downloadCalls).isZero();
+    }
+
+    @Test void moveUsesDestinationFlagsWithoutChangingItsIdentityMatch() throws Exception {
+        String key = seedMove(false);
+        source.flags("a", "1", true, true);
+        run();
+        var before = store().readMeta(key).orElseThrow();
+        var bytes = content(key);
+        moveRemote();
+        source.flags("b", "2", false, false);
+        source.resetCounts();
+        assertThat(run()).allSatisfy(p -> {
+            assertThat(p.downloaded()).isZero(); assertThat(p.failed()).isZero(); assertThat(p.removed()).isZero();
+        });
+        var moved = store().readMeta(key).orElseThrow();
+        assertThat(moved.folderKey()).isEqualTo("f2");
+        assertThat(moved.ref()).isEqualTo("2");
+        assertThat(moved.fingerprint()).isEqualTo(IDENTITY);
+        assertThat(moved.read()).isFalse();
+        assertThat(moved.flagged()).isFalse();
+        assertThat(moved.downloadedAt()).isEqualTo(before.downloadedAt());
+        assertThat(moved.sha256()).isEqualTo(before.sha256());
+        assertThat(content(key)).isEqualTo(bytes);
+        assertThat(source.downloadCalls).isZero();
+    }
+
+    @Test void uidValidityResetDoesNotInheritOldUidFlags() {
+        source.putFolder("a", "A", "7", "1", "2");
+        source.flags("a", "1", true, true);
+        source.flags("a", "2", true, true);
+        run();
+        var old = store().keys();
+        source.putFolder("a", "A", "8", "1", "2");
+        source.flags("a", "1", null, null);
+        source.flags("a", "2", false, false);
+        source.resetCounts();
+        assertThat(run()).containsExactly(new FolderProgress("A", 2, 0, 2, true, true));
+        assertThat(store().keys()).doesNotContainAnyElementsOf(old);
+        var unknown = store().readMeta(refs("f1").get("1")).orElseThrow();
+        var cleared = store().readMeta(refs("f1").get("2")).orElseThrow();
+        assertThat(unknown.read()).isNull(); assertThat(unknown.flagged()).isNull();
+        assertThat(cleared.read()).isFalse(); assertThat(cleared.flagged()).isFalse();
+        assertThat(source.downloadCalls).isEqualTo(2);
+    }
+
 }

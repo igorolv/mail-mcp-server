@@ -147,7 +147,7 @@ public final class SyncRunner {
             for (var entry : plan.info().entrySet()) {
                 var old = matches.get(plan.folder().key() + "/" + entry.getKey());
                 if (old != null) {
-                    var meta = identity(old, plan.folder(), entry.getKey(), complete(entry.getValue()));
+                    var meta = identity(old, plan.folder(), entry.getKey(), entry.getValue());
                     store.writeMeta(meta);
                     checkpoint.accept("metadataReassigned");
                     put(processor.load(meta));
@@ -157,10 +157,12 @@ public final class SyncRunner {
             for (var entry : plan.refs().entrySet()) {
                 if (plan.removed().contains(entry.getKey())) { continue; }
                 var old = store.readMeta(entry.getValue()).orElseThrow();
-                var meta = identity(old, plan.folder(), entry.getKey(), complete(plan.info().get(entry.getKey())));
+                var meta = identity(old, plan.folder(), entry.getKey(), plan.info().get(entry.getKey()));
                 if (!meta.equals(old)) {
                     store.writeMeta(meta);
-                    if (!old.folder().equals(meta.folder())) {
+                    checkpoint.accept("metadataRefreshed");
+                    if (!old.folder().equals(meta.folder()) || !java.util.Objects.equals(old.read(), meta.read())
+                            || !java.util.Objects.equals(old.flagged(), meta.flagged())) {
                         put(meta.state() == MessageState.CONVERTED ? processor.load(meta) : new Processed(meta, null, null, null));
                     }
                 }
@@ -202,10 +204,14 @@ public final class SyncRunner {
                 try {
                     var mime = source.download(plan.remote(), ref, dir.resolve(MessageStore.MESSAGE_FILE));
                     meta = new MessageMeta(key, folder.key(), folder.path(), ref, mime.size(), mime.sha256(),
-                            Instant.now(), MessageState.DOWNLOADED, null, complete(plan.info().get(ref)));
+                            Instant.now(), MessageState.DOWNLOADED, null, complete(plan.info().get(ref)),
+                            plan.info().get(ref) == null ? null : plan.info().get(ref).read(),
+                            plan.info().get(ref) == null ? null : plan.info().get(ref).flagged());
                 } catch (MessageUnavailableException e) {
                     meta = new MessageMeta(key, folder.key(), folder.path(), ref, 0, null,
-                            Instant.now(), MessageState.FAILED, e.getMessage(), complete(plan.info().get(ref)));
+                            Instant.now(), MessageState.FAILED, e.getMessage(), complete(plan.info().get(ref)),
+                            plan.info().get(ref) == null ? null : plan.info().get(ref).read(),
+                            plan.info().get(ref) == null ? null : plan.info().get(ref).flagged());
                 }
                 store.writeMeta(meta);
                 var processed = meta.state() == MessageState.DOWNLOADED
@@ -270,9 +276,11 @@ public final class SyncRunner {
         return info != null && info.fingerprint() != null && info.fingerprint().complete() ? info.fingerprint() : null;
     }
 
-    private static MessageMeta identity(MessageMeta old, LocalFolder folder, String ref, MessageFingerprint fingerprint) {
+    private static MessageMeta identity(MessageMeta old, LocalFolder folder, String ref, RemoteMessageInfo info) {
         return new MessageMeta(old.key(), folder.key(), folder.path(), ref, old.size(), old.sha256(),
-                old.downloadedAt(), old.state(), old.error(), fingerprint);
+                old.downloadedAt(), old.state(), old.error(), complete(info),
+                info == null || info.read() == null ? old.read() : info.read(),
+                info == null || info.flagged() == null ? old.flagged() : info.flagged());
     }
 
     private boolean deleteOriginal(MessageMeta old) {

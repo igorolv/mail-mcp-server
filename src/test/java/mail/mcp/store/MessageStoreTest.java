@@ -192,4 +192,30 @@ class MessageStoreTest {
         assertThat(store().readSyncStatus().orElseThrow().folders().getFirst().rescanned()).isFalse();
     }
 
+
+    @Test void oldMetadataFlagsAreUnknownAndFalseRoundTrips() throws Exception {
+        var store = store();
+        String key = store.newKey();
+        var directory = store.createMessageDir(key);
+        Files.writeString(directory.resolve(MessageStore.META_FILE), """
+                {"key":"%s","folderKey":"f1","folder":"INBOX","ref":"101","size":12,
+                 "downloadedAt":"2026-10-25T12:00:00Z","state":"converted"}
+                """.formatted(key));
+        var old = store.readMeta(key).orElseThrow();
+        assertThat(old.read()).isNull();
+        assertThat(old.flagged()).isNull();
+        store.writeMeta(old);
+        assertThat(Files.readString(directory.resolve(MessageStore.META_FILE))).doesNotContain("\"read\"", "\"flagged\"");
+        for (boolean value : new boolean[] {false, true}) {
+            var meta = new MessageMeta(key, "f1", "INBOX", "101", old.size(), old.sha256(), old.downloadedAt(),
+                    old.state(), old.error(), old.fingerprint(), value, value);
+            store.writeMeta(meta);
+            assertThat(store.readMeta(key)).contains(meta);
+            var json = MAPPER.readTree(Files.readString(directory.resolve(MessageStore.META_FILE)));
+            assertThat(json.get("read").isBoolean()).isTrue();
+            assertThat(json.get("read").asBoolean()).isEqualTo(value);
+            assertThat(json.get("flagged").asBoolean()).isEqualTo(value);
+        }
+    }
+
 }

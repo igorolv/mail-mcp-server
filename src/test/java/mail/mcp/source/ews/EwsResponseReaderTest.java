@@ -241,4 +241,25 @@ class EwsResponseReaderTest {
             decoder.finish();
         }).isInstanceOf(EwsProtocolException.class).hasMessageContaining("truncated");
     }
+
+    @Test void metadataReadsFlaggedCompleteNotFlaggedAndUnknown() throws Exception {
+        String[] statuses = {"Flagged", "Complete", "NotFlagged", "Unexpected", ""};
+        Boolean[] expected = {true, false, false, null, null};
+        for (int i = 0; i < statuses.length; i++) {
+            String flags = "<t:IsRead>" + (i == 0 ? "true" : i == 1 ? "false" : "unknown") + "</t:IsRead>"
+                    + "<t:Flag><t:FlagStatus>" + statuses[i] + "</t:FlagStatus></t:Flag><t:Importance>High</t:Importance>";
+            var info = EwsResponseReader.readMetadata(metadataXml(metadataItem("one")
+                    .replace("</t:Message>", flags + "</t:Message>")), List.of("one")).get("one");
+            assertThat(info.flagged()).isEqualTo(expected[i]);
+            assertThat(info.read()).isEqualTo(i == 0 ? Boolean.TRUE : i == 1 ? Boolean.FALSE : null);
+        }
+        var absent = EwsResponseReader.readMetadata(metadataXml(metadataItem("one")), List.of("one")).get("one");
+        assertThat(absent.read()).isNull();
+        assertThat(absent.flagged()).isNull();
+        var partial = EwsResponseReader.readMetadata(metadataXml(metadataItem("one")
+                .replace("</t:Message>", "<t:IsRead>false</t:IsRead><t:Flag/></t:Message>")), List.of("one")).get("one");
+        assertThat(partial.read()).isFalse();
+        assertThat(partial.flagged()).isNull();
+    }
+
 }

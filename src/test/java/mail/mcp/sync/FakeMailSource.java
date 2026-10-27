@@ -39,6 +39,11 @@ public final class FakeMailSource implements MailSource {
     private final Set<String> tooLarge = new HashSet<>();
     private int failAt;
     private final Map<String, MessageFingerprint> fingerprints = new LinkedHashMap<>();
+    private final Map<String, RemoteMessageInfo> flags = new LinkedHashMap<>();
+    public final Set<String> missingMetadata = new HashSet<>();
+    public void flags(String folder, String ref, Boolean read, Boolean flagged) {
+        flags.put(folder + "/" + ref, new RemoteMessageInfo(ref, null, read, flagged));
+    }
     public int metadataCalls;
     public int failMetadataAt;
     public int foldersCalls;
@@ -94,8 +99,10 @@ public final class FakeMailSource implements MailSource {
         if (++metadataCalls == failMetadataAt) { throw new ImapException(ImapException.Kind.PROTOCOL); }
         var result = new LinkedHashMap<String, RemoteMessageInfo>();
         for (String ref : refs) {
-            if (messages.get(folder.remoteId()).containsKey(ref)) {
-                result.put(ref, new RemoteMessageInfo(ref, fingerprints.get(folder.remoteId() + "/" + ref)));
+            if (messages.get(folder.remoteId()).containsKey(ref) && !missingMetadata.contains(folder.remoteId() + "/" + ref)) {
+                var observed = flags.get(folder.remoteId() + "/" + ref);
+                result.put(ref, new RemoteMessageInfo(ref, fingerprints.get(folder.remoteId() + "/" + ref),
+                        observed == null ? null : observed.read(), observed == null ? null : observed.flagged()));
             }
         }
         return Map.copyOf(result);

@@ -214,4 +214,26 @@ class SearchToolsTest {
         try (var index = MailIndex.openWriter(dir)) { put(index, "f1"); index.commit(); assertThat(tools.search("local", "the and", "body", null, null, null, "2026-10-26", null).total()).isZero(); }
     }
 
+
+    @Test void textAndDateSearchExposeStoredFlags() {
+        for (Boolean value : new Boolean[] {true, false, null}) {
+            String key = store.newKey();
+            var meta = new MessageMeta(key, "f1", "INBOX", key, 0, null, Instant.now(),
+                    MessageState.CONVERTED, null, null, value, value);
+            var message = new MailMessage("Flags", null, null, null, Instant.parse("2026-10-25T12:00:00Z"),
+                    null, null, null, null);
+            try (var writer = MailIndex.openWriter(dir)) {
+                writer.put(meta, message, "Needle", null);
+                writer.commit();
+                for (var result : List.of(tools.search("local", "Needle", "body", null, null, null),
+                        tools.search("local", null, null, null, null, null, "2026-10-25", "2026-10-26"))) {
+                    var hit = result.hits().stream().filter(c -> c.key().equals(key)).findFirst().orElseThrow();
+                    assertThat(hit.read()).isEqualTo(value);
+                    assertThat(hit.flagged()).isEqualTo(value);
+                }
+            }
+        }
+        assertThat(registry.isInitialized("local")).isFalse();
+    }
+
 }

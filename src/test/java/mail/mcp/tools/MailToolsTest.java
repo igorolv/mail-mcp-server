@@ -348,4 +348,33 @@ class MailToolsTest {
         assertThatThrownBy(() -> tools.listMessages("local", "f1", null, null, "2026-10-26", null)).isInstanceOf(IllegalStateException.class);
     }
 
+
+    @Test void messageAndListExposeTrueFalseAndUnknownFlags() throws Exception {
+        String key = keys.getFirst();
+        var original = store.readMeta(key).orElseThrow();
+        for (Boolean value : new Boolean[] {true, false, null}) {
+            var meta = new MessageMeta(key, original.folderKey(), original.folder(), original.ref(), original.size(),
+                    original.sha256(), original.downloadedAt(), original.state(), original.error(), original.fingerprint(), value, value);
+            store.writeMeta(meta);
+            try (var index = MailIndex.openWriter(dir)) {
+                var loaded = new MessageProcessor(store, new Pandoc("unused")).load(meta);
+                index.put(meta, loaded.message(), loaded.body(), loaded.attachmentText());
+                index.commit();
+                var card = tools.listMessages("local", "f1", null, null).messages().stream()
+                        .filter(c -> c.key().equals(key)).findFirst().orElseThrow();
+                assertThat(card.read()).isEqualTo(value);
+                assertThat(card.flagged()).isEqualTo(value);
+                // Metadata changes are visible to getMessage before the next committed index update.
+                store.writeMeta(new MessageMeta(key, "f1", "INBOX", meta.ref(), 0, null, meta.downloadedAt(),
+                        MessageState.FAILED, "Synthetic failure", null, value, value));
+                Files.writeString(store.messageDir(key).resolve(MessageStore.MESSAGE_FILE),
+                        "Content-Type: multipart/mixed; boundary=missing\r\n\r\nnot a multipart");
+                var result = tools.getMessage("local", key, null, null);
+                assertThat(result.subject()).isNull();
+                assertThat(result.read()).isEqualTo(value);
+                assertThat(result.flagged()).isEqualTo(value);
+            }
+        }
+    }
+
 }

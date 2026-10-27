@@ -44,7 +44,7 @@ Non-interactive run with the Codex CLI (Windows PowerShell 5.1; set `$id` to the
 name without `.md`, and list in `-c` the MCP servers of your Codex config the task does not need):
 
 ```powershell
-$id = 'IT-19-message-flags'; "Read AGENTS.md, then docs/impl-tasks/README.md, then docs/impl-tasks/$id.md. Implement the task described there. Change only the files it allows. Do not commit. When done, reply with the implementation report from docs/impl-tasks/README.md." | codex exec -C C:\git\mail-mcp-server -s workspace-write -c 'mcp_servers.jdbc.enabled=false' -c 'mcp_servers.redmine.enabled=false' -c 'mcp_servers.sonar.enabled=false' -o "$env:TEMP\$id.last.txt" -
+$id = '<brief-file-name-without-.md>'; "Read AGENTS.md, then docs/impl-tasks/README.md, then docs/impl-tasks/$id.md. Implement the task described there. Change only the files it allows. Do not commit. When done, reply with the implementation report from docs/impl-tasks/README.md." | codex exec -C C:\git\mail-mcp-server -s workspace-write -c 'mcp_servers.jdbc.enabled=false' -c 'mcp_servers.redmine.enabled=false' -c 'mcp_servers.sonar.enabled=false' -o "$env:TEMP\$id.last.txt" -
 ```
 
 ### 2. Review
@@ -117,26 +117,21 @@ The reviewer checks; it does not fix. Work through every point and report what y
 ## Task list
 
 IT-01…IT-16 were accepted and deleted (2026-10-25…27). The user requested six briefs together
-on 2026-10-27, based on `d3fd516`. IT-22 (Д25), IT-21 (Д24), IT-17 (Д5), IT-18 (Д8) and IT-20 (Д21) were accepted offline
-and deleted on 2026-10-27: background summaries, separate EWS rescan reporting, date filters,
-date-only search, local conversation cards, heuristic move reuse and the 5 MiB XLSX text threshold
-are implemented. The remaining brief is listed below in its original execution order; preserve
-the accepted IT-22, IT-21, IT-17, IT-18 and IT-20 behavior. Checks still pending on real mail are
-in `docs/plan.md` 2.4; applying the XLSX threshold to existing mail is optional and user-run.
+on 2026-10-27, based on `d3fd516`. All six — IT-22 (Д25), IT-21 (Д24), IT-17 (Д5), IT-18 (Д8),
+IT-20 (Д21) and IT-19 (Д9) — were accepted offline and deleted on 2026-10-27. Background
+summaries, separate EWS rescan reporting, date filters, date-only search, local conversation
+cards, heuristic move reuse, the 5 MiB XLSX text threshold and read/star snapshots are implemented.
+No open briefs remain. Preserve the accepted behavior when preparing the next brief.
+Checks still pending on real mail are in `docs/plan.md` 2.4; applying the XLSX threshold to
+existing mail is optional and user-run. Flags need requested sync; old indexes rebuild offline
+to schema 4, while old metadata remains unknown until remote observation.
 Next unused number: IT-23.
 
-| Order | Brief | Plan item | Scope and dependency |
-|---|---|---|---|
-| 5 | [IT-19](IT-19-message-flags.md) | Д9 | Read/star flags; depends on IT-18 metadata and IT-17 thread cards, preserves date-only search. |
-
-Numbers follow the user's requested items, not execution order. Complete the implement →
-review → record cycle for each before starting the next; do not run these agents concurrently.
-IT-18's interruption recovery and protocol allow-list changes were reviewed offline; preserve
-them when extending metadata snapshots for IT-19. All six can be accepted offline with real-mail
-checks explicitly pending; only the user runs credentialed validation. The D8 heuristic was
-explicitly selected by the user;
-other concrete defaults in the briefs are implementation proposals, not new recorded user
-decisions. Recording one brief must preserve the remaining rows and their dependency notes.
+Complete the implement → review → record cycle for each brief before starting the next;
+do not run these agents concurrently. Preserve interruption recovery and protocol allow-lists.
+Only the user runs credentialed validation. The D8 heuristic was explicitly selected by the
+user; other concrete defaults in the accepted batch are implementation choices, not additional
+recorded user decisions.
 
 ## Rules for every implementation session
 

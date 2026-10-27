@@ -97,7 +97,7 @@ public class SearchTools {
                     return new SearchHitInfo(c.key(), c.folderKey(), c.date(), redactor.text(c.from()), redactor.text(c.subject()),
                             c.hasAttachments(), c.state(), hit.score(), hit.snippet(),
                             store.messageDir(c.key()).toAbsolutePath().toString(), hit.snippetAttachmentFile(),
-                            redactor.text(hit.snippetAttachmentName()));
+                            redactor.text(hit.snippetAttachmentName()), c.read(), c.flagged());
                 }).toList();
                 Integer next = (long) position + hits.size() < results.total() ? position + hits.size() : null;
                 ToolLogger.completed(log, "search", start);

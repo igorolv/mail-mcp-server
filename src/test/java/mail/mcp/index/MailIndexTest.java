@@ -51,7 +51,7 @@ class MailIndexTest {
         try (var reader = MailIndexReader.open(connectionDir).orElseThrow()) { assertThat(reader.current()).isTrue(); }
         try (var directory = FSDirectory.open(connectionDir.resolve("index"));
              var reader = DirectoryReader.open(directory)) {
-            assertThat(reader.getIndexCommit().getUserData().get("schema")).isEqualTo("3");
+            assertThat(reader.getIndexCommit().getUserData().get("schema")).isEqualTo("4");
         }
     }
 
@@ -300,4 +300,61 @@ class MailIndexTest {
                     new org.apache.lucene.index.Term("body", "indexed")))).isEqualTo(1);
         }
     }
+
+    @Test void rebuildAndReconciliationPreserveAndRepairFlags() throws Exception {
+        var store = store();
+        String key = store.newKey();
+        var meta = new MessageMeta(key, "f1", "INBOX", "101", 12, "a".repeat(64),
+                Instant.parse("2026-10-25T12:00:00Z"), MessageState.CONVERTED, null, null, true, false);
+        save(store, meta);
+        Files.writeString(store.messageDir(key).resolve(MessageStore.MESSAGE_FILE), "Subject: Saved\r\n\r\nOriginal body");
+        Files.writeString(store.messageDir(key).resolve(MessageStore.BODY_FILE), "Saved Markdown");
+        // A schema-3 commit must rebuild automatically without source access.
+        try (var directory = FSDirectory.open(connectionDir.resolve("index"));
+             var writer = new org.apache.lucene.index.IndexWriter(directory, new org.apache.lucene.index.IndexWriterConfig())) {
+            writer.setLiveCommitData(Map.of("schema", "3").entrySet());
+        }
+        var processor = new mail.mcp.sync.MessageProcessor(store, new mail.mcp.convert.Pandoc("unused"));
+        String unknownKey = store.newKey();
+        var unknown = new MessageMeta(unknownKey, "f1", "INBOX", "102", 0, null, meta.downloadedAt(),
+                MessageState.FAILED, "Synthetic failure");
+        save(store, unknown);
+        try (var index = MailIndex.openWriter(connectionDir)) {
+            assertThat(index.keys()).isEmpty();
+            mail.mcp.sync.SyncRunner.restore(store, index, processor);
+        }
+        try (var reader = MailIndexReader.open(connectionDir).orElseThrow()) {
+            var cards = reader.cards("f1", 0, 10);
+            var card = cards.stream().filter(c -> c.key().equals(key)).findFirst().orElseThrow();
+            assertThat(card.read()).isTrue(); assertThat(card.flagged()).isFalse();
+            var old = cards.stream().filter(c -> c.key().equals(unknownKey)).findFirst().orElseThrow();
+            assertThat(old.read()).isNull(); assertThat(old.flagged()).isNull();
+        }
+        // Simulate an interrupted atomic metadata write before the index document was updated.
+        var updated = new MessageMeta(key, "f1", "INBOX", "101", meta.size(), meta.sha256(), meta.downloadedAt(),
+                meta.state(), null, null, false, true);
+        store.writeMeta(updated);
+        try (var index = MailIndex.openWriter(connectionDir)) {
+            assertThat(index.reconcile(store)).containsExactly(key);
+            mail.mcp.sync.SyncRunner.restore(store, index, processor);
+            assertThat(index.reconcile(store)).isEmpty();
+        }
+        try (var directory = FSDirectory.open(connectionDir.resolve("index")); var reader = DirectoryReader.open(directory)) {
+            var searcher = new org.apache.lucene.search.IndexSearcher(reader);
+            var hit = searcher.search(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term("key", key)), 1);
+            var document = reader.storedFields().document(hit.scoreDocs[0].doc);
+            assertThat(document.get("read")).isEqualTo("false");
+            assertThat(document.get("flagged")).isEqualTo("true");
+            assertThat(document.get("body")).isEqualTo("Saved Markdown");
+            assertThat(searcher.count(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term("read", "false")))).isEqualTo(1);
+        }
+        try (var index = MailIndex.openWriter(connectionDir, true)) { mail.mcp.sync.SyncRunner.restore(store, index, processor); }
+        try (var reader = MailIndexReader.open(connectionDir).orElseThrow()) {
+            var card = reader.cards("f1", 0, 10).stream().filter(c -> c.key().equals(key)).findFirst().orElseThrow();
+            assertThat(card.read()).isFalse(); assertThat(card.flagged()).isTrue();
+        }
+        assertThat(store.readMeta(key)).contains(updated);
+        assertThat(Files.readString(store.messageDir(key).resolve(MessageStore.BODY_FILE))).isEqualTo("Saved Markdown");
+    }
+
 }
