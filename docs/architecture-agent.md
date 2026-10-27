@@ -1,12 +1,12 @@
 # docs/architecture-agent.md — source layout, technology and layer boundaries
 
 Read this when locating code, adding a package, changing a dependency, or changing the server
-transport and Spring wiring. The design summary is `docs/plan.md` section 3 (packages: 3.3),
-possible improvements are in section 4, decisions in section 5. This file describes what exists.
+transport and Spring wiring. Principles and data flow are in `docs/plan.md` section 3, possible
+improvements in section 4, decisions in `docs/decisions.md`. This file describes what exists.
 
 ## Status (2026-10-26: draft version complete)
 
-Implemented and checked on the user's real mailboxes (plan.md section 2):
+Implemented and checked on the user's real mailboxes (`docs/results.md`):
 
 - Gradle build, Spring Boot application with the stdio MCP transport, the connections file with
   a lazy registry.
@@ -58,7 +58,7 @@ and the HttpClient `headers`/`wire` loggers are `OFF` because they would print `
 headers. Both logging configurations keep the Angus/Jakarta Mail loggers off and log only errors
 from PDFBox and FontBox. `McpServerConfig` sets `immediateExecution(true)` on the `McpSyncServer` builder (copied
 from redmine-mcp-server @ `f62b3e5`): tool calls of one session run one at a time, so long work —
-synchronization — runs in the background and returns at once (plan.md 3.6).
+synchronization — runs in the background and returns at once (`docs/tools-agent.md`).
 `config/McpStdioConcurrencyTest` documents the race; its disabled half passed once with MCP SDK
 2.1.0 on 2026-10-24, which is not yet a reason to drop the setting.
 
@@ -84,7 +84,7 @@ existing shared analyzer and omit the `wordForms` commit entry.
   `2.1.0` when released. MCP Java SDK 2.1.0, Jackson 3 (`tools.jackson`) come transitively.
 - **Apache HttpClient 5.6.5** classic — EWS transport with explicitly registered NTLM (П1).
 - **Eclipse Angus Mail 2.0.5**, **Jakarta Mail API 2.1.5** — IMAP with implicit TLS (П3); also the
-  MIME parser (plan.md 3.5).
+  MIME parser (`docs/mime-agent.md`).
 - **Lucene Core 10.5.2** — derived catalog, NRT lookups and the per-connection write lock.
 - **Lucene analysis-common, queryparser, highlighter 10.5.2** — field analyzers,
   `SimpleQueryParser` and `UnifiedHighlighter`, all on the catalog's version.
@@ -96,7 +96,7 @@ existing shared analyzer and omit the `wordForms` commit entry.
 Pandoc is required on `PATH` for sync/reprocessing/reindexing; `Pandoc` runs one sandboxed process per
 body or supported attachment conversion. PDFBox and POI run in-process, without the sibling
 parser framework. Do not add Mime4j, jsoup, SQLite or any other library the plan
-does not name (plan.md 3.8).
+does not name (`docs/decisions.md` section 1).
 
 If you change a dependency, update `libs.versions.toml`, not the build script.
 
@@ -208,11 +208,11 @@ needs them and register them above. Attachment converters live in `convert/`.
   `ConnectionRegistry` name/definition lookups (source resolution only for sync); there is no
   default connection and no cross-mailbox call.
 - Tools return `api/` records; connection credentials, hosts and logins are not returned. Mail
-  content and local paths to message files may be returned (plan.md 3.7). Optional output
+  content and local paths to message files may be returned (`docs/tools-agent.md`). Optional output
   filtering applies to human-readable response text, not original paths or lookup identifiers.
 - Anything that reaches a mail server goes through `source/`; only allow-listed EWS operations
-  exist (`EwsOperation`). Adding one needs a decision in plan.md section 5.
-- Follow plan.md 3.8: no limit budgets, extra databases, diagnostic codes or speculative
+  exist (`EwsOperation`). Adding one needs a decision in `docs/decisions.md`.
+- Follow `docs/decisions.md` section 1: no limit budgets, extra databases, diagnostic codes or speculative
   safeguards that the step's done criterion does not require.
 - Code copied from sibling projects names its source and commit in the class Javadoc (П5).
 - Keep OAuth provider implementations in `source/oauth/<provider>/`. Shared `source/oauth/`

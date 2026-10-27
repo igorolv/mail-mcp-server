@@ -20,7 +20,7 @@ public interface MailSource extends AutoCloseable {
 
     /**
      * Identity and read/star metadata of the given refs, in practice the added ones: known refs keep
-     * their stored fingerprints (docs/plan.md 3.6, Д29). Requests use batches of at most 100, without
+     * their stored fingerprints (docs/decisions.md, Д29). Requests use batches of at most 100, without
      * MIME/body reads. Missing items are omitted; other errors abort. The expected cursor is the one
      * just returned by changes (IMAP checks UIDVALIDITY).
      */

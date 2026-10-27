@@ -2,7 +2,8 @@
 
 Read this when changing `redaction/`, its startup flag or a tool's output filtering.
 The purpose is to reduce accidental inclusion of secrets in model context, not prevent
-intentional extraction. See plan.md 3.1 and the user's decision in section 5.
+intentional extraction. See plan.md 3.1 and the Д6 decision in `docs/decisions.md`;
+the user-facing summary is `docs/security.md`, "Secret filter".
 
 ## Boundary and configuration
 

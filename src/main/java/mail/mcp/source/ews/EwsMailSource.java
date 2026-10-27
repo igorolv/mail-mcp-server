@@ -105,7 +105,7 @@ public final class EwsMailSource implements MailSource {
     }
 
     /**
-     * Read/star observations of known items that changed (docs/plan.md 3.6, Д29): ReadFlagChange
+     * Read/star observations of known items that changed (docs/decisions.md, Д29): ReadFlagChange
      * carries IsRead; an Update, for example of a follow-up flag, is read with a short metadata
      * request for those items only. Fingerprints are dropped: known items keep their stored identity.
      */

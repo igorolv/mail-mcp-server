@@ -7,7 +7,7 @@ package mail.mcp.source.ews;
  *
  * <p>The request writer takes the operation element name from this enum, so a write operation such
  * as {@code UpdateItem}, {@code MoveItem} or {@code SendItem} cannot even be expressed. Adding a
- * constant here needs a recorded decision in {@code docs/plan.md} section 5.
+ * constant here needs a recorded decision in {@code docs/decisions.md}.
  */
 public enum EwsOperation {
 

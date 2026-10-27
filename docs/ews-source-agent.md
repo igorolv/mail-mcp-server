@@ -1,7 +1,7 @@
 # docs/ews-source-agent.md — EWS client and NTLM transport
 
 Read this before changing anything in `source/ews/` or adding an EWS operation.
-Background: plan.md 2.1 (server facts), decisions П1 and П4,
+Background: `docs/results.md` section 1 (server facts), decisions П1 and П4,
 research RT-02 (client and NTLM) and RT-03 (operations).
 
 ## Shape
@@ -15,7 +15,7 @@ EwsClient ──builds request (EwsXml.envelope)──> EwsTransport.exchange(op
 - `EwsOperation` is the allow-list: the 10 read operations of `docs/research/RT-03-ews-operations.md`. The envelope writer
   takes the request element name from this enum, so a write operation cannot be expressed.
   `EwsRequestTest` fails if a write operation from RT-03 appears in it. Adding an operation needs a
-  decision in plan.md section 5.
+  decision in `docs/decisions.md`.
 - Every request carries `RequestServerVersion Exchange2013_SP1` (the server is Exchange 2013 CU23).
 - `EwsClient` methods: `getFolder(DistinguishedFolder)`,
   `folderIds(List<DistinguishedFolder>)` (one IdOnly `GetFolder`, ids in request order; a count
@@ -133,7 +133,7 @@ and [FlagStatus](https://learn.microsoft.com/en-us/exchange/client-developer/web
   registered explicitly with `NTLMSchemeFactory`. Negotiate/Kerberos is never tried.
 - `NTCredentials(username, password, null, domain)`: without a configured domain the NTLM domain
   field stays empty and the server applies its own — the combination that signed in from .NET
-  (plan.md 2.1). Credentials are scoped to the host and port of the URL. Basic with a domain sends
+  (`docs/results.md` section 1). Credentials are scoped to the host and port of the URL. Basic with a domain sends
   `DOMAIN\login`.
 - One connection, one `HttpClientContext` per mailbox: NTLM authenticates the TCP connection.
 - Automatic retries and redirects are disabled. HTTP 401 after the handshake becomes
@@ -147,7 +147,7 @@ and [FlagStatus](https://learn.microsoft.com/en-us/exchange/client-developer/web
 Verified on 2026-10-25 by a user-run check against the real mailbox: `GetFolder`, `FindItem` and
 `GetItem` with MIME succeeded, with 3 HTTP requests after the first operation and 5 total.
 The authenticated connection was reused. `IsRead` was `true` both before and after the download;
-this run did not test an unread message. See plan.md 2.1. The fallback is not needed for this
+this run did not test an unread message. See `docs/results.md` section 1. The fallback is not needed for this
 tested connection.
 
 Known risk (RT-02): HttpClient's NTLM engine sends no channel binding. If the server enforces

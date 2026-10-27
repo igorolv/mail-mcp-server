@@ -20,7 +20,7 @@ final class EwsXml {
     static final String MESSAGES_NS = "http://schemas.microsoft.com/exchange/services/2006/messages";
     static final String TYPES_NS = "http://schemas.microsoft.com/exchange/services/2006/types";
 
-    /** Schema version of the Exchange 2013 CU23 server (docs/plan.md, 2.1). */
+    /** Schema version of the Exchange 2013 CU23 server (docs/results.md, 1). */
     static final String SERVER_VERSION = "Exchange2013_SP1";
 
     private static final XMLOutputFactory OUTPUT = XMLOutputFactory.newFactory();

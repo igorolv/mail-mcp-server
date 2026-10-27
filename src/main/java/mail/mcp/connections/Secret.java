@@ -3,7 +3,7 @@ package mail.mcp.connections;
 /**
  * A sign-in secret of one connection: a literal password from {@code connections.json}, a generic
  * Windows credential ({@code windowsCredential}, Д28) or the output of its {@code passwordCommand}
- * (Д22); docs/plan.md 3.6.
+ * (Д22); docs/decisions.md.
  *
  * <p>Sources ask for the value only right before signing in, so a command never runs at startup or
  * for a connection that is not synchronized. Implementations never print the value in

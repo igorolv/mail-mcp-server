@@ -12,7 +12,7 @@ import java.time.Duration;
  *
  * @param url            EWS endpoint, e.g. {@code https://webmail.example.com/EWS/Exchange.asmx}
  * @param auth           {@link AuthKind#NTLM} or {@link AuthKind#BASIC}
- * @param username       login; a bare login without a domain part works with NTLM (docs/plan.md, 2.1)
+ * @param username       login; a bare login without a domain part works with NTLM (docs/results.md, 1)
  * @param password       secret, asked for only at sign-in; never logged, never returned by a tool
  * @param domain         NTLM domain; {@code null} leaves the domain field of the NTLM message empty
  *                       and lets the server use its own domain

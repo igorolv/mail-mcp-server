@@ -115,7 +115,7 @@ source-size limit, shared budget, setting or catch of `Error`.
 An I/O, messaging or runtime exception stops only that container. Earlier listed entries remain,
 the incomplete entry is removed, and later containers can still expand. Debug logs contain
 only the exception class name. Container failures never change message state. These local
-limits are the approved exception in `plan.md` 3.8, not settings or a shared budget.
+limits are the approved exception in `docs/decisions.md` section 1, not settings or a shared budget.
 
 For existing local data, run `mail-reprocess <connection>`; `mail-reindex` alone does not create
 children or Markdown. Complete reprocessing of the connection before attachment lookup/search
@@ -137,7 +137,7 @@ has the fixed message `pandoc failed with exit code <n>`. I/O and interruption m
 fixed too and never include mail or process output. There are no timeouts or retries.
 
 The reviewer measured pandoc 3.1.11 on 2026-10-25: `pandoc server` listens on `0.0.0.0` without
-a localhost-only option; therefore the sandboxed per-conversion mode applies (plan.md 3.5).
+a localhost-only option; therefore the sandboxed per-conversion mode applies (decision 2026-10-25 in `docs/decisions.md`).
 A run cost about 27 ms; unknown formats exited 21. The sandbox refused a local LaTeX `\input`.
 Tests cover UTF-8 Markdown, removal of styles/scripts and no inclusion of local image content.
 
@@ -261,7 +261,7 @@ fall through to plain text because of a conflicting `text/plain` declaration. No
 dependency, option, size limit or state is introduced. Existing DOC/XLS/PPT files need
 `mail-reprocess` to create Markdown and indexed text, rather than `mail-reindex` alone.
 One reprocessing pass per connection covers both changes; whether it was run on real data is
-tracked in plan.md 2.4.
+tracked in plan.md section 2.
 
 Images, ZIP archives themselves, calendars and S/MIME are never converted; no OCR or expansion
 of archive formats other than ZIP is added.

@@ -16,7 +16,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.zip.ZipInputStream;
 
-/** Appends files inside saved EML, ZIP, MSG and TNEF containers (plan.md 3.5). */
+/** Appends files inside saved EML, ZIP, MSG and TNEF containers (docs/mime-agent.md). */
 public final class Containers {
     private static final Logger log = LoggerFactory.getLogger(Containers.class);
     private static final int MAX_DEPTH = 5;

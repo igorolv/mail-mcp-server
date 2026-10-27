@@ -18,7 +18,7 @@ import java.util.concurrent.TimeoutException;
 
 /**
  * A password printed by a local program, such as a password manager's CLI ({@code passwordCommand},
- * docs/plan.md 3.6, Д22).
+ * docs/decisions.md, Д22).
  *
  * <p>The program runs on the first {@link #value()} call, right before sign-in, and its result stays in
  * memory for the life of this process, so frequent synchronizations do not unlock the password

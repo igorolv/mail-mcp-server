@@ -1,7 +1,7 @@
 # docs/storage-agent.md — message directories and the derived catalog
 
 Message directories, the derived Lucene index (schema 4), synchronization, MIME/body
-processing, search and attachment text. See `docs/plan.md` 3.2–3.6 for the design.
+processing, search and attachment text. Principles and data flow: `docs/plan.md` 3.1–3.2.
 `MessageStore` and `MailIndex` take one connection directory; neither contacts a mailbox.
 
 ## Disk layout
@@ -71,7 +71,7 @@ Binary DOC/XLS/PPT (Office 97-2003) use the same `<file>.md` sidecars and index 
 including documents inside containers. No disk/API/schema change is required. Existing
 files need offline `mail-reprocess`, not merely `mail-reindex`, to create the newly supported
 Markdown; one pass covers containers and legacy Office text (pending real-data checks: plan.md
-2.4).
+section 2).
 
 Files inside EML, ZIP, MSG and TNEF containers share the same flat `attachments/` directory
 and numbering as MIME attachments. Their `AttachmentInfo.parent` points to the containing

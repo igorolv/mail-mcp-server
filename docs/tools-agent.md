@@ -1,6 +1,7 @@
 # docs/tools-agent.md — MCP tools and background synchronization
 
-Nine tools (plan.md 3.7). Tools are Spring services returning `api/` records, never `model/`
+Nine tools; the user-facing description of search, dates, copies and conversations is
+`docs/search.md`. Tools are Spring services returning `api/` records, never `model/`
 records.
 `MAIL_MCP_REDACT_SECRETS=true` optionally filters response text; see `docs/redaction-agent.md`.
 Downloads, files, index, lookup IDs, stored filenames and original local paths stay unchanged.
@@ -80,7 +81,7 @@ Binary DOC/XLS/PPT support targets Office 97-2003 and also applies to files insi
 It uses the same saved-text lookup and snippet attribution; legacy text is never converted
 on demand. Encrypted or malformed documents retain their file without Markdown.
 One reprocessing pass creates both container children and legacy Office text; `mail-reindex`
-alone cannot create that text. Pending real-data checks are tracked in plan.md 2.4.
+alone cannot create that text. Pending real-data checks are tracked in plan.md section 2.
 
 Every message response includes an absolute `localPath` to its directory. An agent with local
 file access may read those files directly. All reading tools use local data only, without
@@ -305,7 +306,8 @@ then opens the Lucene writer before constructing a lazy source. A competing writ
 `lockedByOtherProcess` without opening a source or changing status. One daemon platform thread
 named `sync-<connection>` owns the source and index for its run; it closes both, logs failures by
 exception class only and removes itself from the running map. After resources close, one INFO
-summary reports state, durationMs, downloaded, failed and removed. Downloaded counts converted
+summary reports state, durationMs, downloaded, failed and removed:
+`Background sync finished: state={}, durationMs={}, downloaded={}, failed={}, removed={}`. Downloaded counts converted
 new messages; failed counts per-message failures; removed counts removed local messages. Reused
 apparent moves count as none of these, so zero downloads may include recognized moves. Totals
 use the latest cumulative report for each folder, so on failure an unreported partial batch may

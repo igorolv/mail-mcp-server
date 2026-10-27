@@ -1,70 +1,31 @@
 # docs/gmail-oauth-agent.md — Gmail Desktop OAuth and IMAP XOAUTH2
 
 Read before changing `source/oauth/google/`, Gmail OAuth configuration or the `gmail-oauth` command.
-Design: plan.md 2.2 and the 2026-10-25 decision on Gmail OAuth2 (plan.md section 5).
-No real Gmail OAuth sign-in is verified yet; all agent checks use synthetic inputs and loopback servers.
-The user deferred connecting their Gmail on 2026-10-25 and uses only `work` and `mailru` locally.
-Keep this optional capability; the setup below is for a future explicit Gmail connection request.
+Design: the 2026-10-25 decision on Gmail OAuth2 (`docs/decisions.md`); status: `docs/results.md`,
+section 2. No real Gmail OAuth sign-in is verified yet; all agent checks use synthetic inputs and
+loopback servers. The user deferred connecting their Gmail on 2026-10-25 and uses only `work` and
+`mailru` locally. Keep this optional capability.
 
 ## User setup
 
-These steps are performed by the user, in their browser and local editor. Never ask for a password,
+The Google Cloud steps, the connection entry and the command sequence are in
+`docs/connections.md`, "Gmail" — the single source; update it when this flow changes. These steps
+are performed by the user, in their browser and local editor. Never ask for a password,
 authorization code, client JSON or token file in chat, and never read the real credential files.
 
-1. Open [Google Cloud Console](https://console.cloud.google.com/) and choose/create a project.
-   Cloud Console requires 2-Step Verification for the account managing the project. That can be
-   a different account you own with 2SV enabled; add the target Gmail as a test user in step 2.
-   OAuth removes the app-password requirement for the target mailbox; it does not remove Cloud
-   Console MFA or any verification Google requires during the mailbox's own login.
-2. Configure Google Auth Platform / OAuth consent: app name `mail-mcp-server`, support/contact
-   email, External audience for personal Gmail, Testing status, and your Gmail address as a test user.
-3. In Data Access add the scope `https://mail.google.com/`. This is the scope for IMAP;
-   `gmail.readonly` belongs to the Gmail REST API and does not authorize IMAP.
-4. In Clients create an OAuth client of type **Desktop app**, named `mail-mcp-server`.
-   Download its JSON and save it as `%USERPROFILE%\.mail-mcp-server\google-oauth-client.json`.
-   Do not use a Web application client, OOB/manual-code flow, service account, or someone else's client ID.
-5. Change only the Gmail entry in the existing external `connections.json`, using the schema below.
-   Keep the existing EWS/Mail.ru entries. Remove Gmail's old password field.
-6. Run `gmail-oauth gmail` using the built jar. The command opens the system browser; select the
-   same mailbox as the configured username and review/approve the consent request.
-7. After `RESULT: OK`, run `mail-sync gmail`. No rebuild is required when only credentials change.
+Facts behind that setup, checked against the primary sources below:
 
-Google requires a broad mail scope for IMAP, including permissions beyond reading. The server still
-enforces read-only commands at the IMAP protocol boundary; authorization itself does not narrow the scope.
-Google may show an unverified/testing-app warning or block authorization under account/admin policies.
-Use only the project/client you created. Workspace policy can override the setup.
-The Testing refresh token normally expires in seven days for this scope. `invalid_grant` requires
-running `gmail-oauth` again; there is no automatic browser or repeated sign-in fallback.
-OAuth does not require an app password, but Google can still request verification for the account.
-
-```json
-{
-  "connections": {
-    "gmail": {
-      "type": "imap",
-      "host": "imap.gmail.com",
-      "port": 993,
-      "tls": true,
-      "auth": "oauth2",
-      "username": "user@gmail.com",
-      "oauthClientFile": "${USERPROFILE}/.mail-mcp-server/google-oauth-client.json",
-      "description": "Personal Gmail"
-    }
-  }
-}
-```
-
-```powershell
-.\gradlew.bat bootJar
-java -jar build\libs\mail-mcp-server.jar gmail-oauth gmail
-java -jar build\libs\mail-mcp-server.jar mail-sync gmail
-```
-
-The downloaded client file should also be readable only by the owner, like connections.json:
-
-```powershell
-icacls "$env:USERPROFILE\.mail-mcp-server\google-oauth-client.json" /inheritance:r /grant:r "${env:USERNAME}:F"
-```
+- IMAP needs the scope `https://mail.google.com/`; `gmail.readonly` belongs to the Gmail REST API
+  and does not authorize IMAP. The broad scope includes more than reading; the server still
+  enforces read-only commands at the IMAP protocol boundary.
+- Only a **Desktop app** client works: no Web application client, OOB/manual-code flow, service
+  account or someone else's client ID.
+- Cloud Console requires 2-Step Verification for the account managing the project, which can be
+  a different account than the mailbox; OAuth removes only the app-password requirement.
+- Google may show an unverified/testing-app warning or block authorization under account/admin
+  policies. The Testing refresh token normally expires in seven days for this scope;
+  `invalid_grant` requires running `gmail-oauth` again, with no automatic browser or repeated
+  sign-in fallback.
 
 Only `gmail-oauth --help` is safe for agents to run against the normal environment. Never launch the
 real authorization command, browser flow, token refresh or mail sync on behalf of the user.
@@ -94,7 +55,7 @@ packages when implemented.
 - OAuth failures become fixed messages, with no raw provider body or nested exception. A failed token
   provider is terminal for that client; new attempts require an explicit new request. The token HTTP
   client disables retries and redirects, uses connect/request/read timeouts and a 64 KiB response cap.
-- Credential files remain plaintext protected by owner permissions; DPAPI encryption of the refresh token is plan.md Д27.
+- Credential files remain plaintext protected by owner permissions; DPAPI encryption of the refresh token is `docs/plan.md` Д27.
 
 ## Authorization flow
 

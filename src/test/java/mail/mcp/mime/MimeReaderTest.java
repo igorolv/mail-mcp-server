@@ -109,7 +109,7 @@ class MimeReaderTest {
                 assertThat(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(withCrlf)))
                         .isEqualTo(part.get("sha256").asString());
             } else if (id.equals("M19")) {
-                // Like M09, per level of nesting; nested messages stay opaque (plan.md 3.5).
+                // Like M09, per level of nesting; nested messages stay opaque (docs/mime-agent.md).
                 assertThat(actual.size()).isEqualTo(3381);
                 assertThat(hash).isEqualTo("738b154f7e560f0f62901fcb552ce3fbf34f04cc9a819f33fa578933c3ffcab5");
             } else {

@@ -66,7 +66,7 @@ public final class SyncRunner {
         Instant startedAt = Instant.now();
         long pid = ProcessHandle.current().pid();
         var folders = new LinkedHashMap<String, FolderProgress>();
-        // Only a run that did not complete can leave meta.json and the index apart (docs/plan.md 3.6, Д30).
+        // Only a run that did not complete can leave meta.json and the index apart (docs/decisions.md, Д30).
         boolean checkMetadata = !store.readSyncStatus().map(status -> "completed".equals(status.state())).orElse(false);
         try {
             store.writeSyncStatus(new SyncStatus("running", pid, startedAt, null, List.of(), null, false));
@@ -136,7 +136,7 @@ public final class SyncRunner {
             }
         }
         // Discovery is read-only after restoration. A run reads meta.json only of messages it removes,
-        // moves or changes, never of every message (docs/plan.md 3.6, Д30).
+        // moves or changes, never of every message (docs/decisions.md, Д30).
         var previousPaths = new HashMap<String, String>();
         local.forEach(folder -> previousPaths.put(folder.key(), folder.path()));
         var vanished = local.stream().filter(f -> remote.stream().noneMatch(r -> r.remoteId().equals(f.remoteId()))).toList();
@@ -157,7 +157,7 @@ public final class SyncRunner {
             removed.stream().map(refs::get).filter(java.util.Objects::nonNull).forEach(removedKeys::add);
             if (changes.reset()) { resetFolders.add(folder.key()); }
             // Known refs keep their stored fingerprints; flags come cheaply with the changes. Only
-            // added refs need identity metadata (docs/plan.md 3.6, Д29).
+            // added refs need identity metadata (docs/decisions.md, Д29).
             var info = new HashMap<String, RemoteMessageInfo>();
             changes.observed().forEach((ref, observed) -> {
                 if (refs.containsKey(ref) && !removed.contains(ref)) { info.put(ref, observed); }

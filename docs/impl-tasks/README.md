@@ -100,15 +100,16 @@ The reviewer checks; it does not fix. Work through every point and report what y
 
 ## Recording an accepted brief
 
-1. `docs/plan.md` (Russian, current state only; see AGENTS.md "Working with the plan"):
-   - **Section 4:** delete the improvement's row and add its number to the list of done items
-     above the table. A partly done improvement keeps its row with the remaining part.
-   - **Section 2:** add the user-run results, numbers only. If a real-mail check is still
-     pending, add it to 2.4 with the acceptance date.
-   - **Section 3:** update any statement the change made untrue.
-   - **Section 5:** add a row only for a decision the user made in this brief.
-2. Update every other document that still describes the old behavior. Check `README.md` and
-   the `AGENTS.md` status paragraph too.
+1. Russian project documents (current state only; see AGENTS.md "Working with the plan"):
+   - **`docs/plan.md` section 4:** delete the improvement's row and add its number to the list of
+     done items above the table. A partly done improvement keeps its row with the remaining part.
+   - **`docs/results.md`:** add the user-run results, numbers only. If a real-mail check is still
+     pending, add it to `docs/plan.md` section 2 with the acceptance date.
+   - **`docs/plan.md` section 3:** update a principle or the data flow if the change made it untrue.
+   - **`docs/decisions.md`:** add a row only for a decision the user made in this brief.
+2. Update every other document that still describes the old behavior: the engineering documents
+   (`docs/*-agent.md`), the user documents (`README.md`, `docs/connections.md`, `clients.md`,
+   `commands.md`, `search.md`, `security.md`) and the `AGENTS.md` status paragraph.
 3. Delete the brief file and remove its row from the task list below.
 4. Run `.\gradlew.bat build` again and the real-values check above.
 5. Commit everything with `git add` of the changed files (never `git add -A` on files you did not
@@ -117,7 +118,7 @@ The reviewer checks; it does not fix. Work through every point and report what y
 ## Task list
 
 IT-01…IT-24 were accepted and deleted (2026-10-25…27). Checks still pending on real mail are in
-`docs/plan.md` 2.4. Next unused number: IT-26. No brief is open; a new one gets a row in a
+`docs/plan.md` section 2. Next unused number: IT-26. No brief is open; a new one gets a row in a
 table with the columns Order, Brief, Plan item, Scope and dependency.
 
 IT-25 (Д26) was not implemented as briefed: on 2026-10-28 the user reduced it to one sentence in
@@ -138,15 +139,15 @@ preserve the remaining rows and their dependency notes.
    lists under "Read first". Read other code only to answer a concrete question.
 2. **Change only the files the brief allows.** The brief lists files to create, to change and,
    sometimes, to delete. If you find that another file must change, stop and ask (rule 9).
-3. **Do not edit** `docs/plan.md`, `AGENTS.md`, other briefs, research results
-   (`docs/research/`) or `testdata/`, and edit `README.md` only when the brief lists it. The
-   recording session updates the plan after acceptance. Update the
-   engineering documents (`docs/*-agent.md`) only where the brief's "Documents" section says.
+3. **Do not edit** `docs/plan.md`, `docs/results.md`, `docs/decisions.md`, `AGENTS.md`, other
+   briefs, research results (`docs/research/`) or `testdata/`. The recording session updates them
+   after acceptance. Update `README.md`, the user documents and the engineering documents
+   (`docs/*-agent.md`) only where the brief's "Documents" section says.
 4. **No new dependencies** unless the brief names the library and version. Versions go to
    `gradle/libs.versions.toml`, never into `build.gradle.kts` directly.
 5. **Invariants from `AGENTS.md` always apply:** no real host names, domains or logins in any
    file; never handle passwords; never sign in to a real mailbox; read-only at protocol level.
-6. **Build only what the brief asks for.** `docs/plan.md` 3.8 lists what no task may add:
+6. **Build only what the brief asks for.** `docs/decisions.md` section 1 lists what no task may add:
    limit budgets, extra databases, diagnostic codes, speculative safeguards, process isolation.
    No "while I'm here" refactoring, no extra abstraction layers, no unused parameters or types.
 7. **Write code like the surrounding code:** same naming, Javadoc density and idioms; one public

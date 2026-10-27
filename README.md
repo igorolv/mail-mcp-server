@@ -16,7 +16,7 @@ checks run on Windows. Possible improvements are listed in
 
 EML/ZIP/MSG/TNEF extraction and DOC/XLS/PPT text are verified offline; data synced before them
 needs `mail-reprocess`, and their check on real messages is still pending
-([docs/plan.md](docs/plan.md#24-ещё-не-проверено-на-реальной-почте), section 2.4).
+([docs/plan.md](docs/plan.md#2-ждёт-проверки-на-реальной-почте), section 2).
 
 Local conversations (`getThread`) are accepted offline; checking a known conversation on real
 mail after restarting the server is still pending. Flags are verified offline and need a
@@ -31,7 +31,7 @@ user-requested sync to populate existing mail; the schema-4 index rebuilds from 
 ## Features
 
 - **Several mailboxes at once.** They are described in one
-  [`connections.json`](docs/build-config-agent.md#the-connections-file) outside the project.
+  [`connections.json`](docs/connections.md) outside the project.
   Every tool takes a `connection` argument. Credentials stay in that file, never in the MCP client
   configuration, or in Windows Credential Manager or a password manager that the file names.
 - **Exchange without Graph.** A thin SOAP client on StAX speaks EWS to Exchange 2013 and later,
@@ -134,7 +134,7 @@ has unknown flags until the next requested sync; reindexing alone cannot obtain 
 `getMessage` uses metadata even when MIME parsing fails. Real-server flag refresh remains
 to verify (проверить); only the user changes flags in their client and runs credentialed checks.
 
-Design, decisions and real-mailbox results: [docs/plan.md](docs/plan.md) (in Russian).
+Design: [docs/plan.md](docs/plan.md); decisions: [docs/decisions.md](docs/decisions.md); real-mailbox results: [docs/results.md](docs/results.md) (all in Russian).
 
 ## Quickstart
 
@@ -181,12 +181,10 @@ connection name:
 - Instead of `password` you may set `"windowsCredential": "mail-mcp/work"` (a generic credential
   you add in Windows Credential Manager) or `passwordCommand`, a program that prints the password,
   such as a password manager's CLI. Either is read at the first sign-in and kept in memory until
-  the server exits: [Windows Credential Manager](docs/build-config-agent.md#windows-credential-manager),
-  [Password commands](docs/build-config-agent.md#password-commands).
+  the server exits: [Windows Credential Manager](docs/connections.md#windows-credential-manager),
+  [Password commands](docs/connections.md#password-commands).
 - Keep the file readable only by its owner.
-- All fields, Gmail with OAuth2 and validation rules:
-  [docs/build-config-agent.md](docs/build-config-agent.md#the-connections-file),
-  [docs/gmail-oauth-agent.md](docs/gmail-oauth-agent.md).
+- All fields, Gmail with OAuth2 and validation rules: [docs/connections.md](docs/connections.md).
 
 **4. Run the first sync from a terminal.** It downloads the whole mailbox, so on a large mailbox
 it takes a long time; Exchange costs one MIME request per new message plus batched metadata
@@ -233,7 +231,7 @@ Nine tools use an explicit connection name.
 | `getAttachment` | The text of one attachment in chunks, and the file path |
 | `search` | Every word is required, `"…"` is a phrase. Fields: `any`, `subject`, `body`, `from`, `to`, `attachmentName`, `attachmentText`. Returns cards with score and snippet |
 
-Arguments, bounds and errors: [docs/tools-agent.md](docs/tools-agent.md).
+Search syntax, dates, copies and conversations: [docs/search.md](docs/search.md). Arguments, bounds and errors: [docs/tools-agent.md](docs/tools-agent.md).
 
 `getThread(connection, key, offset, limit)` links local keys to case-sensitive IDs in stored
 Message-ID, In-Reply-To and References. It follows the complete undirected component, including
@@ -340,7 +338,7 @@ Exit codes:
 
 For `mail-analyze`, file reading errors also use exit code 2.
 
-Details: [docs/build-config-agent.md](docs/build-config-agent.md).
+Details: [docs/commands.md](docs/commands.md).
 
 ## Read-only protection
 
@@ -410,15 +408,21 @@ skipped when it is not installed.
 | Document | Contents |
 |---|---|
 | [AGENTS.md](AGENTS.md) | Rules for AI agents changing this repository, and the document map |
-| [docs/plan.md](docs/plan.md) | Plan (Russian): design, real-mailbox results, possible improvements, decisions |
+| [docs/connections.md](docs/connections.md) | The connections file, passwords, Exchange, Mail.ru and Gmail setup |
+| [docs/clients.md](docs/clients.md) | Registering the server with MCP clients, environment variables |
+| [docs/commands.md](docs/commands.md) | User-run commands, their output and exit codes |
+| [docs/search.md](docs/search.md) | Search syntax, dates, copies, conversations, word forms |
+| [docs/security.md](docs/security.md) | Read-only protection, sign-in policy, credentials, local data, secret filter |
+| [docs/plan.md](docs/plan.md) | Plan (Russian): status, pending real-mail checks, principles, possible improvements |
+| [docs/decisions.md](docs/decisions.md), [docs/results.md](docs/results.md) | Decisions and real-mailbox results (Russian) |
 | [docs/architecture-agent.md](docs/architecture-agent.md) | Packages, layers, dependencies |
-| [docs/build-config-agent.md](docs/build-config-agent.md) | Build, settings, connections file, all commands |
+| [docs/build-config-agent.md](docs/build-config-agent.md) | Build and tests; implementation of settings, the connections file and commands |
 | [docs/tools-agent.md](docs/tools-agent.md) | MCP tools, status file, processes |
 | [docs/storage-agent.md](docs/storage-agent.md) | Disk layout, index fields, reconciliation |
 | [docs/mime-agent.md](docs/mime-agent.md) | MIME parsing, attachments, pandoc |
 | [docs/ews-source-agent.md](docs/ews-source-agent.md), [docs/imap-source-agent.md](docs/imap-source-agent.md), [docs/gmail-oauth-agent.md](docs/gmail-oauth-agent.md) | Mail sources and sign-in |
 | [docs/impl-tasks/](docs/impl-tasks/README.md) | How implementation briefs for agent sessions are written |
-| [docs/research/](docs/research/) | Background research (Russian) |
+| [docs/research/](docs/research/README.md) | Background research (Russian) |
 
 ## Troubleshooting
 

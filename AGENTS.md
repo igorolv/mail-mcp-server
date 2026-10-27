@@ -5,13 +5,14 @@ over EWS, Mail.ru and Gmail over IMAP. It keeps a full local copy of every messa
 metadata, body and attachments with Markdown text), indexes it with Lucene and answers tools from
 local data only. User-facing overview: `README.md`.
 
-**Current status (2026-10-27): the draft version is complete and checked on the user's real
-mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/plan.md` section 2).
+**Current status (2026-10-28): the draft version is complete and checked on the user's real
+mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/results.md`). The first published version
+`0.1.0` (Apache 2.0) is in preparation (`docs/plan.md` section 4, Д18).
 - Nine MCP tools, background sync, offline reprocessing and reindexing work.
 - Gmail OAuth2 is implemented, but its real sign-in is unverified. The user deferred Gmail, so do
   not treat Gmail setup as a required next step.
 - Features accepted offline but not yet checked by the user on real mail are listed in
-  `docs/plan.md` 2.4 (container expansion and legacy Office text need a user-run
+  `docs/plan.md` section 2 (container expansion and legacy Office text need a user-run
   `mail-reprocess`; background summaries and EWS rescan reporting await observation during
   user-requested sync; date filters, date-only search and local conversations await local
   queries after schema-4 rebuild and restart; heuristic move reuse needs a manual test move;
@@ -26,7 +27,7 @@ Work now consists of polishing and optional improvements:
 - `docs/plan.md` section 4 lists the open ones (`Д7`, `Д13`, …); the user chooses which to take.
   Accepted items are removed from that table.
 - Add new tools or subsystems only when the task asks for them.
-- `docs/plan.md` 3.8 lists what no change may add without a user decision.
+- `docs/decisions.md` section 1 lists what no change may add without a user decision.
 - An offline MIME pipeline with shared limits (commit `d6534ca`) was reverted on 2026-10-25 by
   user decision as over-engineering; do not rebuild it.
 
@@ -37,8 +38,11 @@ Work now consists of polishing and optional improvements:
 | `README.md` | Project overview for users: features, quickstart, tools, commands, troubleshooting |
 | `AGENTS.md` | This file: rules for agents changing the repository |
 | `CLAUDE.md` | One line, `@AGENTS.md`, so Claude Code loads this file. Keep all rules here, not there |
-| `docs/plan.md` | The plan (in Russian): idea and status, environment facts and real-mailbox results, design summary, possible improvements, current decisions, research index |
-| `docs/research/` | Background research results `RT-NN-*.md` (in Russian), from 2026-10-24; the decisions taken from them are in `docs/plan.md` section 5 |
+| `docs/plan.md` | The plan (in Russian): idea and status, checks pending on real mail, principles and data flow, possible improvements, how work is done |
+| `docs/results.md` | Environment facts and real-mailbox results (in Russian), numbers only |
+| `docs/decisions.md` | The user's current decisions and what no change may add without one (in Russian) |
+| `docs/connections.md`, `docs/clients.md`, `docs/commands.md`, `docs/search.md`, `docs/security.md` | User documents (in English): connections file, client registration, user-run commands, search, security |
+| `docs/research/` | Background research results `RT-NN-*.md` (in Russian), from 2026-10-24, with an index in `README.md`; the decisions taken from them are in `docs/decisions.md` |
 | `docs/impl-tasks/` | Implementation briefs `IT-NN-*.md` for separate agent sessions, plus `README.md` with shared rules and the report template |
 | `docs/*-agent.md` | Engineering documents (in English), see the routing table below |
 | `src/main/java/mail/mcp/` | Server source; layout in `docs/architecture-agent.md` |
@@ -56,15 +60,18 @@ Read this file first. Then read only the documents whose `When` matches the task
 
 | Document | When | What it holds |
 |---|---|---|
-| `docs/plan.md` | any design question; choosing or recording an improvement; recording a finding or a decision | status, environment facts, design summary, improvements table, decisions, research index |
+| `docs/plan.md` | any design question; choosing or recording an improvement; recording a pending real-mail check | status, pending checks, principles, data flow, improvements table |
+| `docs/decisions.md` | any design question; before adding a dependency, an operation or a safeguard; recording a user decision | what not to add without the user, current decisions with reasons |
+| `docs/results.md` | interpreting user-run output; recording a real-mailbox result | environment facts and real-mailbox numbers |
 | `docs/impl-tasks/README.md` | implementing a brief `IT-NN`, or writing a new implementation brief | how to start a session, task list, shared rules, report template, self-check |
 | `docs/impl-tasks/IT-NN-*.md` | you were given that task | goal, files to read, fixed decisions, types and behavior, named tests, what not to build, files and documents to change |
-| `docs/research/RT-NN-*.md` | working on an improvement whose row in plan.md section 6 names that research | background facts, sources and comparisons; check them against the current code and decisions |
+| `docs/research/RT-NN-*.md` | working on an improvement whose row in `docs/research/README.md` names that research | background facts, sources and comparisons; check them against the current code and decisions |
+| `docs/connections.md`, `clients.md`, `commands.md`, `search.md`, `security.md` | changing user-visible behavior: connection keys, settings, command output or exit codes, search syntax, read-only and privacy guarantees | the user-facing description; the single source for formats, output and exit codes |
 | `docs/architecture-agent.md` | locating code, adding a package, changing a dependency, Spring wiring or the stdio transport | what is implemented, tech stack, package layout and layer rules |
-| `docs/build-config-agent.md` | building, running tests, adding a setting, changing the connections file format, running a user command | Gradle commands, `MAIL_MCP_*` settings, `connections.json` keys and validation, every jar mode with output and exit codes |
+| `docs/build-config-agent.md` | building, running tests, adding a setting, changing the connections file format, running a user command | Gradle commands, `MAIL_MCP_*` settings, implementation of the connections file, password sources and every jar mode; rules for agents |
 | `docs/ews-source-agent.md` | changing `source/ews/`, adding an EWS operation, NTLM questions | allow-list, response checks, NTLM transport rules, `EwsMailSource`, known risks |
 | `docs/imap-source-agent.md` | changing `source/imap/` or IMAP authentication | TLS, command allow-list, one sign-in attempt, EXAMINE/PEEK, bounded MIME downloads |
-| `docs/gmail-oauth-agent.md` | changing `source/oauth/google/`, Gmail OAuth configuration, authorization or refresh | Desktop client setup, PKCE/state/loopback flow, owner-only refresh storage, token endpoint and XOAUTH2 rules |
+| `docs/gmail-oauth-agent.md` | changing `source/oauth/google/`, Gmail OAuth configuration, authorization or refresh | facts behind the user's Desktop client setup, PKCE/state/loopback flow, owner-only refresh storage, token endpoint and XOAUTH2 rules |
 | `docs/tools-agent.md` | changing `tools/`, `api/`, `SyncService`, `sync-status.json` or a tool's arguments and bounds | the nine tools, local-only reading, status file fields, single writer across processes, sign-in refusal, search control-set numbers |
 | `docs/redaction-agent.md` | changing `redaction/`, output filtering or its setting | output-only secret replacement, detectors, chunk/highlight ordering, unchanged original paths and control-set policy |
 | `docs/mime-agent.md` | changing `mime/` or `convert/`, MIME parsing rules, attachment names, pandoc calls, attachment text, `mail-reprocess` | Angus properties, body and attachment rules, stored names, sandboxed pandoc, attachment formats, known `testdata/mime` differences |
@@ -99,8 +106,9 @@ one in this table.
 2. **Never handle passwords.** Do not ask the user to paste a password into the chat, do not
    put passwords into files, scripts, command lines, documentation examples, logs or commit
    messages. Scripts that need a password prompt for it interactively
-   (`Read-Host -AsSecureString`) and keep it in memory only. In the future server, credentials
-   live only in the connections file outside the repository (`docs/build-config-agent.md`).
+   (`Read-Host -AsSecureString`) and keep it in memory only. In the server, credentials live
+   only in the connections file outside the repository or in the stores it names
+   (`docs/connections.md`).
 
 3. **Do not sign in to mailboxes yourself.** The mail accounts are real. Every sign-in attempt
    counts toward the domain lockout policy. Credentialed checks are run by the user; you prepare
@@ -108,7 +116,7 @@ one in this table.
    response headers are allowed only when the task asks for them.
 
 4. **Read-only by default.** No script or code may send, move, delete or flag mail, or change
-   mailbox settings, unless `docs/plan.md` records a decision that enables that operation.
+   mailbox settings, unless `docs/decisions.md` records a decision that enables that operation.
    Writing mail is a possible improvement behind an explicit flag (plan.md section 4, Д15).
 
 5. **Do not push or rewrite history unless asked.** Commit only when the task asks for it.
@@ -116,33 +124,43 @@ one in this table.
 
 ## Working with the plan
 
-- `docs/plan.md` and `docs/research/` are written **in Russian**. Keep Russian when you edit
-  them. Agent documents (`AGENTS.md`, `docs/*-agent.md`, `README.md`) are written **in English**.
-- `docs/plan.md` describes the current state, not the history. Replace outdated statements
-  instead of appending corrections. Git keeps the history; the full discussion up to 2026-10-26 is
-  in the commits before the plan was rewritten.
-- When you record something in `docs/plan.md`:
-  - a verified fact or a real-mailbox result goes to section 2, anonymized: numbers only, no
-    folder names, addresses, file names or message content;
-  - a design change goes to section 3;
-  - an improvement's status changes in the section 4 table: ⬜ → 🔨 when work starts, ✖ with a
-    reason when rejected. When accepted, delete its row, add its number to the list of done items
-    above the table, describe the result in section 3 and list anything still awaiting a
-    real-mail check in 2.4. Numbers are never reused. A new idea is a new row with the next number;
-  - section 5 gets a row **only for decisions the user made**; mark your own proposals
-    «Предложено».
+- `docs/plan.md`, `docs/results.md`, `docs/decisions.md` and `docs/research/` are written **in
+  Russian**. Keep Russian when you edit them. `AGENTS.md`, `README.md`, the user documents
+  (`docs/connections.md`, `clients.md`, `commands.md`, `search.md`, `security.md`) and the
+  engineering documents (`docs/*-agent.md`) are written **in English**.
+- User documents describe what a user sees and does: formats, settings, output, exit codes,
+  guarantees. They are the single source for those; engineering documents describe the
+  implementation and link to them instead of repeating them. A change of user-visible behavior
+  updates the user document in the same change. User documents describe the current version for a
+  new user; upgrade steps for the user's own data belong in `docs/plan.md` section 2.
+- The Russian documents describe the current state, not the history. Replace outdated statements
+  instead of appending corrections. Git keeps the history.
+- Where to record what:
+  - a verified fact or a real-mailbox result goes to `docs/results.md`, anonymized: numbers only,
+    no folder names, addresses, file names or message content;
+  - a feature accepted offline but awaiting a real-mail check goes to `docs/plan.md` section 2
+    with its acceptance date; once the user's check passes, its result moves to `results.md`;
+  - a design change goes to the engineering document that owns the code, and to `docs/plan.md`
+    section 3 only if it changes a principle or the data flow;
+  - an improvement's status changes in the `docs/plan.md` section 4 table: ⬜ → 🔨 when work
+    starts, ✖ with a reason when rejected. When accepted, delete its row, add its number to the
+    list of done items above the table, describe the result in the engineering and user documents
+    and list anything still awaiting a real-mail check in section 2. Numbers are never reused. A
+    new idea is a new row with the next number;
+  - `docs/decisions.md` section 2 gets a row **only for decisions the user made**; mark your own
+    proposals «Предложено». Rows go in date order.
 - Delete an implementation brief once it is accepted and recorded, and update the task list in
   `docs/impl-tasks/README.md`.
 - Always use absolute dates in `YYYY-MM-DD` form, never "today" or "yesterday".
 - Mark a fact you have not verified from a primary source "проверить" (to verify); do not
   present recollection as fact.
-- Keep section numbering and internal links (`plan.md 3.5`, `раздел 2.1`) consistent when you
-  add or move sections. Code comments cite plan sections too.
+- Keep section numbering and internal links (`plan.md 3.1`, `results.md, раздел 1`) consistent
+  when you add or move sections. Code comments cite these documents too.
 
 ## Architecture summary
 
-This summarizes `docs/plan.md` section 3 and the decisions in section 5, so you can keep changes
-consistent with them. The plan is authoritative where this summary is shorter. What exists in
+This summarizes the engineering documents and the decisions in `docs/decisions.md`, so you can
+keep changes consistent with them. Those documents are authoritative where this summary is shorter. What exists in
 code is listed in `docs/architecture-agent.md`.
 
 - **Stack:** Java 25, Spring Boot `4.2.0-RC1`, Spring AI `2.1.0-RC1`, Gradle 9 with a version
@@ -259,7 +277,7 @@ Sibling projects used as references (same author, both public on GitHub):
   and `ImapClientTest`.
 - Code copied from a sibling project names its source project and commit in the class Javadoc.
 - The `mail-sync` command signs in to a real mailbox, so only the user runs it. Agents interpret
-  the output the user pastes back (`docs/build-config-agent.md`).
+  the output the user pastes back (`docs/commands.md`, `docs/build-config-agent.md`).
   Never open the real connections file or saved original messages; use synthetic files for checks.
 - The `gmail-oauth` command opens a browser and exchanges a real authorization code. Only the
   user runs it. Agents must not open downloaded OAuth client JSON or token files.
@@ -275,7 +293,7 @@ Sibling projects used as references (same author, both public on GitHub):
   defaults.
 - Known result: EWS sign-in works with **NTLM and a bare login** (no domain part). Basic with a
   bare login is rejected (`401`); Basic with a domain prefix was not tried and is not needed.
-  Details are in `docs/plan.md`, section 2.1.
+  Details are in `docs/results.md`, section 1.
 
 ## Verification before you finish
 

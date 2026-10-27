@@ -210,7 +210,7 @@ public final class MailIndex implements AutoCloseable {
     /**
      * Read/star values stored in the documents of one folder, by remote ref: {@code [key, read, flagged]},
      * where read/flagged are "true", "false" or null. Lets a sync compare fresh flags without reading
-     * every meta.json (docs/plan.md 3.6, Д30).
+     * every meta.json (docs/decisions.md, Д30).
      */
     public Map<String, String[]> folderFlags(String folderKey) {
         String prefix = folderKey + "/";
@@ -256,7 +256,7 @@ public final class MailIndex implements AutoCloseable {
      * @param checkMetadata true after an interrupted or failed run, or offline: also removes directories
      *                      without meta.json and compares every meta.json with its document (folder, ref,
      *                      read/star). False after a completed run: only directory and document keys are
-     *                      compared, without opening any meta.json (docs/plan.md 3.6, Д30)
+     *                      compared, without opening any meta.json (docs/decisions.md, Д30)
      */
     public List<String> reconcile(MessageStore store, boolean checkMetadata) {
         Set<String> diskKeys = new HashSet<>(store.keys());

@@ -23,7 +23,7 @@ import static java.lang.foreign.ValueLayout.JAVA_INT;
 
 /**
  * The password of a generic credential in Windows Credential Manager ({@code windowsCredential},
- * docs/plan.md 3.6, Д28), read with {@code CredReadW} through the Java foreign function API.
+ * docs/decisions.md, Д28), read with {@code CredReadW} through the Java foreign function API.
  *
  * <p>Like {@link PasswordCommand}, it is read on the first {@link #value()} call, right before sign-in,
  * and kept in memory for the life of this process; {@link #forget()} drops it after a rejected sign-in.

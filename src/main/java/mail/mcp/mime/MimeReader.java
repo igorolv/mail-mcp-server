@@ -65,7 +65,7 @@ public final class MimeReader {
      * Identity evidence of a saved original, built like the IMAP ENVELOPE fingerprint: Message-ID,
      * file size (equal to RFC822.SIZE for an IMAP download), sent date, a single non-group From
      * address and the decoded subject. Only headers are parsed. Used for move detection of messages
-     * without a stored fingerprint (docs/plan.md 3.6, Д29); a mismatch only prevents reuse.
+     * without a stored fingerprint (docs/decisions.md, Д29); a mismatch only prevents reuse.
      */
     public static MessageFingerprint fingerprint(Path eml) throws MessagingException, IOException {
         try (var input = open(eml)) {

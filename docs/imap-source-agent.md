@@ -1,7 +1,7 @@
 # docs/imap-source-agent.md — read-only IMAP source
 
 Read before changing `source/imap/`, authentication or wire commands.
-Design: plan.md 3.1 and 3.6, decisions П3 and П4; background: research/RT-04-imap-gmail-mailru.md.
+Design: plan.md 3.1 and `docs/storage-agent.md`, decisions П3 and П4; background: research/RT-04-imap-gmail-mailru.md.
 
 ## Implemented scope
 
@@ -129,7 +129,7 @@ Verified by user-run Mail.ru checks on 2026-10-25: LIST returned 41 folders and 
 MIME download succeeded with EXAMINE and BODY.PEEK. A later check through `MailSource` listed
 39 sync folders, enumerated about 13 thousand inbox UIDs and downloaded the highest UID in
 one session. The downloaded message was already read; unread behavior was not tested.
-See plan.md 2.2. Gmail has no successful user-run result; the user deferred its setup on
+See `docs/results.md` section 2. Gmail has no successful user-run result; the user deferred its setup on
 2026-10-25. Gmail and OAuth2 support remain available for later use.
 
 ## Read/star observations
@@ -172,7 +172,7 @@ the allow-list refusal, which carries the command shape with numbers replaced by
 Skipped metadata responses are not failures; they log
 `IMAP metadata batch <i>/<n>: <k> of <m> messages have no parsed metadata response (<u> responses
 unparsable); their metadata stays unknown`. The first real failure that motivated this:
-2026-10-27, the first Mail.ru run with the metadata pass (plan.md 2.2).
+2026-10-27, the first Mail.ru run with the metadata pass (`docs/results.md` section 2).
 
 ## Offline verification and primary references
 
