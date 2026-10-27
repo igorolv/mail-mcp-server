@@ -51,12 +51,20 @@ public final class SyncRunner {
     }
 
     public void run(Consumer<FolderProgress> progress) {
+        run(progress, count -> { });
+    }
+
+    /**
+     * @param restored running count of catalog entries restored from disk before the mailbox is read;
+     *                 large after an index rebuild, for example on a schema change
+     */
+    public void run(Consumer<FolderProgress> progress, IntConsumer restored) {
         Instant startedAt = Instant.now();
         long pid = ProcessHandle.current().pid();
         var folders = new LinkedHashMap<String, FolderProgress>();
         try {
             store.writeSyncStatus(new SyncStatus("running", pid, startedAt, null, List.of(), null, false));
-            synchronize(p -> {
+            synchronize(restored, p -> {
                 folders.put(p.path(), p);
                 store.writeSyncStatus(new SyncStatus("running", pid, startedAt, null,
                         List.copyOf(folders.values()), null, false));
@@ -96,8 +104,8 @@ public final class SyncRunner {
         index.commit();
     }
 
-    private void synchronize(Consumer<FolderProgress> progress) {
-        restore(store, index, processor);
+    private void synchronize(IntConsumer restored, Consumer<FolderProgress> progress) {
+        restore(store, index, processor, restored);
         var local = store.folders();
         var remote = source.folders();
         BigInteger nextKey = local.stream().map(LocalFolder::key)

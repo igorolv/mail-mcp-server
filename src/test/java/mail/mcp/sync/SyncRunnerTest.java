@@ -435,6 +435,22 @@ class SyncRunnerTest {
         assertThat(status.signInRejected()).isFalse();
     }
 
+    @Test void rebuiltIndexReportsRestoredMessagesBeforeTheMailboxIsRead() {
+        source.putFolder("inbox", "INBOX", "7", "2", "1");
+        source.putFolder("archive", "Archive", "9", "3");
+        run();
+        List<Integer> restored = new ArrayList<>();
+        int foldersCalls = source.foldersCalls;
+        try (var index = MailIndex.openWriter(connectionDir, true)) {
+            new SyncRunner(store(), index, source, processor()).run(p -> { }, count -> {
+                assertThat(source.foldersCalls).as("restored before the mailbox is read").isEqualTo(foldersCalls);
+                restored.add(count);
+            });
+        }
+        assertThat(restored).containsExactly(1, 2, 3);
+        assertThat(source.downloadCalls).isEqualTo(3);
+    }
+
     @Test void firstRunDownloadsEverythingAndSecondRunNothing() throws Exception {
         source.putFolder("inbox", "INBOX", "7", "2", "1");
         source.putFolder("archive", "Archive", "9", "3");

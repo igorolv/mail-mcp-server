@@ -100,6 +100,8 @@ public final class MailSyncCommand {
                             + (progress.reset() ? ", folder reset" : "")
                             + (progress.done() ? "" : " (in progress)"));
                     if (progress.done()) { done.add(progress); }
+                }, restored -> {
+                    if (restored % 1_000 == 0) { out.println("  " + restored + " messages indexed"); }
                 });
             }
         } catch (IndexLockedException e) {

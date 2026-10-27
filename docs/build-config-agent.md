@@ -272,6 +272,10 @@ Connection: mailru (imap, app-password; address and credentials hidden)
 RESULT: OK (1 folders, 120 downloaded, 1 failed, 2 removed)
 ```
 
+Before the mailbox is read, each run restores catalog entries missing from the index. After an
+index rebuild (for example an old schema or changed word forms) that covers every stored message
+and takes minutes without network access; it prints `  <N> messages indexed` every 1,000
+restored messages, like `mail-reindex`. The MCP `sync` tool restores silently.
 A reset adds `, folder reset` to the folder line. Batch lines are cumulative; the result sums
 only completed folder lines, including folders deleted locally. Errors print
 `RESULT: FAILED (<fixed message>)`; configuration and unexpected local details are withheld.
@@ -352,7 +356,7 @@ downloaded messages are processed, failed messages get metadata only. Incomplete
 are removed. Originals and converted output remain unchanged for converted messages.
 The index commits every 100 entries and at the end, with commit data `schema=4` and
 `wordForms=<hash>` only when nonempty rules are active.
-Progress goes to the command's output only; server restoration stays silent.
+Progress goes to the command's output only (also during `mail-sync`); server restoration stays silent.
 
 ```text
 Mail reindex (offline)
