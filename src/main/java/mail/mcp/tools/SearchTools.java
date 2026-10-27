@@ -62,7 +62,10 @@ public class SearchTools {
             "or one. Text results come by relevance, with a snippet marking matches as **word**; without a " +
             "query, since/until list messages newest first. Query syntax: every word is required; " +
             "\"double quotes\" make a phrase; there is no OR, NOT or wildcard, so search alternatives " +
-            "separately. Russian and English word forms match. An email address matches only when complete, " +
+            "separately. Regular Russian and English word forms match; irregular forms in either language " +
+            "(child/children, buy/bought) and synonyms do not, so after few or no results retry with other " +
+            "forms, synonyms or the other language before concluding the mail is absent. " +
+            "An email address matches only when complete, " +
             "and a query of one address ignores display names. File names match whole or by parts. " +
             "When the snippet comes from an attachment, snippetAttachmentFile is the file for getAttachment. " +
             "A message stored in several folders is returned once, with the other copies under copies.",

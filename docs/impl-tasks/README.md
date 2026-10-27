@@ -117,17 +117,12 @@ The reviewer checks; it does not fix. Work through every point and report what y
 ## Task list
 
 IT-01…IT-24 were accepted and deleted (2026-10-25…27). Checks still pending on real mail are in
-`docs/plan.md` 2.4. The user requested IT-23…IT-25 together on 2026-10-27, based on `d725d93`.
-IT-23 and IT-24 are accepted; the remaining brief builds on their implementation. Next unused
-number: IT-26.
+`docs/plan.md` 2.4. Next unused number: IT-26. No brief is open; a new one gets a row in a
+table with the columns Order, Brief, Plan item, Scope and dependency.
 
-| Order | Brief | Plan item | Scope and dependency |
-|---|---|---|---|
-| 3 | [IT-25](IT-25-search-hints.md) | Д26 | `search` description hints only; builds on accepted IT-23 copies and IT-24 word forms, so it goes last. |
-
-Numbers follow the plan items, which here match the execution order. Complete the implement →
-review → record cycle for each before starting the next; do not run these agents concurrently.
-IT-24 was accepted offline on 2026-10-27: an absent file leaves the analyzer and commit data
+IT-25 (Д26) was not implemented as briefed: on 2026-10-28 the user reduced it to one sentence in
+the `search` description, without `word-forms.txt` or `mail-reindex` advice and without a test of
+the description text, and the brief was deleted. IT-24 was accepted offline on 2026-10-27: an absent file leaves the analyzer and commit data
 unchanged; all 13 named tests pass. The full build has 681 tests, one expected skip and no failures.
 Listed words override the Russian stop set so the required `человек люди` group works; unlisted
 stop words and English analysis are unchanged. Reprocessing retains failed metadata-only entries
