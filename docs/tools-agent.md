@@ -287,10 +287,10 @@ Every MCP process then refuses further starts before looking for pandoc or openi
 The user fixes the local connection configuration and runs `mail-sync <connection>` in a terminal;
 a successful run clears the flag. Restart the MCP server as well if its startup configuration
 has changed. Tools do not automatically retry a rejected sign-in.
-A rejected sign-in also drops a `passwordCommand` result kept in this process. A failed password
-command is not a rejection: no credentials were sent, `signInRejected` stays false, the fixed
+A rejected sign-in also drops a `windowsCredential` or `passwordCommand` value kept in this
+process. A password that could not be obtained is not a rejection: no credentials were sent, `signInRejected` stays false, the fixed
 message goes to `error`, and the next `sync` may start (`docs/build-config-agent.md`,
-"Password commands").
+"Windows Credential Manager" and "Password commands").
 
 `SyncService.start` checks the definition, in-process running map, rejected status and pandoc,
 then opens the Lucene writer before constructing a lazy source. A competing writer returns

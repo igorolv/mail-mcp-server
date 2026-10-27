@@ -3,7 +3,7 @@ package mail.mcp.source.ews;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import mail.mcp.connections.AuthKind;
-import mail.mcp.connections.PasswordCommandException;
+import mail.mcp.connections.SecretUnavailableException;
 import mail.mcp.connections.Secret;
 import org.apache.hc.client5.http.auth.AuthSchemeFactory;
 import org.apache.hc.client5.http.auth.Credentials;
@@ -173,12 +173,12 @@ class HttpClient5EwsTransportTest {
     @Test
     void failedPasswordCommandSendsNoRequest() {
         Secret secret = () -> {
-            throw new PasswordCommandException("work", "exited with code 1");
+            throw new SecretUnavailableException("work", "exited with code 1");
         };
 
         try (EwsClient client = new EwsClient(new HttpClient5EwsTransport(settingsWith(secret)))) {
             assertThatThrownBy(() -> client.getFolder(DistinguishedFolder.INBOX))
-                    .isInstanceOf(PasswordCommandException.class);
+                    .isInstanceOf(SecretUnavailableException.class);
         }
 
         assertThat(requests).isEmpty();

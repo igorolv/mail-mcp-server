@@ -1,6 +1,6 @@
 package mail.mcp.sync;
 
-import mail.mcp.connections.PasswordCommandException;
+import mail.mcp.connections.SecretUnavailableException;
 import mail.mcp.index.IndexLockedException;
 import mail.mcp.source.ews.EwsAuthenticationException;
 import mail.mcp.source.ews.EwsException;
@@ -18,7 +18,7 @@ public final class SyncErrors {
     public static String describe(RuntimeException e) {
         return switch (e) {
             case IndexLockedException locked -> locked.getMessage();
-            case PasswordCommandException command -> command.getMessage();
+            case SecretUnavailableException command -> command.getMessage();
             case OAuthException oauth -> oauth.getMessage();
             case ImapException imap -> imap.getMessage();
             case EwsAuthenticationException ignored ->

@@ -6,7 +6,7 @@ import mail.mcp.connections.ConnectionRegistry;
 import mail.mcp.connections.ConnectionType;
 import mail.mcp.connections.AuthKind;
 import mail.mcp.connections.MailConnection;
-import mail.mcp.connections.PasswordCommandException;
+import mail.mcp.connections.SecretUnavailableException;
 import mail.mcp.connections.Secret;
 import mail.mcp.convert.Pandoc;
 import mail.mcp.convert.PandocException;
@@ -135,7 +135,7 @@ class SyncServiceTest {
             @Override public java.util.Map<String, mail.mcp.source.RemoteMessageInfo> metadata(RemoteFolder f, String c, java.util.Collection<String> r) {
                 throw new AssertionError();
             }
-            @Override public List<RemoteFolder> folders() { throw new PasswordCommandException("local", "exited with code 1"); }
+            @Override public List<RemoteFolder> folders() { throw new SecretUnavailableException("local", "exited with code 1"); }
             @Override public FolderChanges changes(RemoteFolder f, String c, Set<String> known) { throw new AssertionError(); }
             @Override public Downloaded download(RemoteFolder f, String r, Path target) { throw new AssertionError(); }
             @Override public void close() { }

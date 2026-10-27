@@ -89,6 +89,7 @@ Modeled on jdbc-mcp-server `docs/connections.md` @ `c2c4362`. Read once at start
 | `description` | all | What the mailbox is for; shown by `listConnections` |
 | `auth` | all | EWS: `ntlm` (default) or `basic`. IMAP: `app-password` (default) or Gmail-only `oauth2` |
 | `username`, `password` | all | Username required; password required except for OAuth2 and unused there. Any string value may use `${VAR}` |
+| `windowsCredential` | ews, imap/app-password | Instead of `password`: target name of a generic credential in Windows Credential Manager, e.g. `mail-mcp/work`; see [Windows Credential Manager](#windows-credential-manager). 64-bit Windows only. Ignored for OAuth2 |
 | `passwordCommand` | ews, imap/app-password | Instead of `password`: a JSON array, the program and its arguments, that prints the password; see [Password commands](#password-commands). Each element may use `${VAR}`. Ignored for OAuth2 |
 | `oauthClientFile` | imap/oauth2 | Required path to downloaded Google Desktop client JSON; supports `${VAR}` and leading `~`. Token file is derived as `<data-dir>/<connection>/oauth/google-tokens.json` |
 | `url` | ews | Absolute `https://` EWS endpoint; plain `http` is refused |
@@ -101,9 +102,10 @@ the name is also the data directory name.
 
 What stops startup: invalid JSON, an invalid name, an entry that is not an object, a value of the
 wrong JSON type, an unset `${VAR}`. What only makes one entry unusable (`configError` in
-`listConnections`): a missing or unknown `type` or `auth`, a missing URL, host or login, neither
-or both of `password` and `passwordCommand`, an empty `passwordCommand` or an empty element,
-out-of-range values. Unknown keys and keys of the other type are logged as warnings and
+`listConnections`): a missing or unknown `type` or `auth`, a missing URL, host or login, not
+exactly one of `password`, `passwordCommand` and `windowsCredential`, an empty `passwordCommand`
+or an empty element, `windowsCredential` on a platform other than 64-bit Windows, out-of-range
+values. Unknown keys and keys of the other type are logged as warnings and
 ignored. A missing file starts the server with no connections. A `passwordCommand` that is not
 an array of strings is a wrong JSON type and stops startup.
 
@@ -118,11 +120,42 @@ file to append connections. Do not paste it into chat. For IMAP app-password aut
 use the provider's app password. Placeholder references are optional; a literal password in this
 owner-only external file is supported by the loader too.
 
+### Windows Credential Manager
+
+For users who do not want the password in this file or in environment variables (plan.md 3.6,
+Д28). `connections/WindowsCredential` reads a generic credential with `CredReadW` through the Java
+foreign function API: no PowerShell, script or external program.
+
+```json
+"work": {
+  "type": "ews",
+  "url": "https://webmail.example.com/EWS/Exchange.asmx",
+  "username": "user",
+  "windowsCredential": "mail-mcp/work"
+}
+```
+
+- **Adding the credential** (the user does it): Control Panel → Credential Manager → Windows
+  Credentials → Add a generic credential. Internet or network address: the target name from
+  `windowsCredential`; user name: anything, it is not read (the dialog rejected a name with `@`
+  with error `0x80070057`); password: the mailbox password. `cmdkey /generic:<target> /user:<name> /pass`
+  should ask for the password instead of taking it on the command line (unverified); never put it
+  on the command line.
+- **When and how long:** as for password commands below: read right before the first sign-in of a
+  synchronization, kept in process memory, dropped after a rejected sign-in. After changing the
+  password in Credential Manager, restart the MCP server.
+- **Value:** the credential blob as UTF-16LE, as Credential Manager stores it; trailing NUL
+  characters are removed. A missing credential, an empty password or an odd-length blob is a
+  `SecretUnavailableException`: no sign-in, `signInRejected` stays false, `mail-sync` exits 2.
+- **Native access:** the jar manifest has `Enable-Native-Access: ALL-UNNAMED`, so `java -jar`
+  prints no restricted-method warning; tests and the `mailSync` Gradle task pass
+  `--enable-native-access=ALL-UNNAMED`. On other platforms the key makes the entry unusable; use
+  `passwordCommand` there.
+
 ### Password commands
 
-For users who do not want the password in this file or in environment variables (plan.md 3.1,
-Д22). `connections/PasswordCommand` runs the configured program and takes its output as the
-password:
+For password managers and other platforms (plan.md 3.6, Д22). `connections/PasswordCommand` runs
+the configured program and takes its output as the password:
 
 ```json
 "work": {
@@ -145,14 +178,14 @@ password:
 - **Output:** UTF-8, one non-empty line. One trailing `\n` or `\r\n` and a leading byte order mark
   are removed; other whitespace is kept. More than one line, empty output, invalid UTF-8 or more
   than 64 KiB is a failure. Windows PowerShell 5.1 does not write UTF-8 to a pipe by default;
-  scripts must write bytes (as `scripts/Get-StoredPassword.ps1` does).
+  scripts must write bytes (see the SecretManagement recipe).
 - **In the server:** the program gets no input (end of file at once) and 60 seconds; its error
   output goes to the log only, shortened. It cannot ask anything in a terminal: unlock the manager
   beforehand or use one that asks in its own window.
 - **In `mail-sync`:** the program uses the user's terminal for input and error output and gets
   5 minutes, so a master-password prompt works there.
 - **Failure:** a nonzero exit code, a timeout, a program that cannot start or bad output ends the
-  run with a fixed `PasswordCommandException` message (no program output). No credentials were
+  run with a fixed `SecretUnavailableException` message (no program output). No credentials were
   sent, so it is never a rejected sign-in: `signInRejected` stays false, MCP `sync` may start
   again, and `mail-sync` exits 2.
 
@@ -163,19 +196,13 @@ Recipes (check each tool's own documentation; all of them must print only the pa
 
 | Store | `passwordCommand` |
 |---|---|
-| Windows Credential Manager | `["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "C:\\path\\to\\mail-mcp-server\\scripts\\Get-StoredPassword.ps1", "mail-mcp/work"]` |
 | 1Password CLI | `["op", "read", "op://<vault>/<item>/password"]` |
 | PowerShell SecretManagement | `["powershell", "-NoProfile", "-NonInteractive", "-Command", "$b = [Text.UTF8Encoding]::new($false).GetBytes((Get-Secret -Name mail-work -AsPlainText)); [Console]::OpenStandardOutput().Write($b, 0, $b.Length)"]`; a SecretStore vault must be unlocked or configured without a prompt |
 | macOS Keychain | `["security", "find-generic-password", "-s", "mail-mcp", "-a", "work", "-w"]` |
 | Linux Secret Service | `["secret-tool", "lookup", "service", "mail-mcp", "account", "work"]` |
 | pass / gopass | `["pass", "show", "mail/work"]`; the first line must be the only line |
 
-For Windows Credential Manager, add the credential yourself: Control Panel → Credential Manager →
-Windows Credentials → Add a generic credential, internet or network address `mail-mcp/work`, any
-user name, the password. `cmdkey /generic:mail-mcp/work /user:user /pass` should ask for the
-password instead of taking it on the command line (unverified); never put it on the command line.
-The script reads only generic credentials, prints UTF-8 without a line break and exits 1 with a
-message on standard error when the credential is missing. Managers that need a master password on
+For Windows Credential Manager use `windowsCredential` above. Managers that need a master password on
 standard input for each call (`keepassxc-cli`, Bitwarden CLI without a session) work only in
 `mail-sync`.
 
@@ -393,7 +420,7 @@ never retries and does not open a browser. Expired/revoked refresh tokens requir
 Only the user runs real authorization and sign-in; agents may run `gmail-oauth --help`.
 
 For a personal Gmail mailbox the simpler default is an app password (`auth: app-password`),
-kept in a password manager through `passwordCommand`: no Google Cloud project, no repeated
+kept in Windows Credential Manager (`windowsCredential`) or a password manager (`passwordCommand`): no Google Cloud project, no repeated
 consent while the OAuth app is in Testing and no token file. Both grant full IMAP access and both
 can be revoked separately. Use OAuth when app passwords are unavailable, for example when a
 Workspace administrator disallows them. The OAuth refresh token remains a plaintext owner-only

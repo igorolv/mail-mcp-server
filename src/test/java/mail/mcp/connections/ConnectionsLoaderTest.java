@@ -250,7 +250,7 @@ class ConnectionsLoaderTest {
                 .contains("https://");
         assertThat(loadOne("{\"type\": \"ews\", \"url\": \"https://webmail.example.com/EWS/Exchange.asmx\", "
                 + "\"username\": \"user\"}").configError())
-                .contains("no 'password' or 'passwordCommand'");
+                .contains("no 'password', 'passwordCommand' or 'windowsCredential'");
         assertThat(loadOne("{\"type\": \"ews\", " + ews + ", \"connectTimeoutSeconds\": 0}").configError())
                 .contains("timeouts");
         assertThat(loadOne("{\"type\": \"imap\", \"username\": \"u\", \"password\": \"p\"}").configError())
@@ -296,17 +296,37 @@ class ConnectionsLoaderTest {
         String ews = "\"type\": \"ews\", \"url\": \"https://webmail.example.com/EWS/Exchange.asmx\", \"username\": \"user\"";
 
         assertThat(loadOne("{" + ews + ", \"password\": \"p\", \"passwordCommand\": [\"op\"]}").configError())
-                .contains("either 'password' or 'passwordCommand'");
+                .contains("only one of 'password', 'passwordCommand' and 'windowsCredential'");
         assertThat(loadOne("{" + ews + ", \"passwordCommand\": []}").configError()).contains("non-empty array");
         assertThat(loadOne("{" + ews + ", \"passwordCommand\": [\"op\", \"\"]}").configError()).contains("non-empty array");
         assertThat(loadOne("{" + ews + ", \"passwordCommand\": [\" \"]}").configError()).contains("non-empty array");
-        assertThat(loadOne("{" + ews + "}").configError()).contains("no 'password' or 'passwordCommand'");
+        assertThat(loadOne("{" + ews + "}").configError()).contains("no 'password', 'passwordCommand' or 'windowsCredential'");
         assertThatThrownBy(() -> loadOne("{" + ews + ", \"passwordCommand\": \"op read item\"}"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("wrong type");
         assertThatThrownBy(() -> loadOne("{" + ews + ", \"passwordCommand\": [\"${UNSET_FOR_MAIL_MCP_TESTS}\"]}"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("passwordCommand[0]");
+    }
+
+    @Test
+    void windowsCredentialIsKeptForSignInAndExcludesOtherPasswords() throws IOException {
+        String ews = "\"type\": \"ews\", \"url\": \"https://webmail.example.com/EWS/Exchange.asmx\", \"username\": \"user\"";
+
+        var definition = loadOne("{" + ews + ", \"windowsCredential\": \" mail-mcp/work \"}");
+        if (WindowsCredential.supported()) {
+            assertThat(definition.usable()).isTrue();
+            assertThat(definition.ews().password()).isInstanceOf(WindowsCredential.class)
+                    .hasToString("WindowsCredential[connection=box, target=mail-mcp/work]");
+        } else {
+            assertThat(definition.configError()).contains("only on 64-bit Windows");
+        }
+        assertThat(loadOne("{" + ews + ", \"password\": \"p\", \"windowsCredential\": \"mail-mcp/work\"}").configError())
+                .contains("only one of");
+        assertThat(loadOne("{" + ews + ", \"passwordCommand\": [\"op\"], \"windowsCredential\": \"mail-mcp/work\"}").configError())
+                .contains("only one of");
+        assertThat(loadOne("{" + ews + ", \"windowsCredential\": \" \"}").configError())
+                .contains("no 'password', 'passwordCommand' or 'windowsCredential'");
     }
 
     @Test

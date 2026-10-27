@@ -34,6 +34,8 @@ public record ConnectionsFile(
      * @param password             password or app password; prefer {@code ${VAR}}
  * @param passwordCommand      program and arguments that print the password, instead of
  *                             {@code password}; see {@link PasswordCommand}
+ * @param windowsCredential    target name of a generic Windows Credential Manager entry that holds
+ *                             the password, instead of {@code password}; see {@link WindowsCredential}
      * @param domain               EWS NTLM domain; leave out for a bare login
      * @param connectTimeoutSeconds EWS connect timeout, 15 by default
      * @param readTimeoutSeconds   EWS read timeout, 120 by default
@@ -50,6 +52,7 @@ public record ConnectionsFile(
             String username,
             String password,
             List<String> passwordCommand,
+            String windowsCredential,
             String domain,
             Integer connectTimeoutSeconds,
             Integer readTimeoutSeconds,

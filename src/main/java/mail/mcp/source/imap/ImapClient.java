@@ -13,7 +13,7 @@ import jakarta.mail.internet.InternetAddress;
 import mail.mcp.model.MessageFingerprint;
 import mail.mcp.source.RemoteMessageInfo;
 import mail.mcp.connections.AuthKind;
-import mail.mcp.connections.PasswordCommandException;
+import mail.mcp.connections.SecretUnavailableException;
 import mail.mcp.source.Downloaded;
 import mail.mcp.source.MessageUnavailableException;
 import mail.mcp.source.oauth.google.GoogleAccessTokenProvider;
@@ -107,7 +107,7 @@ public final class ImapClient implements AutoCloseable {
         if (!connected) {
             String secret;
             try { secret = credential.get(); }
-            catch (OAuthException | PasswordCommandException e) { close(); throw e; }
+            catch (OAuthException | SecretUnavailableException e) { close(); throw e; }
             store.connect(settings.host(), settings.port(), settings.username(), secret);
             connected = true;
         }

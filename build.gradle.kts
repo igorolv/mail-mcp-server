@@ -41,6 +41,10 @@ tasks.bootJar {
     archiveBaseName.set("mail-mcp-server")
     archiveVersion.set("")
     archiveClassifier.set("")
+    // WindowsCredential calls CredReadW through the foreign function API.
+    manifest {
+        attributes("Enable-Native-Access" to "ALL-UNNAMED")
+    }
 }
 
 tasks.withType<JavaCompile> {
@@ -49,6 +53,7 @@ tasks.withType<JavaCompile> {
 
 tasks.test {
     useJUnitPlatform()
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
     systemProperty("mail.mime.decodefilename", "true")
     systemProperty("mail.mime.parameters.strict", "false")
     systemProperty("mail.mime.base64.ignoreerrors", "true")
@@ -78,5 +83,6 @@ tasks.register<JavaExec>("mailSync") {
     description = "Synchronizes one mailbox into local storage (run by the user only)"
     classpath = sourceSets.main.get().runtimeClasspath
     mainClass.set("mail.mcp.cli.MailSyncCommand")
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
     javaLauncher.set(javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) })
 }

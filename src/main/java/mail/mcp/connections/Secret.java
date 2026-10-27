@@ -1,8 +1,9 @@
 package mail.mcp.connections;
 
 /**
- * A sign-in secret of one connection: a literal password from {@code connections.json} or the output
- * of its {@code passwordCommand} (docs/plan.md 3.1, Д22).
+ * A sign-in secret of one connection: a literal password from {@code connections.json}, a generic
+ * Windows credential ({@code windowsCredential}, Д28) or the output of its {@code passwordCommand}
+ * (Д22); docs/plan.md 3.6.
  *
  * <p>Sources ask for the value only right before signing in, so a command never runs at startup or
  * for a connection that is not synchronized. Implementations never print the value in
@@ -11,9 +12,9 @@ package mail.mcp.connections;
 public interface Secret {
 
     /**
-     * The secret. A password command runs on the first call and its result is kept in memory.
+     * The secret. A Windows credential or password command is read on the first call and kept in memory.
      *
-     * @throws PasswordCommandException when the password command fails; nothing was sent to a server
+     * @throws SecretUnavailableException when the password cannot be obtained; nothing was sent to a server
      */
     String value();
 

@@ -6,7 +6,7 @@ import mail.mcp.connections.ConnectionDefinition;
 import mail.mcp.connections.ConnectionsLoader;
 import mail.mcp.connections.MailConnection;
 import mail.mcp.connections.MailConnectionFactory;
-import mail.mcp.connections.PasswordCommandException;
+import mail.mcp.connections.SecretUnavailableException;
 import mail.mcp.index.IndexLockedException;
 import mail.mcp.index.MailIndex;
 import mail.mcp.index.WordForms;
@@ -107,7 +107,7 @@ public final class MailSyncCommand {
         } catch (IndexLockedException e) {
             out.println("RESULT: FAILED (" + SyncErrors.describe(e) + ")");
             return 5;
-        } catch (OAuthException | PasswordCommandException e) {
+        } catch (OAuthException | SecretUnavailableException e) {
             out.println("RESULT: FAILED (" + SyncErrors.describe(e) + ")");
             return 2;
         } catch (ImapException e) {

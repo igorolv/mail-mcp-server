@@ -34,9 +34,10 @@ import java.util.stream.Collectors;
  * <p>What stops startup: a file that is not valid JSON, an invalid connection name, an entry that is
  * not an object, a value of the wrong JSON type, and an unset {@code ${VAR}}. What only marks one
  * entry unusable ({@link ConnectionDefinition#configError()}): a missing or unknown {@code type} or
- * {@code auth}, a missing URL, host or login, neither or both of {@code password} and
- * {@code passwordCommand}, and values out of range. Password commands only run at sign-in
- * ({@link PasswordCommand}). Unknown keys are
+ * {@code auth}, a missing URL, host or login, not exactly one of {@code password},
+ * {@code passwordCommand} and {@code windowsCredential}, and values out of range. Password commands
+ * and Windows credentials are only read at sign-in ({@link PasswordCommand}, {@link WindowsCredential}).
+ * Unknown keys are
  * logged as warnings. A missing file, or one that defines no connection, starts the server with an
  * empty list so {@code listConnections} can say that nothing is configured.
  *
@@ -167,6 +168,8 @@ public final class ConnectionsLoader {
                         field + ".passwordCommand[" + i + "]", env));
             }
         }
+        String windowsCredential = blankToNull(EnvironmentPlaceholders.resolve(entry.windowsCredential(),
+                field + ".windowsCredential", env));
         String domain = blankToNull(EnvironmentPlaceholders.resolve(entry.domain(), field + ".domain", env));
         String oauthClientFile = blankToNull(EnvironmentPlaceholders.resolve(entry.oauthClientFile(), field + ".oauthClientFile", env));
 
@@ -196,10 +199,18 @@ public final class ConnectionsLoader {
         Secret secret = null;
         if (auth != AuthKind.OAUTH2) {
             boolean hasPassword = password != null && !password.isEmpty();
-            if (hasPassword && passwordCommand != null) {
-                return common.unusable(type, auth, "set either 'password' or 'passwordCommand', not both");
+            int sources = (hasPassword ? 1 : 0) + (passwordCommand != null ? 1 : 0) + (windowsCredential != null ? 1 : 0);
+            if (sources > 1) {
+                return common.unusable(type, auth,
+                        "set only one of 'password', 'passwordCommand' and 'windowsCredential'");
             }
-            if (passwordCommand != null) {
+            if (windowsCredential != null) {
+                if (!WindowsCredential.supported()) {
+                    return common.unusable(type, auth,
+                            "'windowsCredential' works only on 64-bit Windows; use 'passwordCommand' here");
+                }
+                secret = new WindowsCredential(name, windowsCredential.trim());
+            } else if (passwordCommand != null) {
                 if (passwordCommand.isEmpty() || passwordCommand.stream().anyMatch(part -> part == null || part.isEmpty())
                         || passwordCommand.getFirst().isBlank()) {
                     return common.unusable(type, auth,
@@ -209,7 +220,7 @@ public final class ConnectionsLoader {
             } else if (hasPassword) {
                 secret = Secret.of(password);
             } else {
-                return common.unusable(type, auth, "no 'password' or 'passwordCommand'");
+                return common.unusable(type, auth, "no 'password', 'passwordCommand' or 'windowsCredential'");
             }
         }
 

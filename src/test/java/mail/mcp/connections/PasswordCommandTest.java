@@ -98,8 +98,8 @@ class PasswordCommandTest {
     @Test
     void nonzeroExitFailsWithoutTheErrorOutput() {
         assertThatThrownBy(() -> new PasswordCommand("box", fixture("fail"), false).value())
-                .isInstanceOf(PasswordCommandException.class)
-                .hasMessageContaining("connection 'box' exited with code 3")
+                .isInstanceOf(SecretUnavailableException.class)
+                .hasMessageContaining("connection 'box' is unavailable: password command exited with code 3")
                 .hasMessageContaining("no sign-in was attempted")
                 .hasMessageNotContaining("vault is locked");
     }
@@ -109,14 +109,14 @@ class PasswordCommandTest {
         var secret = new PasswordCommand("box", fixture("sleep"), false, Duration.ofSeconds(3));
 
         assertThatThrownBy(secret::value)
-                .isInstanceOf(PasswordCommandException.class)
+                .isInstanceOf(SecretUnavailableException.class)
                 .hasMessageContaining("did not finish within 3 s");
     }
 
     @Test
     void missingProgramFails() {
         assertThatThrownBy(() -> new PasswordCommand("box", List.of("no-such-program-for-mail-mcp-tests"), false).value())
-                .isInstanceOf(PasswordCommandException.class)
+                .isInstanceOf(SecretUnavailableException.class)
                 .hasMessageContaining("could not start");
     }
 
@@ -149,7 +149,7 @@ class PasswordCommandTest {
 
     @Test
     void failureIsNotARejectedSignIn() {
-        var failure = new PasswordCommandException("box", "exited with code 1");
+        var failure = new SecretUnavailableException("box", "exited with code 1");
 
         assertThat(SyncErrors.signInRejected(failure)).isFalse();
         assertThat(SyncErrors.describe(failure)).isEqualTo(failure.getMessage());

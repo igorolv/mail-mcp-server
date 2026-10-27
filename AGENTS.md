@@ -19,8 +19,8 @@ mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/plan.md` section 2).
   read/star snapshots need user-requested sync and flag comparisons in the user's mail client;
   copy grouping needs local search/thread queries after restart, without reindexing;
   optional user word forms need user-created rules, `mail-analyze`, per-connection `mail-reindex`
-  and local search checks; `passwordCommand` needs a user-configured password store and a
-  user-run `mail-sync` or `sync`).
+  and local search checks; `windowsCredential` and `passwordCommand` need user-added credentials
+  and a user-run `mail-sync` or `sync`).
 
 Work now consists of polishing and optional improvements:
 - `docs/plan.md` section 4 lists the open ones (`Д7`, `Д13`, …); the user chooses which to take.
@@ -45,7 +45,6 @@ Work now consists of polishing and optional improvements:
 | `src/test/` | Unit tests and synthetic EWS responses (`src/test/resources/ews/`); none needs a network |
 | `build.gradle.kts`, `settings.gradle.kts`, `gradle/` | Gradle build, version catalog `gradle/libs.versions.toml`, wrapper |
 | `gradlew`, `gradlew.bat` | Gradle wrapper scripts |
-| `scripts/` | User-run helper scripts for Windows PowerShell 5.1: `Get-StoredPassword.ps1` prints a Windows Credential Manager password for `passwordCommand` |
 | `testdata/` | Synthetic test data sets (MIME, redaction samples, search queries); byte-exact (`testdata/.gitattributes`) |
 | `.gitignore` | Ignores `.local/`, Gradle output and IDE files |
 | `.gitattributes` | Line endings of wrapper scripts; keeps `.eml` and EWS fixtures byte-exact |
@@ -157,9 +156,10 @@ code is listed in `docs/architecture-agent.md`.
   (`%USERPROFILE%\.mail-mcp-server\`), modeled on the sibling project `jdbc-mcp-server`.
   - Each connection has a name, a type (`ews` or `imap`), an `auth` kind, its own properties and
     credentials.
-  - A password is a literal, a `${VAR}`, or `passwordCommand`: a program (password manager CLI,
-    `scripts/Get-StoredPassword.ps1`) run without a shell right before the first sign-in; its
-    result stays in process memory until a rejected sign-in. Its failure is not a rejected sign-in.
+  - A password is a literal, a `${VAR}`, `windowsCredential` (a generic Windows Credential Manager
+    entry read with `CredReadW` through the foreign function API) or `passwordCommand` (a password
+    manager CLI run without a shell). The last two are read right before the first sign-in and kept
+    in process memory until a rejected sign-in; their failure is not a rejected sign-in.
   - Every tool, including search, takes a required `connection`.
 - **Mail sources:**
   - EWS: own thin SOAP client on StAX over Apache HttpClient 5 with NTLM explicitly registered.

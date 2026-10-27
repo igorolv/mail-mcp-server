@@ -18,7 +18,7 @@ import java.util.concurrent.TimeoutException;
 
 /**
  * A password printed by a local program, such as a password manager's CLI ({@code passwordCommand},
- * docs/plan.md 3.1, Д22).
+ * docs/plan.md 3.6, Д22).
  *
  * <p>The program runs on the first {@link #value()} call, right before sign-in, and its result stays in
  * memory for the life of this process, so frequent synchronizations do not unlock the password
@@ -89,7 +89,7 @@ public final class PasswordCommand implements Secret {
             process = builder.start();
         } catch (IOException | RuntimeException e) {
             log.warn("Password command of connection '{}' could not start: {}", connection, e.getClass().getSimpleName());
-            throw new PasswordCommandException(connection, "could not start; check the program name and path");
+            throw new SecretUnavailableException(connection, "password command could not start; check the program name and path");
         }
         CompletableFuture<byte[]> output = drain(process.getInputStream(), MAX_OUTPUT_BYTES + 1);
         CompletableFuture<byte[]> errors = terminal ? CompletableFuture.completedFuture(new byte[0])
@@ -101,19 +101,19 @@ public final class PasswordCommand implements Secret {
         try {
             if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
                 kill(process);
-                throw new PasswordCommandException(connection, "did not finish within " + timeout.toSeconds() + " s");
+                throw new SecretUnavailableException(connection, "password command did not finish within " + timeout.toSeconds() + " s");
             }
         } catch (InterruptedException e) {
             kill(process);
             Thread.currentThread().interrupt();
-            throw new PasswordCommandException(connection, "was interrupted");
+            throw new SecretUnavailableException(connection, "password command was interrupted");
         }
         int exit = process.exitValue();
         byte[] bytes = collect(output, process);
         if (exit != 0) {
             log.warn("Password command of connection '{}' exited with code {}; error output: {}",
                     connection, exit, errorExcerpt(collect(errors, process)));
-            throw new PasswordCommandException(connection, "exited with code " + exit);
+            throw new SecretUnavailableException(connection, "password command exited with code " + exit);
         }
         return parse(bytes);
     }
@@ -121,13 +121,13 @@ public final class PasswordCommand implements Secret {
     /** One line of UTF-8: one trailing line break and a leading byte order mark are removed. */
     String parse(byte[] bytes) {
         if (bytes.length > MAX_OUTPUT_BYTES) {
-            throw new PasswordCommandException(connection, "printed more than " + MAX_OUTPUT_BYTES + " bytes");
+            throw new SecretUnavailableException(connection, "password command printed more than " + MAX_OUTPUT_BYTES + " bytes");
         }
         String text;
         try {
             text = StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString();
         } catch (CharacterCodingException e) {
-            throw new PasswordCommandException(connection, "printed output that is not UTF-8");
+            throw new SecretUnavailableException(connection, "password command printed output that is not UTF-8");
         }
         if (text.startsWith("﻿")) {
             text = text.substring(1);
@@ -138,10 +138,10 @@ public final class PasswordCommand implements Secret {
             text = text.substring(0, text.length() - 1);
         }
         if (text.isEmpty()) {
-            throw new PasswordCommandException(connection, "printed nothing");
+            throw new SecretUnavailableException(connection, "password command printed nothing");
         }
         if (text.indexOf('\n') >= 0 || text.indexOf('\r') >= 0) {
-            throw new PasswordCommandException(connection, "printed more than one line");
+            throw new SecretUnavailableException(connection, "password command printed more than one line");
         }
         return text;
     }
@@ -171,12 +171,12 @@ public final class PasswordCommand implements Secret {
             return stream.get(DRAIN_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
             kill(process);
-            throw new PasswordCommandException(connection, "left its output open after exiting");
+            throw new SecretUnavailableException(connection, "password command left its output open after exiting");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new PasswordCommandException(connection, "was interrupted");
+            throw new SecretUnavailableException(connection, "password command was interrupted");
         } catch (ExecutionException e) {
-            throw new PasswordCommandException(connection, "output could not be read");
+            throw new SecretUnavailableException(connection, "password command output could not be read");
         }
     }
 

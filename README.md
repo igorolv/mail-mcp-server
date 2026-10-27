@@ -33,7 +33,7 @@ user-requested sync to populate existing mail; the schema-4 index rebuilds from 
 - **Several mailboxes at once.** They are described in one
   [`connections.json`](docs/build-config-agent.md#the-connections-file) outside the project.
   Every tool takes a `connection` argument. Credentials stay in that file, never in the MCP client
-  configuration, or in a password manager the file names through `passwordCommand`.
+  configuration, or in Windows Credential Manager or a password manager that the file names.
 - **Exchange without Graph.** A thin SOAP client on StAX speaks EWS to Exchange 2013 and later,
   with NTLM through Apache HttpClient 5 (a bare login works; the server fills in the domain).
   Incremental sync uses `SyncFolderItems`.
@@ -178,9 +178,10 @@ connection name:
 
 - Any string value may be `${VAR}`. An unset variable stops startup rather than becoming an empty
   password.
-- Instead of `password` you may set `passwordCommand`, a program that prints the password: a
-  password manager's CLI, or the bundled `scripts/Get-StoredPassword.ps1` for Windows Credential
-  Manager. It runs at the first sign-in and the result stays in memory until the server exits:
+- Instead of `password` you may set `"windowsCredential": "mail-mcp/work"` (a generic credential
+  you add in Windows Credential Manager) or `passwordCommand`, a program that prints the password,
+  such as a password manager's CLI. Either is read at the first sign-in and kept in memory until
+  the server exits: [Windows Credential Manager](docs/build-config-agent.md#windows-credential-manager),
   [Password commands](docs/build-config-agent.md#password-commands).
 - Keep the file readable only by its owner.
 - All fields, Gmail with OAuth2 and validation rules:
@@ -425,8 +426,9 @@ skipped when it is not installed.
   attempt with a wrong password counts toward the account lockout policy. Check the login and
   password in `connections.json` first. For Exchange, a bare login with `auth: ntlm` is the
   combination known to work.
-- **`Password command of connection '...' ...; no sign-in was attempted`.** The program in
-  `passwordCommand` failed, so nothing was sent to the mail server. Run the same program in a
+- **`Password of connection '...' is unavailable: ...; no sign-in was attempted`.** Nothing was
+  sent to the mail server. For `windowsCredential`, check that a *generic* credential with exactly
+  that target name exists in Credential Manager. For `passwordCommand`, run the same program in a
   terminal and check that it prints only the password; the server log has its shortened error
   output. Unlock the password manager, or run `mail-sync` in a terminal where it can ask.
 - **`pandoc not found; install pandoc and put it on PATH`.** Install pandoc and restart the
