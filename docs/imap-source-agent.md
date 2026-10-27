@@ -129,8 +129,8 @@ Verified by user-run Mail.ru checks on 2026-10-25: LIST returned 41 folders and 
 MIME download succeeded with EXAMINE and BODY.PEEK. A later check through `MailSource` listed
 39 sync folders, enumerated about 13 thousand inbox UIDs and downloaded the highest UID in
 one session. The downloaded message was already read; unread behavior was not tested.
-See `docs/results.md` section 2. Gmail has no successful user-run result; the user deferred its setup on
-2026-10-25. Gmail and OAuth2 support remain available for later use.
+See `docs/results.md` section 2. Gmail has no successful user-run result yet; connecting and
+checking it is part of `0.1.0` (`docs/plan.md` section 4, Д7).
 
 ## Read/star observations
 

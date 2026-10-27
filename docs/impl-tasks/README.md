@@ -29,7 +29,7 @@ If the review says `changes needed`, start a new implementation session with the
 from the review report, then review again.
 
 The user starts each session. A strong model is needed only to write briefs for large
-improvements (size L in plan.md section 4) and to review risky changes; everything else can run
+improvements (size L in `docs/plan.md` section 4 or `docs/backlog.md`) and to review risky changes; everything else can run
 on any capable model.
 
 ### 1. Implement

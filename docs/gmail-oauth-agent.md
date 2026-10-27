@@ -3,8 +3,9 @@
 Read before changing `source/oauth/google/`, Gmail OAuth configuration or the `gmail-oauth` command.
 Design: the 2026-10-25 decision on Gmail OAuth2 (`docs/decisions.md`); status: `docs/results.md`,
 section 2. No real Gmail OAuth sign-in is verified yet; all agent checks use synthetic inputs and
-loopback servers. The user deferred connecting their Gmail on 2026-10-25 and uses only `work` and
-`mailru` locally. Keep this optional capability.
+loopback servers. The user's configuration has only `work` and `mailru` so far; connecting and
+checking their Gmail is part of `0.1.0` (`docs/plan.md` section 4, Д7). The user runs every real
+authorization and sign-in.
 
 ## User setup
 
@@ -55,7 +56,7 @@ packages when implemented.
 - OAuth failures become fixed messages, with no raw provider body or nested exception. A failed token
   provider is terminal for that client; new attempts require an explicit new request. The token HTTP
   client disables retries and redirects, uses connect/request/read timeouts and a 64 KiB response cap.
-- Credential files remain plaintext protected by owner permissions; DPAPI encryption of the refresh token is `docs/plan.md` Д27.
+- Credential files remain plaintext protected by owner permissions; DPAPI encryption of the refresh token is `docs/backlog.md` Д27.
 
 ## Authorization flow
 

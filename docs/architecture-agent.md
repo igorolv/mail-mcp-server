@@ -1,8 +1,9 @@
 # docs/architecture-agent.md — source layout, technology and layer boundaries
 
 Read this when locating code, adding a package, changing a dependency, or changing the server
-transport and Spring wiring. Principles and data flow are in `docs/plan.md` section 3, possible
-improvements in section 4, decisions in `docs/decisions.md`. This file describes what exists.
+transport and Spring wiring. Principles and data flow are in `docs/plan.md` section 3, the scope
+of `0.1.0` in section 4, later improvements in `docs/backlog.md`, decisions in
+`docs/decisions.md`. This file describes what exists.
 
 ## Status (2026-10-26: draft version complete)
 
@@ -13,7 +14,7 @@ Implemented and checked on the user's real mailboxes (`docs/results.md`):
 - Read-only EWS client over Apache HttpClient 5 with NTLM (`GetFolder`, `FindFolder`,
   `SyncFolderItems`, `GetItem` with MIME) and `EwsMailSource`.
 - Read-only IMAP client on Angus Mail and `ImapMailSource`; Gmail Desktop OAuth2 with PKCE and
-  XOAUTH2 (supported, real sign-in unverified; the user deferred Gmail).
+  XOAUTH2 (supported, real sign-in unverified; checking it is part of `0.1.0`, Д7).
 - Message directories with `meta.json`, `body.md`, attachment files and their `.md`; MIME
   reading (`docs/mime-agent.md`); a derived Lucene index, schema 4, with Russian/English search
   (`docs/storage-agent.md`).
@@ -31,7 +32,7 @@ Implemented and checked on the user's real mailboxes (`docs/results.md`):
 Optional tool-output secret replacement is described in `docs/redaction-agent.md`. Local files and the index remain unfiltered.
 
 Not implemented: PII anonymization, MCP resources, embeddings, writing
-mail; see plan.md section 4.
+mail; see `docs/backlog.md`.
 
 Read/star flags are implemented and verified offline; real-server behavior remains to verify
 (проверить). `RemoteMessageInfo`, `MessageMeta` and `MessageCard` carry nullable `read`/`flagged`.

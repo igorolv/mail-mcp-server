@@ -7,25 +7,19 @@ local data only. User-facing overview: `README.md`.
 
 **Current status (2026-10-28): the draft version is complete and checked on the user's real
 mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/results.md`). The first published version
-`0.1.0` (Apache 2.0) is in preparation (`docs/plan.md` section 4, Д18).
+`0.1.0` (Apache 2.0) is in preparation: `docs/plan.md` section 4 lists its scope, Д18
+(publication) and Д7 (Gmail).
 - Nine MCP tools, background sync, offline reprocessing and reindexing work.
-- Gmail OAuth2 is implemented, but its real sign-in is unverified. The user deferred Gmail, so do
-  not treat Gmail setup as a required next step.
+- Gmail (app password or OAuth2) is implemented, but no real Gmail sign-in is verified yet.
+  Connecting and checking it on the user's mailbox is part of `0.1.0` (Д7); the user runs it.
 - Features accepted offline but not yet checked by the user on real mail are listed in
-  `docs/plan.md` section 2 (container expansion and legacy Office text need a user-run
-  `mail-reprocess`; background summaries and EWS rescan reporting await observation during
-  user-requested sync; date filters, date-only search and local conversations await local
-  queries after schema-4 rebuild and restart; heuristic move reuse needs a manual test move;
-  applying the 5 MiB XLSX text threshold to existing mail needs optional user-run reprocessing;
-  read/star snapshots need user-requested sync and flag comparisons in the user's mail client;
-  copy grouping needs local search/thread queries after restart, without reindexing;
-  optional user word forms need user-created rules, `mail-analyze`, per-connection `mail-reindex`
-  and local search checks; `windowsCredential` and `passwordCommand` need user-added credentials
-  and a user-run `mail-sync` or `sync`).
+  `docs/plan.md` section 2, each with how to check it. Only the first, a user-run
+  `mail-reprocess` of both mailboxes, blocks `0.1.0`; the rest are checked as the user works.
 
-Work now consists of polishing and optional improvements:
-- `docs/plan.md` section 4 lists the open ones (`Д7`, `Д13`, …); the user chooses which to take.
-  Accepted items are removed from that table.
+Work now consists of finishing `0.1.0`, then optional improvements:
+- `docs/plan.md` section 4 lists what `0.1.0` includes; accepted items are removed from that table.
+- `docs/backlog.md` lists improvements after `0.1.0` (`Д13`, `Д15`, …); the user chooses which to
+  take and moves them into the version table.
 - Add new tools or subsystems only when the task asks for them.
 - `docs/decisions.md` section 1 lists what no change may add without a user decision.
 - An offline MIME pipeline with shared limits (commit `d6534ca`) was reverted on 2026-10-25 by
@@ -38,9 +32,10 @@ Work now consists of polishing and optional improvements:
 | `README.md` | Project overview for users: features, quickstart, tools, commands, troubleshooting |
 | `AGENTS.md` | This file: rules for agents changing the repository |
 | `CLAUDE.md` | One line, `@AGENTS.md`, so Claude Code loads this file. Keep all rules here, not there |
-| `docs/plan.md` | The plan (in Russian): idea and status, checks pending on real mail, principles and data flow, possible improvements, how work is done |
+| `docs/plan.md` | The plan (in Russian): idea and status, checks pending on real mail, principles and data flow, scope of `0.1.0`, how work is done |
 | `docs/results.md` | Environment facts and real-mailbox results (in Russian), numbers only |
-| `docs/decisions.md` | The user's current decisions and what no change may add without one (in Russian) |
+| `docs/decisions.md` | The user's current decisions, including rejected ideas, and what no change may add without one (in Russian) |
+| `docs/backlog.md` | Possible improvements after `0.1.0` (in Russian) |
 | `docs/connections.md`, `docs/clients.md`, `docs/commands.md`, `docs/search.md`, `docs/security.md` | User documents (in English): connections file, client registration, user-run commands, search, security |
 | `docs/research/` | Background research results `RT-NN-*.md` (in Russian), from 2026-10-24, with an index in `README.md`; the decisions taken from them are in `docs/decisions.md` |
 | `docs/impl-tasks/` | Implementation briefs `IT-NN-*.md` for separate agent sessions, plus `README.md` with shared rules and the report template |
@@ -60,7 +55,8 @@ Read this file first. Then read only the documents whose `When` matches the task
 
 | Document | When | What it holds |
 |---|---|---|
-| `docs/plan.md` | any design question; choosing or recording an improvement; recording a pending real-mail check | status, pending checks, principles, data flow, improvements table |
+| `docs/plan.md` | any design question; choosing or recording an improvement; recording a pending real-mail check | status, pending checks, principles, data flow, scope of `0.1.0` |
+| `docs/backlog.md` | choosing, adding or rejecting an improvement after `0.1.0` | improvements table with sizes and sources |
 | `docs/decisions.md` | any design question; before adding a dependency, an operation or a safeguard; recording a user decision | what not to add without the user, current decisions with reasons |
 | `docs/results.md` | interpreting user-run output; recording a real-mailbox result | environment facts and real-mailbox numbers |
 | `docs/impl-tasks/README.md` | implementing a brief `IT-NN`, or writing a new implementation brief | how to start a session, task list, shared rules, report template, self-check |
@@ -117,14 +113,14 @@ one in this table.
 
 4. **Read-only by default.** No script or code may send, move, delete or flag mail, or change
    mailbox settings, unless `docs/decisions.md` records a decision that enables that operation.
-   Writing mail is a possible improvement behind an explicit flag (plan.md section 4, Д15).
+   Writing mail is a possible improvement behind an explicit flag (`docs/backlog.md`, Д15).
 
 5. **Do not push or rewrite history unless asked.** Commit only when the task asks for it.
    Never force-push, amend or rebase published commits without an explicit request.
 
 ## Working with the plan
 
-- `docs/plan.md`, `docs/results.md`, `docs/decisions.md` and `docs/research/` are written **in
+- `docs/plan.md`, `docs/results.md`, `docs/decisions.md`, `docs/backlog.md` and `docs/research/` are written **in
   Russian**. Keep Russian when you edit them. `AGENTS.md`, `README.md`, the user documents
   (`docs/connections.md`, `clients.md`, `commands.md`, `search.md`, `security.md`) and the
   engineering documents (`docs/*-agent.md`) are written **in English**.
@@ -142,11 +138,14 @@ one in this table.
     with its acceptance date; once the user's check passes, its result moves to `results.md`;
   - a design change goes to the engineering document that owns the code, and to `docs/plan.md`
     section 3 only if it changes a principle or the data flow;
-  - an improvement's status changes in the `docs/plan.md` section 4 table: ⬜ → 🔨 when work
-    starts, ✖ with a reason when rejected. When accepted, delete its row, add its number to the
-    list of done items above the table, describe the result in the engineering and user documents
-    and list anything still awaiting a real-mail check in section 2. Numbers are never reused. A
-    new idea is a new row with the next number;
+  - an improvement in the current version is a row of the `docs/plan.md` section 4 table:
+    ⬜ → 🔨 when work starts. When accepted, delete its row, add its number to the list of done
+    items above the table, describe the result in the engineering and user documents and list
+    anything still awaiting a real-mail check in section 2;
+  - an improvement for later is a row of `docs/backlog.md`; a new idea is a new row there with the
+    next free number (stated above its table). Numbers are never reused. When the user takes an
+    item into the version, move its row to `docs/plan.md` section 4. A rejected idea is deleted
+    from the table and recorded with its reason in `docs/decisions.md`;
   - `docs/decisions.md` section 2 gets a row **only for decisions the user made**; mark your own
     proposals «Предложено». Rows go in date order.
 - Delete an implementation brief once it is accepted and recorded, and update the task list in
