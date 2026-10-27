@@ -176,7 +176,10 @@ public class MailTools {
     }
 
     @McpTool(description = "Read a local attachment and extracted text in chunks. Text exists only for DOCX, ODT, " +
-            "RTF, EPUB, HTML, CSV, PDF, DOC, XLS, PPT, XLSX, PPTX, EML, MSG, TNEF and plain text up to 20 MiB, when conversion succeeds. " +
+            "RTF, EPUB, HTML, CSV, PDF, DOC, XLS, PPT, XLSX, PPTX, EML, MSG, TNEF and plain text up to 20 MiB " +
+            "of decoded bytes, except XLSX up to 5 MiB, when conversion succeeds. Conversion is best effort; " +
+            "compressed XLSX size does not bound POI memory and smaller files can still be expensive. " +
+            "Existing text stays readable until mail-reprocess replaces it; mail-reindex alone retains saved text. " +
             "Attachments include files inside EML, ZIP, MSG and TNEF containers; accepts their exact file from getMessage. " +
             "path is the original file; textPath is the Markdown. maxChars defaults to 20000, capped at 100000; " +
             "use nextOffset for the next chunk. With secret filtering, offsets refer to filtered text; " +

@@ -2,18 +2,29 @@ package mail.mcp.sync;
 
 import mail.mcp.config.JsonConfig;
 import mail.mcp.convert.Pandoc;
+import mail.mcp.convert.XlsxText;
+import mail.mcp.index.MailIndex;
+import mail.mcp.index.MailIndexReader;
+import mail.mcp.index.SearchField;
 import mail.mcp.mime.MimeReader;
 import mail.mcp.model.MessageMeta;
 import mail.mcp.model.MessageState;
 import mail.mcp.store.MessageStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.zip.CRC32;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 import static mail.mcp.convert.PandocTest.pandocAvailable;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -233,6 +244,122 @@ class MessageProcessorTest {
         assertThat(Files.readString(attachments.resolve("2__entry.txt.md"))).isEqualTo("Archive needle text");
         assertThat(attachments.resolve("1__archive.zip.md")).doesNotExist();
         assertThat(result.attachmentText()).isEqualTo("Archive needle text");
+    }
+
+    @Test void oversizedNestedXlsxKeepsBinaryWithoutMarkdown() throws Exception {
+        byte[] workbook = oversizedWorkbook();
+        var meta = workbookMessage(workbook, true);
+        var directory = store().messageDir(meta.key());
+        byte[] original = Files.readAllBytes(directory.resolve(MessageStore.MESSAGE_FILE));
+        var result = processor().process(meta);
+        assertThat(result.meta().state()).isEqualTo(MessageState.CONVERTED);
+        assertThat(result.meta().error()).isNull();
+        assertThat(store().readMeta(meta.key())).contains(result.meta());
+        assertThat(result.message().attachments()).extracting(a -> a.file())
+                .containsExactly("1__archive.zip", "2__cells.XLSX");
+        var nested = result.message().attachments().getLast();
+        assertThat(nested.parent()).isEqualTo("1__archive.zip");
+        assertThat(nested.size()).isEqualTo(workbook.length);
+        var attachments = directory.resolve(MessageStore.ATTACHMENTS_DIR);
+        assertThat(Files.readAllBytes(attachments.resolve(nested.file()))).isEqualTo(workbook);
+        assertThat(attachments.resolve(nested.file() + ".md")).doesNotExist();
+        assertThat(result.attachmentText()).isNull();
+        assertThat(Files.readAllBytes(directory.resolve(MessageStore.MESSAGE_FILE))).isEqualTo(original);
+    }
+
+    @Test void reprocessRemovesPreviouslyIndexedOversizedXlsxText() throws Exception {
+        byte[] workbook = oversizedWorkbook();
+        var meta = workbookMessage(workbook, false);
+        var processed = processor().process(meta);
+        var directory = store().messageDir(meta.key());
+        var eml = directory.resolve(MessageStore.MESSAGE_FILE);
+        byte[] original = Files.readAllBytes(eml);
+        var emlTime = Files.getLastModifiedTime(eml);
+        var attachment = processed.message().attachments().getFirst();
+        var binary = directory.resolve(MessageStore.ATTACHMENTS_DIR).resolve(attachment.file());
+        var sidecar = binary.resolveSibling(attachment.file() + ".md");
+        // Simulate Markdown saved by the previous 20 MiB conversion policy.
+        Files.writeString(sidecar, XlsxText.extract(binary));
+        String oldText = Files.readString(sidecar);
+        var sidecarTime = Files.getLastModifiedTime(sidecar);
+        assertThat(processor().load(processed.meta()).attachmentText()).isEqualTo(oldText);
+        try (var index = MailIndex.openWriter(temp, true)) {
+            SyncRunner.restore(store(), index, processor());
+        }
+        try (var reader = MailIndexReader.open(temp).orElseThrow()) {
+            assertThat(reader.current()).isTrue();
+            assertThat(reader.search("oversizedneedle", SearchField.ATTACHMENT_TEXT, null, 0, 10).total()).isEqualTo(1);
+        }
+        assertThat(Files.readString(sidecar)).isEqualTo(oldText);
+        assertThat(Files.getLastModifiedTime(sidecar)).isEqualTo(sidecarTime);
+
+        var reprocessed = processor().process(processed.meta());
+        assertThat(reprocessed.meta()).isEqualTo(processed.meta());
+        assertThat(sidecar).doesNotExist();
+        assertThat(reprocessed.attachmentText()).isNull();
+        assertThat(processor().load(reprocessed.meta()).attachmentText()).isNull();
+        assertThat(Files.readAllBytes(binary)).isEqualTo(workbook);
+        assertThat(Files.readAllBytes(eml)).isEqualTo(original);
+        assertThat(Files.getLastModifiedTime(eml)).isEqualTo(emlTime);
+        try (var index = MailIndex.openWriter(temp)) {
+            index.put(reprocessed.meta(), reprocessed.message(), reprocessed.body(), reprocessed.attachmentText());
+            index.commit();
+        }
+        try (var reader = MailIndexReader.open(temp).orElseThrow()) {
+            assertThat(reader.current()).isTrue();
+            assertThat(reader.search("oversizedneedle", SearchField.ATTACHMENT_TEXT, null, 0, 10).total()).isZero();
+        }
+    }
+
+    private MessageMeta workbookMessage(byte[] workbook, boolean nested) throws Exception {
+        var meta = message("M01");
+        byte[] attachment = nested ? mail.mcp.LegacyOfficeFixtures.zip("folder/cells.XLSX", workbook) : workbook;
+        String type = nested ? "application/zip" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        String name = nested ? "archive.zip" : "cells.xlsx";
+        Files.writeString(store().messageDir(meta.key()).resolve(MessageStore.MESSAGE_FILE),
+                "Content-Type: " + type + "\r\nContent-Disposition: attachment; filename=" + name + "\r\n"
+                        + "Content-Transfer-Encoding: base64\r\n\r\n"
+                        + java.util.Base64.getEncoder().encodeToString(attachment));
+        return meta;
+    }
+
+    private static byte[] oversizedWorkbook() throws Exception {
+        int size = 5 * 1024 * 1024 + 1;
+        var source = new ByteArrayOutputStream();
+        try (var workbook = new XSSFWorkbook()) {
+            workbook.createSheet("Boundary").createRow(0).createCell(0).setCellValue("oversizedneedle");
+            workbook.write(source);
+        }
+        byte[] result = new byte[0];
+        int padding = 0;
+        for (int pass = 0; pass < 2; pass++) {
+            var output = new ByteArrayOutputStream();
+            try (var input = new ZipInputStream(new ByteArrayInputStream(source.toByteArray()));
+                 var zip = new ZipOutputStream(output)) {
+                ZipEntry entry;
+                while ((entry = input.getNextEntry()) != null) {
+                    zip.putNextEntry(new ZipEntry(entry.getName()));
+                    input.transferTo(zip);
+                    zip.closeEntry();
+                }
+                byte[] bytes = new byte[padding];
+                java.util.Arrays.fill(bytes, (byte) ' ');
+                if (padding > 10) { System.arraycopy("<padding/>".getBytes(java.nio.charset.StandardCharsets.UTF_8), 0, bytes, 0, 10); }
+                var crc = new CRC32();
+                crc.update(bytes);
+                var extra = new ZipEntry("padding.xml");
+                extra.setMethod(ZipEntry.STORED);
+                extra.setSize(bytes.length);
+                extra.setCrc(crc.getValue());
+                zip.putNextEntry(extra);
+                zip.write(bytes);
+                zip.closeEntry();
+            }
+            result = output.toByteArray();
+            padding = size - result.length;
+        }
+        assertThat(result).hasSize(size);
+        return result;
     }
 
     @Test void loadListsArchiveEntriesWithoutWriting() throws Exception {

@@ -46,10 +46,19 @@ an `error` explaining the failure; it may have no `message.eml`. Null properties
 by the configured Jackson 3 mapper and read back as null. A converted message has its selected
 body in UTF-8 `body.md` (absent when there is no body) and decoded attachment files under
 `attachments/` (absent when there are none). A conversion failure keeps the original MIME,
-size and SHA-256, with `state=failed` and a fixed error. Supported attachments up to 20 MiB also have UTF-8
+size and SHA-256, with `state=failed` and a fixed error. Supported attachments up to 20 MiB of
+decoded bytes, except XLSX up to 5 MiB inclusive, can also have UTF-8
 `<file>.md`; absent or failed attachment
 text never changes metadata or the converted message state.
 See `docs/mime-agent.md` for parsing, naming and pandoc rules.
+The XLSX exception uses the resolved format and actual file size, including inside containers;
+binary XLS retains 20 MiB. Conversion is best effort: compressed XLSX size does not bound
+eager POI memory usage, and smaller spreadsheets can still be expensive. The threshold reduces
+risk without guaranteeing prevention of out-of-memory failures.
+Existing XLSX sidecars/text remain readable and searchable until optional user-run
+`mail-reprocess <connection>` replaces output and index entries, removing old sidecars and
+indexed attachment text for XLSX over 5 MiB. Reads and `mail-reindex` of converted messages
+retain saved text; MIME and original attachments are preserved, with no index schema change.
 
 `MessageMeta.fingerprint` is nullable and old JSON reads it as null; the old Java constructor
 also defaults it to null. `MessageFingerprint(messageId, size, sentAt, from, subject)` holds

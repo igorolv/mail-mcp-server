@@ -117,17 +117,17 @@ The reviewer checks; it does not fix. Work through every point and report what y
 ## Task list
 
 IT-01…IT-16 were accepted and deleted (2026-10-25…27). The user requested six briefs together
-on 2026-10-27, based on `d3fd516`. IT-22 (Д25), IT-21 (Д24), IT-17 (Д5) and IT-18 (Д8) were accepted offline
+on 2026-10-27, based on `d3fd516`. IT-22 (Д25), IT-21 (Д24), IT-17 (Д5), IT-18 (Д8) and IT-20 (Д21) were accepted offline
 and deleted on 2026-10-27: background summaries, separate EWS rescan reporting, date filters,
-date-only search, local conversation cards and heuristic move reuse are implemented. The remaining
-briefs are listed below in their original execution order; preserve the accepted IT-22, IT-21,
-IT-17 and IT-18 behavior. Checks still pending on real mail are in `docs/plan.md` 2.4.
+date-only search, local conversation cards, heuristic move reuse and the 5 MiB XLSX text threshold
+are implemented. The remaining brief is listed below in its original execution order; preserve
+the accepted IT-22, IT-21, IT-17, IT-18 and IT-20 behavior. Checks still pending on real mail are
+in `docs/plan.md` 2.4; applying the XLSX threshold to existing mail is optional and user-run.
 Next unused number: IT-23.
 
 | Order | Brief | Plan item | Scope and dependency |
 |---|---|---|---|
 | 5 | [IT-19](IT-19-message-flags.md) | Д9 | Read/star flags; depends on IT-18 metadata and IT-17 thread cards, preserves date-only search. |
-| 6 | [IT-20](IT-20-xlsx-size-limit.md) | Д21 | Independent 5 MiB XLSX text threshold; may be done earlier. |
 
 Numbers follow the user's requested items, not execution order. Complete the implement →
 review → record cycle for each before starting the next; do not run these agents concurrently.

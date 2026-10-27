@@ -22,6 +22,13 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.util.Arrays;
+import java.util.zip.CRC32;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 import static mail.mcp.convert.PandocTest.pandocAvailable;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -70,6 +77,89 @@ class AttachmentTextTest {
             wb.write(out);
         }
         assertThat(text(file)).contains("--- Sheet: Данные ---", "Договоры | 42");
+    }
+
+    @Test void xlsxAtFiveMiBIsEligibleAndOneByteOverIsSkipped() throws Exception {
+        Path file = dir.resolve("boundary.xlsx");
+        Files.write(file, paddedWorkbook(5 * 1024 * 1024));
+        assertThat(Files.size(file)).isEqualTo(5L * 1024 * 1024);
+        assertThat(text(file)).contains("Boundary workbook text");
+        byte[] original = paddedWorkbook(5 * 1024 * 1024 + 1);
+        Files.write(file, original);
+        assertThat(Files.size(file)).isEqualTo(5L * 1024 * 1024 + 1);
+        assertThat(AttachmentText.toMarkdown(file, info(file, null, "application/octet-stream", null), pandoc)).isEmpty();
+        assertThat(Files.readAllBytes(file)).isEqualTo(original);
+    }
+
+    @Test void xlsxLimitUsesResolvedFormatAndActualFileSize() throws Exception {
+        Path file = dir.resolve("workbook");
+        String type = "APPLICATION/VND.OPENXMLFORMATS-OFFICEDOCUMENT.SPREADSHEETML.SHEET";
+        for (int size : new int[]{5 * 1024 * 1024, 5 * 1024 * 1024 + 1}) {
+            Files.write(file, paddedWorkbook(size));
+            for (String name : new String[]{"REPORT.XLSX", "part", null}) {
+                var misleading = new AttachmentInfo("workbook", name, "REPORT.XLSX".equals(name) ? "text/plain" : type,
+                        size == 5 * 1024 * 1024 ? 30L * 1024 * 1024 : 1, null, false, null, null);
+                var result = AttachmentText.toMarkdown(file, misleading, pandoc);
+                if (size == 5 * 1024 * 1024) {
+                    assertThat(result).hasValueSatisfying(t -> assertThat(t).contains("Boundary workbook text"));
+                } else { assertThat(result).isEmpty(); }
+            }
+        }
+        // A known suffix still wins over a conflicting XLSX MIME declaration.
+        Files.writeString(file, "A".repeat(5 * 1024 * 1024 + 1));
+        assertThat(AttachmentText.toMarkdown(file, info(file, "report.txt", type, null), pandoc))
+                .hasValueSatisfying(t -> assertThat(t).hasSize(5 * 1024 * 1024 + 1));
+    }
+
+    @Test void nonXlsxFormatsKeepTwentyMiBLimit() throws Exception {
+        Path plain = dir.resolve("large.txt");
+        Files.writeString(plain, "A".repeat(20 * 1024 * 1024));
+        assertThat(text(plain)).hasSize(20 * 1024 * 1024);
+        Path xls = dir.resolve("large.xls");
+        Files.write(xls, Arrays.copyOf(LegacyOfficeFixtures.xls("Legacy boundary text"), 20 * 1024 * 1024));
+        assertThat(text(xls)).contains("Legacy boundary text");
+        for (Path file : new Path[]{plain, xls}) {
+            Files.write(file, new byte[]{1}, StandardOpenOption.APPEND);
+            assertThat(AttachmentText.toMarkdown(file, info(file, null, "application/octet-stream", null), pandoc)).isEmpty();
+        }
+    }
+
+    private static byte[] paddedWorkbook(int size) throws Exception {
+        var source = new ByteArrayOutputStream();
+        try (var workbook = new XSSFWorkbook()) {
+            workbook.createSheet("Boundary").createRow(0).createCell(0).setCellValue("Boundary workbook text");
+            workbook.write(source);
+        }
+        byte[] result = new byte[0];
+        int padding = 0;
+        for (int pass = 0; pass < 2; pass++) {
+            var output = new ByteArrayOutputStream();
+            try (var input = new ZipInputStream(new ByteArrayInputStream(source.toByteArray()));
+                 var zip = new ZipOutputStream(output)) {
+                ZipEntry entry;
+                while ((entry = input.getNextEntry()) != null) {
+                    zip.putNextEntry(new ZipEntry(entry.getName()));
+                    input.transferTo(zip);
+                    zip.closeEntry();
+                }
+                byte[] bytes = new byte[padding];
+                Arrays.fill(bytes, (byte) ' ');
+                if (padding > 10) { System.arraycopy("<padding/>".getBytes(java.nio.charset.StandardCharsets.UTF_8), 0, bytes, 0, 10); }
+                var crc = new CRC32();
+                crc.update(bytes);
+                var extra = new ZipEntry("padding.xml");
+                extra.setMethod(ZipEntry.STORED);
+                extra.setSize(bytes.length);
+                extra.setCrc(crc.getValue());
+                zip.putNextEntry(extra);
+                zip.write(bytes);
+                zip.closeEntry();
+            }
+            result = output.toByteArray();
+            padding = size - result.length;
+        }
+        assertThat(result).hasSize(size);
+        return result;
     }
 
     @Test void pptxSlideTextIsExtracted() throws Exception {

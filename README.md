@@ -43,6 +43,14 @@ mail after restarting the server is still pending. No sync or reindex is needed.
   attachments, and `<attachment>.md` with the attachment's text.
   - Bodies, DOCX, ODT, RTF, EPUB, HTML and CSV are converted with sandboxed pandoc.
   - PDF goes through PDFBox; DOC/XLS/PPT (Office 97-2003), XLSX and PPTX through Apache POI.
+  - Attachment text conversion is best effort, up to 20 MiB of decoded bytes except XLSX up to
+    5 MiB (inclusive), including files inside containers. Larger files keep their original bytes
+    without new Markdown; binary XLS retains the 20 MiB threshold. Compressed XLSX size does
+    not bound POI memory usage, and smaller spreadsheets can still be expensive. This reduces
+    risk without guaranteeing prevention of out-of-memory failures.
+    Existing XLSX text remains readable and searchable until optional user-run
+    `mail-reprocess <connection>` removes old sidecars and indexed text for XLSX over 5 MiB.
+    `mail-reindex` alone retains saved text for converted messages; the index schema is unchanged.
   - Files inside EML, ZIP, Outlook MSG and TNEF (`winmail.dat`) containers are extracted as
     attachments and converted too; message headers and selected bodies become Markdown.
     Each child's `parent` is its container's stored filename. Original MIME and container bytes

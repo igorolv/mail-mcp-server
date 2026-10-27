@@ -176,10 +176,22 @@ as a contract. These differences follow the rules above and were accepted in rev
 
 After attachment files and body.md are saved, `AttachmentText` converts each supported file to
 UTF-8 `attachments/<file>.md`. Files larger than **20 MiB (20 * 1024 * 1024 decoded bytes)**
-are kept without Markdown. Blank text and conversion errors also produce no Markdown. A failed
+are kept without Markdown. XLSX has a separate **5 MiB (5 * 1024 * 1024 bytes)** threshold,
+inclusive, checked with `Files.size` after format selection and before `XlsxText.extract`.
+`AttachmentInfo.size` is not used for these checks. The same rules cover files inside containers;
+format precedence is unchanged, including uppercase suffixes and unnamed/MIME fallback cases.
+Other formats, including binary XLS, retain 20 MiB. Compressed XLSX size does not bound eager
+POI memory usage; smaller spreadsheets can still be expensive. This is best effort risk
+reduction, not a guarantee against out-of-memory failures.
+Blank text and conversion errors also produce no Markdown. A failed
 attachment never changes message state or adds an error to metadata. Exceptions are logged at
 debug level by class name only. Markdown write errors propagate as local storage failures.
 `MessageProcessor.load` reads existing Markdown without running converters.
+Existing XLSX sidecars remain readable and searchable until optional user-run
+`mail-reprocess <connection>` removes previous output and rebuilds attachmentText/index entries.
+For XLSX over 5 MiB it saves the binary without a sidecar, removing any formerly indexed text.
+Reads and `mail-reindex` of converted messages retain saved sidecars/text; there is no schema
+change or new download/container-extraction limit.
 
 The lowercase extension of the decoded name (stored filename when unnamed) selects the format;
 without a known extension the MIME base content type selects it. Container rules above take

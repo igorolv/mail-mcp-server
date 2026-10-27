@@ -14,7 +14,8 @@ mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/plan.md` section 2).
   `docs/plan.md` 2.4 (container expansion and legacy Office text need a user-run
   `mail-reprocess`; background summaries and EWS rescan reporting await observation during
   user-requested sync; date filters, date-only search and local conversations await local
-  queries after restart; heuristic move reuse needs user-run seeding and a manual test move).
+  queries after restart; heuristic move reuse needs user-run seeding and a manual test move;
+  applying the 5 MiB XLSX text threshold to existing mail needs optional user-run reprocessing).
 
 Work now consists of polishing and optional improvements:
 - `docs/plan.md` section 4 lists the open ones (`Д4`, `Д7`, …); the user chooses which to take.
@@ -169,6 +170,10 @@ code is listed in `docs/architecture-agent.md`.
   - One sandboxed `pandoc --sandbox` process per conversion turns HTML bodies and
     DOCX/ODT/RTF/EPUB/HTML/CSV attachments into Markdown.
   - PDF uses PDFBox; DOC/XLS/PPT (Office 97-2003), XLSX and PPTX use POI.
+  - Attachment text conversion admits up to 20 MiB of decoded bytes, except XLSX up to 5 MiB
+    inclusive, using the resolved format and actual file size, including inside containers.
+    This reduces risk without bounding eager POI memory use. Existing XLSX text remains until
+    optional user-run `mail-reprocess`; reads and `mail-reindex` of converted messages retain it.
   - MSG headers and the first nonblank plain/HTML/RTF body become Markdown; TNEF provides
     its subject and RTF body. HTML/RTF use pandoc. Declared code pages are applied without guessing.
   - Without pandoc, sync and reprocessing refuse to start.

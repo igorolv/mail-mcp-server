@@ -24,10 +24,11 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-/** Best-effort text conversion of supported attachments up to 20 MiB. */
+/** Best-effort text conversion up to 20 MiB, except XLSX up to 5 MiB. */
 public final class AttachmentText {
     private static final Logger log = LoggerFactory.getLogger(AttachmentText.class);
     private static final long MAX_SIZE = 20L * 1024 * 1024;
+    private static final long MAX_XLSX_SIZE = 5L * 1024 * 1024;
 
     private AttachmentText() { }
 
@@ -68,6 +69,7 @@ public final class AttachmentText {
                 };
             };
             if (format == null) { return Optional.empty(); }
+            if (format.equals("xlsx") && Files.size(file) > MAX_XLSX_SIZE) { return Optional.empty(); }
             String text = switch (format) {
                 case "docx", "odt", "rtf", "epub" -> pandoc.toMarkdown(file, format);
                 case "html", "csv", "txt" -> {

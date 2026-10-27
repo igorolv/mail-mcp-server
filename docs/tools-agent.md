@@ -57,11 +57,18 @@ offsets and lengths refer to the filtered view. Headers, display names, descript
 and folder paths are also filtered. Local file paths and attachment `file` values remain original.
 
 Attachment text is available for DOCX, ODT, RTF, EPUB, HTML/HTM, CSV, PDF, DOC, XLS, PPT, XLSX, PPTX, EML, MSG, TNEF and plain
-text up to 20 MiB of decoded bytes, when conversion yields nonblank text. `path` is the original
+text up to 20 MiB of decoded bytes, except XLSX up to 5 MiB inclusive, when conversion yields
+nonblank text. The exception also applies inside containers; binary XLS retains 20 MiB.
+Conversion is best effort: compressed XLSX size does not bound eager POI memory usage,
+and smaller spreadsheets can still be expensive. It does not guarantee prevention of all
+out-of-memory failures. `path` is the original
 attachment file and `textPath` is its UTF-8 Markdown; the tool never converts on demand.
 Unsupported, oversized or failed attachments retain their original files. See `docs/mime-agent.md`.
 Use offline `mail-reprocess <connection>` to create Markdown for messages already on disk,
 with no sync running.
+Existing XLSX sidecars remain readable and searchable until optional user-run reprocessing
+removes old sidecars and indexed attachment text for XLSX over 5 MiB. Reads and `mail-reindex`
+of converted messages retain saved text. No index schema change is needed.
 Binary DOC/XLS/PPT support targets Office 97-2003 and also applies to files inside containers.
 It uses the same saved-text lookup and snippet attribution; legacy text is never converted
 on demand. Encrypted or malformed documents retain their file without Markdown.
