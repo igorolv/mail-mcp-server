@@ -188,6 +188,26 @@ precision collisions and raw synthetic secret matches remain accepted limitation
 
 ## Status file and writer ownership
 
+Requested syncs now read one source metadata snapshot for every present ref, including known
+messages, in batches of at most 100 without MIME/body fetches. EWS uses IdOnly GetItem identity
+properties; IMAP uses ENVELOPE/size/UID and verifies UIDVALIDITY after reopening with EXAMINE.
+The first ordinary sync seeds old `meta.json` fingerprints without repeat downloads or
+reprocessing. Before seeding, an apparent move uses normal download. No reader tool initiates
+these metadata requests.
+
+The runner reuses a removed converted message only for a unique complete Message-ID/metadata
+match in a different included folder of the same connection; retained copies, incomplete
+identities and UIDVALIDITY resets disqualify reuse. This heuristic can hide different remote
+content even when all metadata is equal. SHA-256 remains the hash of the saved original.
+Reused messages keep UUID and all original paths/content; cards gain the new folder/ref after
+commit. All folders are discovered before removal; matches commit first and removals check the
+old identity. Folder identities retain old/null cursors, including vanished folders, until the
+final replacement after all planned changes commit. On interruption, reconciliation repairs an
+indexed folder/ref/path differing from disk metadata and reruns skip current local refs.
+Final reports for retained folders follow the final cursor save; batch reports still mark
+`done=false`. See `docs/storage-agent.md` for exact eligibility and recovery rules. This path is
+verified offline; availability on the user's servers remains to verify (проверить).
+
 `sync-status.json` is atomically replaced by `SyncRunner`, which runs only while its caller holds
 the connection's Lucene writer lock. Fields: `state` (running/completed/failed), `pid`,
 `startedAt`, optional `finishedAt`, ordered `folders`, optional `error`, `signInRejected`.
@@ -214,7 +234,8 @@ then opens the Lucene writer before constructing a lazy source. A competing writ
 named `sync-<connection>` owns the source and index for its run; it closes both, logs failures by
 exception class only and removes itself from the running map. After resources close, one INFO
 summary reports state, durationMs, downloaded, failed and removed. Downloaded counts converted
-new messages; failed counts per-message failures; removed counts removed local messages. Totals
+new messages; failed counts per-message failures; removed counts removed local messages. Reused
+apparent moves count as none of these, so zero downloads may include recognized moves. Totals
 use the latest cumulative report for each folder, so on failure an unreported partial batch may
 be missing. Run-level errors do not increase failed. No summary is emitted for a start that does
 not reach the worker. A close failure makes the summary failed even if the runner already saved

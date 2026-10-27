@@ -8,4 +8,10 @@ import java.time.Instant;
  * error: why the state is failed, otherwise null.
  */
 public record MessageMeta(String key, String folderKey, String folder, String ref, long size,
-                          String sha256, Instant downloadedAt, MessageState state, String error) { }
+                          String sha256, Instant downloadedAt, MessageState state, String error,
+                          MessageFingerprint fingerprint) {
+    public MessageMeta(String key, String folderKey, String folder, String ref, long size,
+                       String sha256, Instant downloadedAt, MessageState state, String error) {
+        this(key, folderKey, folder, ref, size, sha256, downloadedAt, state, error, null);
+    }
+}

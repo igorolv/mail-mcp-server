@@ -23,7 +23,8 @@ EwsClient ──builds request (EwsXml.envelope)──> EwsTransport.exchange(op
   names, classes and parent ids), `syncFolderItems(folderId, syncState)` (IdOnly,
   `MaxChangesReturned=512`, `SyncScope=NormalItems`; null state is omitted),
   `getItemMime(itemId, target)` (`GetItem` with `IncludeMimeContent`; writes `<target>.part`, moves
-  it into place after the whole response was read, and returns size and SHA-256).
+  it into place after the whole response was read, and returns size and SHA-256),
+  `metadata(refs)` (one `GetItem` for 1–100 distinct refs, properties only).
 
 ## Response handling
 
@@ -74,6 +75,29 @@ Downloads use one `GetItem` per message and return the decoded size and SHA-256.
 `TOO_LARGE`. Other errors propagate. There are no retries for authentication, SOAP faults,
 HTTP or transport failures, including `ErrorServerBusy`. A long first run can therefore stop
 when Exchange throttles it; a later user-run sync resumes using known refs and saved cursors.
+
+`EwsMailSource.metadata(folder, expectedCursor, refs)` reads every resulting present ref,
+including known ones, in batches of at most 100 on the same session. Its `IdOnly` ItemShape adds
+`message:InternetMessageId`, `item:Size`, `item:DateTimeSent`, `message:From`, `item:Subject`.
+It requests neither IncludeMimeContent nor Body. The cursor remains opaque; EWS has no IMAP
+UIDVALIDITY check. A dedicated reader uses the shared safe parser and SOAP-fault checks,
+validates each GetItemResponseMessage and the response count, omits ErrorItemNotFound, and
+maps successes by returned ItemId rather than by successful-response position. Duplicate,
+unrequested or missing success IDs and other errors abort without retry. Missing optional
+identity properties disable matching. EWS item size is never replaced by local MIME byte size.
+
+The sync runner uses these snapshots to seed old stores without repeat downloads and to count
+retained copies before matching apparent moves. Unique complete Message-ID/metadata equality
+can still hide different content: this is heuristic evidence, not remote byte identity. Reuse
+preserves UUID, paths, original SHA-256/time and every content file, and changes metadata/index
+before unmatched removals. All cursors advance only after planned changes commit; reconciliation
+repairs a metadata/index folder/ref mismatch on restart. Reused moves contribute no downloaded,
+failed or removed count. See `docs/storage-agent.md` for exact eligibility and recovery rules.
+Synthetic protocol tests cover these requests; availability on the user's EWS server remains
+to verify (проверить), not a real-mail result.
+
+Primary references checked 2026-10-27: [ItemShape](https://learn.microsoft.com/en-us/exchange/client-developer/web-service-reference/itemshape)
+and [FieldURI](https://learn.microsoft.com/en-us/exchange/client-developer/web-service-reference/fielduri).
 
 ## Transport and NTLM
 

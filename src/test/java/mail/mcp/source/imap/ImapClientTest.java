@@ -31,6 +31,67 @@ class ImapClientTest {
         return new ImapSettings("127.0.0.1", port, true, AuthKind.APP_PASSWORD, "user", "synthetic-test-value");
     }
 
+    @Test void metadataFetchUsesEnvelopeSizeUidAndNeverBodyOrWrites() throws Exception {
+        var messages = java.util.stream.LongStream.rangeClosed(1, 205)
+                .mapToObj(uid -> new FakeImapServer.Item(uid, MIME, 987654L, "")).toList();
+        var folder = new FakeImapServer.MailFolder("INBOX", 7, List.of(), messages);
+        try (var server = new FakeImapServer(folder); var client = new ImapClient(settings(server.port()), false)) {
+            var uids = client.folderUids("INBOX");
+            var result = client.metadata("INBOX", uids.uidValidity(), uids.uids());
+            assertThat(result).hasSize(205).containsOnlyKeys(uids.uids().stream().map(String::valueOf).toArray(String[]::new));
+            var fingerprint = result.get("42").fingerprint();
+            assertThat(fingerprint.complete()).isTrue();
+            assertThat(fingerprint.messageId()).isEqualTo("<Move@example.com>");
+            assertThat(fingerprint.subject()).isEqualTo("Тема");
+            assertThat(fingerprint.from()).isEqualTo("Sender@example.com");
+            assertThat(fingerprint.size()).isEqualTo(987654L);
+            assertThat(fingerprint.sentAt()).isEqualTo(java.time.Instant.parse("2026-10-25T12:00:00Z"));
+            assertThatThrownBy(result::clear).isInstanceOf(UnsupportedOperationException.class);
+            assertThat(server.commands.stream().filter(s -> s.contains("ENVELOPE"))).containsExactly(
+                    "FETCH 1:100 (ENVELOPE INTERNALDATE RFC822.SIZE UID)",
+                    "FETCH 101:200 (ENVELOPE INTERNALDATE RFC822.SIZE UID)",
+                    "FETCH 201:205 (ENVELOPE INTERNALDATE RFC822.SIZE UID)");
+            assertThat(server.commands).noneMatch(s -> s.matches("(?i).*(BODY|RFC822[^.]|SELECT |STORE |EXPUNGE|APPEND ).*"));
+            assertThat(server.commands.stream().filter(s -> s.startsWith("LOGIN "))).hasSize(1);
+        }
+    }
+
+    @Test void metadataRejectsUidValidityChange() throws Exception {
+        try (var server = new FakeImapServer(); var client = new ImapClient(settings(server.port()), false)) {
+            var snapshot = client.folderUids("INBOX");
+            server.nextUidValidity = 8L;
+            assertThatThrownBy(() -> client.metadata("INBOX", snapshot.uidValidity(), snapshot.uids()))
+                    .isInstanceOfSatisfying(ImapException.class, e -> assertThat(e.kind()).isEqualTo(ImapException.Kind.PROTOCOL));
+            assertThat(server.commands).noneMatch(s -> s.contains("ENVELOPE") || s.contains("BODY"));
+            assertThat(server.commands.stream().filter(s -> s.startsWith("EXAMINE "))).hasSize(2);
+            assertThat(server.commands.stream().filter(s -> s.startsWith("LOGIN "))).hasSize(1);
+            assertThatThrownBy(client::listFolders).isInstanceOf(ImapException.class).hasMessageContaining("closed");
+        }
+    }
+
+    @Test void metadataMissingUidAndMultipleSendersDoNotProvideCompleteIdentity() throws Exception {
+        String two = FakeImapServer.ENVELOPE.replace("((NIL NIL \"Sender\" \"example.com\"))",
+                "((NIL NIL \"Sender\" \"example.com\") (NIL NIL \"Other\" \"example.com\"))");
+        try (var server = new FakeImapServer(new FakeImapServer.MailFolder("INBOX", new FakeImapServer.Item(42, MIME, 123, "", two)));
+             var client = new ImapClient(settings(server.port()), false)) {
+            var result = client.metadata("INBOX", 7, List.of(42L, 99L));
+            assertThat(result).containsOnlyKeys("42");
+            assertThat(result.get("42").fingerprint().from()).isNull();
+            assertThat(result.get("42").fingerprint().complete()).isFalse();
+            assertThat(server.commands).noneMatch(s -> s.contains("BODY"));
+        }
+    }
+
+    @Test void metadataSignInRejectionIsNotRetried() throws Exception {
+        try (var server = new FakeImapServer(true, false, "login"); var client = new ImapClient(settings(server.port()), false)) {
+            assertThatThrownBy(() -> client.metadata("INBOX", 7, List.of(42L))).isInstanceOf(ImapException.class)
+                    .hasMessageContaining("sign-in rejected");
+            assertThatThrownBy(() -> client.metadata("INBOX", 7, List.of(42L))).isInstanceOf(ImapException.class)
+                    .hasMessageContaining("closed");
+            assertThat(server.commands.stream().filter(s -> s.startsWith("LOGIN "))).hasSize(1);
+        }
+    }
+
     @Test void folderUidsAndDownloadUseOneAuthenticatedSocket() throws Exception {
         try (var server = new FakeImapServer(); var client = new ImapClient(settings(server.port()), false)) {
             var folders = client.listFolders();

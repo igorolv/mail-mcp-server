@@ -141,6 +141,51 @@ class EwsMailSourceTest {
         assertThat(twice.requestCount()).isEqualTo(2);
     }
 
+    @Test void metadataIsBatchedAndMissingItemsAreOmitted() {
+        var batches = new ArrayList<Integer>();
+        EwsTransport transport = new EwsTransport() {
+            @Override public <T> T exchange(EwsOperation op, byte[] request, ResponseHandler<T> handler) {
+                String xml = new String(request, java.nio.charset.StandardCharsets.UTF_8);
+                assertThat(op).isEqualTo(GET_ITEM);
+                assertThat(xml).doesNotContain("IncludeMimeContent", "item:Body", "<t:Body");
+                int count = (int) java.util.regex.Pattern.compile("<t:ItemId ").matcher(xml).results().count();
+                batches.add(count);
+                String reply = """
+                        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+                         xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"><s:Body>
+                        <m:GetItemResponse><m:ResponseMessages>%s</m:ResponseMessages></m:GetItemResponse>
+                        </s:Body></s:Envelope>
+                        """.formatted(("<m:GetItemResponseMessage ResponseClass=\"Error\">"
+                        + "<m:ResponseCode>ErrorItemNotFound</m:ResponseCode></m:GetItemResponseMessage>").repeat(count));
+                try { return handler.handle(new java.io.ByteArrayInputStream(reply.getBytes(java.nio.charset.StandardCharsets.UTF_8))); }
+                catch (java.io.IOException | javax.xml.stream.XMLStreamException e) { throw new AssertionError(e); }
+            }
+            @Override public int requestCount() { return batches.size(); }
+            @Override public void close() { }
+        };
+        try (var source = new EwsMailSource(new EwsClient(transport))) {
+            var refs = java.util.stream.IntStream.rangeClosed(1, 205).mapToObj(i -> "id" + i).toList();
+            var result = source.metadata(INBOX, "opaque", refs);
+            assertThat(result).isEmpty();
+            assertThatThrownBy(() -> result.put("bad", null)).isInstanceOf(UnsupportedOperationException.class);
+            assertThat(source.metadata(INBOX, "opaque", List.of())).isEmpty();
+        }
+        assertThat(batches).containsExactly(100, 100, 5);
+    }
+
+    @Test void metadataSignInAndProtocolErrorsAbortWithoutRetry() {
+        for (var error : List.of(new EwsAuthenticationException("Synthetic rejected sign-in", "NTLM"),
+                new EwsResponseException(GET_ITEM, "ErrorAccessDenied", "Synthetic denied"),
+                new EwsTransportException("Synthetic connection failure", null))) {
+            var transport = new ScriptedEwsTransport().fail(GET_ITEM, error);
+            try (var source = new EwsMailSource(new EwsClient(transport))) {
+                assertThatThrownBy(() -> source.metadata(INBOX, "cursor", List.of("one", "two"))).isSameAs(error);
+            }
+            assertThat(transport.requestCount()).isEqualTo(1);
+            transport.assertDrained();
+        }
+    }
+
     @Test void downloadWritesMimeAndReturnsSizeAndHash() throws Exception {
         var transport = new ScriptedEwsTransport().answer(GET_ITEM, "getitem-mime.xml");
         Path target = temp.resolve("message.eml");
@@ -226,6 +271,7 @@ class EwsMailSourceTest {
     @Test void twoSyncRunsDownloadEachMessageOnce() throws Exception {
         var first = new ScriptedEwsTransport().answer(GET_FOLDER, "getfolder-excluded.xml")
                 .answer(FIND_FOLDER, "findfolder-inbox.xml").answer(SYNC_FOLDER_ITEMS, "sync-changes.xml")
+                .answer(GET_ITEM, "getitem-metadata-two.xml")
                 .answer(GET_ITEM, "getitem-mime.xml").answer(GET_ITEM, "getitem-mime.xml");
         var store = new MessageStore(temp, new JsonConfig().mailMcpObjectMapper());
         List<FolderProgress> progress = new ArrayList<>();
@@ -234,8 +280,9 @@ class EwsMailSourceTest {
             assertThat(index.folderRefs("f1")).containsOnlyKeys("AAMkSYNTH-b", "AAMkSYNTH-a");
         }
         assertThat(progress).containsExactly(new FolderProgress("Входящие", 2, 0, 0, false, true));
-        assertThat(first.requests.get(3)).contains("Id=\"AAMkSYNTH-b\"");
-        assertThat(first.requests.get(4)).contains("Id=\"AAMkSYNTH-a\"");
+        assertThat(first.requests.get(3)).doesNotContain("IncludeMimeContent");
+        assertThat(first.requests.get(4)).contains("Id=\"AAMkSYNTH-b\"");
+        assertThat(first.requests.get(5)).contains("Id=\"AAMkSYNTH-a\"");
         assertThat(store.folders().getFirst().cursor()).isEqualTo("state-final");
         var originalKeys = store.keys();
         byte[] expected = EwsResponseReaderTest.fixtureBytes("sample.eml");
@@ -243,7 +290,8 @@ class EwsMailSourceTest {
             assertThat(Files.readAllBytes(store.messageDir(key).resolve(MessageStore.MESSAGE_FILE))).isEqualTo(expected);
         }
         var second = new ScriptedEwsTransport().answer(GET_FOLDER, "getfolder-excluded.xml")
-                .answer(FIND_FOLDER, "findfolder-inbox.xml").answer(SYNC_FOLDER_ITEMS, "sync-empty.xml");
+                .answer(FIND_FOLDER, "findfolder-inbox.xml").answer(SYNC_FOLDER_ITEMS, "sync-empty.xml")
+                .answer(GET_ITEM, "getitem-metadata-two.xml");
         progress.clear();
         try (var index = MailIndex.openWriter(temp); var source = new EwsMailSource(new EwsClient(second))) {
             new SyncRunner(store, index, source, new mail.mcp.sync.MessageProcessor(store, new mail.mcp.convert.Pandoc("pandoc"))).run(progress::add);
@@ -251,7 +299,7 @@ class EwsMailSourceTest {
         }
         assertThat(progress).containsExactly(new FolderProgress("Входящие", 0, 0, 0, false, true));
         assertThat(second.requests.get(2)).contains("<m:SyncState>state-final</m:SyncState>");
-        assertThat(second.operations).doesNotContain(GET_ITEM);
+        assertThat(second.requests).noneMatch(xml -> xml.contains("IncludeMimeContent"));
         assertThat(store.keys()).isEqualTo(originalKeys);
         first.assertDrained();
         second.assertDrained();

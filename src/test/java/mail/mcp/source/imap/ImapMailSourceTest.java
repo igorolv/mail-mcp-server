@@ -90,9 +90,12 @@ class ImapMailSourceTest {
         try (var server = new FakeImapServer(); var source = source(server)) {
             for (String cursor : List.of("", "-1", "+7", "7.0", " 7", "abc", "7\n")) {
                 assertThatThrownBy(() -> source.changes(INBOX, cursor, Set.of())).isInstanceOf(IllegalArgumentException.class);
+                assertThatThrownBy(() -> source.metadata(INBOX, cursor, List.of("1"))).isInstanceOf(IllegalArgumentException.class);
             }
             for (String ref : List.of("", "0", "000", "-1", "+1", "1.0", " 1", "abc", "1\n", "99999999999999999999")) {
                 assertThatThrownBy(() -> source.download(INBOX, ref, temp.resolve("invalid.eml")))
+                        .isInstanceOf(IllegalArgumentException.class);
+                assertThatThrownBy(() -> source.metadata(INBOX, "7", List.of(ref)))
                         .isInstanceOf(IllegalArgumentException.class);
             }
             assertThat(server.commands).isEmpty();
@@ -108,6 +111,8 @@ class ImapMailSourceTest {
             assertThat(source.folders()).containsExactly(a, b);
             assertThat(source.changes(a, null, Set.of()).added()).containsExactly("1", "2");
             assertThat(source.changes(b, null, Set.of()).added()).containsExactly("3");
+            assertThat(source.metadata(a, "7", List.of("1", "2"))).containsOnlyKeys("1", "2");
+            assertThat(source.metadata(b, "7", List.of("3"))).containsOnlyKeys("3");
             source.download(a, "1", temp.resolve("a1.eml"));
             source.download(b, "3", temp.resolve("b3.eml"));
             source.download(a, "2", temp.resolve("a2.eml"));

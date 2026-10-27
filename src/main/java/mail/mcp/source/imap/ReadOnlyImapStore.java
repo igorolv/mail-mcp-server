@@ -110,7 +110,7 @@ final class ReadOnlyImapStore extends IMAPStore {
             return;
         }
         // Restrict FETCH attributes as well as its verb: BODY/RFC822 can set \\Seen.
-        String item = "(?:UID|FLAGS|INTERNALDATE|RFC822\\.SIZE|BODY\\.PEEK\\[\\](?:<\\d+\\.\\d+>)?)";
+        String item = "(?:UID|FLAGS|INTERNALDATE|ENVELOPE|RFC822\\.SIZE|BODY\\.PEEK\\[\\](?:<\\d+\\.\\d+>)?)";
         if (upper.matches("(?:UID )?FETCH [0-9:,]+ \\(" + item + "(?: " + item + ")*\\)")) {
             return;
         }

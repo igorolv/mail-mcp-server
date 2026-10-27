@@ -50,6 +50,15 @@ size and SHA-256, with `state=failed` and a fixed error. Supported attachments u
 `<file>.md`; absent or failed attachment
 text never changes metadata or the converted message state.
 See `docs/mime-agent.md` for parsing, naming and pandoc rules.
+
+`MessageMeta.fingerprint` is nullable and old JSON reads it as null; the old Java constructor
+also defaults it to null. `MessageFingerprint(messageId, size, sentAt, from, subject)` holds
+source-reported metadata. Its nullable Long size is independent of `MessageMeta.size` (MIME
+bytes); EWS item size can differ. Matching needs one nonempty angle-bracketed Message-ID without
+whitespace/nested brackets, positive size, known Instant, nonblank sender and subject. Only
+ID/address outer whitespace is stripped; comparison preserves case and the exact decoded subject.
+Processing, reprocessing and reindexing preserve the fingerprint. It is not indexed and schema 3
+is unchanged.
 Binary DOC/XLS/PPT (Office 97-2003) use the same `<file>.md` sidecars and index fields,
 including documents inside containers. No disk/API/schema change is required. Existing
 files need offline `mail-reprocess`, not merely `mail-reindex`, to create the newly supported
@@ -85,10 +94,30 @@ A missing folders file returns an empty list. Missing metadata returns an empty 
 `SyncRunner` matches folders by `remoteId`, preserving a known folder's key and cursor while
 updating its path. New keys are `f<n>`, one above the largest number in the local list before
 vanished folders are dropped, starting at `f1`. A key dropped in an earlier run may be reused.
-Folders are saved in server order before downloads, so even an interrupted first run retains
-their assigned keys. Vanished folders lose every message directory and index document; their
-deletions are committed before the folders list is saved. A reset removes all local messages
-of that folder, even if the source's removed list is incomplete, then downloads the added refs.
+After restoration, changes and metadata for all included folders are discovered before any
+removal or cursor update. Discovery failure retains candidates and old cursors. New/retained
+folders in server order are saved with old/null cursors before applying changes, followed by
+vanished-folder entries. Their identities remain until all changes commit. A reset removes all
+local messages of that folder, even if the source's removed list is incomplete, then downloads
+the added refs; both ends of a UIDVALIDITY reset are excluded from move matching. EWS rescans
+do not invalidate refs and remain eligible.
+
+Move matching uses the pre-run metadata snapshot before refreshing retained messages. An old
+converted message with existing MIME must be explicitly removed in this run, with a complete
+saved fingerprint equal to a new ref's fingerprint in a different folder of this connection.
+Exactly one old occurrence and one current remote occurrence are required across the entire
+connection, including retained copies and all candidates. Ambiguity, missing evidence, failed
+or downloaded entries and cross-connection entries cannot supply moves. No candidate is kept
+after a completed run. Duplicate Message-IDs with different metadata remain distinct identities.
+
+All present refs, including known messages, receive one metadata snapshot per folder/run, in
+protocol batches of at most 100 without MIME/body downloads. The first ordinary sync seeds old
+stores without reprocessing or repeat MIME downloads; moves before seeding fall back to download.
+A refreshed incomplete fingerprint clears the saved fingerprint to null. Reuse atomically
+rewrites only the folder key/path, remote ref and fingerprint, then rebuilds that index document
+with `MessageProcessor.load`. UUID, physical directory, state/error, MIME size/SHA-256/time,
+body, attachments and sidecars stay unchanged. Equal metadata can conceal different bytes:
+this heuristic does not verify remote byte identity; SHA-256 describes the saved original only.
 
 ## Write order and failures
 
@@ -102,17 +131,21 @@ Without metadata, the directory is incomplete.
 Metadata writes require an existing message directory; saving folders creates the connection
 directory if needed. Constructors perform no I/O.
 
-Within each folder the runner applies removals and commits, then downloads in batches of 100
-messages (including failed ones), committing each batch. It commits again after all downloads,
-then saves the folder's new cursor in `folders.json`. The cursor never advances on a partial
-folder. A `MessageUnavailableException` writes `state=failed`, size 0, null SHA-256 and the
+The runner applies matches and commits before unmatched removals, including vanished-folder
+removals. It deletes an old key only while metadata still identifies the old folder/ref, so a
+reassigned key survives removal of its original folder. Downloads commit in batches of 100
+messages (including failed ones), and at folder end. Only after all planned changes commit does
+one `folders.json` replacement save all new cursors and drop vanished folders. No cursor advances
+on partial completion. With old cursors, current local refs skip already stored additions on
+rerun. A `MessageUnavailableException` writes `state=failed`, size 0, null SHA-256 and the
 exception's fixed message, without `message.eml`. Its ref is indexed, so the next run does not
 retry it; normal removals delete failed messages too. Other exceptions propagate without retries
 or cleanup; the next run reconciles before contacting the source. Closing the index commits
 pending entries, including a partial batch with completed metadata.
 
 `FolderProgress.downloaded` counts new messages ending converted; `failed` includes download
-and conversion failures. Conversion failures are not automatically retried. The offline
+and conversion failures. Reused moves count as neither downloaded, failed nor removed; zero
+downloads can include recognized moves. Conversion failures are not automatically retried. The offline
 `mail-reprocess` command processes every message with metadata and MIME, replacing output and
 index fields, including creating attachment `.md` files for messages already on disk; entries
 without MIME remain unchanged.
@@ -177,18 +210,22 @@ There is no retry or additional lock. Closing commits the writer and closes the 
 Other Lucene I/O failures become `UncheckedIOException`.
 
 `reconcile(store)` deletes incomplete message directories, removes indexed keys absent from
-disk, and returns sorted keys with metadata missing from the index. It does not index or
+disk, reads existing metadata to compare the stored folder path and combined folder/ref, and
+returns sorted keys missing from the index or with a changed identity. It does not index or
 commit them itself. `SyncRunner` processes downloaded entries, loads converted entries using
 MIME headers, saved `body.md` and attachment Markdown without writes, and indexes failed
-entries with null headers, body and attachment text. Existing index entries are left alone. Failed
+entries with null headers, body and attachment text. Matching index identities are left alone;
+no full rebuild or reconversion is needed. This closes an interruption after metadata reassignment
+before its index write. Interruptions after index commit and before cursor save also resume
+with the same destination key and content, without repeating the MIME download. Failed
 messages with metadata remain valid without MIME. Deleting `index/` loses no source data:
 reconciliation restores headers and body from disk before the runner accesses the source.
 `mail-reprocess` also restores processed entries offline, without sign-in.
 
 `cli/MailSyncCommand` owns the source and writer, takes the writer lock before the first network
 request and closes the source before the index. `SyncRunner` opens and closes neither; it reports
-cumulative `FolderProgress` after each committed batch and after a folder's cursor is saved (or
-the folder is deleted). `FolderProgress` lives in `model/`. `SyncService` runs the same runner in
+cumulative `FolderProgress` after each committed batch and final folder reports after all cursors
+are saved (or a vanished folder's removals commit). `FolderProgress` lives in `model/`. `SyncService` runs the same runner in
 the background; `MailIndexReader` reads the last commit; `mail-reindex` and `mail-reprocess`
 rebuild offline.
 

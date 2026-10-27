@@ -14,7 +14,7 @@ mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/plan.md` section 2).
   `docs/plan.md` 2.4 (container expansion and legacy Office text need a user-run
   `mail-reprocess`; background summaries and EWS rescan reporting await observation during
   user-requested sync; date filters, date-only search and local conversations await local
-  queries after restart).
+  queries after restart; heuristic move reuse needs user-run seeding and a manual test move).
 
 Work now consists of polishing and optional improvements:
 - `docs/plan.md` section 4 lists the open ones (`Д4`, `Д7`, …); the user chooses which to take.
@@ -189,6 +189,14 @@ code is listed in `docs/architecture-agent.md`.
 - **Synchronization:**
   - runs only on request: the `sync` tool in the background, or `mail-sync`;
   - always syncs everything, then incrementally;
+  - metadata-only snapshots of every present ref seed nullable remote fingerprints without
+    redownloading known MIME. A unique complete Message-ID/metadata match can reuse an explicitly
+    removed converted message in another included folder of the same connection, preserving UUID,
+    directory and all content. Equality is heuristic; SHA-256 describes the saved original only.
+    Ambiguity, missing evidence and UIDVALIDITY resets use normal deletion/download;
+  - discovers all folders before removal, commits reused moves before unmatched deletions,
+    and saves all cursors only after all changes commit. Reconciliation repairs index folder/ref
+    mismatches from metadata without reconversion; reused moves increase no sync counter;
   - one sign-in per run, no retries. After a rejected sign-in the `sync` tool refuses the
     connection until the user runs `mail-sync`;
   - several server processes share one data directory; only the holder of the Lucene write lock

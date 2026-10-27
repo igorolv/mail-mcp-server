@@ -127,9 +127,12 @@ java -jar build\libs\mail-mcp-server.jar mail-sync work
 ```
 
 One run uses one lazy source session and one Lucene writer. It takes the writer lock before any
-network request, reconciles disk and index, lists folders, removes vanished folders/messages,
-downloads new messages as `message.eml` and `meta.json`, and commits the index after every 100
-messages. A folder's opaque cursor is saved only after the folder finishes. Messages remain
+network request, reconciles disk and index state/identity, and discovers changes and metadata for
+all included folders before removals. Unique apparent moves reuse saved content with the same
+UUID and paths; unmatched vanished folders/messages are removed locally. New messages download
+as `message.eml` and `meta.json`, with index commits after every 100 messages. New/retained folder
+identities keep old/null cursors and vanished entries until all planned changes commit, then one
+folders-file replacement saves all new cursors. Messages remain
 `converted` after MIME parsing, attachment saving and body conversion; download or conversion
 failures get `state=failed` and are not retried. Headers and Markdown are indexed. Pandoc is
 required on `PATH` and checked before the index or mailbox is opened; missing pandoc exits 2.
@@ -142,8 +145,12 @@ See `docs/tools-agent.md` for status fields and cross-process reading.
 
 The first run downloads the whole mailbox and may take a while (EWS uses one `GetItem` per
 message). Run the same command again:
-with no new mail it ends with `0 downloaded`. After an interruption, the next run removes
-incomplete directories, restores missing index entries from metadata and resumes without
+with no new mail it ends with `0 downloaded`; reused moves also increase no downloaded, failed
+or removed count. Each run reads identity metadata for all present refs in batches of at most
+100, without MIME/body retrieval; the first run seeds old stores without repeat downloads or
+reprocessing. Matching remains heuristic and can conceal different remote content; see
+`docs/storage-agent.md`. After an interruption, the next run removes
+incomplete directories, restores missing or identity-mismatched index entries from metadata and resumes without
 downloading messages already stored. Failures end the run without automatic retries.
 
 Output (folder paths are shown; addresses, subjects and credentials are hidden):

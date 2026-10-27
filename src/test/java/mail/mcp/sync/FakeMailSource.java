@@ -5,6 +5,8 @@ import mail.mcp.source.FolderChanges;
 import mail.mcp.source.MailSource;
 import mail.mcp.source.MessageUnavailableException;
 import mail.mcp.source.RemoteFolder;
+import mail.mcp.source.RemoteMessageInfo;
+import mail.mcp.model.MessageFingerprint;
 import mail.mcp.source.imap.ImapException;
 
 import java.io.IOException;
@@ -23,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Collection;
 
 /** Mutable in-memory mailbox with synthetic MIME; never opens a network connection. */
 public final class FakeMailSource implements MailSource {
@@ -35,6 +38,9 @@ public final class FakeMailSource implements MailSource {
     private final Map<String, Map<String, byte[]>> messages = new LinkedHashMap<>();
     private final Set<String> tooLarge = new HashSet<>();
     private int failAt;
+    private final Map<String, MessageFingerprint> fingerprints = new LinkedHashMap<>();
+    public int metadataCalls;
+    public int failMetadataAt;
     public int foldersCalls;
     public int changesCalls;
     public int downloadCalls;
@@ -57,7 +63,13 @@ public final class FakeMailSource implements MailSource {
 
     public void failOnDownload(int call) { failAt = call; }
 
-    public void resetCounts() { foldersCalls = 0; changesCalls = 0; downloadCalls = 0; }
+    public void fingerprint(String folder, String ref, MessageFingerprint fingerprint) {
+        fingerprints.put(folder + "/" + ref, fingerprint);
+    }
+
+    public void putMime(String folder, String ref, byte[] bytes) { messages.get(folder).put(ref, bytes); }
+
+    public void resetCounts() { foldersCalls = 0; changesCalls = 0; downloadCalls = 0; metadataCalls = 0; }
 
     public static byte[] mime(String ref) {
         return ("Subject: Synthetic message\r\n\r\nMessage " + ref + "\r\n").getBytes(StandardCharsets.US_ASCII);
@@ -76,6 +88,17 @@ public final class FakeMailSource implements MailSource {
         var added = present.stream().filter(ref -> reset || !known.contains(ref)).sorted(REF_ORDER).toList();
         var removed = known.stream().filter(ref -> reset || !present.contains(ref)).sorted(REF_ORDER).toList();
         return new FolderChanges(added, removed, nextCursor, reset);
+    }
+
+    @Override public Map<String, RemoteMessageInfo> metadata(RemoteFolder folder, String expectedCursor, Collection<String> refs) {
+        if (++metadataCalls == failMetadataAt) { throw new ImapException(ImapException.Kind.PROTOCOL); }
+        var result = new LinkedHashMap<String, RemoteMessageInfo>();
+        for (String ref : refs) {
+            if (messages.get(folder.remoteId()).containsKey(ref)) {
+                result.put(ref, new RemoteMessageInfo(ref, fingerprints.get(folder.remoteId() + "/" + ref)));
+            }
+        }
+        return Map.copyOf(result);
     }
 
     @Override public Downloaded download(RemoteFolder folder, String ref, Path target) {

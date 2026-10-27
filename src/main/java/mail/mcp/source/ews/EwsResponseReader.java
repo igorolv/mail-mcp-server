@@ -10,6 +10,12 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
+import mail.mcp.model.MessageFingerprint;
+import mail.mcp.source.RemoteMessageInfo;
 
 import static javax.xml.stream.XMLStreamConstants.CDATA;
 import static javax.xml.stream.XMLStreamConstants.CHARACTERS;
@@ -225,6 +231,94 @@ final class EwsResponseReader {
         return m;
     }
 
+    /** Each response is consumed separately; missing items never shift successful item ids. */
+    static Map<String, RemoteMessageInfo> readMetadata(InputStream in, List<String> requested)
+            throws XMLStreamException, IOException {
+        var result = new HashMap<String, RemoteMessageInfo>();
+        int[] responses = {0};
+        read(EwsOperation.GET_ITEM, in, r -> { }, r -> {
+            if (!"GetItemResponseMessage".equals(r.getLocalName()) || ++responses[0] > requested.size()) {
+                throw new EwsProtocolException("Unexpected metadata response message");
+            }
+            String responseClass = r.getAttributeValue(null, "ResponseClass");
+            String code = null;
+            RemoteMessageInfo item = null;
+            while (r.hasNext()) {
+                int event = r.next();
+                if (event == END_ELEMENT) { break; }
+                if (event != START_ELEMENT) { continue; }
+                if (EwsXml.MESSAGES_NS.equals(r.getNamespaceURI()) && "ResponseCode".equals(r.getLocalName())) {
+                    code = r.getElementText().strip();
+                } else if (EwsXml.MESSAGES_NS.equals(r.getNamespaceURI()) && "Items".equals(r.getLocalName())) {
+                    while (r.hasNext()) {
+                        int child = r.next();
+                        if (child == END_ELEMENT) { break; }
+                        if (child == START_ELEMENT) {
+                            if (item != null || !EwsXml.TYPES_NS.equals(r.getNamespaceURI())) {
+                                throw new EwsProtocolException("Unexpected metadata item");
+                            }
+                            item = readMetadataItem(r);
+                        }
+                    }
+                } else { skipElement(r); }
+            }
+            if ("Error".equals(responseClass) && "ErrorItemNotFound".equals(code) && item == null) { return; }
+            if (!"Success".equals(responseClass) || !"NoError".equals(code)) {
+                throw new EwsResponseException(EwsOperation.GET_ITEM, code == null ? "unknown" : code, null);
+            }
+            if (item == null || item.ref() == null || !requested.contains(item.ref()) || result.putIfAbsent(item.ref(), item) != null) {
+                throw new EwsProtocolException("Missing, duplicate or unrequested metadata item id");
+            }
+        });
+        if (responses[0] != requested.size()) {
+            throw new EwsProtocolException("GetItem returned a different number of metadata responses");
+        }
+        return Map.copyOf(result);
+    }
+
+    private static RemoteMessageInfo readMetadataItem(XMLStreamReader r) throws XMLStreamException {
+        String ref = null, messageId = null, from = null, subject = null;
+        Long size = null;
+        Instant sentAt = null;
+        var fields = new java.util.HashSet<String>();
+        while (r.hasNext()) {
+            int event = r.next();
+            if (event == END_ELEMENT) { break; }
+            if (event != START_ELEMENT) { continue; }
+            String field = r.getLocalName();
+            if (!EwsXml.TYPES_NS.equals(r.getNamespaceURI())) { skipElement(r); continue; }
+            if (!fields.add(field)) { throw new EwsProtocolException("Duplicate metadata field"); }
+            switch (field) {
+                case "ItemId" -> { ref = r.getAttributeValue(null, "Id"); skipElement(r); }
+                case "InternetMessageId" -> messageId = r.getElementText();
+                case "Subject" -> subject = r.getElementText();
+                case "Size" -> {
+                    try { size = Long.valueOf(r.getElementText().strip()); }
+                    catch (NumberFormatException e) { throw new EwsProtocolException("Invalid metadata size", e); }
+                }
+                case "DateTimeSent" -> {
+                    try { sentAt = Instant.parse(r.getElementText().strip()); }
+                    catch (DateTimeParseException e) { throw new EwsProtocolException("Invalid metadata date", e); }
+                }
+                case "From" -> {
+                    int depth = 1, addresses = 0;
+                    while (depth > 0) {
+                        int nested = r.next();
+                        if (nested == START_ELEMENT) {
+                            if (EwsXml.TYPES_NS.equals(r.getNamespaceURI()) && "EmailAddress".equals(r.getLocalName())) {
+                                from = r.getElementText();
+                                addresses++;
+                            } else { depth++; }
+                        } else if (nested == END_ELEMENT) { depth--; }
+                    }
+                    if (addresses != 1) { from = null; }
+                }
+                default -> skipElement(r);
+            }
+        }
+        return new RemoteMessageInfo(ref, new MessageFingerprint(messageId, size, sentAt, from, subject));
+    }
+
     @FunctionalInterface
     interface PayloadHandler {
         /** Called for every start element outside the envelope bookkeeping; may consume the element. */
@@ -232,6 +326,11 @@ final class EwsResponseReader {
     }
 
     static void read(EwsOperation operation, InputStream in, PayloadHandler payload)
+            throws XMLStreamException, IOException {
+        read(operation, in, payload, null);
+    }
+
+    private static void read(EwsOperation operation, InputStream in, PayloadHandler payload, PayloadHandler response)
             throws XMLStreamException, IOException {
         XMLStreamReader r = EwsXml.inputFactory().createXMLStreamReader(in);
         try {
@@ -247,6 +346,7 @@ final class EwsResponseReader {
                 }
                 if (EwsXml.MESSAGES_NS.equals(ns) && local.endsWith("ResponseMessage")) {
                     messages++;
+                    if (response != null) { response.onStart(r); continue; }
                     String responseClass = r.getAttributeValue(null, "ResponseClass");
                     if ("Error".equals(responseClass)) {
                         throw readError(operation, r);

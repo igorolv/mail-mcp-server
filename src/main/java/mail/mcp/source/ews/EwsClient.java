@@ -11,6 +11,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
+import mail.mcp.source.RemoteMessageInfo;
 
 /**
  * Thin read-only EWS client of one mailbox (decision P1). It builds SOAP requests for allow-listed
@@ -119,6 +121,30 @@ public final class EwsClient implements AutoCloseable {
             w.writeEndElement();
         });
         return transport.exchange(EwsOperation.SYNC_FOLDER_ITEMS, request, EwsResponseReader::readSyncPage);
+    }
+
+    /** Identity properties only, in one batch; no MIME or body is requested. */
+    public Map<String, RemoteMessageInfo> metadata(List<String> refs) {
+        if (refs.isEmpty() || refs.size() > 100 || refs.stream().anyMatch(id -> id == null || id.isBlank())
+                || new java.util.HashSet<>(refs).size() != refs.size()) {
+            throw new IllegalArgumentException("Metadata requires 1 to 100 distinct item ids");
+        }
+        byte[] request = EwsXml.envelope(EwsOperation.GET_ITEM, w -> {
+            w.writeStartElement("m", "ItemShape", EwsXml.MESSAGES_NS);
+            EwsXml.typesElement(w, "BaseShape", "IdOnly");
+            w.writeStartElement("t", "AdditionalProperties", EwsXml.TYPES_NS);
+            for (String field : List.of("message:InternetMessageId", "item:Size", "item:DateTimeSent",
+                    "message:From", "item:Subject")) { EwsXml.fieldUri(w, field); }
+            w.writeEndElement();
+            w.writeEndElement();
+            w.writeStartElement("m", "ItemIds", EwsXml.MESSAGES_NS);
+            for (String ref : refs) {
+                w.writeEmptyElement("t", "ItemId", EwsXml.TYPES_NS);
+                w.writeAttribute("Id", ref);
+            }
+            w.writeEndElement();
+        });
+        return transport.exchange(EwsOperation.GET_ITEM, request, in -> EwsResponseReader.readMetadata(in, refs));
     }
 
     /**

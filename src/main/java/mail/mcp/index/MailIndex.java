@@ -179,11 +179,25 @@ public final class MailIndex implements AutoCloseable {
                 diskKeys.remove(key);
             }
         }
-        Set<String> indexedKeys = keys();
+        Set<String> indexedKeys = new HashSet<>();
+        Set<String> changedKeys = new HashSet<>();
+        try (var reader = DirectoryReader.open(writer)) {
+            var searcher = new IndexSearcher(reader);
+            for (var hit : searcher.search(new MatchAllDocsQuery(), Math.max(1, reader.numDocs())).scoreDocs) {
+                var document = searcher.storedFields().document(hit.doc);
+                String key = document.get("key");
+                indexedKeys.add(key);
+                if (diskKeys.contains(key)) {
+                    var meta = store.readMeta(key).orElseThrow();
+                    if (!(meta.folderKey() + "/" + meta.ref()).equals(document.get("ref"))
+                            || !meta.folder().equals(document.get("folder"))) { changedKeys.add(key); }
+                }
+            }
+        } catch (IOException e) { throw new UncheckedIOException(e); }
         for (String key : indexedKeys) {
             if (!diskKeys.contains(key)) { delete(key); }
         }
-        return diskKeys.stream().filter(key -> !indexedKeys.contains(key)).sorted().toList();
+        return diskKeys.stream().filter(key -> !indexedKeys.contains(key) || changedKeys.contains(key)).sorted().toList();
     }
 
     @Override public void close() {

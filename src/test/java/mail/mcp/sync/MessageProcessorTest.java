@@ -40,6 +40,24 @@ class MessageProcessorTest {
         return meta;
     }
 
+    @Test void reprocessingPreservesRemoteFingerprint() throws Exception {
+        var old = message("M01");
+        var fingerprint = new mail.mcp.model.MessageFingerprint("<remote@example.com>", 987654L,
+                Instant.parse("2026-10-25T12:00:00Z"), "user@example.com", "Remote subject");
+        var meta = new MessageMeta(old.key(), old.folderKey(), old.folder(), old.ref(), old.size(), old.sha256(),
+                old.downloadedAt(), old.state(), old.error(), fingerprint);
+        var converted = processor().process(meta);
+        assertThat(converted.meta().fingerprint()).isEqualTo(fingerprint);
+        assertThat(processor().process(converted.meta()).meta().fingerprint()).isEqualTo(fingerprint);
+        assertThat(processor().load(converted.meta()).meta().fingerprint()).isEqualTo(fingerprint);
+        Files.writeString(store().messageDir(meta.key()).resolve(MessageStore.MESSAGE_FILE),
+                "Content-Type: multipart/mixed; boundary=missing\r\n\r\nnot a multipart");
+        var failed = processor().process(converted.meta());
+        assertThat(failed.meta().state()).isEqualTo(MessageState.FAILED);
+        assertThat(failed.meta().fingerprint()).isEqualTo(fingerprint);
+        assertThat(store().readMeta(meta.key()).orElseThrow().fingerprint()).isEqualTo(fingerprint);
+    }
+
     @Test void plainMessageIsConvertedWithBodyAndAttachments() throws Exception {
         var meta = message("M01");
         byte[] original = Files.readAllBytes(store().messageDir(meta.key()).resolve(MessageStore.MESSAGE_FILE));

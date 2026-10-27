@@ -155,8 +155,7 @@ class MailIndexTest {
         try (var index = MailIndex.openWriter(connectionDir)) {
             index.put(meta(c, "f1", "103"), null, null, null);
             index.put(alreadyIndexed, null, null, null);
-            // Existing indexed metadata must not be read during reconciliation.
-            Files.writeString(store.messageDir(alreadyIndexed.key()).resolve(MessageStore.META_FILE), "not JSON");
+            // Matching indexed identities need no restoration; metadata is checked for reassignment.
             var missingKeys = index.reconcile(store);
             assertThat(missingKeys).containsExactly(a.key());
             assertThat(index.keys()).containsExactly(alreadyIndexed.key());
@@ -171,6 +170,35 @@ class MailIndexTest {
              var reader = DirectoryReader.open(directory)) {
             assertThat(reader.numDocs()).isEqualTo(2);
         }
+    }
+
+    @Test void reconcileRepairsRefChangedInMetadata() throws IOException {
+        var store = store();
+        String key = store.newKey();
+        var old = new MessageMeta(key, "f1", "INBOX", "101", 12, "a".repeat(64),
+                Instant.parse("2026-10-25T12:00:00Z"), MessageState.CONVERTED, null);
+        save(store, old);
+        Files.writeString(store.messageDir(key).resolve(MessageStore.MESSAGE_FILE), "Subject: Saved\r\n\r\nOriginal body");
+        Files.writeString(store.messageDir(key).resolve(MessageStore.BODY_FILE), "Saved Markdown");
+        try (var index = MailIndex.openWriter(connectionDir)) { index.put(old, null, null, null); }
+        var moved = new MessageMeta(key, "f2", "Archive", "new/ref", old.size(), old.sha256(), old.downloadedAt(),
+                old.state(), null);
+        store.writeMeta(moved);
+        try (var index = MailIndex.openWriter(connectionDir)) {
+            assertThat(index.reconcile(store)).containsExactly(key);
+            mail.mcp.sync.SyncRunner.restore(store, index,
+                    new mail.mcp.sync.MessageProcessor(store, new mail.mcp.convert.Pandoc("unused")));
+            assertThat(index.folderRefs("f1")).isEmpty();
+            assertThat(index.folderRefs("f2")).containsEntry("new/ref", key);
+            assertThat(index.reconcile(store)).isEmpty();
+        }
+        try (var directory = FSDirectory.open(connectionDir.resolve("index")); var reader = DirectoryReader.open(directory)) {
+            var document = reader.storedFields().document(0);
+            assertThat(document.get("body")).isEqualTo("Saved Markdown");
+            assertThat(document.get("subject")).isEqualTo("Saved");
+            assertThat(document.get("folder")).isEqualTo("Archive");
+        }
+        assertThat(Files.readString(store.messageDir(key).resolve(MessageStore.BODY_FILE))).isEqualTo("Saved Markdown");
     }
 
     @Test void deletedIndexIsRestoredFromDisk() throws IOException {

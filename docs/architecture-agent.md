@@ -101,17 +101,17 @@ cli/ ──► sync/, connections/, source/, store/, index/  (user-run commands 
 | `MailMcpServerApplication` | Entry point. Empty apart from command dispatch. | Nothing else. |
 | `config/` | Spring wiring. | `MailMcpProperties` (`mail-mcp.*`), `ConnectionsConfig` (loader + registry beans), `McpServerConfig`, `JsonConfig`, `SyncConfig` (`SyncService` with `Pandoc::locate`). |
 | `connections/` | The connections file and the registry. | `ConnectionsFile` (JSON shape), `ConnectionsLoader`, `ConnectionDefinition`, `EnvironmentPlaceholders`, `ConnectionType`, `AuthKind`, `ConnectionRegistry`, `MailConnection`, `MailConnectionFactory`. `MailConnection.openSource()` supplies a fresh lazy IMAP or EWS session, owned by its caller. |
-| `source/` (root) | Common mailbox session contract. | `MailSource`, `RemoteFolder`, `FolderChanges`, `Downloaded`, `MessageUnavailableException` (GONE/TOO_LARGE leaves the session usable). |
+| `source/` (root) | Common mailbox session contract. | `MailSource`, `RemoteFolder`, `FolderChanges`, `RemoteMessageInfo`, `Downloaded`, `MessageUnavailableException` (GONE/TOO_LARGE leaves the session usable). |
 | `source/ews/` | Read-only EWS source and thin client. | `EwsMailSource`, `EwsClient`, `EwsOperation` (allow-list), `EwsXml` (envelope, parser settings), `EwsResponseReader` (StAX), `EwsTransport` + `HttpClient5EwsTransport`, result records (`EwsFolderNode`, `EwsFolderPage`, `EwsSyncPage`), `Ews*Exception`. See `docs/ews-source-agent.md`. |
 | `source/imap/` | Read-only IMAP source and client. | `ImapMailSource`, `ImapClient` (one session across folders/downloads), `ReadOnlyImapStore` (wire command guard), `ImapSettings`, `ImapFolderInfo`, `FolderUids`, sanitized `ImapException`. See `docs/imap-source-agent.md`. |
 | `source/oauth/` | Provider-independent OAuth components. | `OAuthLoopbackReceiver` and sanitized `OAuthException`. No provider endpoints, settings or provider-specific messages. |
 | `source/oauth/google/` | Google Desktop OAuth and refresh credentials. | All `Google*` classes and the package-private `OAuthJson` helper. Depends on shared `source/oauth/` components. See `docs/gmail-oauth-agent.md`. |
-| `model/` | Shared disk records and lifecycle. | `MessageState`, `MessageMeta`, `LocalFolder`, `MailMessage`, `Address`, `AttachmentInfo`, `MessageCard`, `SearchHit`, `SearchResults`, `ThreadResults`, `FolderProgress`, `SyncStatus`, one type per file. |
+| `model/` | Shared disk records and lifecycle. | `MessageState`, `MessageMeta`, `MessageFingerprint`, `LocalFolder`, `MailMessage`, `Address`, `AttachmentInfo`, `MessageCard`, `SearchHit`, `SearchResults`, `ThreadResults`, `FolderProgress`, `SyncStatus`, one type per file. |
 | `store/` | Local message directories and metadata. | `MessageStore`: UUID paths, atomic `meta.json`, `folders.json` and `sync-status.json`, listing and deletion. See `docs/storage-agent.md`. |
 | `index/` | Derived Lucene catalog and committed readers. | `MailIndex`: schema 3, metadata, headers/body/attachment text fields, NRT key/ref lookups, commit and reconciliation; `IndexLockedException`. `MailAnalyzers` shares per-field analysis, `SearchField` defines groups. `MailIndexReader` reads committed counts, sorted cards and scored search hits without the writer lock. Package-private `SearchSnippets` selects a body or saved attachment passage after paging. See `docs/storage-agent.md`. |
 | `tools/` | Thin `@McpTool` adapters, Spring `@Service` beans. | `ConnectionTools` (`listConnections`), `SyncTools` (`sync`, `syncStatus`), `MailTools` (`listFolders`, `listMessages`, `getMessage`), `SearchTools` (`search`), `ThreadTools` (`getThread`), `ToolLogger`. |
 | `api/` | Stable MCP response records with `@Schema`. | Discovery, sync start/status, folder/message pages, body chunks, attachment references, `SearchResult`, `SearchHitInfo`, `GetThreadResult` and `ThreadMessageInfo`. Never expose `source/` or `model/` records or settings here. |
-| `sync/` | One synchronization run and local conversion. | `SyncRunner`, `MessageProcessor`, `Processed`: reconcile by state, folders, removals, downloads/conversion in batches of 100, cursor after the folder. Caller owns the source and writer. `SyncService` owns background runs, `SyncStart` their immediate result; `SyncErrors` shares fixed CLI/status failure messages. |
+| `sync/` | One synchronization run and local conversion. | `SyncRunner`, `MessageProcessor`, `Processed`: reconcile by state/identity, discover all folders and metadata, reuse unique apparent moves before unmatched removals, download/convert in batches of 100, save all cursors after all changes commit. Caller owns the source and writer. `SyncService` owns background runs, `SyncStart` their immediate result; `SyncErrors` shares fixed CLI/status failure messages. |
 | `cli/` | User-run commands without Spring. | `GmailOAuthCommand`, `MailSyncCommand`, `MailReprocessCommand`, `MailReindexCommand`. Check pandoc before the index or sign-in; source closes before the index. Reprocessing and reindexing are offline. |
 | `mime/` | Local MIME and container reading. | `MimeReader`, `ParsedMessage`: decoded headers, selected body and MIME attachment files. `Containers` coordinates breadth-first EML/ZIP/MSG/TNEF expansion; package-private `MsgReader`/`TnefReader` enumerate immediate children using POI. See `docs/mime-agent.md`. |
 | `convert/` | Body and attachment text. | `Pandoc`, `PandocException`: sandboxed process per conversion; `AttachmentText` dispatches formats. `PdfText`, `XlsxText`/`XlsText`, `PptxText`/`PptText` adapt sibling extraction methods; `DocText` uses HWPF `WordExtractor`. |
@@ -139,6 +139,30 @@ fields are scanned, dates use doc values, and stored card fields are loaded for 
 No bodies, MIME, attachment text, source or pandoc are read. The writer lock does not block
 reading. Schema 3 and disk layout remain unchanged, without reindexing or persisted threads.
 Only displayed subjects/senders are filtered; keys, paths, folder keys and dates stay original.
+
+Move reuse is verified offline. Each sync reads metadata for all present refs in batches of at
+most 100, through EWS IdOnly GetItem with five identity properties or IMAP ENVELOPE/size/UID
+with a renewed EXAMINE and UIDVALIDITY check. This first seeds old stores without repeat MIME
+downloads or reprocessing. `MessageMeta.fingerprint` is nullable for old JSON; processing and
+reindexing preserve it, and schema 3 remains unchanged. A move before seeding falls back to
+normal download. Missing/incomplete refreshed identity clears the fingerprint.
+
+Matching uses a pre-run snapshot, an explicitly removed converted entry with MIME, and exactly
+one old and one remote occurrence of a complete Message-ID/size/sent date/sender/subject
+fingerprint in the connection. Retained identical copies, failed/downloaded entries and both
+ends of UIDVALIDITY resets cannot supply reuse; EWS rescans remain eligible. Equality is
+heuristic and can conceal changed content: SHA-256 describes only the saved MIME, not remote
+bytes, and EWS item size is separate. Reuse atomically changes metadata, loads saved content
+into the index and preserves UUID, directory and every content file. It counts as neither
+downloaded, failed nor removed; zero downloads may include moves.
+
+Before applying changes, folder identities are saved with old/null cursors, including vanished
+folders. Matches commit before unmatched removals, which check the original folder/ref before
+deleting. Only the final folder-list replacement advances all cursors and drops vanished entries.
+Reconciliation compares indexed folder/ref/path with disk metadata and restores just mismatched
+documents without reconversion. Current local refs make reruns after metadata reassignment,
+index commit or interrupted downloads/cursor save idempotent. No journal or second store is
+used. Protocol availability on the user's servers remains to verify (проверить).
 
 ### Planned packages
 

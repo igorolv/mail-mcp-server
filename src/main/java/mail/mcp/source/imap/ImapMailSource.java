@@ -11,6 +11,9 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Collection;
+import java.util.Map;
+import mail.mcp.source.RemoteMessageInfo;
 
 /** One lazy IMAP session shared by all folder queries and downloads. */
 public final class ImapMailSource implements MailSource {
@@ -44,6 +47,20 @@ public final class ImapMailSource implements MailSource {
         var added = present.stream().filter(ref -> reset || !known.contains(ref)).toList();
         var removed = known.stream().filter(ref -> reset || !presentSet.contains(ref)).sorted(REF_ORDER).toList();
         return new FolderChanges(added, removed, newCursor, reset);
+    }
+
+    @Override public Map<String, RemoteMessageInfo> metadata(RemoteFolder folder, String expectedCursor,
+                                                           Collection<String> refs) {
+        if (expectedCursor == null || !expectedCursor.matches("[0-9]+")) {
+            throw new IllegalArgumentException("Metadata requires the UIDVALIDITY change cursor");
+        }
+        try {
+            var uids = refs.stream().map(ref -> {
+                if (ref == null || !ref.matches("[0-9]+")) { throw new IllegalArgumentException("Invalid metadata UID"); }
+                return Long.valueOf(ref);
+            }).toList();
+            return client.metadata(folder.remoteId(), Long.parseLong(expectedCursor), uids);
+        } catch (NumberFormatException e) { throw new IllegalArgumentException("Metadata UID or cursor outside range"); }
     }
 
     @Override public Downloaded download(RemoteFolder folder, String ref, Path target) {

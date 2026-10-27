@@ -14,6 +14,9 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Collection;
+import java.util.Map;
+import mail.mcp.source.RemoteMessageInfo;
 
 import static mail.mcp.source.ews.DistinguishedFolder.*;
 
@@ -93,6 +96,16 @@ public final class EwsMailSource implements MailSource {
         }
         return new FolderChanges(created.stream().filter(ref -> !known.contains(ref)).toList(),
                 removed.stream().sorted().toList(), page.syncState(), false, rescanned);
+    }
+
+    @Override public Map<String, RemoteMessageInfo> metadata(RemoteFolder folder, String expectedCursor,
+                                                           Collection<String> refs) {
+        var ids = List.copyOf(refs);
+        var result = new HashMap<String, RemoteMessageInfo>();
+        for (int i = 0; i < ids.size(); i += 100) {
+            result.putAll(client.metadata(ids.subList(i, Math.min(i + 100, ids.size()))));
+        }
+        return Map.copyOf(result);
     }
 
     @Override public Downloaded download(RemoteFolder folder, String ref, Path target) {

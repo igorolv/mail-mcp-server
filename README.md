@@ -56,6 +56,9 @@ mail after restarting the server is still pending. No sync or reindex is needed.
   recipients, attachment names and attachment text.
 - **Local conversations:** `getThread` follows stored Message-ID, In-Reply-To and References
   across folders of one mailbox, returning chronological cards from a local message key.
+- **Heuristic move reuse:** an unambiguous move between included folders can keep the local
+  UUID, directory and all saved content without downloading or converting MIME again.
+  This is verified offline; availability on the user's servers remains to verify (проверить).
 - **Background sync** on request. The tool returns at once, `syncStatus` shows progress, and
   several server processes can share one data directory. Folder progress distinguishes an IMAP
   UIDVALIDITY `reset` from an EWS `rescanned` recovery of an invalid SyncState; old status files
@@ -83,6 +86,26 @@ MailSource (EWS | IMAP)  ──download .eml──▶  SyncRunner  ──▶  <d
 - It always takes everything, then only changes: new messages, deletions, vanished folders.
 - One sign-in per run and no retries: a stale password must not lock a domain account.
 - The disk is the full copy; the index is derived and can be rebuilt offline (`mail-reindex`).
+
+Each sync reads identity metadata for all present messages, including known ones, in batches of
+at most 100: EWS `GetItem` properties or IMAP `ENVELOPE`, UID and `RFC822.SIZE`, without bodies.
+The first sync after upgrading seeds old local metadata without downloading known MIME or
+reprocessing it. A message moved before seeding uses the normal download path.
+
+Reuse requires an explicitly removed, converted local message with MIME, a new ref in another
+folder, and exactly one old and one current occurrence of its complete Message-ID/size/sent
+date/sender/subject fingerprint in the connection. IDs and addresses keep their case and lose
+only outer whitespace; the decoded subject is compared exactly. Incomplete identities,
+ambiguous copies and IMAP UIDVALIDITY resets fall back to normal deletion and download.
+This is a heuristic: equal metadata can hide different content. SHA-256 still describes the
+saved original, and EWS item size is separate from the saved MIME size; remote byte identity
+is not verified.
+
+All folders are discovered before applying changes. Matches update metadata and the index
+before unmatched removals. Old cursors and vanished-folder identities remain until all planned
+changes commit; the next run repairs an index whose folder/ref disagrees with metadata and uses
+current local refs to resume. Content paths stay unchanged. Reused messages count as neither
+downloaded, failed nor removed, so `0 downloaded` can include recognized moves.
 
 Design, decisions and real-mailbox results: [docs/plan.md](docs/plan.md) (in Russian).
 
@@ -134,7 +157,8 @@ connection name:
   [docs/gmail-oauth-agent.md](docs/gmail-oauth-agent.md).
 
 **4. Run the first sync from a terminal.** It downloads the whole mailbox, so on a large mailbox
-it takes a long time; Exchange costs one request per message. Run it again to check that it ends
+it takes a long time; Exchange costs one MIME request per new message plus batched metadata
+requests for all present messages. Run it again to check that it ends
 with `0 downloaded`:
 
 ```powershell

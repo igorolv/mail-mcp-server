@@ -6,7 +6,7 @@ Design: plan.md 3.1 and 3.6, decisions П3 and П4; background: research/RT-04-i
 ## Implemented scope
 
 Angus Mail 2.0.5 with Jakarta Mail API 2.1.5. `ImapMailSource` implements `MailSource` on top
-of `ImapClient`: filtered mail folders, changes by UIDVALIDITY and folder UIDs, and original
+of `ImapClient`: filtered mail folders, changes by UIDVALIDITY and folder UIDs, metadata snapshots and original
 MIME downloads by UID. One source owns one lazy session for any number of queries and downloads
 across folders. `mail-sync` uses the same `SyncRunner`, store and catalog as EWS; MCP tools read
 the local copy (`docs/tools-agent.md`). Gmail labels/deduplication, CONDSTORE/QRESYNC
@@ -49,7 +49,7 @@ Allowed control commands: CAPABILITY, NOOP, LOGOUT, LOGIN, AUTHENTICATE (PLAIN/L
 configured provider), LIST, LSUB, NAMESPACE, STATUS, EXAMINE, CLOSE, UNSELECT and ENABLE (UTF8 negotiation).
 OAuth connections use AUTHENTICATE with XOAUTH2 arguments; the wrapper acknowledges OAuth error
 challenges with an empty response instead of resending credentials (see gmail-oauth-agent.md).
-FETCH/UID FETCH is allowed only with UID, FLAGS, INTERNALDATE, RFC822.SIZE and BODY.PEEK[]
+FETCH/UID FETCH is allowed only with UID, FLAGS, INTERNALDATE, ENVELOPE, RFC822.SIZE and BODY.PEEK[]
 (optionally a partial byte range). Command text containing CR/LF is rejected.
 
 CLOSE is safe because SELECT is forbidden: RFC 3501 section 6.4.2 specifies that CLOSE cannot
@@ -77,7 +77,7 @@ separately for invalid SyncState recovery without invalidating known refs. Old s
 2. Resolve the UID; a missing message raises `MessageUnavailableException(GONE)`.
 3. Set PEEK and fetch `RFC822.SIZE` using `FetchProfile.Item.SIZE`. A declared size above the
    limit raises `MessageUnavailableException(TOO_LARGE)` before fetching the body. Do not call
-   `IMAPMessage.getSize()`: it fetches ENVELOPE, which the guard forbids.
+   `IMAPMessage.getSize()`: it fetches ENVELOPE unnecessarily on the download path.
 4. Stream `getMimeStream()` in partial BODY.PEEK blocks into a random local `.part` file next to
    the target, enforcing the byte limit (64 MiB by default) and computing SHA-256. Exceeding the
    limit despite the declared size removes the partial and raises TOO_LARGE. The next message
@@ -91,6 +91,33 @@ separately for invalid SyncState recovery without invalidating known refs. Old s
 `folders()` preserves server order, keeps only folders holding messages and excludes attributes
 `\Noselect`, `\NonExistent`, `\Trash`, `\Junk`, `\Drafts` ignoring case. No provider-specific
 Gmail handling is added.
+
+## Remote identity metadata
+
+`ImapMailSource.metadata(folder, expectedCursor, refs)` requires the UIDVALIDITY cursor just
+returned by changes. `ImapClient.metadata` closes/reopens the folder with EXAMINE, checks that
+UIDVALIDITY still matches before trusting reused UIDs, then resolves and fetches refs in batches
+of at most 100. A mismatch closes the client and aborts the run without retry. Missing/expunged
+items are omitted; other protocol/authentication/transport errors abort.
+
+The Angus 2.0.5 profile uses ENVELOPE and UID. Offline fake-server tests verify the exact emitted
+attributes `(ENVELOPE INTERNALDATE RFC822.SIZE UID)`; ENVELOPE already supplies the date and size
+fetch attributes, so adding SIZE to the profile would duplicate RFC822.SIZE. Cached envelope
+values provide Message-ID, sent date, decoded subject and From. Exactly one non-group sender
+address is required; optional missing fields disable identity matching. No body or arbitrary
+header fetch, CONDSTORE or Gmail extension is used. The exact attribute guard remains in place;
+adding ENVELOPE permits no RFC822 body retrieval, non-PEEK BODY or write command.
+
+Every present ref, including known messages, is read once per folder/run to seed old local
+fingerprints and detect retained copies. Seeding needs neither reprocessing nor repeat MIME
+downloads; a move before seeding uses normal download. Unique complete metadata equality remains
+a heuristic: different bytes may share it. A matched move preserves UUID, directory, original
+MIME SHA-256/time and all saved content; reused moves increase no downloaded, failed or removed
+counter. Both ends of UIDVALIDITY resets are excluded. The runner discovers all folders before
+removal, writes matches first and commits before saving all cursors; reconciliation repairs an
+interrupted metadata/index reassignment. See `docs/storage-agent.md` for exact matching/recovery
+rules. Availability on the user's servers remains to verify (проверить); only synthetic protocol
+tests have been run for this metadata path.
 
 Original MIME is kept on disk as downloaded. Under the 2026-10-25 decisions mail content and
 local paths may reach the model through tools, with an optional output filter (plan.md 3.1,

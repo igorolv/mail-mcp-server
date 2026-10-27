@@ -161,6 +161,27 @@ class MessageStoreTest {
         assertThat(store.keys()).isEmpty();
         assertThat(store.hasMeta(key)).isFalse();
     }
+    @Test void oldMetadataHasNoFingerprint() throws IOException {
+        var store = store();
+        String key = store.newKey();
+        Path directory = store.createMessageDir(key);
+        Files.writeString(directory.resolve(MessageStore.META_FILE), """
+                {"key":"%s","folderKey":"f1","folder":"INBOX","ref":"101","size":12,
+                 "downloadedAt":"2026-10-25T12:00:00Z","state":"converted"}
+                """.formatted(key));
+        assertThat(store.readMeta(key).orElseThrow().fingerprint()).isNull();
+        var fingerprint = new mail.mcp.model.MessageFingerprint(" <Case@example.com> ", 1234L,
+                DOWNLOADED_AT, " User@example.com ", " Subject ");
+        var old = store.readMeta(key).orElseThrow();
+        var meta = new MessageMeta(key, old.folderKey(), old.folder(), old.ref(), old.size(), old.sha256(),
+                old.downloadedAt(), old.state(), old.error(), fingerprint);
+        store.writeMeta(meta);
+        assertThat(store.readMeta(key)).contains(meta);
+        assertThat(fingerprint.messageId()).isEqualTo("<Case@example.com>");
+        assertThat(fingerprint.from()).isEqualTo("User@example.com");
+        assertThat(fingerprint.subject()).isEqualTo(" Subject ");
+    }
+
     @Test void oldSyncStatusDefaultsRescannedToFalse() throws IOException {
         Path folder = Files.createDirectories(temp.resolve("box"));
         Files.writeString(folder.resolve(MessageStore.SYNC_STATUS_FILE), """

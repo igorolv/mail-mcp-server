@@ -96,6 +96,9 @@ class SyncServiceTest {
 
     @Test void rejectedSignInIsRecordedAndRefusesTheNextStart() throws Exception {
         var service = service(() -> new MailSource() {
+            @Override public java.util.Map<String, mail.mcp.source.RemoteMessageInfo> metadata(RemoteFolder f, String c, java.util.Collection<String> r) {
+                return fake.metadata(f, c, r);
+            }
             @Override public List<RemoteFolder> folders() { throw new ImapException(ImapException.Kind.AUTHENTICATION); }
             @Override public FolderChanges changes(RemoteFolder f, String c, Set<String> known) { throw new AssertionError(); }
             @Override public Downloaded download(RemoteFolder f, String r, Path target) { throw new AssertionError(); }
@@ -129,6 +132,9 @@ class SyncServiceTest {
 
     private MailSource blocking(CountDownLatch entered, CountDownLatch release) {
         return new MailSource() {
+            @Override public java.util.Map<String, mail.mcp.source.RemoteMessageInfo> metadata(RemoteFolder f, String c, java.util.Collection<String> r) {
+                return fake.metadata(f, c, r);
+            }
             @Override public List<RemoteFolder> folders() {
                 entered.countDown();
                 try {
@@ -223,6 +229,9 @@ class SyncServiceTest {
         withLogs(logs -> {
             try {
                 var service = service(() -> new MailSource() {
+                    @Override public java.util.Map<String, mail.mcp.source.RemoteMessageInfo> metadata(RemoteFolder f, String c, java.util.Collection<String> r) {
+                        return fake.metadata(f, c, r);
+                    }
                     @Override public List<RemoteFolder> folders() { return List.of(); }
                     @Override public FolderChanges changes(RemoteFolder f, String c, Set<String> k) { throw new AssertionError(); }
                     @Override public Downloaded download(RemoteFolder f, String r, Path t) { throw new AssertionError(); }

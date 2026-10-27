@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,6 +28,60 @@ class EwsResponseReaderTest {
         try (InputStream in = fixture(name)) {
             return in.readAllBytes();
         }
+    }
+
+    private static InputStream metadataXml(String responses) {
+        String xml = """
+                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+                 xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+                 xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"><s:Body>
+                <m:GetItemResponse><m:ResponseMessages>%s</m:ResponseMessages></m:GetItemResponse>
+                </s:Body></s:Envelope>
+                """.formatted(responses);
+        return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String metadataItem(String id) {
+        return """
+                <m:GetItemResponseMessage ResponseClass="Success"><m:ResponseCode>NoError</m:ResponseCode>
+                <m:Items><t:Message><t:ItemId Id="%s"/><t:Subject>Тема &amp; text</t:Subject>
+                <t:Size>987654</t:Size><t:DateTimeSent>2026-10-25T12:00:00Z</t:DateTimeSent>
+                <t:InternetMessageId> &lt;Case@example.com&gt; </t:InternetMessageId>
+                <t:From><t:Mailbox><t:Name>Display name</t:Name><t:EmailAddress> Sender@example.com </t:EmailAddress>
+                </t:Mailbox></t:From></t:Message></m:Items></m:GetItemResponseMessage>
+                """.formatted(id);
+    }
+
+    @Test void metadataBatchHandlesMissingItemsWithoutRefMisassociation() throws Exception {
+        String gone = """
+                <m:GetItemResponseMessage ResponseClass="Error"><m:ResponseCode>ErrorItemNotFound</m:ResponseCode>
+                </m:GetItemResponseMessage>
+                """;
+        var items = EwsResponseReader.readMetadata(metadataXml(gone + metadataItem("second") + metadataItem("third")),
+                List.of("gone", "second", "third"));
+        assertThat(items).containsOnlyKeys("second", "third");
+        assertThat(items.get("second").ref()).isEqualTo("second");
+        assertThat(items.get("second").fingerprint()).isEqualTo(new mail.mcp.model.MessageFingerprint(
+                "<Case@example.com>", 987654L, java.time.Instant.parse("2026-10-25T12:00:00Z"), "Sender@example.com", "Тема & text"));
+        assertThat(items.get("third").fingerprint().complete()).isTrue();
+        assertThatThrownBy(() -> items.clear()).isInstanceOf(UnsupportedOperationException.class);
+        var reversed = EwsResponseReader.readMetadata(metadataXml(metadataItem("third") + gone + metadataItem("second")),
+                List.of("gone", "second", "third"));
+        assertThat(reversed).isEqualTo(items);
+        assertThatThrownBy(() -> EwsResponseReader.readMetadata(metadataXml(metadataItem("second") + metadataItem("second")),
+                List.of("first", "second"))).isInstanceOf(EwsProtocolException.class);
+        assertThatThrownBy(() -> EwsResponseReader.readMetadata(metadataXml(metadataItem("unexpected")), List.of("first")))
+                .isInstanceOf(EwsProtocolException.class);
+        assertThatThrownBy(() -> EwsResponseReader.readMetadata(metadataXml(gone), List.of("first", "second")))
+                .isInstanceOf(EwsProtocolException.class);
+        assertThatThrownBy(() -> EwsResponseReader.readMetadata(metadataXml(gone.replace("ErrorItemNotFound", "ErrorAccessDenied")), List.of("first")))
+                .isInstanceOf(EwsResponseException.class);
+        assertThatThrownBy(() -> EwsResponseReader.readMetadata(fixture("xxe.xml"), List.of("first")))
+                .isInstanceOfAny(XMLStreamException.class, EwsProtocolException.class);
+        assertThatThrownBy(() -> EwsResponseReader.readMetadata(fixture("fault-server-busy.xml"), List.of("first")))
+                .isInstanceOf(EwsSoapFaultException.class);
+        assertThatThrownBy(() -> EwsResponseReader.readMetadata(fixture("no-response-message.xml"), List.of("first")))
+                .isInstanceOf(EwsProtocolException.class);
     }
 
     @Test

@@ -133,6 +133,20 @@ class EwsRequestTest {
         assertThat(xml.indexOf("Id=\"drafts\"")).isLessThan(xml.indexOf("Id=\"outbox\""));
     }
 
+    @Test void metadataRequestOmitsMimeAndBody() {
+        var transport = new RecordingTransport();
+        try (var client = new EwsClient(transport)) {
+            assertThatThrownBy(() -> client.metadata(List.of("id\"<>&", "second")))
+                    .isInstanceOf(UnsupportedOperationException.class);
+        }
+        assertThat(transport.lastOperation).isEqualTo(EwsOperation.GET_ITEM);
+        assertThat(transport.lastRequest()).contains("<t:BaseShape>IdOnly</t:BaseShape>",
+                "FieldURI=\"message:InternetMessageId\"", "FieldURI=\"item:Size\"",
+                "FieldURI=\"item:DateTimeSent\"", "FieldURI=\"message:From\"", "FieldURI=\"item:Subject\"",
+                "Id=\"id&quot;&lt;&gt;&amp;\"", "Id=\"second\"")
+                .doesNotContain("IncludeMimeContent", "item:Body", "<t:Body", "InternetMessageHeaders", "IsRead");
+    }
+
     /** Captures the request and refuses to answer. */
     private static final class RecordingTransport implements EwsTransport {
         private byte[] lastEnvelope;

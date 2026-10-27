@@ -23,8 +23,12 @@ final class FakeImapServer implements AutoCloseable {
     static final byte[] MIME = ("From: test@example.com\r\nTo: reader@example.org\r\n"
             + "Subject: Synthetic IMAP\r\n\r\nSynthetic body, never real mail.\r\n").getBytes(StandardCharsets.US_ASCII);
 
-    record Item(long uid, byte[] bytes, long declaredSize, String flags) {
+    static final String ENVELOPE = "(\"Sun, 25 Oct 2026 12:00:00 +0000\" \"=?UTF-8?B?0KLQtdC80LA=?=\" "
+            + "((NIL NIL \"Sender\" \"example.com\")) NIL NIL NIL NIL NIL NIL \"<Move@example.com>\")";
+
+    record Item(long uid, byte[] bytes, long declaredSize, String flags, String envelope) {
         Item(long uid, byte[] bytes) { this(uid, bytes, bytes.length, ""); }
+        Item(long uid, byte[] bytes, long declaredSize, String flags) { this(uid, bytes, declaredSize, flags, ENVELOPE); }
     }
 
     record MailFolder(String name, long uidValidity, List<String> attributes, List<Item> messages) {
@@ -36,6 +40,7 @@ final class FakeImapServer implements AutoCloseable {
     private final java.util.concurrent.ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Future<?> task;
     private volatile Socket socket;
+    volatile Long nextUidValidity;
 
     FakeImapServer() throws IOException { this(false, false, "login"); }
 
@@ -100,17 +105,18 @@ final class FakeImapServer implements AutoCloseable {
                     current = folders.stream().filter(f -> f.name().equals(name)).findFirst().orElseThrow();
                     long next = current.messages().stream().mapToLong(Item::uid).max().orElse(0) + 1;
                     send(out, "* FLAGS (\\Seen)\r\n* " + current.messages().size() + " EXISTS\r\n"
-                            + "* 0 RECENT\r\n* OK [UIDVALIDITY " + current.uidValidity() + "] generation\r\n"
+                            + "* 0 RECENT\r\n* OK [UIDVALIDITY " + (nextUidValidity == null ? current.uidValidity() : nextUidValidity) + "] generation\r\n"
                             + "* OK [UIDNEXT " + next + "] next\r\n");
                     send(out, tag + " OK [READ-ONLY] examined\r\n"); continue;
                 } else if (command.equals("CLOSE")) {
                     assertThat(current).isNotNull();
                     current = null;
-                } else if (command.matches("UID FETCH [0-9]+ \\(UID\\)")) {
+                } else if (command.matches("UID FETCH [0-9:,]+ \\(UID\\)")) {
                     assertThat(current).isNotNull();
-                    long uid = Long.parseLong(command.split(" ")[2]);
+                    String set = command.split(" ")[2];
                     for (int i = 0; i < current.messages().size(); i++) {
-                        if (current.messages().get(i).uid() == uid) {
+                        long uid = current.messages().get(i).uid();
+                        if (inSet(Math.toIntExact(uid), set)) {
                             send(out, "* " + (i + 1) + " FETCH (UID " + uid + ")\r\n");
                         }
                     }
@@ -120,6 +126,17 @@ final class FakeImapServer implements AutoCloseable {
                     for (int i = 0; i < current.messages().size(); i++) {
                         if (inSet(i + 1, set)) {
                             send(out, "* " + (i + 1) + " FETCH (UID " + current.messages().get(i).uid() + ")\r\n");
+                        }
+                    }
+                } else if (command.matches("FETCH [0-9:,]+ \\(ENVELOPE INTERNALDATE RFC822\\.SIZE UID\\)")) {
+                    assertThat(current).isNotNull();
+                    String set = command.split(" ")[1];
+                    for (int i = 0; i < current.messages().size(); i++) {
+                        if (inSet(i + 1, set)) {
+                            var item = current.messages().get(i);
+                            send(out, "* " + (i + 1) + " FETCH (ENVELOPE " + item.envelope()
+                                    + " INTERNALDATE \"25-Oct-2026 12:00:00 +0000\" RFC822.SIZE " + item.declaredSize()
+                                    + " UID " + item.uid() + ")\r\n");
                         }
                     }
                 } else if (command.matches("FETCH [0-9]+ \\(RFC822\\.SIZE\\)")) {

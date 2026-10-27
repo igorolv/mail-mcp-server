@@ -7,6 +7,10 @@ import jakarta.mail.Message;
 import jakarta.mail.MessagingException;
 import jakarta.mail.Session;
 import jakarta.mail.UIDFolder;
+import jakarta.mail.MessageRemovedException;
+import jakarta.mail.internet.InternetAddress;
+import mail.mcp.model.MessageFingerprint;
+import mail.mcp.source.RemoteMessageInfo;
 import mail.mcp.connections.AuthKind;
 import mail.mcp.source.Downloaded;
 import mail.mcp.source.MessageUnavailableException;
@@ -26,6 +30,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.Collection;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -152,6 +159,55 @@ public final class ImapClient implements AutoCloseable {
                 uids.sort(Long::compareTo);
             }
             return new FolderUids(uidValidity, uids);
+        } catch (MessagingException e) { throw fail(e); }
+        catch (ImapException e) { close(); throw e; }
+    }
+
+    /** Refresh EXAMINE before trusting UIDs from the preceding change snapshot. */
+    public synchronized Map<String, RemoteMessageInfo> metadata(String folderName, long expectedUidValidity,
+                                                               Collection<Long> uids) {
+        if (folderName == null || folderName.isBlank() || expectedUidValidity <= 0
+                || uids.stream().anyMatch(uid -> uid == null || uid <= 0)) {
+            throw new IllegalArgumentException("Metadata requires a folder, UIDVALIDITY and positive UIDs");
+        }
+        var ids = List.copyOf(uids);
+        try {
+            if (currentFolder != null) { currentFolder.close(false); currentFolder = null; }
+            var folder = open(folderName);
+            if (folder.getUIDValidity() != expectedUidValidity) { throw new ImapException(ImapException.Kind.PROTOCOL); }
+            var result = new LinkedHashMap<String, RemoteMessageInfo>();
+            for (int i = 0; i < ids.size(); i += 100) {
+                long[] batch = ids.subList(i, Math.min(i + 100, ids.size())).stream().mapToLong(Long::longValue).toArray();
+                var messages = java.util.Arrays.stream(folder.getMessagesByUID(batch))
+                        .filter(java.util.Objects::nonNull).filter(m -> !m.isExpunged()).toArray(Message[]::new);
+                var profile = new FetchProfile();
+                // Angus 2.0.5 ENVELOPE already includes INTERNALDATE and RFC822.SIZE.
+                profile.add(FetchProfile.Item.ENVELOPE);
+                profile.add(UIDFolder.FetchProfileItem.UID);
+                folder.fetch(messages, profile);
+                for (var entry : messages) {
+                    var message = (IMAPMessage) entry;
+                    try {
+                        if (message.isExpunged()) { continue; }
+                        long uid = folder.getUID(message);
+                        if (uid <= 0 || java.util.Arrays.stream(batch).noneMatch(id -> id == uid)) {
+                            throw new ImapException(ImapException.Kind.PROTOCOL);
+                        }
+                        String ref = Long.toString(uid);
+                        var senders = message.getFrom();
+                        String from = senders != null && senders.length == 1 && senders[0] instanceof InternetAddress address
+                                && !address.isGroup() ? address.getAddress() : null;
+                        var date = message.getSentDate();
+                        var fingerprint = new MessageFingerprint(message.getMessageID(), message.getSizeLong(),
+                                date == null ? null : date.toInstant(), from, message.getSubject());
+                        if (result.putIfAbsent(ref, new RemoteMessageInfo(ref, fingerprint)) != null) {
+                            throw new ImapException(ImapException.Kind.PROTOCOL);
+                        }
+                    } catch (MessageRemovedException e) { /* vanished since UID discovery */ }
+                }
+            }
+            if (folder.getUIDValidity() != expectedUidValidity) { throw new ImapException(ImapException.Kind.PROTOCOL); }
+            return Map.copyOf(result);
         } catch (MessagingException e) { throw fail(e); }
         catch (ImapException e) { close(); throw e; }
     }
