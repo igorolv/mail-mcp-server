@@ -4,6 +4,7 @@ import mail.mcp.model.MessageCard;
 import mail.mcp.model.DateRange;
 import mail.mcp.model.SearchHit;
 import mail.mcp.model.SearchResults;
+import mail.mcp.model.ThreadResults;
 import mail.mcp.store.MessageStore;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.LongPoint;
@@ -12,6 +13,7 @@ import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.index.MultiDocValues;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.MatchAllDocsQuery;
@@ -27,6 +29,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.List;
 import java.util.Arrays;
 import java.util.Set;
@@ -38,6 +45,9 @@ import java.util.function.UnaryOperator;
 /** Read-only snapshot of the last committed catalog; never takes the writer lock. */
 public final class MailIndexReader implements AutoCloseable {
     private static final Pattern FULL_ADDRESS = Pattern.compile("[^\\s\"@]+@[^\\s\"@]+\\.[^\\s\"@]+");
+    private static final Pattern HEADER_ID = Pattern.compile("<[^<>\\s]+>", Pattern.UNICODE_CHARACTER_CLASS);
+    private static final Set<String> THREAD_FIELDS = Set.of("key", "messageId", "inReplyTo", "references");
+    private static final Set<String> CARD_FIELDS = Set.of("key", "ref", "date", "from", "subject", "attachmentNames", "state");
     private final FSDirectory directory;
     private final DirectoryReader reader;
     private final IndexSearcher searcher;
@@ -175,6 +185,90 @@ public final class MailIndexReader implements AutoCloseable {
             }
             return new CardPage(total, List.copyOf(cards));
         } catch (IOException e) { throw new UncheckedIOException(e); }
+    }
+
+    /** Finds the complete header component before paging, using only this committed snapshot. */
+    public ThreadResults thread(String key, int offset, int limit) {
+        if (offset < 0 || limit < 1) { throw new IllegalArgumentException("Invalid offset or limit"); }
+        try {
+            Map<String, Integer> documents = new HashMap<>();
+            Map<String, Set<String>> keyIds = new HashMap<>();
+            Map<String, Set<String>> idKeys = new HashMap<>();
+            for (var leaf : reader.leaves()) {
+                var live = leaf.reader().getLiveDocs();
+                var fields = leaf.reader().storedFields();
+                for (int i = 0; i < leaf.reader().maxDoc(); i++) {
+                    if (live != null && !live.get(i)) { continue; }
+                    var doc = fields.document(i, THREAD_FIELDS);
+                    String localKey = doc.get("key");
+                    documents.put(localKey, leaf.docBase + i);
+                    Set<String> ids = new HashSet<>();
+                    String own = doc.get("messageId");
+                    if (own != null && HEADER_ID.matcher(own.strip()).matches()) { ids.add(own.strip()); }
+                    ids.addAll(replyIds(doc.get("inReplyTo")));
+                    // MIME stores References as whitespace-separated values; retain bracket context across them.
+                    ids.addAll(replyIds(String.join(" ", doc.getValues("references"))));
+                    keyIds.put(localKey, ids);
+                    for (String id : ids) { idKeys.computeIfAbsent(id, ignored -> new HashSet<>()).add(localKey); }
+                }
+            }
+            if (!documents.containsKey(key)) {
+                throw new IllegalArgumentException("Message is not indexed; use listMessages");
+            }
+            Set<String> component = new HashSet<>();
+            Set<String> visitedIds = new HashSet<>();
+            var pending = new ArrayDeque<String>();
+            component.add(key);
+            pending.add(key);
+            while (!pending.isEmpty()) {
+                for (String id : keyIds.get(pending.removeFirst())) {
+                    if (!visitedIds.add(id)) { continue; }
+                    for (String linked : idKeys.get(id)) {
+                        if (component.add(linked)) { pending.addLast(linked); }
+                    }
+                }
+            }
+            int total = component.size();
+            if (offset >= total) { return new ThreadResults(total, List.of()); }
+            // Read dates from doc values, without loading off-page stored cards or bodies.
+            var dateValues = MultiDocValues.getNumericValues(reader, "date");
+            Map<String, Long> dates = new HashMap<>();
+            for (String member : component.stream().sorted(Comparator.comparingInt(documents::get)).toList()) {
+                if (dateValues != null && dateValues.advanceExact(documents.get(member))) {
+                    dates.put(member, dateValues.longValue());
+                }
+            }
+            var ordered = component.stream().sorted(Comparator
+                    .comparing((String member) -> dates.get(member), Comparator.nullsLast(Comparator.naturalOrder()))
+                    .thenComparing(Comparator.naturalOrder())).toList();
+            int end = (int) Math.min(total, (long) offset + limit);
+            List<MessageCard> cards = new ArrayList<>();
+            var fields = searcher.storedFields();
+            for (String member : ordered.subList(offset, end)) {
+                cards.add(card(fields.document(documents.get(member), CARD_FIELDS)));
+            }
+            return new ThreadResults(total, List.copyOf(cards));
+        } catch (IOException e) { throw new UncheckedIOException(e); }
+    }
+
+    private static Set<String> replyIds(String header) {
+        Set<String> ids = new HashSet<>();
+        if (header == null) { return ids; }
+        int depth = 0;
+        int start = 0;
+        boolean nested = false;
+        for (int i = 0; i < header.length(); i++) {
+            char c = header.charAt(i);
+            if (c == '<') {
+                if (depth == 0) { start = i; nested = false; }
+                else { nested = true; }
+                depth++;
+            } else if (c == '>' && depth > 0 && --depth == 0 && !nested) {
+                String candidate = header.substring(start, i + 1);
+                if (HEADER_ID.matcher(candidate).matches()) { ids.add(candidate); }
+            }
+        }
+        return ids;
     }
 
     private static boolean isFullAddress(String query) {

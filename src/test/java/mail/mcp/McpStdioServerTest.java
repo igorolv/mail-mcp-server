@@ -94,7 +94,18 @@ class McpStdioServerTest {
             // Not findValues("name"): the output schema has a "name" property object too.
             List<String> toolNames = new ArrayList<>();
             tools.at("/result/tools").forEach(tool -> toolNames.add(tool.get("name").asString()));
-            assertThat(toolNames).containsExactlyInAnyOrder("listConnections", "sync", "syncStatus", "listFolders", "listMessages", "getMessage", "search", "getAttachment");
+            assertThat(toolNames).hasSize(9).containsExactlyInAnyOrder("listConnections", "sync", "syncStatus", "listFolders", "listMessages", "getMessage", "search", "getAttachment", "getThread");
+            JsonNode threadTool = java.util.stream.StreamSupport.stream(tools.at("/result/tools").spliterator(), false)
+                    .filter(tool -> tool.path("name").asString().equals("getThread")).findFirst().orElseThrow();
+            assertThat(threadTool.at("/inputSchema/required").toString()).contains("connection", "key").doesNotContain("offset", "limit");
+            assertThat(threadTool.at("/annotations/readOnlyHint").asBoolean()).isTrue();
+            assertThat(threadTool.at("/annotations/destructiveHint").asBoolean()).isFalse();
+            assertThat(threadTool.at("/annotations/idempotentHint").asBoolean()).isTrue();
+            JsonNode threadCardSchema = threadTool.at("/outputSchema/properties/messages/items/properties");
+            for (String field : List.of("key", "folder", "date", "from", "subject", "hasAttachments", "state", "localPath")) {
+                assertThat(threadCardSchema.has(field)).as("thread card field %s", field).isTrue();
+            }
+            assertThat(threadCardSchema.toString()).doesNotContain("messageId", "inReplyTo", "references", "body");
             JsonNode searchTool = java.util.stream.StreamSupport.stream(tools.at("/result/tools").spliterator(), false)
                     .filter(tool -> tool.path("name").asString().equals("search")).findFirst().orElseThrow();
             assertThat(searchTool.at("/inputSchema/required").toString()).doesNotContain("query", "since", "until");
@@ -127,6 +138,25 @@ class McpStdioServerTest {
             assertThat(dateOnly.at("/hits/0").has("snippetAttachmentFile")).isFalse();
             assertThat(dateOnly.at("/hits/0").has("snippetAttachmentName")).isFalse();
             String key = messages.at("/messages/0/key").asString();
+            JsonNode thread = call(requests, io, replies, stderr, stdout, 31, "getThread",
+                    "{\"connection\":\"local\",\"key\":\"" + key + "\"}");
+            assertThat(thread.path("total").asInt()).isEqualTo(1);
+            assertThat(thread.path("connection").asString()).isEqualTo("local");
+            assertThat(thread.path("key").asString()).isEqualTo(key);
+            assertThat(thread.path("offset").asInt()).isZero();
+            assertThat(thread.has("nextOffset")).isFalse();
+            assertThat(thread.path("messages").size()).isEqualTo(1);
+            assertThat(thread.at("/messages/0/key").asString()).isEqualTo(key);
+            assertThat(thread.at("/messages/0/folder").asString()).isEqualTo("f1");
+            assertThat(thread.at("/messages/0/date")).isEqualTo(messages.at("/messages/0/date"));
+            assertThat(thread.at("/messages/0/subject")).isEqualTo(messages.at("/messages/0/subject"));
+            assertThat(thread.at("/messages/0/from")).isEqualTo(messages.at("/messages/0/from"));
+            assertThat(thread.at("/messages/0/state").asString()).isEqualTo("converted");
+            assertThat(thread.at("/messages/0/hasAttachments").asBoolean()).isTrue();
+            assertThat(Path.of(thread.at("/messages/0/localPath").asString())).isDirectory();
+            assertThat(thread.toString()).doesNotContain("messageId", "inReplyTo", "references", "body");
+            var threadResponse = JSON.readTree(stdout.getLast());
+            assertThat(JSON.readTree(threadResponse.at("/result/content/0/text").asString())).isEqualTo(thread);
             JsonNode message = call(requests, io, replies, stderr, stdout, 6, "getMessage",
                     "{\"connection\":\"local\",\"key\":\"" + key + "\",\"maxChars\":10}");
             assertThat(message.get("body").asString()).hasSize(10);
@@ -214,6 +244,11 @@ class McpStdioServerTest {
 
     @org.junit.jupiter.api.Test
     void dateArgumentsAreOptionalAndDateOnlySearchWorks(@TempDir Path dir) throws Exception {
+        listConnectionsWorksOverStdioAndStdoutIsPureJsonRpc(false, dir);
+    }
+
+    @org.junit.jupiter.api.Test
+    void threadToolHasSchemaAndReturnsStructuredCards(@TempDir Path dir) throws Exception {
         listConnectionsWorksOverStdioAndStdoutIsPureJsonRpc(false, dir);
     }
 

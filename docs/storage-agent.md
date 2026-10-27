@@ -216,7 +216,7 @@ opens one snapshot of the latest commit per call. It counts folder messages with
 on ref, and pages stored MessageCard fields by date descending (missing dates last), then key.
 New documents have sorted `keySort` doc values; documents without them still sort by date.
 The separate field preserves the `key` field's doc values type NONE.
-`current()` checks commit schema; search and listMessages reject old schemas until a rebuild.
+`current()` checks commit schema; search, listMessages and getThread reject old schemas until a rebuild.
 Optional date bounds filter the existing MIME-header `date` LongPoint, with inclusive since and
 exclusive until; undated documents are excluded. Date-only search sorts by date descending then
 key with score 0 and no snippets. No schema change or reindex is needed.
@@ -239,3 +239,17 @@ snippet/identity. The exact lookup filename and the separately filtered display 
 search-hit fields. This changes no matches, scores, totals, pagination, files or index schema.
 See `docs/redaction-agent.md`; no reprocessing or migration is required for existing sidecars.
 The writer's NRT lookups remain separate; tools see only committed documents.
+
+`MailIndexReader.thread` scans only live documents' stored key, messageId, inReplyTo and
+references in that same snapshot. Local keys and header IDs are separate graph nodes: a key
+links to its own usable Message-ID and all usable reply/reference IDs. Matching is case-sensitive;
+surrounding whitespace is trimmed. IDs must be nonempty and angle-bracketed without whitespace
+or nested brackets. Message-ID must consist of exactly one ID; reply headers contribute all
+valid IDs, deduplicated. Invalid/missing headers create no links; a failed card can be a singleton.
+The undirected component includes ancestors, descendants and missing-parent siblings; visited
+key/ID sets terminate cycles. Deleted documents contribute no links and copies retain their keys.
+No subject, participant, date or provider identifier creates a link.
+Dates are read from numeric doc values to sort the complete component ascending, undated last,
+then key. Only the returned page loads stored card fields, never bodies or attachment text/MIME.
+The exact total is computed before paging. No writer lock, source or pandoc is needed; pages
+across calls can change during sync. No persisted thread data, schema change or reindex is needed.

@@ -13,9 +13,115 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class MailIndexReaderTest {
     @TempDir Path dir;
+
+    private void putThread(MailIndex writer, String key, String folder, Instant date,
+                           String messageId, String inReplyTo, String... references) {
+        writer.put(new MessageMeta(key, folder, "INBOX", key, 0, null, Instant.now(), MessageState.CONVERTED, null),
+                new MailMessage("Same subject", List.of(new Address("Name", "user@example.com")), null, null,
+                        date, messageId, inReplyTo, List.of(references), List.of()), "Unused body", "Unused attachment text");
+    }
+
+    @Test void threadFindsAncestorsDescendantsAndMissingParentSiblings() {
+        try (var writer = MailIndex.openWriter(dir)) {
+            putThread(writer, "ancestor", "f1", null, " <root@example.com> ", null);
+            putThread(writer, "bridge", "f2", null, "<bridge@example.com>", "<root@example.com>", "<missing@example.com>");
+            putThread(writer, "descendant", "f3", null, "<child@example.com>", "<bridge@example.com>");
+            putThread(writer, "sibling", "f4", null, "<sibling@example.com>", "<missing@example.com>");
+            writer.commit();
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                var result = reader.thread("descendant", 0, 10);
+                assertThat(result.total()).isEqualTo(4);
+                assertThat(result.cards()).extracting(c -> c.key()).containsExactly("ancestor", "bridge", "descendant", "sibling");
+                assertThat(reader.thread("ancestor", 2, 1).cards()).extracting(c -> c.key()).containsExactly("descendant");
+                assertThat(reader.thread("sibling", 0, 10).cards()).isEqualTo(result.cards());
+            }
+        }
+    }
+
+    @Test void threadCyclesAndRepeatedIdsTerminate() {
+        try (var writer = MailIndex.openWriter(dir)) {
+            putThread(writer, "a", "f1", null, "<a>", "<c> <c> <a>", "<b>", "<b>");
+            putThread(writer, "b", "f1", null, "<b>", "<a>", "<a> <a>");
+            putThread(writer, "c", "f2", null, "<c>", "<b>");
+            writer.commit();
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                assertThat(reader.thread("a", 0, 10).total()).isEqualTo(3);
+                assertThat(reader.thread("a", 0, 10).cards()).extracting(c -> c.key()).containsExactly("a", "b", "c");
+            }
+        }
+    }
+
+    @Test void threadKeepsCopiesAndDoesNotMatchSubjectOrIdCase() {
+        try (var writer = MailIndex.openWriter(dir)) {
+            putThread(writer, "a", "f1", null, "<Same@example.com>", null);
+            putThread(writer, "copy", "f2", null, "<Same@example.com>", null);
+            putThread(writer, "differentCase", "f1", null, "<same@example.com>", null);
+            putThread(writer, "sameSubject", "f1", null, "<other@example.com>", null);
+            writer.commit();
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                assertThat(reader.thread("a", 0, 10).cards()).extracting(c -> c.key()).containsExactly("a", "copy");
+                assertThat(reader.thread("differentCase", 0, 10).total()).isEqualTo(1);
+                assertThat(reader.thread("sameSubject", 0, 10).total()).isEqualTo(1);
+            }
+        }
+    }
+
+    @Test void threadSingletonMalformedHeadersAndDeletedDocuments() {
+        try (var writer = MailIndex.openWriter(dir)) {
+            putThread(writer, "target", "f1", null, "<valid>", null);
+            int n = 0;
+            for (String malformed : List.of("", "valid", "<>", "<valid> <other>", "<bad id>", "<<valid>>", "<outer<valid>>", "junk <valid>", "<bad\u2003id>")) {
+                putThread(writer, "malformed" + n++, "f1", null, malformed, null);
+            }
+            putThread(writer, "badReplies", "f1", null, null, "<> <bad id> <outer<valid>>", "valid", "<<valid>>", "<outer", "<valid>>");
+            putThread(writer, "a", "f1", null, "<a>", null);
+            putThread(writer, "b", "f1", null, "<b>", null);
+            putThread(writer, "deletedBridge", "f1", null, "<deleted>", "<a>", "<b>");
+            writer.put(new MessageMeta("failed", "f1", "INBOX", "failed", 0, null, Instant.now(), MessageState.FAILED, "Unavailable"),
+                    null, null, null);
+            writer.commit();
+            writer.delete("deletedBridge");
+            writer.commit();
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                for (String key : List.of("target", "badReplies", "a", "b", "failed")) {
+                    assertThat(reader.thread(key, 0, 10).cards()).extracting(c -> c.key()).containsExactly(key);
+                }
+                for (int i = 0; i < n; i++) { assertThat(reader.thread("malformed" + i, 0, 10).total()).isEqualTo(1); }
+                assertThat(reader.thread("failed", 0, 10).cards().getFirst().state()).isEqualTo("failed");
+                assertThatThrownBy(() -> reader.thread("deletedBridge", 0, 10)).isInstanceOf(IllegalArgumentException.class)
+                        .hasMessage("Message is not indexed; use listMessages");
+            }
+        }
+    }
+
+    @Test void threadPagesChronologicallyWithUndatedLast() {
+        try (var writer = MailIndex.openWriter(dir)) {
+            var date = Instant.parse("2026-10-26T00:00:00Z");
+            putThread(writer, "z", "f1", date.minusSeconds(1), "<root>", null);
+            putThread(writer, "b", "f2", date, "<b>", "<root>");
+            putThread(writer, "a", "f1", date, "<a>", "<root>");
+            putThread(writer, "c", "f2", null, null, "<root>");
+            putThread(writer, "d", "f2", null, null, "<root>");
+            putThread(writer, "lastDated", "f2", Instant.ofEpochMilli(Long.MAX_VALUE), null, "<root>");
+            writer.commit();
+            try (var reader = MailIndexReader.open(dir).orElseThrow()) {
+                assertThat(reader.thread("a", 0, 20).cards()).extracting(c -> c.key()).containsExactly("z", "a", "b", "lastDated", "c", "d");
+                var page = reader.thread("a", 1, 2);
+                assertThat(page.total()).isEqualTo(6);
+                assertThat(page.cards()).extracting(c -> c.key()).containsExactly("a", "b");
+                assertThat(reader.thread("a", 5, Integer.MAX_VALUE).cards()).extracting(c -> c.key()).containsExactly("d");
+                assertThat(reader.thread("a", 6, 1).cards()).isEmpty();
+                assertThat(reader.thread("a", Integer.MAX_VALUE, 1).total()).isEqualTo(6);
+                putThread(writer, "laterCommit", "f1", date, null, "<root>");
+                writer.commit();
+                assertThat(reader.thread("a", 0, 20).total()).isEqualTo(6);
+            }
+        }
+    }
 
     private void put(MailIndex writer, String key, String folder, Instant date) {
         writer.put(new MessageMeta(key, folder, "INBOX", key, 0, null, Instant.now(), MessageState.CONVERTED, null),

@@ -18,6 +18,9 @@ EML/ZIP/MSG/TNEF extraction and DOC/XLS/PPT text are verified offline; data sync
 needs `mail-reprocess`, and their check on real messages is still pending
 ([docs/plan.md](docs/plan.md#24-ещё-не-проверено-на-реальной-почте), section 2.4).
 
+Local conversations (`getThread`) are accepted offline; checking a known conversation on real
+mail after restarting the server is still pending. No sync or reindex is needed.
+
 **Contents:** [Features](#features) · [How it works](#how-it-works) · [Quickstart](#quickstart) ·
 [MCP tools](#mcp-tools) · [Commands](#commands) · [Read-only protection](#read-only-protection) ·
 [Data and privacy](#data-and-privacy) · [Environment variables](#environment-variables) ·
@@ -51,6 +54,8 @@ needs `mail-reprocess`, and their check on real messages is still pending
 - **Search:** Lucene with `RussianAnalyzer` plus an English field, exact address and file name
   terms, file name parts, phrases, and a highlighted snippet. It searches subject, body, sender,
   recipients, attachment names and attachment text.
+- **Local conversations:** `getThread` follows stored Message-ID, In-Reply-To and References
+  across folders of one mailbox, returning chronological cards from a local message key.
 - **Background sync** on request. The tool returns at once, `syncStatus` shows progress, and
   several server processes can share one data directory. Folder progress distinguishes an IMAP
   UIDVALIDITY `reset` from an EWS `rescanned` recovery of an invalid SyncState; old status files
@@ -158,6 +163,8 @@ opencode (`~/.config/opencode/opencode.jsonc`, section `mcp`):
 
 ## MCP tools
 
+Nine tools use an explicit connection name.
+
 | Tool | What it does |
 |---|---|
 | `listConnections` | Configured mailboxes, their type, sign-in method and configuration errors; never contacts a server |
@@ -166,10 +173,24 @@ opencode (`~/.config/opencode/opencode.jsonc`, section `mcp`):
 | `listFolders` | Local folders with message counts and whether each was synced completely |
 | `listMessages` | Message cards of one folder, newest first, in pages |
 | `getMessage` | Headers, the body in chunks, attachments with the paths of the file and of its text |
+| `getThread` | Conversation cards across folders of one connection, anchored by a local message UUID, oldest first |
 | `getAttachment` | The text of one attachment in chunks, and the file path |
 | `search` | Every word is required, `"…"` is a phrase. Fields: `any`, `subject`, `body`, `from`, `to`, `attachmentName`, `attachmentText`. Returns cards with score and snippet |
 
 Arguments, bounds and errors: [docs/tools-agent.md](docs/tools-agent.md).
+
+`getThread(connection, key, offset, limit)` links local keys to case-sensitive IDs in stored
+Message-ID, In-Reply-To and References. It follows the complete undirected component, including
+siblings whose parent is absent locally. IDs must be nonempty and angle-bracketed, without
+whitespace or nested brackets; Message-ID must contain exactly one ID and no other text.
+Subject, participants and provider conversation IDs do not create links. Copies retain their
+separate local keys. Cards sort by ascending date, undated last, then key; paging follows the
+complete component, with exact total and nextOffset (default limit 50, maximum 200).
+Only subject and displayed sender are optionally filtered; keys, folder keys, dates and local
+paths remain usable. The result contains no bodies or raw header IDs; reading uses no bodies,
+attachment text or MIME.
+Each call reads one committed snapshot without the writer lock, network or pandoc; pages can
+change during concurrent sync. Schema 3 is unchanged and no reindex is needed.
 
 Both `search` and `listMessages` accept optional `since` and `until` MIME header dates.
 Use strict `YYYY-MM-DD` (UTC midnight) or an ISO-8601 datetime with `Z` or a numeric

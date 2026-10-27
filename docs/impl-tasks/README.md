@@ -44,7 +44,7 @@ Non-interactive run with the Codex CLI (Windows PowerShell 5.1; set `$id` to the
 name without `.md`, and list in `-c` the MCP servers of your Codex config the task does not need):
 
 ```powershell
-$id = 'IT-17-<slug>'; "Read AGENTS.md, then docs/impl-tasks/README.md, then docs/impl-tasks/$id.md. Implement the task described there. Change only the files it allows. Do not commit. When done, reply with the implementation report from docs/impl-tasks/README.md." | codex exec -C C:\git\mail-mcp-server -s workspace-write -c 'mcp_servers.jdbc.enabled=false' -c 'mcp_servers.redmine.enabled=false' -c 'mcp_servers.sonar.enabled=false' -o "$env:TEMP\$id.last.txt" -
+$id = 'IT-18-message-moves'; "Read AGENTS.md, then docs/impl-tasks/README.md, then docs/impl-tasks/$id.md. Implement the task described there. Change only the files it allows. Do not commit. When done, reply with the implementation report from docs/impl-tasks/README.md." | codex exec -C C:\git\mail-mcp-server -s workspace-write -c 'mcp_servers.jdbc.enabled=false' -c 'mcp_servers.redmine.enabled=false' -c 'mcp_servers.sonar.enabled=false' -o "$env:TEMP\$id.last.txt" -
 ```
 
 ### 2. Review
@@ -117,15 +117,14 @@ The reviewer checks; it does not fix. Work through every point and report what y
 ## Task list
 
 IT-01…IT-16 were accepted and deleted (2026-10-25…27). The user requested six briefs together
-on 2026-10-27, based on `d3fd516`. IT-22 (Д25) and IT-21 (Д24) were accepted offline and
-deleted on 2026-10-27: background summaries, separate EWS rescan reporting, date filters and
-date-only search are implemented. The remaining briefs are listed below in their original
-execution order; preserve the accepted IT-22 and IT-21 behavior.
+on 2026-10-27, based on `d3fd516`. IT-22 (Д25), IT-21 (Д24) and IT-17 (Д5) were accepted offline
+and deleted on 2026-10-27: background summaries, separate EWS rescan reporting, date filters,
+date-only search and local conversation cards are implemented. The remaining briefs are listed
+below in their original execution order; preserve the accepted IT-22, IT-21 and IT-17 behavior.
 Checks still pending on real mail are in `docs/plan.md` 2.4. Next unused number: IT-23.
 
 | Order | Brief | Plan item | Scope and dependency |
 |---|---|---|---|
-| 3 | [IT-17](IT-17-message-threads.md) | Д5 | Local getThread; preserves IT-21 reader behavior. |
 | 4 | [IT-18](IT-18-message-moves.md) | Д8 | Heuristic move reuse without MIME download; preserves IT-22 and supplies metadata snapshots for IT-19. |
 | 5 | [IT-19](IT-19-message-flags.md) | Д9 | Read/star flags; depends on IT-18 metadata and IT-17 thread cards, preserves date-only search. |
 | 6 | [IT-20](IT-20-xlsx-size-limit.md) | Д21 | Independent 5 MiB XLSX text threshold; may be done earlier. |

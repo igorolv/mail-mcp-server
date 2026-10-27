@@ -15,7 +15,7 @@ Downloads, `.eml`, metadata, Markdown, attachments and the index always keep ori
 No migration, reprocessing or reindexing is needed. Do not wire the redactor into writers,
 MIME parsing, conversion or synchronization. It has no network, file or logging operations.
 
-The four tool adapters filter human-readable response values: connection descriptions and
+The five tool adapters filter human-readable response values: connection descriptions and
 configuration errors, folder paths, status messages, message subjects and displayed addresses,
 message header values, failure descriptions, attachment display names, body/attachment text,
 search subjects/senders, snippets and the query echo. Numeric values and dates are unchanged.
@@ -52,6 +52,14 @@ separately (original display name, or filename when null/blank). Both are omitte
 absent snippets. The already highlighted snippet is never filtered again by `SearchTools`.
 Date-only searches return no snippet; normalized date bounds are unchanged by filtering.
 No index/schema or disk-format changes, migration, reindexing or reprocessing are required.
+
+`getThread` matches the raw stored Message-ID, In-Reply-To and References locally in one
+committed snapshot; filtering never changes its graph, exact total, chronological ordering or
+pagination. Only the returned cards' subject and displayed from are filtered. Connection names,
+anchor/message keys, folder keys, dates, states and original localPath values are preserved,
+even when paths or folder keys contain detector matches. No raw header IDs or bodies are in
+the thread result. Thread reading loads no MIME, body or attachment text and performs no writes;
+schema 3 is unchanged and no reindex is required.
 
 ## Rules and replacement
 

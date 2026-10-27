@@ -1,6 +1,6 @@
 # docs/tools-agent.md — MCP tools and background synchronization
 
-Eight tools (plan.md 3.7). Tools are Spring services returning `api/` records, never `model/`
+Nine tools (plan.md 3.7). Tools are Spring services returning `api/` records, never `model/`
 records.
 `MAIL_MCP_REDACT_SECRETS=true` optionally filters response text; see `docs/redaction-agent.md`.
 Downloads, files, index, lookup IDs, stored filenames and original local paths stay unchanged.
@@ -17,6 +17,7 @@ and rethrown; `IllegalArgumentException` becomes an MCP tool error with its mess
 | `listFolders` | Required `connection` | Stored folder keys and paths, committed catalog counts and `synced` (cursor exists), in stored order. No index means zero counts. |
 | `listMessages` | Required `connection`, `folder`; optional `offset`, `limit`, `since`, `until` | Folder cards sorted by descending date (undated last), then key; total, offset, optional nextOffset. Offset defaults to 0; limit to 50, capped at 200. Unknown folder is an error. |
 | `getMessage` | Required `connection`, `key`; optional `offset`, `maxChars` | Metadata, MIME headers, body.md chunk, bodyLength, optional nextOffset and attachment file paths and optional Markdown `textPath`. Offset defaults to 0; maxChars to 20,000, capped at 100,000. Invalid/nonexistent UUID is an error. |
+| `getThread` | Required `connection`, `key`; optional `offset`, `limit` | Local conversation cards across folders, ascending date (undated last), then key; exact total, offset and optional nextOffset. Offset defaults to 0; limit to 50, capped at 200. Invalid UUID or unknown connection is an error before opening the index. Missing index/anchor is an error. |
 | `getAttachment` | Required `connection`, `key`, `file`; optional `offset`, `maxChars` | Original file path and saved Markdown chunk, textPath, textLength and optional nextOffset. `file` must exactly match a stored filename in that message's expanded attachment list, including files inside EML, ZIP, MSG and TNEF containers. Unknown file (including traversal or another message's filename) is an error. Offset defaults to 0; maxChars to 20,000, capped at 100,000. |
 | `search` | Required `connection`; optional `query`, `field`, `folder`, `offset`, `limit`, `since`, `until` | Local cards with BM25 score and body or saved attachment snippet, sorted by score descending then key. Exact total, offset and optional nextOffset. Query is at most 1,000 characters and may be omitted or blank only with a date bound. Offset defaults to 0; limit to 20, capped at 100. Unknown field/folder is an error. No index means zero hits. |
 
@@ -76,6 +77,36 @@ being processed. `MailIndexReader` opens the latest commit once per call.
 
 All tools advertise read-only and non-destructive hints. `sync` is not idempotent.
 MCP resources, mail flags and mail writing are not implemented here.
+
+## Threads
+
+`ThreadTools.getThread` returns `GetThreadResult(connection, key, total, offset, nextOffset,
+messages)`. `ThreadMessageInfo` includes key, local folder key, date, displayed from, subject,
+hasAttachments, state and absolute message directory localPath. No bodies or raw header IDs
+are exposed. Subject/from use `SecretRedactor`; keys, folder keys, paths and dates stay original.
+
+One committed `MailIndexReader` snapshot supplies the anchor and live documents from one
+connection. Each local key is a node, separate from header-ID nodes, linked to its own
+Message-ID and every usable In-Reply-To/References ID. Matching is case-sensitive. Surrounding
+whitespace is trimmed; IDs must be angle-bracketed, nonempty, without whitespace or nested
+brackets. Message-ID must be exactly one such ID with no other text; reply headers contribute
+all valid IDs, deduplicated. Missing/malformed IDs contribute no links. A known card without
+usable headers is a singleton, including failed messages.
+
+An undirected traversal with visited sets finds ancestors, descendants and missing-parent
+siblings and terminates on cycles. Different local keys remain separate cards, including
+duplicate Message-IDs in different folders. No subject, participant, date or provider-ID
+heuristic is used. The complete component sorts by ascending date, undated last, then key
+before paging. total is exact for the snapshot; offsets beyond the end return no cards and no
+nextOffset. Separate calls can see different commits, as with listMessages; no snapshot token
+or cache is retained.
+
+Only key and the three stored header fields are scanned; dates use doc values and stored card
+fields are fetched for the returned page. No bodies, MIME, attachment text, source construction
+or pandoc are involved; reading works while the writer lock is held. Schema 3 remains unchanged,
+without reindexing. Missing index/anchor raises
+`IllegalArgumentException("Message is not indexed; use listMessages")`. Old schemas raise the
+same rebuild error as search below.
 
 ## Search
 

@@ -7,16 +7,17 @@ local data only. User-facing overview: `README.md`.
 
 **Current status (2026-10-27): the draft version is complete and checked on the user's real
 mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/plan.md` section 2).
-- Eight MCP tools, background sync, offline reprocessing and reindexing work.
+- Nine MCP tools, background sync, offline reprocessing and reindexing work.
 - Gmail OAuth2 is implemented, but its real sign-in is unverified. The user deferred Gmail, so do
   not treat Gmail setup as a required next step.
 - Features accepted offline but not yet checked by the user on real mail are listed in
   `docs/plan.md` 2.4 (container expansion and legacy Office text need a user-run
   `mail-reprocess`; background summaries and EWS rescan reporting await observation during
-  user-requested sync; date filters and date-only search await a local query after restart).
+  user-requested sync; date filters, date-only search and local conversations await local
+  queries after restart).
 
 Work now consists of polishing and optional improvements:
-- `docs/plan.md` section 4 lists the open ones (`Д4`, `Д5`, …); the user chooses which to take.
+- `docs/plan.md` section 4 lists the open ones (`Д4`, `Д7`, …); the user chooses which to take.
   Accepted items are removed from that table.
 - Add new tools or subsystems only when the task asks for them.
 - `docs/plan.md` 3.8 lists what no change may add without a user decision.
@@ -58,7 +59,7 @@ Read this file first. Then read only the documents whose `When` matches the task
 | `docs/ews-source-agent.md` | changing `source/ews/`, adding an EWS operation, NTLM questions | allow-list, response checks, NTLM transport rules, `EwsMailSource`, known risks |
 | `docs/imap-source-agent.md` | changing `source/imap/` or IMAP authentication | TLS, command allow-list, one sign-in attempt, EXAMINE/PEEK, bounded MIME downloads |
 | `docs/gmail-oauth-agent.md` | changing `source/oauth/google/`, Gmail OAuth configuration, authorization or refresh | Desktop client setup, PKCE/state/loopback flow, owner-only refresh storage, token endpoint and XOAUTH2 rules |
-| `docs/tools-agent.md` | changing `tools/`, `api/`, `SyncService`, `sync-status.json` or a tool's arguments and bounds | the eight tools, local-only reading, status file fields, single writer across processes, sign-in refusal, search control-set numbers |
+| `docs/tools-agent.md` | changing `tools/`, `api/`, `SyncService`, `sync-status.json` or a tool's arguments and bounds | the nine tools, local-only reading, status file fields, single writer across processes, sign-in refusal, search control-set numbers |
 | `docs/redaction-agent.md` | changing `redaction/`, output filtering or its setting | output-only secret replacement, detectors, chunk/highlight ordering, unchanged original paths and control-set policy |
 | `docs/mime-agent.md` | changing `mime/` or `convert/`, MIME parsing rules, attachment names, pandoc calls, attachment text, `mail-reprocess` | Angus properties, body and attachment rules, stored names, sandboxed pandoc, attachment formats, known `testdata/mime` differences |
 | `docs/storage-agent.md` | changing `model/`, `store/` or `index/`, the on-disk layout, `meta.json`, `folders.json` or the Lucene index | message directories, write order and atomic writes, index fields and schema, single writer, reconciliation |
@@ -181,6 +182,10 @@ code is listed in `docs/architecture-agent.md`.
   tool response text. Downloads, disk and index hold everything as is. Tools still return original
   file paths and stored filenames. This reduces accidental context exposure, not intentional
   extraction. See `docs/redaction-agent.md`.
+- **Local conversations:** `getThread` follows case-sensitive Message-ID, In-Reply-To and
+  References across folders of one connection in one committed index snapshot. Copies remain
+  separate; cards sort oldest first, undated last, then key before paging. No bodies, MIME,
+  source or pandoc are read; schema 3 is unchanged and no reindex is needed.
 - **Synchronization:**
   - runs only on request: the `sync` tool in the background, or `mail-sync`;
   - always syncs everything, then incrementally;

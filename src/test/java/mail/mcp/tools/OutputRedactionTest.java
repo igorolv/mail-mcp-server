@@ -235,4 +235,45 @@ class OutputRedactionTest {
         assertThat(search.search("local", "Reporting", "body", "f1", null, null, "2026-10-27", null).total()).isZero();
     }
 
+    @Test void threadRedactsDisplayFieldsAndPreservesLookupValues() throws Exception {
+        String token = "ghp_" + "A".repeat(36);
+        Path connectionDir = dir.resolve(token);
+        var threadRegistry = new ConnectionRegistry(List.of(new ConnectionDefinition("local", null,
+                ConnectionType.IMAP, AuthKind.APP_PASSWORD, null, null, connectionDir, "unconfigured")),
+                definition -> { throw new AssertionError("no mailbox access"); });
+        var threadStore = new MessageStore(connectionDir, mapper);
+        String copyKey = threadStore.newKey();
+        try (var index = MailIndex.openWriter(connectionDir)) {
+            for (String member : List.of(key, copyKey)) {
+                var meta = new MessageMeta(member, token, "INBOX", member, 0, null, Instant.now(), MessageState.CONVERTED, null);
+                var message = new mail.mcp.model.MailMessage("Password: " + SECRET,
+                        List.of(new mail.mcp.model.Address("Password: " + SECRET, "sender@example.com")), null, null,
+                        Instant.parse("2026-10-26T00:00:00Z"), "<" + token + ">", null, null, null);
+                index.put(meta, message, BODY, BODY);
+            }
+            index.commit();
+        }
+        var before = snapshot();
+        var original = new ThreadTools(threadRegistry, mapper).getThread("local", key, null, null);
+        var result = new ThreadTools(threadRegistry, mapper, redactor).getThread("local", key, null, null);
+        assertThat(result.key()).isEqualTo(key);
+        assertThat(result.total()).isEqualTo(2).isEqualTo(original.total());
+        assertThat(result.offset()).isEqualTo(original.offset());
+        assertThat(result.nextOffset()).isEqualTo(original.nextOffset());
+        for (int i = 0; i < result.messages().size(); i++) {
+            var card = result.messages().get(i);
+            var rawCard = original.messages().get(i);
+            assertThat(card.key()).isEqualTo(rawCard.key());
+            assertThat(card.folder()).isEqualTo(token).isEqualTo(rawCard.folder());
+            assertThat(card.localPath()).isEqualTo(rawCard.localPath()).contains(token);
+            assertThat(card.date()).isEqualTo(rawCard.date());
+            assertThat(card.state()).isEqualTo(rawCard.state());
+            assertThat(card.hasAttachments()).isEqualTo(rawCard.hasAttachments());
+            assertThat(card.subject()).isEqualTo(redactor.text(rawCard.subject())).contains("[redacted:password]").doesNotContain(SECRET);
+            assertThat(card.from()).isEqualTo(redactor.text(rawCard.from())).contains("[redacted:password]").doesNotContain(SECRET);
+        }
+        assertThat(mapper.writeValueAsString(result)).doesNotContain(SECRET, "messageId", "inReplyTo", "references", "body", "<" + token + ">");
+        assertUnchanged(before);
+    }
+
 }
