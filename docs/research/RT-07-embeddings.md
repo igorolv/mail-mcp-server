@@ -1,149 +1,90 @@
-# RT-07 — Эмбеддинги для русскоязычной почты
+# RT-07 — Embeddings for Russian-language email
 
-- Дата: 2026-10-24
-- Исполнитель: Codex / исследовательская сессия RT-07
-- Бриф: `docs/research-tasks/RT-07-embeddings.md`
+- Date: 2026-10-24
+- Author: Codex / research session RT-07
+- Brief: `docs/research-tasks/RT-07-embeddings.md`
 
-## Кратко
+## Summary
 
-- [предположение] Рекомендация: необязательная локальная модель — `intfloat/multilingual-e5-base`,
-  облегчённая — `multilingual-e5-small`; BM25 остаётся основным поиском. Основания: русский
-  поиск проверен в ruMTEB, есть готовые ONNX, понятные правила обработки входа [1, 4–8].
-- [док] В исходном ruMTEB результат Retrieval у E5-base — 67,1, у small — 65,8,
-  у BGE-M3 — 74,8. Это средний nDCG@10 на трёх задачах, не точность поиска писем [1].
-- [предположение] Runtime: ONNX Runtime Java CPU плюс DJL HuggingFace Tokenizers;
-  для Spring AI нужна обёртка с правильными префиксами, усреднением и нормализацией [20–26].
-- [код] Spring AI 2.0.2 усредняет векторы токенов и не выполняет L2-нормализацию.
-  Его нельзя автоматически считать готовым адаптером любой модели из таблицы [26].
-- [док] Новые варианты существуют: Qwen3-Embedding выпущен в 2025 году,
-  EmbeddingGemma 300M — 2025-09-04, EmbeddingGemma 2 — 2026-10-06 [14, 16, 18].
-- [предположение] Для 100 000 фрагментов по 300 токенов условный расчёт даёт E5-small
-  примерно 3–13 часов, base — 10–41 час, BGE-M3 — 41–164 часа. Это перенос старых
-  измерений с допущениями о длине и CPU, не опубликованный замер ноутбука; см. В6 [2, 3].
-- [док] Ollama предлагает BGE-M3, Qwen3-Embedding и EmbeddingGemma 300M через HTTP.
-  Нужны явный размер модели и локальный режим: `qwen3-embedding:latest` указывает на 8B [28–33].
-- [предположение] Начать с 250–350 токенов полезного текста, сохранять границы абзацев,
-  убирать повторы цитат из векторного представления, хранить ссылки на исходные места; см. В5.
-- [док] Внешние API различаются правилами хранения: OpenAI — обычные журналы до 30 дней;
-  Voyage — нулевое хранение после явного отказа от обучения; у Google платный режим
-  исключает обучение, но допускает временное журналирование [35, 37, 41].
+- [assumption] Recommendation: an optional local model, `intfloat/multilingual-e5-base`, with the lighter `multilingual-e5-small`; BM25 remains the primary search. Rationale: Russian retrieval was evaluated in ruMTEB, ONNX files are available, and input handling rules are clear [1, 4–8].
+- [docs] In the original ruMTEB results, E5-base scores 67.1, small 65.8, and BGE-M3 74.8 for Retrieval. These are average nDCG@10 scores across three tasks, not email-search accuracy [1].
+- [assumption] Runtime: ONNX Runtime Java CPU plus DJL HuggingFace Tokenizers; Spring AI needs a wrapper that applies the correct prefixes, pooling, and normalization [20–26].
+- [code] Spring AI 2.0.2 averages token vectors and does not perform L2 normalization. It should not automatically be treated as a ready adapter for any model in the table [26].
+- [docs] Newer options exist: Qwen3-Embedding was released in 2025, EmbeddingGemma 300M on 2025-09-04, and EmbeddingGemma 2 on 2026-10-06 [14, 16, 18].
+- [assumption] A conditional estimate for 100,000 chunks of 300 tokens is about 3–13 hours for E5-small, 10–41 hours for base, and 41–164 hours for BGE-M3. This extrapolates older measurements with assumptions about length and CPU; it is not a published laptop benchmark. See В6 [2, 3].
+- [docs] Ollama offers BGE-M3, Qwen3-Embedding, and EmbeddingGemma 300M over HTTP. Specify the model size and local mode: `qwen3-embedding:latest` refers to 8B [28–33].
+- [assumption] Start with 250–350 tokens of useful text, preserve paragraph boundaries, remove repeated quotations from vector representations, and store links to source locations; see В5.
+- [docs] External APIs have different data-retention rules: OpenAI keeps ordinary logs for up to 30 days; Voyage offers zero retention after an explicit opt-out from training; Google's paid mode excludes training but allows temporary logging [35, 37, 41].
 
-## Ответы на вопросы
+## Answers to the questions
 
-### В1. Какие локальные модели подходят для русского текста?
+### В1. Which local models are suitable for Russian text?
 
-[предположение] Сначала стоит сравнивать качество поиска, затем общую оценку представления
-текста. Хорошая классификация тональности сама по себе не доказывает качество поиска
-условия договора или ответа внутри переписки. Основания для такого разделения — разные
-группы задач ruMTEB и отсутствие поисковых задач в encodechka [1, 2].
+[assumption] Compare retrieval quality first, then general text-representation scores. Strong sentiment classification does not by itself demonstrate good retrieval of a contract clause or an answer in an email thread. The distinction is supported by ruMTEB's separate task groups and the absence of retrieval tasks in encodechka [1, 2].
 
-[док] ruMTEB в статье 2024-08-22 содержит 23 задачи семи типов. Числа `R/A` ниже означают
-Retrieval / Avg из таблицы 5 статьи: средний nDCG@10 трёх поисковых задач / среднее семи
-групп. Шкала — 0–100. Эти результаты сопоставимы внутри данного эксперимента [1].
+[docs] The ruMTEB paper dated 2024-08-22 contains 23 tasks across seven types. `R/A` below means Retrieval / Avg from Table 5 of the paper: average nDCG@10 across three retrieval tasks / average across seven groups. The scale is 0–100. These results are comparable within this experiment [1].
 
-[код] `S` ниже — Mean S из README encodechka, шкала 0–1. Это другой набор задач,
-его нельзя объединять с `R/A` в один рейтинг. Методика CPU разобрана в В6 [2, 3].
+[code] `S` below is Mean S from the encodechka README, on a 0–1 scale. It uses a different task set and must not be combined with `R/A` into one ranking. The CPU methodology is discussed in В6 [2, 3].
 
-[док] Qwen и обе EmbeddingGemma публикуют многоязычные результаты MTEB, но отдельный
-сопоставимый русский результат в прочитанных карточках не найден. Общий MTEB не назван
-русской оценкой; это сознательный пробел, а не нулевое качество [14, 16, 18].
+[docs] Qwen and both EmbeddingGemma models publish multilingual MTEB results, but the model cards reviewed did not provide a separate comparable Russian result. Overall MTEB is not described as a Russian evaluation; this is an explicit evidence gap, not a score of zero [14, 16, 18].
 
-[предположение] Практический список для последующей проверки: E5-base, E5-small и BGE-M3.
-Qwen3-Embedding-0.6B и EmbeddingGemma 2 интересны как новые альтернативы, но пока не
-заменяют проверку на русских запросах и нужном Java runtime.
+[assumption] Practical shortlist for later testing: E5-base, E5-small, and BGE-M3. Qwen3-Embedding-0.6B and EmbeddingGemma 2 are interesting newer alternatives, but do not replace testing with Russian queries and the intended Java runtime.
 
-Правила получения вектора:
+Vector-generation rules:
 
-| Семейство | Представление запроса / документа | Получение итогового вектора | Основание |
+| Family | Query / document representation | Final vector generation | Basis |
 |---|---|---|---|
-| multilingual E5 small/base/large | `query: …` / `passage: …`, включая русский текст | Среднее с маской, затем L2 | [док] [4–6] |
-| multilingual E5 large-instruct | `Instruct: …\nQuery: …` / документ без инструкции | Среднее с маской, затем L2 | [док] [7] |
-| e5-mistral-7b-instruct | Инструкция для запроса / документ без неё | Последний значимый токен, затем L2 | [док] [47] |
-| BGE-M3 / USER-bge-m3 | Для обычного плотного поиска префиксы не нужны | CLS, затем L2 | [док] [9, 11] |
-| ru-en-RoSBERTa | `search_query: …` / `search_document: …` | Рекомендован CLS, затем L2 | [док] [10] |
-| LaBSE в Sentence Transformers | Без E5-префиксов | CLS, обученный Dense с tanh, нормализация | [код] [13] |
-| Qwen3-Embedding | Инструкция у запроса; документ без инструкции | Последний значимый токен, L2; размерность выбирается отдельно | [док] [14] |
-| EmbeddingGemma 300M / 2 | `task: search result \| query: …` / `title: … \| text: …` | Среднее и обученная проекция; после сокращения размерности повторная L2 | [док] [16, 18] |
+| multilingual E5 small/base/large | `query: …` / `passage: …`, including for Russian text | Masked mean, then L2 | [docs] [4–6] |
+| multilingual E5 large-instruct | `Instruct: …\nQuery: …` / document without an instruction | Masked mean, then L2 | [docs] [7] |
+| e5-mistral-7b-instruct | Instruction for query / document without it | Last significant token, then L2 | [docs] [47] |
+| BGE-M3 / USER-bge-m3 | No prefixes needed for ordinary dense retrieval | CLS, then L2 | [docs] [9, 11] |
+| ru-en-RoSBERTa | `search_query: …` / `search_document: …` | CLS recommended, then L2 | [docs] [10] |
+| LaBSE in Sentence Transformers | No E5 prefixes | CLS, trained Dense with tanh, normalization | [code] [13] |
+| Qwen3-Embedding | Instruction for query; document without instruction | Last significant token, L2; dimension selected separately | [docs] [14] |
+| EmbeddingGemma 300M / 2 | `task: search result \| query: …` / `title: … \| text: …` | Mean and trained projection; after dimension reduction, repeat L2 | [docs] [16, 18] |
 
-[предположение] Для E5-instruct можно начать с инструкции `Retrieve relevant emails and
-attachment passages for the query.` Она описывает задачу, но её качество здесь не измерялось.
-У Qwen авторы рекомендуют английские инструкции и для многоязычного применения [14].
+[assumption] For E5-instruct, a reasonable initial instruction is `Retrieve relevant emails and attachment passages for the query.` It describes the task, but its quality has not been measured here. Qwen's authors recommend English instructions for multilingual use as well [14].
 
-[док] У E5 проверен именно `multilingual-e5-large-instruct`. Англоязычные `e5-small-v2`
-и `e5-base-v2` — другие модели; наличие такого имени в Java-модуле не означает наличие
-многоязычного E5. E5-Mistral приведён как крупный instruct-вариант, не как кандидат
-для обычного CPU-ноутбука [7, 24, 47].
+[docs] The reviewed E5-instruct model is specifically `multilingual-e5-large-instruct`. English-language `e5-small-v2` and `e5-base-v2` are different models; seeing such a name in a Java module does not mean it contains multilingual E5. E5-Mistral is included as a large instruct model, not as a candidate for a typical CPU laptop [7, 24, 47].
 
-[предположение] Готовый ONNX означает наличие файла, а не подтверждённое совпадение
-с эталонной реализацией. Нужно совпадение токенизатора, маски, способа получения
-итогового вектора и нормализации. Экспорты Qwen/Gemma от сообщества требуют особенно
-внимательной проверки: это не Java-интеграции, гарантированные авторами модели [15, 17].
+[assumption] A ready-made ONNX file means the file exists, not that it has been confirmed to match the reference implementation. The tokenizer, mask, final-vector method, and normalization must match. Community exports of Qwen/Gemma need especially careful validation: they are not Java integrations guaranteed by the model authors [15, 17].
 
-[код] В официальных репозиториях E5 есть ONNX. У small/base есть вариант
-`model_qint8_avx512_vnni.onnx`: его название указывает на AVX-512 VNNI, а не на любой CPU.
-[предположение] Для неизвестного ноутбука начать с FP32; INT8 подбирать под его инструкции [8].
+[code] The official E5 repositories contain ONNX files. Small/base have a `model_qint8_avx512_vnni.onnx` variant: its name indicates AVX-512 VNNI, not an arbitrary CPU. [assumption] Start with FP32 on an unknown laptop; select INT8 according to its instruction set [8].
 
-[док] В рассмотренном списке нет модели с явной лицензией только для некоммерческого
-использования. Однако `gemma` у версии 300M — собственные условия, не MIT/Apache:
-они включают ограничения использования и требования при распространении. У Gemma 2
-карточка указывает Apache-2.0; условия одной версии нельзя переносить на другую [16, 18, 19].
+[docs] None of the reviewed models has an explicit license limited to non-commercial use. However, Gemma 300M uses its own terms, not MIT/Apache: they include use restrictions and redistribution requirements. The Gemma 2 model card states Apache-2.0; terms for one version cannot be carried over to another [16, 18, 19].
 
-### В2. Чем запускать модели из Java?
+### В2. How can the models be run from Java?
 
-[док] ONNX Runtime Java загружает граф через `OrtEnvironment.createSession(...)`, принимает
-тензоры и возвращает выходы графа. Официальный CPU-артефакт поддерживает Windows x64;
-токенизацию и получение одного вектора из выходов трансформера он не реализует [20].
+[docs] ONNX Runtime Java loads a graph with `OrtEnvironment.createSession(...)`, accepts tensors, and returns graph outputs. The official CPU artifact supports Windows x64; it does not implement tokenization or derive a single vector from transformer outputs [20].
 
-[док] DJL загружает модель через `Criteria`, путь к файлам и выбранный движок;
-токенизатор — через `HuggingFaceTokenizer` с `tokenizer.json`. Последний использует Rust
-через JNI. Для автономной работы нативные зависимости нужно включить заранее [21–23].
+[docs] DJL loads a model through `Criteria`, a file path, and a selected engine; the tokenizer is loaded through `HuggingFaceTokenizer` with `tokenizer.json`. The latter uses Rust through JNI. Native dependencies must be bundled in advance for offline operation [21–23].
 
-[док] LangChain4j упаковывает несколько моделей в Maven-модули, включая варианты `-q`.
-В просмотренном списке есть английские MiniLM/BGE/E5 и китайский BGE; готового
-`multilingual-e5-base` там нет. Старый репозиторий перенёс модули в основной
-`langchain4j` 2025-12-04: его архивность не означает прекращения поддержки модулей [24].
+[docs] LangChain4j packages several models in Maven modules, including `-q` variants. The reviewed list includes English MiniLM/BGE/E5 and Chinese BGE; it does not include a ready `multilingual-e5-base`. The old repository moved the modules into the main `langchain4j` repository on 2025-12-04: its archival status does not mean support for the modules ended [24].
 
-[док] Spring AI принимает URI графа и токенизатора через
-`spring.ai.embedding.transformer.onnx.model-uri` и `…tokenizer.uri`.
-Можно указать локальные файлы. В документации описаны настройка имени выхода,
-выравнивание длины входов и проблема ONNX external data для графов больше 2 GB [25].
+[docs] Spring AI accepts graph and tokenizer URIs through `spring.ai.embedding.transformer.onnx.model-uri` and `…tokenizer.uri`. Local files can be specified. The documentation describes configuring the output name, padding input lengths, and the ONNX external-data issue for graphs larger than 2 GB [25].
 
-[код] В `TransformersEmbeddingModel` версии 2.0.2 ожидается трёхмерный выход
-`float[batch][tokens][dimensions]`; затем вызывается `meanPooling`, без L2.
-[предположение] Поэтому готовый двумерный `sentence_embedding`, CLS-модели и Qwen
-с последним токеном нельзя подключать только заменой URI или имени выхода [26].
+[code] `TransformersEmbeddingModel` version 2.0.2 expects a three-dimensional output, `float[batch][tokens][dimensions]`, then calls `meanPooling`, without L2. [assumption] Therefore a ready two-dimensional `sentence_embedding`, CLS models, and Qwen with last-token pooling cannot be connected merely by changing a URI or output name [26].
 
-[предположение] Для E5 проще использовать ORT Java напрямую и DJL только для токенизатора,
-выполнить среднее с маской и L2 обычными массивами. Это избавляет от зависимости
-получения вектора от дополнительного DJL-движка. Spring AI можно сохранить как интерфейс.
-Готовую обёртку Spring следует рассматривать после проверки равенства результатов [20–26].
+[assumption] For E5, it is simpler to use ORT Java directly and DJL only for the tokenizer, then perform masked mean pooling and L2 with ordinary arrays. This avoids depending on an additional DJL engine to produce the vector. Spring AI can remain the interface. Consider a ready Spring wrapper after verifying that its results match [20–26].
 
-[код] По Maven Central на 2026-10-24 опубликованы ORT Java 1.31.0 от 2026-10-09 и
-DJL Tokenizers 0.39.0 от 2026-10-20. Документация DJL ещё показывает 0.38.0.
-Это проверка активности публикаций, не проверка совместимости этих версий между собой [21, 27].
+[code] As of 2026-10-24, Maven Central has published ORT Java 1.31.0 on 2026-10-09 and DJL Tokenizers 0.39.0 on 2026-10-20. DJL documentation still shows 0.38.0. This confirms recent releases, not compatibility between these versions [21, 27].
 
-[док] DJL предупреждает о конфликте Windows VC runtime у ORT 1.21+ с некоторыми JDK;
-на странице названы проверенные JDK 17. [предположение] Работу именно Java 25 нужно
-проверить отдельно: общая поддержка Windows не заменяет эту проверку [22].
+[docs] DJL warns of a Windows VC runtime conflict between ORT 1.21+ and some JDKs; the page names JDK 17 as tested. [assumption] Java 25 specifically needs a separate check: general Windows support does not substitute for that check [22].
 
-### В3. Что даёт Ollama?
+### В3. What does Ollama offer?
 
-| Модель в библиотеке | Размер загрузки и контекст в каталоге | Применимость |
+| Model in library | Download size and catalog context | Applicability |
 |---|---|---|
-| `bge-m3:567m` | 1,2 GB, 8K | [док] Многоязычная; русский поиск оценён отдельно в [1] [28] |
-| `qwen3-embedding:0.6b` | 639 MB, 32K | [док] Самый небольшой Qwen3-Embedding; большой контекст не отменяет разбиение [29] |
-| `qwen3-embedding:4b`, `:8b` | 2,5 / 4,7 GB, в каталоге 40K | [док] Крупные варианты; `latest` сейчас соответствует 8B [29] |
-| `embeddinggemma:300m` | 622 MB, 2K; Ollama ≥0.11.10 | [док] Это версия 2025 года; поддержка Gemma 2 этим тегом не подтверждена [30] |
+| `bge-m3:567m` | 1.2 GB, 8K | [docs] Multilingual; Russian retrieval evaluated separately in [1] [28] |
+| `qwen3-embedding:0.6b` | 639 MB, 32K | [docs] Smallest Qwen3-Embedding; a large context does not eliminate the need for chunking [29] |
+| `qwen3-embedding:4b`, `:8b` | 2.5 / 4.7 GB, 40K in catalog | [docs] Larger variants; `latest` currently corresponds to 8B [29] |
+| `embeddinggemma:300m` | 622 MB, 2K; Ollama ≥0.11.10 | [docs] This is the 2025 version; support for Gemma 2 under this tag is unconfirmed [30] |
 
-[док] Контекст 40K у крупных Qwen в Ollama отличается от 32K в исходной карточке.
-[предположение] Это характеристика конкретной сборки, а не основание расширять вход
-любой реализации Qwen до 40K; для сравнения ограничить входы одинаково [14, 29].
+[docs] The 40K context for larger Qwen models in Ollama differs from 32K in the original model card. [assumption] This describes a specific build and is not a reason to expand the input of every Qwen implementation to 40K; use identical input limits for comparisons [14, 29].
 
-[док] Актуальный метод — `POST /api/embed`, поле `input` принимает строку или массив.
-Есть `keep_alive`, `dimensions` и `truncate`; при `truncate:false` превышение контекста
-возвращает ошибку. Ответ содержит массив `embeddings` и счётчики времени/токенов [31].
+[docs] The current method is `POST /api/embed`; the `input` field accepts a string or array. It provides `keep_alive`, `dimensions`, and `truncate`; with `truncate:false`, exceeding the context returns an error. The response contains an `embeddings` array and time/token counters [31].
 
-[предположение] Пример тела локального запроса для BGE-M3:
+[assumption] Example local request body for BGE-M3:
 
 ```json
 {
@@ -154,277 +95,197 @@ DJL Tokenizers 0.39.0 от 2026-10-20. Документация DJL ещё по�
 }
 ```
 
-[док] Ollama работает как нативное Windows-приложение; текущая документация требует
-Windows 10 22H2 или новее и не менее 4 GB для установки без моделей [33].
-[предположение] Для Java это простой HTTP-клиент без JNI в процессе MCP; сбой вычислений
-можно изолировать в отдельном процессе, но появляется служба с собственным жизненным циклом.
+[docs] Ollama runs as a native Windows application; current documentation requires Windows 10 22H2 or newer and at least 4 GB for installation without models [33]. [assumption] For Java, this is a simple HTTP client with no JNI in the MCP process; computation failures can be isolated in a separate process, but that introduces a service with its own lifecycle.
 
-[док] По умолчанию адрес привязки — loopback, порт 11434. Режим без облачных функций
-включается `OLLAMA_NO_CLOUD=1` или `disable_ollama_cloud` в конфигурации [32].
-[предположение] Для требования «текст не покидает ноутбук» использовать локальные модели,
-явный тег/идентификатор сборки и этот режим; не считать любое имя в Ollama локальным.
+[docs] The default bind address is loopback, port 11434. Cloud features can be disabled with `OLLAMA_NO_CLOUD=1` or `disable_ollama_cloud` in the configuration [32]. [assumption] To meet the requirement that “text does not leave the laptop,” use local models, an explicit tag/build identifier, and this mode; do not assume every Ollama name is local.
 
-[предположение] По сравнению с ONNX: Ollama удобнее устанавливать и менять модели,
-проще использовать GPU; ORT даёт больше контроля над входами, потоками и составом
-дистрибутива. HTTP добавляет сериализацию, а конечную скорость определяют также
-квантизация и реализация модели. Доказательств превосходства одного runtime здесь нет.
+[assumption] Compared with ONNX, Ollama is easier to install and switch models and makes GPU use simpler; ORT offers more control over inputs, threads, and distribution contents. HTTP adds serialization, while final speed also depends on quantization and model implementation. There is no evidence here that one runtime is superior.
 
-### В4. Какие внешние API доступны?
+### В4. Which external APIs are available?
 
-[предположение] Ниже цены за 1 млн входных токенов обычного текстового запроса,
-без скидок, бесплатных квот и пересчёта валют. Это снимок на 2026-10-24.
-Русская поддержка не означает доказанное превосходство на нашей почте.
+[assumption] Prices below are per 1 million input tokens for an ordinary text request, excluding discounts, free quotas, and currency conversion. This is a snapshot as of 2026-10-24. Russian-language support does not prove better performance on our email.
 
-| Поставщик / модель | Русский язык | Цена / 1 млн токенов | Хранение и обучение | Источник |
+| Provider / model | Russian language | Price / 1 million tokens | Retention and training | Source |
 |---|---|---|---|---|
-| OpenAI `text-embedding-3-small` / `-large` | [док] Многоязычные | [док] $0,02 / $0,13 | [док] `/v1/embeddings`: без обучения, без состояния приложения; журналы контроля злоупотреблений обычно до 30 дней, есть исключения. ZDR доступен подходящим организациям после одобрения | [34, 35] |
-| Voyage `voyage-4-lite` / `voyage-4` / `voyage-4-large` | [док] Многоязычные | [док] $0,02 / $0,06 / $0,12 | [док] Нулевое хранение после отказа от использования данных для обучения; требуется способ оплаты и администратор. Отказ действует на последующие данные, не отменяет прошлое использование | [36, 37] |
-| Cohere `embed-v5.0-fast` / `-pro` | [док] Russian в списке языков | [док] $0,08 / $0,12 | [док] Для платного SaaS: отказ от обучения в настройках; журналы обычно 30 дней с исключениями, ZDR по одобрению. У пробного ключа другие условия | [38, 39] |
-| Google `gemini-embedding-2` | [док] Многоязычная модель | [док] $0,20; Batch $0,10 | [док] Платный режим: без улучшения моделей на запросах; временные журналы для контроля нарушений, точный срок здесь не указан. Бесплатный режим допускает обучение и просмотр людьми | [40, 41] |
-| Yandex `text-search-doc` / `text-search-query` | [док] Для русского и английского | [док] 10,10 ₽ с НДС | [док] По умолчанию возможно сохранение для улучшения сервиса; его нужно отключать. Срок для embeddings отдельно не найден; отключение журналирования не отключает остальные механизмы хранения | [42–44] |
-| GigaChat `Embeddings-2` | [док] Русскоязычный поставщик; сопоставимый русский результат здесь не проверен | [док] 14 ₽; асинхронно 7 ₽ для опубликованных тарифов действующих юрлиц | [предположение] Срок хранения и условия обучения для этого метода не установлены; нельзя считать ZDR. Новым клиентам с 2026-09-01 предлагается cloud.ru с отдельными условиями | [45, 46] |
+| OpenAI `text-embedding-3-small` / `-large` | [docs] Multilingual | [docs] $0.02 / $0.13 | [docs] `/v1/embeddings`: no training, no application state; abuse-monitoring logs usually retained for up to 30 days, with exceptions. ZDR is available to eligible organizations after approval | [34, 35] |
+| Voyage `voyage-4-lite` / `voyage-4` / `voyage-4-large` | [docs] Multilingual | [docs] $0.02 / $0.06 / $0.12 | [docs] Zero retention after opting out of data use for training; payment method and administrator required. Opt-out applies to subsequent data and does not undo prior use | [36, 37] |
+| Cohere `embed-v5.0-fast` / `-pro` | [docs] Russian listed among languages | [docs] $0.08 / $0.12 | [docs] For paid SaaS: opt out of training in settings; logs usually retained for 30 days, with exceptions; ZDR by approval. Trial keys have different terms | [38, 39] |
+| Google `gemini-embedding-2` | [docs] Multilingual model | [docs] $0.20; Batch $0.10 | [docs] Paid mode: requests are not used to improve models; temporary logs for abuse monitoring, exact retention period not specified here. Free mode permits training and human review | [40, 41] |
+| Yandex `text-search-doc` / `text-search-query` | [docs] Russian and English | [docs] ₽10.10 including VAT | [docs] By default, data may be retained to improve the service; disable this. A separate retention period for embeddings was not found; disabling logging does not disable other retention mechanisms | [42–44] |
+| GigaChat `Embeddings-2` | [docs] Russian-language provider; comparable Russian result not checked here | [docs] ₽14; asynchronous ₽7 under published tariffs for eligible legal entities | [assumption] Retention period and training terms for this method have not been established; do not assume ZDR. From 2026-09-01, new customers are directed to cloud.ru under separate terms | [45, 46] |
 
-[док] У Voyage серия 3.5 теперь находится в разделе старых моделей; цены серии 4
-проверены по актуальной странице. Cohere выпустил Embed 5 2026-09-30 [36, 38].
-[док] Цена Google `gemini-embedding-001` при выпуске 2025-07-14 составляла $0,15;
-текущая таблица выше относится к другой модели, `gemini-embedding-2` [40, 48].
+[docs] Voyage 3.5 series is now in the legacy-models section; series 4 prices were checked on the current page. Cohere released Embed 5 on 2026-09-30 [36, 38]. [docs] At release on 2025-07-14, Google `gemini-embedding-001` cost $0.15; the current table above describes a different model, `gemini-embedding-2` [40, 48].
 
-[предположение] Любой внешний вариант — только явная настройка и только после фильтра
-чувствительных данных. Это относится к документам, запросам и заголовкам фрагментов.
-Место фильтра в остальных локальных операциях здесь не выбирается; см. `docs/plan.md`, 5.4.
+[assumption] Any external option should require explicit configuration and be used only after sensitive-data filtering. This applies to documents, queries, and chunk headers. This report does not choose where filtering belongs in other local operations; see `docs/plan.md`, 5.4.
 
-### В5. Как разбивать письма и вложения?
+### В5. How should email and attachments be chunked?
 
-[предположение] Стартовые параметры ниже — проектная рекомендация, не результат опыта
-на почте. Токены считать токенизатором выбранной модели, включая тему, префикс и специальные
-токены; одинаковое количество символов не означает одинаковое количество токенов.
+[assumption] The initial parameters below are a design recommendation, not the result of an email experiment. Count tokens with the selected model's tokenizer, including subject, prefix, and special tokens; equal character counts do not mean equal token counts.
 
-| Модель | Полезный текст фрагмента | Перекрытие | Ограничение |
+| Model | Useful text per chunk | Overlap | Limit |
 |---|---|---|---|
-| E5 small/base/large/instruct | 250–350 токенов | 30–50 | [предположение] Полный вход держать ≤512; инструкцию и тему считать отдельно [4–7] |
-| BGE-M3 / USER-bge-m3 | 300–500 | 40–60 | [предположение] Для общей оценки с E5 использовать 300; 8K оставить для отдельных проверок [9, 12] |
-| Qwen3-0.6B / Gemma 300M / Gemma 2 | 300–500 | 40–60 | [предположение] Не заполнять большое окно автоматически; 300 токенов — общий исходный вариант [14, 16, 18] |
-| LaBSE в стандартной конфигурации | 160–210 | 20–30 | [предположение] У Sentence Transformers предел 256; исходные 300 нужно разделить [13] |
+| E5 small/base/large/instruct | 250–350 tokens | 30–50 | [assumption] Keep the full input ≤512; count instruction and subject separately [4–7] |
+| BGE-M3 / USER-bge-m3 | 300–500 | 40–60 | [assumption] Use 300 for an overall comparison with E5; reserve 8K for separate tests [9, 12] |
+| Qwen3-0.6B / Gemma 300M / Gemma 2 | 300–500 | 40–60 | [assumption] Do not fill the large window automatically; 300 tokens is a common starting point [14, 16, 18] |
+| LaBSE in standard configuration | 160–210 | 20–30 | [assumption] Sentence Transformers limit is 256; split an initial 300-token chunk [13] |
 
-[предположение] Для писем и вложений предлагается следующий порядок:
+[assumption] Proposed processing order for email and attachments:
 
-1. Из HTML получить читаемый текст, сохранить списки, абзацы и границы таблиц.
-   Не включать в вектор служебные MIME-заголовки и HTML-разметку.
-2. Выделить новый текст ответа, цитаты и подпись в отдельные части. Цитаты, уже имеющиеся
-   в другом письме, не вычислять повторно; хранить связь с исходным сообщением.
-   Если оригинала нет либо цитата содержит правки, оставить её отдельным фрагментом.
-3. Подпись исключить из семантического текста по консервативным правилам, но сохранить
-   в исходном письме. Не удалять автоматически весь текст после первого «С уважением».
-4. Короткое письмо оставить одним фрагментом. Длинное делить по абзацам и предложениям;
-   тему добавлять как короткий контекст, не повторять всю историю переписки.
-5. В договоре сохранять заголовок раздела и номер пункта. В XLSX повторять названия
-   столбцов для группы строк, хранить лист и диапазон; строка без заголовка теряет смысл.
-6. Не склеивать разные вложения и разные письма в один вектор. В результатах поиска
-   объединять соседние фрагменты одного источника, чтобы перекрытие не давало дубли.
+1. Extract readable text from HTML, preserving lists, paragraphs, and table boundaries. Do not include service MIME headers or HTML markup in the vector.
+2. Separate new reply text, quotations, and signature. Do not compute again for quotations already present in another email; retain a link to the original message. If the original is missing or the quotation contains edits, keep it as a separate chunk.
+3. Exclude signatures from semantic text using conservative rules, but preserve them in the original email. Do not automatically remove everything after the first `С уважением`.
+4. Keep a short email as one chunk. Split long email by paragraph and sentence; add the subject as brief context without repeating the full thread history.
+5. In a contract, preserve section heading and clause number. In XLSX, repeat column names for a group of rows and store sheet and range; a row without its header loses meaning.
+6. Do not combine different attachments or emails in one vector. In search results, merge adjacent chunks from the same source so overlap does not produce duplicates.
 
-Метаданные каждого фрагмента — [предположение], для воспроизводимости и возврата к источнику:
+Chunk metadata — [assumption], for reproducibility and returning to the source:
 
-| Группа | Что хранить |
+| Group | What to store |
 |---|---|
-| Принадлежность | `connection`, внутренний стабильный `messageKey`, `threadKey`; `InternetMessageId` — дополнительный атрибут |
-| Вид источника | Тело/цитата/вложение, `attachmentKey`, имя и MIME-тип; путь вложенного письма |
-| Место | `chunkId`, номер фрагмента, смещения в извлечённом тексте; страница PDF, раздел, лист/диапазон XLSX |
-| Контекст | Тема, дата письма, язык, связь с родительским письмом и оригиналом цитаты; адреса — отдельными атрибутами |
-| Воспроизводимость | Хеш фактически поданного текста, версия извлечения, очистки цитат, разбиения и применённого фильтра |
-| Вектор | ID и ревизия модели, токенизатор, префиксы, способ получения вектора, нормализация, размерность, квантизация |
+| Ownership | `connection`, stable internal `messageKey`, `threadKey`; `InternetMessageId` as an additional attribute |
+| Source type | Body/quote/attachment, `attachmentKey`, name and MIME type; path of an attached email |
+| Location | `chunkId`, chunk number, offsets in extracted text; PDF page, section, XLSX sheet/range |
+| Context | Subject, email date, language, relationship to parent email and original quotation; addresses as separate attributes |
+| Reproducibility | Hash of text actually submitted, versions of extraction, quote cleanup, chunking, and applied filter |
+| Vector | Model ID and revision, tokenizer, prefixes, vector-generation method, normalization, dimension, quantization |
 
-[предположение] При замене модели или правил подготовки текста нужен отдельный набор
-векторов либо пересчёт. Одинаковая размерность не делает пространства разных моделей
-совместимыми. Хеш текста позволяет не повторять вычисления для одинаковых вложений,
-сохраняя отдельные связи с письмами и ящиками.
+[assumption] Changing the model or text-preparation rules requires a separate vector set or recomputation. Equal dimensions do not make vector spaces from different models compatible. A text hash avoids repeating work for identical attachments while retaining separate links to emails and mailboxes.
 
-### В6. Сколько займут 100 000 фрагментов по 300 токенов?
+### В6. How long would 100,000 chunks of 300 tokens take?
 
-[код] В encodechka `SpeedTask.eval` последовательно вызывает модель для каждого текста
-из `data/sentences_sample.txt` и возвращает `(elapsed / count) × 1000`, миллисекунды
-на текст. Это не пакетная обработка. README публикует small 40,86, base 130,61,
-BGE-M3 523,4 мс/текст; параметры CPU и средняя длина для этих строк не установлены [2, 3].
+[code] In encodechka, `SpeedTask.eval` calls the model sequentially for each text in `data/sentences_sample.txt` and returns `(elapsed / count) × 1000`, milliseconds per text. This is not batch processing. The README reports 40.86 ms/text for small, 130.61 for base, and 523.4 for BGE-M3; CPU parameters and average text length are not established [2, 3].
 
-[предположение] Поэтому надёжный прогноз конкретного ноутбука из этих чисел получить
-нельзя. Ниже — условный расчёт для планирования на Windows-ноутбуке с 6–8 физическими
-ядрами, 16 GB RAM, питанием от сети и CPU с AVX2; соответствие этому CPU не измерялось.
+[assumption] A reliable forecast for a particular laptop cannot be derived from these numbers. The conditional estimate below is for planning on a Windows laptop with 6–8 physical cores, 16 GB RAM, plugged in, and a CPU with AVX2; suitability of that CPU was not measured.
 
-Допущения расчёта — [предположение], а не характеристики опубликованного эксперимента:
+Calculation assumptions — [assumption], not characteristics of the published experiment:
 
-- За условную длину исходного короткого текста принимаются 64 токена; она неизвестна.
-  Длина целевого входа — 300 токенов уже после добавления контекста.
-- Время условно растёт пропорционально длине: множитель `300 / 64 = 4,6875`.
-  Это упрощение: внимание, постоянные расходы и разные токенизаторы нарушают линейность.
-- Отношение скорости ноутбука и исходной системы неизвестно: множитель времени `0,5–2`.
-  Это выбранный сценарий чувствительности, не доверительный интервал.
-- Дополнительные расходы токенизации/сохранения — множитель `1,2`; ускорение от INT8,
-  обработки пакетами и ONNX против исходного runtime заранее не засчитывается.
+- Assume an unknown average of 64 tokens for the original short text. Target input length is 300 tokens after adding context.
+- Time is assumed to scale proportionally to length: multiplier `300 / 64 = 4.6875`. This is a simplification: attention, fixed overhead, and different tokenizers violate linear scaling.
+- The laptop/source-system speed ratio is unknown: time multiplier `0.5–2`. This is a chosen sensitivity scenario, not a confidence interval.
+- Tokenization/storage overhead adds a multiplier of `1.2`; no speedup from INT8, batching, or ONNX over the original runtime is assumed in advance.
 
-Формула — [предположение]: `T = 100000 × t_ms / 1000 / 3600 × 4,6875 × (0,5…2) × 1,2`.
+Formula — [assumption]: `T = 100000 × t_ms / 1000 / 3600 × 4.6875 × (0.5…2) × 1.2`.
 
-| Модель | Исходное t, мс/короткий текст [код] | Простое умножение на 100 000, без поправок | Условно для 300 токенов [предположение] |
+| Model | Original t, ms/short text [code] | Simple multiplication by 100,000, no adjustments | Conditional for 300 tokens [assumption] |
 |---|---|---|---|
-| E5-small | 40,86 [2, 3] | 1,14 ч | 3–13 ч |
-| E5-base | 130,61 [2, 3] | 3,63 ч | 10–41 ч |
-| BGE-M3 | 523,4 [2, 3] | 14,54 ч | 41–164 ч |
+| E5-small | 40.86 [2, 3] | 1.14 h | 3–13 h |
+| E5-base | 130.61 [2, 3] | 3.63 h | 10–41 h |
+| BGE-M3 | 523.4 [2, 3] | 14.54 h | 41–164 h |
 
-[предположение] Результат может выйти за диапазон: в источнике неизвестны CPU, длина,
-потоки, прогрев и соответствие современному экспорту. Для принятия решения о сроках
-пользователю потребуется отдельный замер на выбранном ноутбуке; здесь он вне задания.
-Если принять исходную длину за 128 вместо 64, расчётное время уменьшится вдвое.
+[assumption] Actual results may fall outside the range: CPU, text length, threads, warm-up, and equivalence to a modern export are unknown for the source. The user needs a separate benchmark on the selected laptop to decide timing; that is outside this task. If the original length is assumed to be 128 instead of 64, the estimated time is halved.
 
-[предположение] 100 000 фрагментов — 30 млн токенов, а не 100 000 писем с вложениями.
-При среднем числе фрагментов на письмо `k` объём будет примерно в `k` раз больше.
-Размер одних FP32-векторов: 384 / 768 / 1024 координаты дают 153,6 / 307,2 / 409,6 MB
-на 100 000 записей. Это арифметика `N × d × 4`, без метаданных и структур поиска.
+[assumption] 100,000 chunks represent 30 million tokens, not 100,000 emails with attachments. If the average number of chunks per email is `k`, the volume is roughly `k` times greater. FP32 vector storage alone: dimensions 384 / 768 / 1024 require 153.6 / 307.2 / 409.6 MB for 100,000 records. This is `N × d × 4` arithmetic, excluding metadata and search structures.
 
-## Сравнительные таблицы
+## Comparison tables
 
-### Модели
+### Models
 
-`M/B` — миллионы/миллиарды параметров. Скорость — мс/короткий текст encodechka,
-а не скорость 300-токенного входа в Java. `?` означает конкретный пробел, раскрытый ниже.
-В колонке качества `R/A` и `S` имеют определения из В1; `MM` — многоязычный MTEB,
-который не является русским показателем.
+`M/B` means millions/billions of parameters. Speed is ms/short text in encodechka, not the speed for a 300-token input in Java. `?` marks a specific gap explained below. In the quality column, `R/A` and `S` are defined in В1; `MM` is multilingual MTEB, not a Russian score.
 
-| Модель | Параметры | Размерность | Макс. токенов | Лицензия | ONNX | Качество на русском | Скорость CPU | Источник |
+| Model | Parameters | Dimensions | Max tokens | License | ONNX | Russian quality | CPU speed | Source |
 |---|---|---|---|---|---|---|---|---|
-| multilingual-e5-small | [док] 118M | [док] 384 | [док] 512 | [док] MIT | [код] В исходном репозитории | [док] R/A 65,8/56,4 | [код] 40,86 мс | [1–4, 8] |
-| multilingual-e5-base | [док] 278M | [док] 768 | [док] 512 | [док] MIT | [код] В исходном репозитории | [док] R/A 67,1/57,1 | [код] 130,61 мс | [1–3, 5, 8] |
-| multilingual-e5-large | [док] 560M | [док] 1024 | [док] 512 | [док] MIT | [код] Есть, FP32 с внешними весами | [док] R/A 74,0/60,4 | [код] 506,8 мс | [1–3, 6, 8] |
-| multilingual-e5-large-instruct | [док] 560M | [док] 1024 | [док] 512 | [док] MIT | [код] Есть, с внешними весами | [док] R/A 75,1/64,7 | [код] 501,5 мс | [1–3, 7, 8] |
-| e5-mistral-7b-instruct | [док] 7,11B | [док] 4096 | [док] Рекомендовано ≤4096 | [док] MIT | ? Готовый авторский экспорт не подтверждён | [док] R/A 74,1/64,9 | ? Сопоставимый замер не найден | [1, 47] |
-| BAAI/bge-m3 | [док] ≈567M | [док] 1024 | [док] 8192 | [док] MIT | [код] В исходном репозитории | [док] R/A 74,8/60,8 | [код] 523,4 мс | [1–3, 9] |
-| ai-forever/ru-en-RoSBERTa | [док] 404M | [док] 1024 | [док] 512 | [док] MIT | ? В просмотренном авторском дереве нет; экспорт проверить | [док] R/A 66,5/60,4 | ? Замер не найден | [1, 10] |
-| deepvk/USER-bge-m3 | [код] 359M | [док] 1024 | [код] 8192 | [док] Apache-2.0 | ? Авторский ONNX не найден; экспорт проверить | [код] S 0,799; авторская русская оценка 30 задач 0,706 | [код] 523,4 мс; независимость замера ? | [2, 3, 11, 12] |
-| sentence-transformers/LaBSE | [код] 471M | [док] 768 | [код] 256 в ST-конфигурации | [док] Apache-2.0 | [код] Есть; проверить Dense после трансформера | [код] S 0,739 | [код] 135,1 мс | [2, 3, 13] |
-| Qwen3-Embedding-0.6B | [док] ≈0,6B | [док] 1024, сокращение 32–1024 | [док] 32768 | [док] Apache-2.0 | [код] `onnx-community`, не авторский | ? Отдельный ru не найден; [док] MM 64,33 | ? Сопоставимый CPU-замер не найден | [14, 15] |
-| EmbeddingGemma 300M | [док] ≈308M, по авторам | [док] 768 / 512 / 256 / 128 | [док] 2048 | [док] Gemma Terms | [код] `onnx-community`, не авторский | ? Отдельный ru не найден; [док] MM 61,15 | ? Для Windows CPU нет; EdgeTPU — другое устройство | [16, 17, 19] |
-| EmbeddingGemma 2 | [док] 740M всего, 270M текстовая часть | [док] 768 / 512 / 256 / 128 | [док] 8192 | [док] Apache-2.0 по карточке | ? В авторском дереве нет; экспорт для Java не подтверждён | ? Отдельный ru не найден; [док] MM 61,36 | ? Текстовый Windows CPU-замер не найден | [18] |
+| multilingual-e5-small | [docs] 118M | [docs] 384 | [docs] 512 | [docs] MIT | [code] In original repository | [docs] R/A 65.8/56.4 | [code] 40.86 ms | [1–4, 8] |
+| multilingual-e5-base | [docs] 278M | [docs] 768 | [docs] 512 | [docs] MIT | [code] In original repository | [docs] R/A 67.1/57.1 | [code] 130.61 ms | [1–3, 5, 8] |
+| multilingual-e5-large | [docs] 560M | [docs] 1024 | [docs] 512 | [docs] MIT | [code] Available, FP32 with external weights | [docs] R/A 74.0/60.4 | [code] 506.8 ms | [1–3, 6, 8] |
+| multilingual-e5-large-instruct | [docs] 560M | [docs] 1024 | [docs] 512 | [docs] MIT | [code] Available, with external weights | [docs] R/A 75.1/64.7 | [code] 501.5 ms | [1–3, 7, 8] |
+| e5-mistral-7b-instruct | [docs] 7.11B | [docs] 4096 | [docs] ≤4096 recommended | [docs] MIT | ? Ready author export unconfirmed | [docs] R/A 74.1/64.9 | ? No comparable benchmark found | [1, 47] |
+| BAAI/bge-m3 | [docs] ≈567M | [docs] 1024 | [docs] 8192 | [docs] MIT | [code] In original repository | [docs] R/A 74.8/60.8 | [code] 523.4 ms | [1–3, 9] |
+| ai-forever/ru-en-RoSBERTa | [docs] 404M | [docs] 1024 | [docs] 512 | [docs] MIT | ? Not in reviewed author tree; check export | [docs] R/A 66.5/60.4 | ? No benchmark found | [1, 10] |
+| deepvk/USER-bge-m3 | [code] 359M | [docs] 1024 | [code] 8192 | [docs] Apache-2.0 | ? Author ONNX not found; check export | [code] S 0.799; author Russian evaluation on 30 tasks: 0.706 | [code] 523.4 ms; independent benchmark? | [2, 3, 11, 12] |
+| sentence-transformers/LaBSE | [code] 471M | [docs] 768 | [code] 256 in ST configuration | [docs] Apache-2.0 | [code] Available; check Dense after transformer | [code] S 0.739 | [code] 135.1 ms | [2, 3, 13] |
+| Qwen3-Embedding-0.6B | [docs] ≈0.6B | [docs] 1024, reduced 32–1024 | [docs] 32768 | [docs] Apache-2.0 | [code] `onnx-community`, not author-provided | ? Separate Russian result not found; [docs] MM 64.33 | ? No comparable CPU benchmark found | [14, 15] |
+| EmbeddingGemma 300M | [docs] ≈308M, per authors | [docs] 768 / 512 / 256 / 128 | [docs] 2048 | [docs] Gemma Terms | [code] `onnx-community`, not author-provided | ? Separate Russian result not found; [docs] MM 61.15 | ? No Windows CPU result; EdgeTPU is a different device | [16, 17, 19] |
+| EmbeddingGemma 2 | [docs] 740M total, 270M text component | [docs] 768 / 512 / 256 / 128 | [docs] 8192 | [docs] Apache-2.0 per model card | ? Not in author tree; Java export unconfirmed | ? Separate Russian result not found; [docs] MM 61.36 | ? No text-only Windows CPU result found | [18] |
 
-[док] В авторском сравнении USER-bge-m3 повышает общее среднее относительно BGE-M3,
-но его Retrieval Average ниже: 0,934 против 0,945. [предположение] Поэтому преимущество
-Mean S не является достаточной причиной заменить BGE-M3 в поиске почты [11].
+[docs] In the authors' comparison, USER-bge-m3 improves the overall average over BGE-M3, but its Retrieval Average is lower: 0.934 versus 0.945. [assumption] Therefore, the higher Mean S is not sufficient reason to replace BGE-M3 for email retrieval [11].
 
-### Среды выполнения для Java
+### Java runtimes
 
-[код] Размеры ниже — размеры сжатых JAR из каталога Maven Central, не объём DLL в памяти.
-Для ORT 1.31.0 — 50 942 147 байт (50,9 MB), Tokenizers 0.39.0 — 18 136 686 (18,1 MB).
-Общий ориентир — 69,1 MB плюс Java-обёртки и веса. Это пример состава, не согласованный
-набор зависимостей Spring AI или LangChain4j. У PyTorch native CPU 2.7.1 Windows JAR —
-75,5 MB, отдельно JNI и токенизатор; исходный каталог также проверен [27].
+[code] Sizes below are compressed JAR sizes from Maven Central, not in-memory DLL sizes. For ORT 1.31.0, 50,942,147 bytes (50.9 MB); Tokenizers 0.39.0, 18,136,686 (18.1 MB). Combined baseline: 69.1 MB, plus Java wrappers and weights. This is an example composition, not a dependency set approved for Spring AI or LangChain4j. PyTorch native CPU 2.7.1 Windows JAR is 75.5 MB, plus separate JNI and tokenizer; the original artifact was also checked [27].
 
-| Runtime для Java | Загрузка модели | Токенизатор | Windows | Размер нативных библиотек | Активность |
+| Java runtime | Model loading | Tokenizer | Windows | Native library size | Activity |
 |---|---|---|---|---|---|
-| ONNX Runtime Java | [док] Локальный ONNX через `createSession`, отдельно внешние веса | [док] Не встроен; добавить DJL Tokenizers | [док] CPU x64 | [код] ORT JAR 50,9 MB; с Tokenizers ориентир 69,1 MB, распакованный размер ? | [код] Maven 1.31.0, 2026-10-09 [20, 27] |
-| DJL | [док] `Criteria` + путь + engine + Translator | [док] HF `tokenizer.json` через Rust/JNI, есть отдельный SentencePiece | [док] x64 для рассматриваемых ORT/PyTorch; Java 25 проверить | [код] ORT-состав как выше; альтернативно PyTorch native 75,5 MB + JNI + Tokenizers, без весов | [код] Tokenizers 0.39.0, 2026-10-20; страницы engine показывают 0.38.0 [21–23, 27] |
-| LangChain4j in-process | [док] Конструктор модели из Maven-модуля; для mE5 потребуется свой модуль/обёртка | [код] В составе ONNX-модулей, подготовленные ресурсы | [предположение] Через платформенные зависимости ORT/JNI; проверить выбранный выпуск | [предположение] ORT + Tokenizers + встроенные веса; размер зависит от модуля и его закреплённых версий | [док] Перенос 2025-12-04 в основной репозиторий; текущая страница содержит 1.22.0-beta32 [24] |
-| Spring AI ONNX Transformers | [док] URI модели/токенизатора, имя выхода; локальные файлы допустимы | [код] DJL HuggingFaceTokenizer | [предположение] Через ORT/DJL; JDK 25 не проверен | [предположение] ORT + Tokenizers и зависимости выбранного NDArray engine; 69,1 MB — только базовый ориентир | [код] Проверена реализация 2.0.2, документация доступна; совместимость BOM проверить [25–27] |
+| ONNX Runtime Java | [docs] Local ONNX through `createSession`, external weights separately | [docs] Not included; add DJL Tokenizers | [docs] CPU x64 | [code] ORT JAR 50.9 MB; 69.1 MB baseline with Tokenizers; unpacked size ? | [code] Maven 1.31.0, 2026-10-09 [20, 27] |
+| DJL | [docs] `Criteria` + path + engine + Translator | [docs] HF `tokenizer.json` through Rust/JNI; separate SentencePiece available | [docs] x64 for the ORT/PyTorch options considered; verify Java 25 | [code] ORT composition as above; alternatively PyTorch native 75.5 MB + JNI + Tokenizers, excluding weights | [code] Tokenizers 0.39.0, 2026-10-20; engine pages show 0.38.0 [21–23, 27] |
+| LangChain4j in-process | [docs] Model constructor from Maven module; multilingual E5 needs a custom module/wrapper | [code] Included in ONNX modules, prepared resources | [assumption] Through platform ORT/JNI dependencies; check selected release | [assumption] ORT + Tokenizers + bundled weights; size depends on module and pinned versions | [docs] Moved to main repository 2025-12-04; current page contains 1.22.0-beta32 [24] |
+| Spring AI ONNX Transformers | [docs] Model/tokenizer URI, output name; local files allowed | [code] DJL HuggingFaceTokenizer | [assumption] Through ORT/DJL; JDK 25 unverified | [assumption] ORT + Tokenizers and selected NDArray engine dependencies; 69.1 MB is only a baseline | [code] Implementation 2.0.2 reviewed, documentation available; check BOM compatibility [25–27] |
 
-## Рекомендация
+## Recommendation
 
-[предположение] Рекомендую E5-base как исходную необязательную модель и E5-small как
-облегчённый вариант. Их преимущество для первого опыта — воспроизводимый простой
-способ получения вектора, опубликованные русские оценки и наличие ONNX без самостоятельного
-экспорта. Цена base — больший объём весов и более длительная первичная обработка [1–8].
+[assumption] I recommend E5-base as the initial optional model and E5-small as the lighter variant. Their advantage for an initial trial is a reproducible, simple vector-generation method, published Russian scores, and ONNX availability without a custom export. The cost of base is larger weights and longer initial processing [1–8].
 
-[предположение] Runtime — ONNX Runtime Java CPU с DJL HuggingFace Tokenizers, локальные
-закреплённые файлы и адаптация к интерфейсу Spring AI. Конкретные версии зависимостей
-нужно согласовать при реализации; версии из исследования не являются готовым BOM.
-Точность токенизации и нормализации важнее выбора Java-обёртки [20–27].
+[assumption] Runtime: ONNX Runtime Java CPU with DJL HuggingFace Tokenizers, local pinned files, and an adapter to the Spring AI interface. Agree on specific dependency versions during implementation; versions from this study are not a ready BOM. Tokenization and normalization accuracy matter more than the Java wrapper choice [20–27].
 
-[предположение] BGE-M3 — вариант следующего сравнения, если E5 не находит достаточно
-русских фрагментов; E5-large-instruct — ещё один вариант при допустимой длительности
-обработки. Qwen3-0.6B удобно исследовать через Ollama. EmbeddingGemma 2 заслуживает
-отдельной проверки после подтверждения русского качества и способа запуска из Java.
+[assumption] BGE-M3 is the next model to compare if E5 does not find enough Russian passages; E5-large-instruct is another option if its processing time is acceptable. Qwen3-0.6B is convenient to investigate through Ollama. EmbeddingGemma 2 merits a separate check after Russian quality and Java execution are confirmed.
 
-[предположение] Выбирать по небольшому пользовательскому набору запросов к письмам,
-договорам и таблицам: сравнить BM25 и его дополнение векторами, долю найденных нужных
-мест, задержку запроса и время обработки. Автоматически менять модель при ошибке
-нельзя: нужен пересчёт или отдельный набор векторов. Решение остаётся за пользователем.
+[assumption] Choose using a small user-provided set of queries over emails, contracts, and spreadsheets: compare BM25 with vector augmentation, the share of relevant passages retrieved, query latency, and processing time. Do not switch models automatically on failure: recomputation or a separate vector set is needed. The decision remains with the user.
 
-## Что не удалось проверить
+## What could not be verified
 
-- [предположение] Нет замеров на ноутбуке пользователя: CPU, RAM, потоки, охлаждение,
-  влияние INT8 и пакетной обработки неизвестны. В6 — сценарий; будущий отдельный
-  эксперимент должен измерить фрагменты 300 токенов на выбранном runtime.
-- [код] Не восстановлены CPU и средняя длина текстов строк encodechka; одинаковые
-  523,4 мс у USER-bge-m3 и BGE-M3 не доказывают отдельный замер каждой модели [2, 3].
-- [док] Нет сопоставимого русского показателя Qwen3 и двух Gemma в прочитанных карточках.
-  Нужна русская выборка одной версии MTEB или проверка поиска на собственных примерах [14, 16, 18].
-- [предположение] Не проверены графы ONNX исполнением: равенство эталонных векторов,
-  поддержка внешних весов, CLS/Dense/проекций, квантизированных операторов и Windows/JDK 25.
-  Модели, нативные JAR и библиотеки не скачивались; читались документация, код и метаданные.
-- [код] Авторские ONNX для RoSBERTa, USER-bge-m3 и Gemma 2 в просмотренных деревьях
-  отсутствуют; для E5-Mistral наличие готового авторского ONNX не установлено.
-  Это не утверждение о невозможности экспорта или отсутствии сторонних сборок [10–13, 18, 47].
-- [предположение] Размер распакованных DLL и полная зависимость конкретного Java-модуля
-  не измерены: размеры JAR в таблице нельзя считать потреблением RAM [27].
-- [предположение] Не установлены точные сроки хранения embeddings у Google, Yandex и
-  GigaChat и условия нового канала оплаты GigaChat. Проверять по выбранному договору
-  и ответу поставщика, не переносить условия чата или другого endpoint [41, 44, 46].
-- [предположение] Доступность зарубежных API для конкретного аккаунта/региона, лимиты
-  и фактические настройки отказа от обучения не проверялись: входов и API-вызовов не было.
+- [assumption] No benchmarks were run on the user's laptop: CPU, RAM, threads, cooling, and the effects of INT8 and batching are unknown. В6 is a scenario; a future separate experiment should measure 300-token chunks on the selected runtime.
+- [code] The CPU and average text length of encodechka input lines could not be recovered; identical 523.4 ms results for USER-bge-m3 and BGE-M3 do not prove that each model had an independent benchmark [2, 3].
+- [docs] The reviewed model cards provide no comparable Russian score for Qwen3 and the two Gemma models. A Russian evaluation in one MTEB version or retrieval tests on local examples are needed [14, 16, 18].
+- [assumption] ONNX graphs were not executed: equivalence to reference vectors, external-weight support, CLS/Dense/projections, quantized operators, and Windows/JDK 25 remain unverified. Models, native JARs, and libraries were not downloaded; documentation, code, and metadata were read.
+- [code] Author ONNX files for RoSBERTa, USER-bge-m3, and Gemma 2 were absent from the reviewed trees; availability of a ready author ONNX for E5-Mistral was not established. This does not claim that export is impossible or third-party builds do not exist [10–13, 18, 47].
+- [assumption] Unpacked DLL size and the full dependency set of a specific Java module were not measured: JAR sizes in the table are not RAM usage [27].
+- [assumption] Exact embedding-retention periods for Google, Yandex, and GigaChat, and terms for the new GigaChat payment channel, were not established. Check the selected contract and provider response; do not carry over terms for chat or another endpoint [41, 44, 46].
+- [assumption] Availability of foreign APIs for a particular account/region, limits, and actual training opt-out settings were not checked; no inputs or API calls were made.
 
-## Что ещё стоит изучить
+## What else to investigate
 
-- [предположение] Повторное ранжирование найденных фрагментов и его добавочная стоимость CPU.
-- [предположение] Отдельная оценка договоров и таблиц: обычные многоязычные рейтинги не
-  заменяют этот корпус; выбор движка поиска относится к RT-06.
-- [предположение] Защита локальных векторов и резервных копий; подробная архитектура
-  фильтра чувствительных данных остаётся отдельным проектным вопросом.
+- [assumption] Reranking retrieved chunks and its additional CPU cost.
+- [assumption] Separate evaluation on contracts and spreadsheets: ordinary multilingual rankings do not replace this corpus; search-engine selection belongs to RT-06.
+- [assumption] Protection of local vectors and backups; detailed architecture for sensitive-data filtering remains a separate project question.
 
-## Источники
+## Sources
 
-Все даты чтения ниже — 2026-10-24. Если дата выпуска не названа, страница её явно не задаёт.
-Каталоги Maven и отдельные JSON/исходники, недоступные веб-просмотрщику, прочитаны
-анонимным HTTP GET в память, без сохранения файлов и без исполнения полученного кода.
+All access dates below are 2026-10-24. If a release date is not given, the page does not state it explicitly. Maven catalogs and individual JSON/source files unavailable to the web viewer were read into memory with anonymous HTTP GET, without saving files or executing received code.
 
-1. ruMTEB, исходная статья, таблицы 4–5 — https://arxiv.org/html/2408.12503v1 (прочитано 2026-10-24; опубликовано 2024-08-22).
-2. encodechka, README с оценками и временами — https://github.com/avidale/encodechka (прочитано 2026-10-24; таблица изменяемая, дата отдельных измерений не указана).
-3. encodechka, `SpeedTask` в `encodechka_eval/tasks.py` — https://raw.githubusercontent.com/avidale/encodechka/master/encodechka_eval/tasks.py (прочитано 2026-10-24; код методики).
-4. multilingual-e5-small, карточка — https://huggingface.co/intfloat/multilingual-e5-small/raw/main/README.md и конфигурация https://huggingface.co/intfloat/multilingual-e5-small/raw/main/config.json (прочитано 2026-10-24; модель 2023 года).
-5. multilingual-e5-base — https://huggingface.co/intfloat/multilingual-e5-base (прочитано 2026-10-24; модель 2023 года).
-6. multilingual-e5-large — https://huggingface.co/intfloat/multilingual-e5-large (прочитано 2026-10-24; модель 2023 года).
-7. multilingual-e5-large-instruct — https://huggingface.co/intfloat/multilingual-e5-large-instruct (прочитано 2026-10-24; модель 2024 года).
-8. Авторские ONNX E5: https://huggingface.co/intfloat/multilingual-e5-small/tree/main/onnx ; https://huggingface.co/intfloat/multilingual-e5-base/tree/main/onnx ; https://huggingface.co/intfloat/multilingual-e5-large/tree/main/onnx ; https://huggingface.co/intfloat/multilingual-e5-large-instruct/tree/main/onnx (прочитано 2026-10-24; состав файлов дополнительно проверен через https://huggingface.co/api/models/intfloat/multilingual-e5-small и https://huggingface.co/api/models/intfloat/multilingual-e5-base).
-9. BGE-M3 — https://huggingface.co/BAAI/bge-m3 и https://huggingface.co/BAAI/bge-m3/tree/main/onnx (прочитано 2026-10-24; модель 2024 года).
-10. ru-en-RoSBERTa — https://huggingface.co/ai-forever/ru-en-RoSBERTa и https://huggingface.co/ai-forever/ru-en-RoSBERTa/tree/main (прочитано 2026-10-24; репозиторий создан 2024-07-29, статья [1]).
-11. USER-bge-m3, карточка и авторские результаты — https://huggingface.co/deepvk/USER-bge-m3 (прочитано 2026-10-24; репозиторий создан 2024-07-05).
-12. USER-bge-m3, метаданные и контекст — https://huggingface.co/api/models/deepvk/USER-bge-m3 ; https://huggingface.co/deepvk/USER-bge-m3/raw/main/config.json ; https://huggingface.co/deepvk/USER-bge-m3/raw/main/sentence_bert_config.json (прочитано 2026-10-24; ревизия `0cc6cfe48e260fb0474c753087a69369e88709ae`).
-13. LaBSE — https://huggingface.co/sentence-transformers/LaBSE ; https://huggingface.co/sentence-transformers/LaBSE/raw/main/sentence_bert_config.json ; https://huggingface.co/sentence-transformers/LaBSE/raw/main/modules.json ; https://huggingface.co/sentence-transformers/LaBSE/tree/main/onnx ; https://huggingface.co/api/models/sentence-transformers/LaBSE (прочитано 2026-10-24; архитектура модели 2020 года, упаковка ST обновлялась).
-14. Qwen3-Embedding-0.6B, карточка, семейство и результаты — https://huggingface.co/Qwen/Qwen3-Embedding-0.6B (прочитано 2026-10-24; статья опубликована 2025-06-05; сравнение MTEB зафиксировано авторами в 2025 году).
-15. Экспорт сообщества Qwen3 — https://huggingface.co/onnx-community/Qwen3-Embedding-0.6B-ONNX (прочитано 2026-10-24).
-16. EmbeddingGemma 300M — https://huggingface.co/google/embeddinggemma-300m ; https://ai.google.dev/gemma/docs/embeddinggemma/model_card ; https://developers.googleblog.com/introducing-embeddinggemma/ (прочитано 2026-10-24; выпуск 2025-09-04).
-17. Экспорт сообщества EmbeddingGemma — https://huggingface.co/onnx-community/embeddinggemma-300m-ONNX (прочитано 2026-10-24).
-18. EmbeddingGemma 2 — https://ai.google.dev/gemma/docs/embeddinggemma/model_card_2 ; https://developers.googleblog.com/en/google-ai-edge-with-embeddinggemma-2/ ; https://huggingface.co/google/embeddinggemma-2/tree/main (прочитано 2026-10-24; выпуск 2026-10-06).
-19. Gemma Terms — https://ai.google.dev/gemma/terms (прочитано 2026-10-24; редакция 2026-04-01).
-20. ONNX Runtime Java — https://onnxruntime.ai/docs/get-started/with-java.html (прочитано 2026-10-24).
-21. DJL HuggingFace Tokenizers — https://docs.djl.ai/master/extensions/tokenizers/index.html (прочитано 2026-10-24; пример 0.38.0).
-22. DJL ONNX Runtime engine — https://docs.djl.ai/master/engines/onnxruntime/onnxruntime-engine/index.html (прочитано 2026-10-24; предупреждение о VC runtime и JDK на Windows).
-23. DJL dependency management — https://docs.djl.ai/master/docs/development/dependency_management.html (прочитано 2026-10-24; состав нативных зависимостей и автономная поставка).
-24. LangChain4j in-process — https://docs.langchain4j.dev/integrations/embedding-models/in-process/ ; сообщение о переносе модулей https://raw.githubusercontent.com/langchain4j/langchain4j-embeddings/main/README.md (прочитано 2026-10-24; перенос 2025-12-04).
-25. Spring AI ONNX embeddings — https://docs.spring.io/spring-ai/reference/api/embeddings/onnx.html (прочитано 2026-10-24; страница показывает 2.0.2).
-26. Spring AI 2.0.2, `TransformersEmbeddingModel.java` — https://raw.githubusercontent.com/spring-projects/spring-ai/v2.0.2/models/spring-ai-transformers/src/main/java/org/springframework/ai/transformers/TransformersEmbeddingModel.java (прочитано 2026-10-24; проверены `call`, `meanPooling`, загрузка токенизатора/графа).
-27. Maven Central, размеры и публикации: https://repo.maven.apache.org/maven2/com/microsoft/onnxruntime/onnxruntime/1.31.0/ ; https://repo.maven.apache.org/maven2/com/microsoft/onnxruntime/onnxruntime/maven-metadata.xml ; https://repo.maven.apache.org/maven2/ai/djl/huggingface/tokenizers/0.39.0/ ; https://repo.maven.apache.org/maven2/ai/djl/huggingface/tokenizers/maven-metadata.xml ; https://repo.maven.apache.org/maven2/ai/djl/pytorch/pytorch-native-cpu/2.7.1/ (прочитано 2026-10-24; даты публикации 2026-10-09, 2026-10-20 и 2025-08-12 соответственно).
-28. Ollama BGE-M3 — https://ollama.com/library/bge-m3 (прочитано 2026-10-24).
-29. Ollama Qwen3-Embedding — https://ollama.com/library/qwen3-embedding (прочитано 2026-10-24).
-30. Ollama EmbeddingGemma — https://ollama.com/library/embeddinggemma (прочитано 2026-10-24).
-31. Ollama `/api/embed` — https://docs.ollama.com/api/embed (прочитано 2026-10-24).
-32. Ollama FAQ — https://docs.ollama.com/faq (прочитано 2026-10-24; локальный режим и адрес привязки).
-33. Ollama Windows — https://docs.ollama.com/windows (прочитано 2026-10-24).
-34. OpenAI embeddings и цены — https://developers.openai.com/api/docs/models/text-embedding-3-small ; https://developers.openai.com/api/docs/models/text-embedding-3-large ; https://developers.openai.com/api/docs/guides/embeddings (прочитано 2026-10-24).
-35. OpenAI data controls, строка `/v1/embeddings` — https://developers.openai.com/api/docs/guides/your-data (прочитано 2026-10-24).
-36. Voyage pricing и модели — https://docs.voyageai.com/docs/pricing ; https://docs.voyageai.com/docs/embeddings (прочитано 2026-10-24; pricing показывает обновление примерно 2026-10-12).
-37. Voyage FAQ и Terms — https://docs.voyageai.com/docs/faq ; https://www.voyageai.com/tos (прочитано 2026-10-24; отказ от обучения и хранения).
-38. Cohere Embed 5 — https://docs.cohere.com/docs/cohere-embed ; https://cohere.com/blog/embed-5 (прочитано 2026-10-24; выпуск и цены 2026-09-30).
-39. Cohere Enterprise Data Commitments — https://cohere.com/enterprise-data-commitments (прочитано 2026-10-24; редакция 2025-12-05).
-40. Gemini API pricing — https://ai.google.dev/gemini-api/docs/pricing (прочитано 2026-10-24; раздел Gemini Embedding 2).
-41. Gemini API Additional Terms — https://ai.google.dev/gemini-api/terms (прочитано 2026-10-24; действует с 2026-03-23, страница обновлена 2026-04-28).
-42. Yandex, модели векторизации — https://aistudio.yandex.ru/ru/docs/ai-studio/concepts/embeddings (прочитано 2026-10-24).
-43. Yandex, тарификация векторизации — https://aistudio.yandex.ru/ru/docs/ai-studio/pricing (прочитано 2026-10-24; 0,0101 ₽ за 1000 токенов с НДС).
-44. Yandex, политика хранения — https://aistudio.yandex.ru/en/docs/ai-studio/concepts/security/data-storage (прочитано 2026-10-24; текст доступен в поисковом представлении официальной страницы, прямой повторный запрос дал ошибку).
-45. GigaChat Embeddings-2 — https://developers.sber.ru/docs/ru/gigachat/models/embeddings-2 (прочитано 2026-10-24).
-46. GigaChat, тарифы юрлиц — https://developers.sber.ru/docs/ru/gigachat/tariffs/legal-tariffs (прочитано 2026-10-24; обновлено 2026-10-07).
-47. E5-Mistral — https://huggingface.co/intfloat/e5-mistral-7b-instruct (прочитано 2026-10-24; ограничения входа и способ получения вектора).
-48. Google, выпуск Gemini Embedding 001 — https://developers.googleblog.com/en/gemini-embedding-available-gemini-api/ (прочитано 2026-10-24; опубликовано 2025-07-14).
+1. ruMTEB, original paper, Tables 4–5 — https://arxiv.org/html/2408.12503v1 (read 2026-10-24; published 2024-08-22).
+2. encodechka, README with scores and timings — https://github.com/avidale/encodechka (read 2026-10-24; mutable table, dates of individual measurements not stated).
+3. encodechka, `SpeedTask` in `encodechka_eval/tasks.py` — https://raw.githubusercontent.com/avidale/encodechka/master/encodechka_eval/tasks.py (read 2026-10-24; methodology code).
+4. multilingual-e5-small, model card — https://huggingface.co/intfloat/multilingual-e5-small/raw/main/README.md and config https://huggingface.co/intfloat/multilingual-e5-small/raw/main/config.json (read 2026-10-24; 2023 model).
+5. multilingual-e5-base — https://huggingface.co/intfloat/multilingual-e5-base (read 2026-10-24; 2023 model).
+6. multilingual-e5-large — https://huggingface.co/intfloat/multilingual-e5-large (read 2026-10-24; 2023 model).
+7. multilingual-e5-large-instruct — https://huggingface.co/intfloat/multilingual-e5-large-instruct (read 2026-10-24; 2024 model).
+8. Author E5 ONNX: https://huggingface.co/intfloat/multilingual-e5-small/tree/main/onnx ; https://huggingface.co/intfloat/multilingual-e5-base/tree/main/onnx ; https://huggingface.co/intfloat/multilingual-e5-large/tree/main/onnx ; https://huggingface.co/intfloat/multilingual-e5-large-instruct/tree/main/onnx (read 2026-10-24; file composition additionally checked through https://huggingface.co/api/models/intfloat/multilingual-e5-small and https://huggingface.co/api/models/intfloat/multilingual-e5-base).
+9. BGE-M3 — https://huggingface.co/BAAI/bge-m3 and https://huggingface.co/BAAI/bge-m3/tree/main/onnx (read 2026-10-24; 2024 model).
+10. ru-en-RoSBERTa — https://huggingface.co/ai-forever/ru-en-RoSBERTa and https://huggingface.co/ai-forever/ru-en-RoSBERTa/tree/main (read 2026-10-24; repository created 2024-07-29, paper [1]).
+11. USER-bge-m3, model card and author results — https://huggingface.co/deepvk/USER-bge-m3 (read 2026-10-24; repository created 2024-07-05).
+12. USER-bge-m3, metadata and context — https://huggingface.co/api/models/deepvk/USER-bge-m3 ; https://huggingface.co/deepvk/USER-bge-m3/raw/main/config.json ; https://huggingface.co/deepvk/USER-bge-m3/raw/main/sentence_bert_config.json (read 2026-10-24; revision `0cc6cfe48e260fb0474c753087a69369e88709ae`).
+13. LaBSE — https://huggingface.co/sentence-transformers/LaBSE ; https://huggingface.co/sentence-transformers/LaBSE/raw/main/sentence_bert_config.json ; https://huggingface.co/sentence-transformers/LaBSE/raw/main/modules.json ; https://huggingface.co/sentence-transformers/LaBSE/tree/main/onnx ; https://huggingface.co/api/models/sentence-transformers/LaBSE (read 2026-10-24; model architecture from 2020, ST packaging updated).
+14. Qwen3-Embedding-0.6B, model card, family, and results — https://huggingface.co/Qwen/Qwen3-Embedding-0.6B (read 2026-10-24; paper published 2025-06-05; authors recorded MTEB comparison in 2025).
+15. Community Qwen3 export — https://huggingface.co/onnx-community/Qwen3-Embedding-0.6B-ONNX (read 2026-10-24).
+16. EmbeddingGemma 300M — https://huggingface.co/google/embeddinggemma-300m ; https://ai.google.dev/gemma/docs/embeddinggemma/model_card ; https://developers.googleblog.com/introducing-embeddinggemma/ (read 2026-10-24; released 2025-09-04).
+17. Community EmbeddingGemma export — https://huggingface.co/onnx-community/embeddinggemma-300m-ONNX (read 2026-10-24).
+18. EmbeddingGemma 2 — https://ai.google.dev/gemma/docs/embeddinggemma/model_card_2 ; https://developers.googleblog.com/en/google-ai-edge-with-embeddinggemma-2/ ; https://huggingface.co/google/embeddinggemma-2/tree/main (read 2026-10-24; released 2026-10-06).
+19. Gemma Terms — https://ai.google.dev/gemma/terms (read 2026-10-24; revision 2026-04-01).
+20. ONNX Runtime Java — https://onnxruntime.ai/docs/get-started/with-java.html (read 2026-10-24).
+21. DJL HuggingFace Tokenizers — https://docs.djl.ai/master/extensions/tokenizers/index.html (read 2026-10-24; example 0.38.0).
+22. DJL ONNX Runtime engine — https://docs.djl.ai/master/engines/onnxruntime/onnxruntime-engine/index.html (read 2026-10-24; warning about VC runtime and JDK on Windows).
+23. DJL dependency management — https://docs.djl.ai/master/docs/development/dependency_management.html (read 2026-10-24; native dependency composition and offline distribution).
+24. LangChain4j in-process — https://docs.langchain4j.dev/integrations/embedding-models/in-process/ ; module-move announcement https://raw.githubusercontent.com/langchain4j/langchain4j-embeddings/main/README.md (read 2026-10-24; move on 2025-12-04).
+25. Spring AI ONNX embeddings — https://docs.spring.io/spring-ai/reference/api/embeddings/onnx.html (read 2026-10-24; page shows 2.0.2).
+26. Spring AI 2.0.2, `TransformersEmbeddingModel.java` — https://raw.githubusercontent.com/spring-projects/spring-ai/v2.0.2/models/spring-ai-transformers/src/main/java/org/springframework/ai/transformers/TransformersEmbeddingModel.java (read 2026-10-24; reviewed `call`, `meanPooling`, tokenizer/graph loading).
+27. Maven Central, sizes and releases: https://repo.maven.apache.org/maven2/com/microsoft/onnxruntime/onnxruntime/1.31.0/ ; https://repo.maven.apache.org/maven2/com/microsoft/onnxruntime/onnxruntime/maven-metadata.xml ; https://repo.maven.apache.org/maven2/ai/djl/huggingface/tokenizers/0.39.0/ ; https://repo.maven.apache.org/maven2/ai/djl/huggingface/tokenizers/maven-metadata.xml ; https://repo.maven.apache.org/maven2/ai/djl/pytorch/pytorch-native-cpu/2.7.1/ (read 2026-10-24; release dates 2026-10-09, 2026-10-20, and 2025-08-12 respectively).
+28. Ollama BGE-M3 — https://ollama.com/library/bge-m3 (read 2026-10-24).
+29. Ollama Qwen3-Embedding — https://ollama.com/library/qwen3-embedding (read 2026-10-24).
+30. Ollama EmbeddingGemma — https://ollama.com/library/embeddinggemma (read 2026-10-24).
+31. Ollama `/api/embed` — https://docs.ollama.com/api/embed (read 2026-10-24).
+32. Ollama FAQ — https://docs.ollama.com/faq (read 2026-10-24; local mode and bind address).
+33. Ollama Windows — https://docs.ollama.com/windows (read 2026-10-24).
+34. OpenAI embeddings and pricing — https://developers.openai.com/api/docs/models/text-embedding-3-small ; https://developers.openai.com/api/docs/models/text-embedding-3-large ; https://developers.openai.com/api/docs/guides/embeddings (read 2026-10-24).
+35. OpenAI data controls, `/v1/embeddings` row — https://developers.openai.com/api/docs/guides/your-data (read 2026-10-24).
+36. Voyage pricing and models — https://docs.voyageai.com/docs/pricing ; https://docs.voyageai.com/docs/embeddings (read 2026-10-24; pricing page shows an update around 2026-10-12).
+37. Voyage FAQ and Terms — https://docs.voyageai.com/docs/faq ; https://www.voyageai.com/tos (read 2026-10-24; opt-out from training and retention).
+38. Cohere Embed 5 — https://docs.cohere.com/docs/cohere-embed ; https://cohere.com/blog/embed-5 (read 2026-10-24; release and prices 2026-09-30).
+39. Cohere Enterprise Data Commitments — https://cohere.com/enterprise-data-commitments (read 2026-10-24; revision 2025-12-05).
+40. Gemini API pricing — https://ai.google.dev/gemini-api/docs/pricing (read 2026-10-24; Gemini Embedding 2 section).
+41. Gemini API Additional Terms — https://ai.google.dev/gemini-api/terms (read 2026-10-24; effective 2026-03-23, page updated 2026-04-28).
+42. Yandex, vectorization models — https://aistudio.yandex.ru/ru/docs/ai-studio/concepts/embeddings (read 2026-10-24).
+43. Yandex, vectorization pricing — https://aistudio.yandex.ru/ru/docs/ai-studio/pricing (read 2026-10-24; ₽0.0101 per 1,000 tokens including VAT).
+44. Yandex, retention policy — https://aistudio.yandex.ru/en/docs/ai-studio/concepts/security/data-storage (read 2026-10-24; text available in search view of official page, direct repeat request returned an error).
+45. GigaChat Embeddings-2 — https://developers.sber.ru/docs/ru/gigachat/models/embeddings-2 (read 2026-10-24).
+46. GigaChat, legal-entity tariffs — https://developers.sber.ru/docs/ru/gigachat/tariffs/legal-tariffs (read 2026-10-24; updated 2026-10-07).
+47. E5-Mistral — https://huggingface.co/intfloat/e5-mistral-7b-instruct (read 2026-10-24; input limits and vector-generation method).
+48. Google, Gemini Embedding 001 release — https://developers.googleblog.com/en/gemini-embedding-available-gemini-api/ (read 2026-10-24; published 2025-07-14).

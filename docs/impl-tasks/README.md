@@ -100,7 +100,7 @@ The reviewer checks; it does not fix. Work through every point and report what y
 
 ## Recording an accepted brief
 
-1. Russian project documents (current state only; see AGENTS.md "Working with the plan"):
+1. Project documents in English (current state only; see AGENTS.md "Working with the plan"):
    - **`docs/plan.md` section 4:** delete the improvement's row and add its number to the list of
      done items above the table. A partly done improvement keeps its row with the remaining part.
    - **`docs/results.md`:** add the user-run results, numbers only. If a real-mail check is still

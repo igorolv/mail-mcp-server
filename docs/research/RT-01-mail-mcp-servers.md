@@ -1,375 +1,374 @@
-# RT-01 — Существующие MCP-серверы для почты
+# RT-01 — Existing MCP Servers for Email
 
-- Дата: 2026-10-24.
-- Исполнитель: Codex, исследовательская сессия RT-01.
-- Бриф: `docs/research-tasks/RT-01-mail-mcp-servers.md`.
-- Метод: первичные документы, README, GitHub REST API и выборочное чтение кода; без установки и запуска серверов, входа в почту и проверки реальных учётных данных.
+- Date: 2026-10-24.
+- Author: Codex, RT-01 research session.
+- Brief: `docs/research-tasks/RT-01-mail-mcp-servers.md`.
+- Method: primary documentation, READMEs, GitHub REST API, and selective source-code review; no server installation or execution, mailbox sign-in, or real credential checks.
 
-## Кратко
+## Summary
 
-- [док][код] Найдено 17 решений: официальные Microsoft/Google, популярные Graph/Gmail-обёртки, EWS/NTLM и локальные индексаторы. Полный перечень — Т1; это обзор идей, а не предложение заменить наш сервер. [3–22]
-- [док] У Microsoft прежний `mcp_MailTools` оставлен для совместимости; актуальное направление — Work IQ MCP. Graph-серверы нельзя считать готовым способом доступа к нашему EWS/NTLM. [3–6]
-- [код] Ближайший пример EWS с локальным индексом — azizmazrou/ews-mcp: SQLite FTS5, `SyncFolderItems`, сохранённые состояния синхронизации; опционально pgvector + Ollama. Текст файловых вложений в этот индекс не включён. [24–26]
-- [код] Для IMAP полезен codefuturist/email-mcp: индекс с ключами соединения, папки, `UIDVALIDITY` и UID; сверка удалений. Название стратегии QRESYNC не означает реализованную обработку `VANISHED`. [35–36]
-- [код] Поиск по тексту вложений есть у JonLaliberte/mail-semantic-search и marshalltech81/protonmail-local-ai. У первого ChromaDB и локальные модели, у второго FTS5 + sqlite-vec, но поставщик эмбеддингов может быть внешним. [20–21,31,40–41]
-- [код] Лучший изученный пример ограниченной обработки вложений — ni-c/imap-mcp: разные пределы для ответа, диска и парсера, изоляция извлечения и продолжение текста по смещению. [17,27,29]
-- [код] Надпись «только чтение» требует проверки: у ni-c инструмент `list_new_messages` по умолчанию ставит служебный флаг; у codefuturist соответствующий флаг ограничивает только изменения почты. [15,27–28,42]
-- [код][предположение] Заимствовать стоит компактный поиск → подробное чтение, явное соединение, состояние индекса и ограничения ресурсов. Защита от внедрения инструкций в письмо и скрытие секретов — разные задачи; универсальный фильтр содержимого в этой выборке не подтверждён. [17,23,30,35]
+- [docs][code] 17 solutions were found: official Microsoft/Google servers, popular Graph/Gmail wrappers, EWS/NTLM, and local indexers. The full list is in Т1; this is an overview of ideas, not a proposal to replace our server. [3–22]
+- [docs] Microsoft retained its former `mcp_MailTools` for compatibility; Work IQ MCP is the current direction. Graph servers cannot be treated as a ready way to access our EWS/NTLM. [3–6]
+- [code] The closest EWS example with a local index is azizmazrou/ews-mcp: SQLite FTS5, `SyncFolderItems`, saved synchronization states; optionally pgvector + Ollama. Text from file attachments is not included in this index. [24–26]
+- [code] For IMAP, codefuturist/email-mcp is useful: an index keyed by connection, folder, `UIDVALIDITY`, and UID; deletion reconciliation. Calling the strategy QRESYNC does not mean `VANISHED` handling is implemented. [35–36]
+- [code] Attachment-text search is available in JonLaliberte/mail-semantic-search and marshalltech81/protonmail-local-ai. The former uses ChromaDB and local models; the latter uses FTS5 + sqlite-vec, but its embedding provider may be external. [20–21,31,40–41]
+- [code] The best reviewed example of bounded attachment processing is ni-c/imap-mcp: separate response, disk, and parser limits, isolated extraction, and text continuation by offset. [17,27,29]
+- [code] A “read-only” label needs checking: ni-c's `list_new_messages` tool sets a service flag by default; codefuturist's corresponding flag limits only mail changes. [15,27–28,42]
+- [code][assumption] Useful ideas to borrow are compact search → detailed reading, explicit connections, index state, and resource limits. Protection from instructions embedded in mail and secret masking are different tasks; this sample did not confirm a universal content filter. [17,23,30,35]
 
-## Ответы на вопросы
+## Answers to the questions
 
-### В1. Какие почтовые MCP-серверы существуют?
+### В1. Which email MCP servers exist?
 
-[док][код] Таблица Т1 содержит 17 отдельных проектов/сервисов, в том числе три официальных
-сервиса. Два поколения Microsoft перечислены отдельно: это разные интерфейсы, а не два
-названия одной реализации. Порядок строк не является рейтингом. [3–22]
+[docs][code] Table Т1 contains 17 distinct projects/services, including three official
+services. The two Microsoft generations are listed separately: they are different interfaces, not two
+names for one implementation. Row order is not a ranking. [3–22]
 
-[код] Поиск начат с официального реестра и `modelcontextprotocol/servers`, продолжен поиском
-репозиториев по протоколам и индексам. Реестр сам по себе не доказывает безопасность или
-официальность проекта; принадлежность проверялась по репозиторию либо документации поставщика. [1–2]
+[code] The search began with the official registry and `modelcontextprotocol/servers`, then continued by searching
+repositories by protocol and index. The registry alone does not prove a project is safe or
+official; ownership was checked against the repository or vendor documentation. [1–2]
 
-[док] Важное изменение относительно старых обзоров: статья Microsoft от 2026-10-13
-рекомендует Work IQ MCP вместо прежних отдельных серверов Mail/Calendar и других.
-Обзор Work IQ и общая статья расходятся даже по количеству инструментов: соответственно
-12 перечисленных имён и формулировка «10 generic tools». Фактический набор без подключения
-не проверялся. [4–6]
+[docs] An important change from older reviews: Microsoft's article dated 2026-10-13
+recommends Work IQ MCP in place of the former separate Mail/Calendar servers and others.
+Even the Work IQ overview and general article differ on the number of tools: respectively,
+12 listed names and the phrase “10 generic tools.” The actual set was not checked by connecting. [4–6]
 
-[док] Gmail MCP — официальный удалённый сервис в Developer Preview. Общая инструкция
-перечисляет девять инструментов, справочник — десять, включая `get_message`; это различие
-документов, а не подтверждённые разные версии сервера. [7–8]
+[docs] Gmail MCP is an official remote service in Developer Preview. The general instructions
+list nine tools, while the reference lists ten, including `get_message`; this is a difference
+between documents, not evidence of different server versions. [7–8]
 
-### В2. Где есть локальный индекс или RAG и как он устроен?
+### В2. Where is there a local index or RAG, and how is it implemented?
 
-| Строка Т1 | Движок и индексируемые данные | Получение изменений и ограничения | Основание |
+| Т1 row | Engine and indexed data | Change retrieval and limitations | Evidence |
 |---|---|---|---|
-| P06 azizmazrou | SQLite FTS5: нормализованный текст письма и метаданные; pgvector + Ollama опционально, объединение рангов RRF | `folder.sync_items`, состояния по папке на диске; создания, изменения, удаления; по умолчанию inbox/sent, окно 365 дней, период 45 с; текст вложений не поступает в индекс | [код] `cache/store.py`, `cache/sync.py`, `tools/mail_read.py`, `config.py` [23–26] |
-| P10 codefuturist | SQLite FTS5: тема, отправитель, тело, **имена** вложений; отдельное хранилище файлов по хэшу | `UIDVALIDITY`, UID, modseq при CONDSTORE, сверка множества UID для удалений; фоновые и ленивые обновления; полноценный путь QRESYNC/VANISHED прямо помечен нереализованным | [код] `src/cache/schema.ts`, `sync-engine.ts`; README [15,35–36] |
-| P13 Tillman32 | SQLite FTS5 заявлен для кэша писем | Механизм синхронизации, удаления и сброса поколения UID по коду не проверен; индексирование текста вложений не подтверждено | [код] README; глубина проверки ниже, чем у P10/P14 [18] |
-| P14 DreamC0der-AI | SQLite FTS5: subject/from/to/body; без векторов и извлечения текста вложений | Сначала заголовки; тело загружается при чтении; `SEARCH ALL`, сравнение UID, удаление исчезнувших, сброс при изменении `UIDVALIDITY`; тело в индексе только после загрузки | [код] `db.py`, `server.py` [33–34] |
-| P15 JonLaliberte | SQLite для метаданных + ChromaDB для векторов; тело, имена и извлечённый текст вложений в общем тексте для эмбеддинга | Источник — локальные `.eml`, не IMAP; обход файлов, отдельный `index-file`, пропуск уже обработанных, обслуживание `prune`/`reextract`; корреляция перемещений по Message-ID | [код] README, `index.py` [20,40] |
-| P16 marshalltech81 | SQLite FTS5 + sqlite-vec: цепочки, фрагменты писем, извлечённые вложения; RRF, необязательное повторное ранжирование | Bridge → mbsync → Maildir → наблюдение за файлами → индексатор; есть состояния сбора и индексации, повторный разбор; режим хранения удалённых писем требует отдельного понимания | [код] README, `docs/architecture.md` [21,41] |
+| P06 azizmazrou | SQLite FTS5: normalized message text and metadata; optional pgvector + Ollama, RRF rank fusion | `folder.sync_items`, per-folder states on disk; creates, updates, deletes; inbox/sent by default, 365-day window, 45 s interval; attachment text is not indexed | [code] `cache/store.py`, `cache/sync.py`, `tools/mail_read.py`, `config.py` [23–26] |
+| P10 codefuturist | SQLite FTS5: subject, sender, body, **attachment names**; separate hash-keyed file store | `UIDVALIDITY`, UID, modseq with CONDSTORE, compare UID sets for deletions; background and lazy updates; full QRESYNC/VANISHED path explicitly marked unimplemented | [code] `src/cache/schema.ts`, `sync-engine.ts`; README [15,35–36] |
+| P13 Tillman32 | SQLite FTS5 is claimed for the mail cache | Synchronization, deletion, and UID generation-reset behavior not checked in code; attachment-text indexing unconfirmed | [code] README; review was less in-depth than P10/P14 [18] |
+| P14 DreamC0der-AI | SQLite FTS5: subject/from/to/body; no vectors or attachment-text extraction | Headers first; body fetched on read; `SEARCH ALL`, compare UIDs, delete vanished items, reset when `UIDVALIDITY` changes; body indexed only after fetching | [code] `db.py`, `server.py` [33–34] |
+| P15 JonLaliberte | SQLite for metadata + ChromaDB for vectors; body, names, and extracted attachment text combined into embedding text | Source is local `.eml` files, not IMAP; traverse files, separate `index-file`, skip processed files, `prune`/`reextract` maintenance; correlate moves by Message-ID | [code] README, `index.py` [20,40] |
+| P16 marshalltech81 | SQLite FTS5 + sqlite-vec: threads, message chunks, extracted attachments; RRF, optional reranking | Bridge → mbsync → Maildir → file watcher → indexer; collection/indexing states and reparsing; deleted-mail retention mode needs separate investigation | [code] README, `docs/architecture.md` [21,41] |
 
-[предположение] P14 показывает риск ленивой загрузки: наличие письма в базе ещё не означает,
-что его тело доступно полнотекстовому поиску. В нашем ответе поиска стоит показывать покрытие
-тел и вложений отдельно; вывод следует из схемы загрузки P14. [33–34]
+[assumption] P14 illustrates a risk of lazy loading: a message being in the database does not mean
+its body is available for full-text search. Our search response should show body
+and attachment coverage separately; this follows from P14's loading design. [33–34]
 
-[код][предположение] P15 действительно извлекает вложения, но объединяет их с телом перед
-эмбеддингом и ограничивает длину. Это не эквивалент независимому поиску по всем страницам
-каждого вложения: конец большого документа может не попасть в представление письма. [20,31,40]
+[code][assumption] P15 does extract attachments, but combines them with the body before
+embedding and limits the length. This is not equivalent to independent search across every page
+of every attachment: the end of a large document may not be represented in the message. [20,31,40]
 
-[док][код] P01–P05, P07–P09, P11–P12 и P17 предоставляют поиск поставщика либо IMAP;
-собственный локальный поисковый индекс в прочитанных материалах этих строк не подтверждён.
-Поиск Microsoft по вложениям на стороне сервиса не означает локальное извлечение. [3–22]
+[docs][code] P01–P05, P07–P09, P11–P12, and P17 provide vendor search or IMAP;
+the reviewed materials for these rows did not confirm a local search index of their own.
+Microsoft server-side attachment search does not mean local extraction. [3–22]
 
-### В3. Как устроены вложения?
+### В3. How are attachments handled?
 
-| Строка Т1 | Возвращаемый результат / извлечение | Проверенные ограничения и пробелы |
+| Т1 row | Returned result / extraction | Verified limits and gaps |
 |---|---|---|
-| P02 Work IQ | `fetch_blob`: base64 и метаданные в `structuredContent`, без дублирования в текстовом блоке | [док] Предел по умолчанию 4 MB, настраивается по пути; не обещание поддержки любого почтового вложения [6] |
-| P04 Softeria | Base64; опциональный EmbeddedResource, сохранение на диск; отдельное чтение чистого текста письма | [код] Для режима blob предел 5 MiB; извлечение PDF/Office в почтовый индекс не подтверждено [9] |
-| P06 azizmazrou | `info`, UTF-8 `text`, `save`; бинарные файлы по умолчанию дают метаданные | [код] Текст 20 000 символов; `.content` целиком в памяти до ограничения; item attachments не поддержаны этим обработчиком; сохранение по очищенному имени может перезаписать одноимённый файл [23] |
-| P07 ShermanGu | Вложения при подготовке и редактировании черновика | [код] Скачивание входящего файла, извлечение текста и пределы не установлены [12] |
-| P08 GongRzhe | Метаданные при чтении, отдельное скачивание на диск, файлы при отправке | [код] Упомянутый README предел Gmail 25 MB нельзя принимать за собственный предел скачивания/памяти сервера [13] |
-| P09 Workspace MCP | Локальные файлы в stdio, ссылки на скачивание в HTTP; необязательный GCS | [код] Есть ограничения чтения файлов и разрешённых каталогов; это не индекс текста вложений [14] |
-| P10 codefuturist | Base64 до 5 MB; опциональное сохранение в заданный каталог, по умолчанию до 25 MiB; кэш файлов | [код] Раздельные пределы ответа и диска; FTS хранит имена, не извлечённый текст файлов [15,35] |
-| P12 ni-c | Список частей; содержимое/изображение; `mode=text` для PDF/Office; `mode=save`; MCP-ресурсы | [код] По умолчанию 1 MiB inline, 25 MiB на диск, 10 MiB для извлечения; проверка типа и сигнатуры; дочерний процесс с пределом памяти/времени; OCR нет [17,27] |
-| P13 Tillman32 | При отправке и создании черновика принимает местные пути и HTTP(S)-ссылки | [код] Не более 10 файлов, 10 MB каждый, 25 MB суммарно; HTTP-таймаут 15 с; получение байтов входящих вложений не подтверждено [18] |
-| P14 DreamC0der-AI | `download_attachment` сохраняет файл и запись о скачивании | [код] Парсинг MIME есть; извлечения PDF/Office и жёсткого предела размера скачивания в просмотренном обработчике не найдено [34] |
-| P15 JonLaliberte | PDF, DOCX, XLSX, PPTX, текст/CSV; копирование вложений и `.eml` в каталог `STAGING_DIR` | [код] Вход извлечения ограничен 10 MiB; лимиты текста каждого файла и общего текста для эмбеддинга; OCR не подтверждён [20,31,40] |
-| P16 marshalltech81 | Извлечение вложений с отдельными таблицами текста и состояний разбора | [код] Индексирование подтверждено архитектурой; численные пределы парсера и скачивания не проверены [41] |
-| P17 zayansalman | Все вложения цепочки в каталог; результат содержит путь, размер, MIME-тип и исходное имя | [код] Фильтр расширений есть; извлечение текста и предел размера файла не подтверждены [22] |
+| P02 Work IQ | `fetch_blob`: base64 and metadata in `structuredContent`, without duplication in the text block | [docs] Default limit 4 MB, configurable by path; not a promise to support every email attachment [6] |
+| P04 Softeria | Base64; optional EmbeddedResource, save to disk; separate plain-text email reading | [code] Blob mode limit is 5 MiB; PDF/Office extraction into a mail index unconfirmed [9] |
+| P06 azizmazrou | `info`, UTF-8 `text`, `save`; binary files return metadata by default | [code] Text is 20,000 characters; `.content` is held entirely in memory before the limit; item attachments are unsupported by this handler; saving under a sanitized name may overwrite a same-named file [23] |
+| P07 ShermanGu | Attachments when preparing and editing a draft | [code] Incoming-file download, text extraction, and limits not established [12] |
+| P08 GongRzhe | Metadata on read, separate download to disk, files when sending | [code] The README's stated Gmail limit of 25 MB must not be treated as the server's own download/memory limit [13] |
+| P09 Workspace MCP | Local files over stdio, download links over HTTP; optional GCS | [code] File reads and allowed directories are restricted; this is not an attachment-text index [14] |
+| P10 codefuturist | Base64 up to 5 MB; optional save to a chosen directory, 25 MiB by default; file cache | [code] Separate response and disk limits; FTS stores names, not extracted file text [15,35] |
+| P12 ni-c | Part list; content/image; `mode=text` for PDF/Office; `mode=save`; MCP resources | [code] Defaults: 1 MiB inline, 25 MiB to disk, 10 MiB for extraction; type and signature checks; child process with memory/time limits; no OCR [17,27] |
+| P13 Tillman32 | Accepts local paths and HTTP(S) links when sending and creating drafts | [code] At most 10 files, 10 MB each, 25 MB total; HTTP timeout 15 s; retrieval of incoming attachment bytes unconfirmed [18] |
+| P14 DreamC0der-AI | `download_attachment` saves the file and a download record | [code] MIME parsing exists; no PDF/Office extraction or hard download-size limit found in the reviewed handler [34] |
+| P15 JonLaliberte | PDF, DOCX, XLSX, PPTX, text/CSV; copies attachments and `.eml` to `STAGING_DIR` | [code] Extraction input limited to 10 MiB; per-file text and total embedding-text limits; OCR unconfirmed [20,31,40] |
+| P16 marshalltech81 | Attachment extraction with separate text and parse-state tables | [code] Indexing confirmed by architecture; numerical parser and download limits not checked [41] |
+| P17 zayansalman | Saves all thread attachments in a directory; result includes path, size, MIME type, and original name | [code] Extension filter exists; text extraction and file-size limit unconfirmed [22] |
 
-[предположение] Для нашего stdio-сервера наиболее полезна комбинация P12 и P15:
-оригинал на диск, отдельный очищенный текст с продолжением, отдельные пределы размера файла,
-распаковки, времени и ответа. Base64 нужен только как явная опция: он расходует контекст,
-даже если исходный файл укладывается в ограничение скачивания. [6,17,31]
+[assumption] For our stdio server, the most useful combination is P12 and P15:
+keep the original on disk, store extracted text separately with continuation, and use separate limits for file size,
+unpacking, time, and response. Base64 should be an explicit option only: it consumes context
+even when the original file is within the download limit. [6,17,31]
 
-### В4. Какие есть меры безопасности?
+### В4. What security measures exist?
 
-| Мера | Где найдена | Что доказано и чего она не гарантирует |
+| Measure | Found in | What it establishes and what it does not guarantee |
 |---|---|---|
-| Запрет изменений по умолчанию | P02 Work IQ | [док] Запросы изменений блокирует политика арендатора; администратор может разрешить пути/методы. Это не локальный флаг нашего сервера [6] |
-| Уровни возможностей и исключение инструментов | P06 azizmazrou | [код] `read`/`draft`/`full`, проверка и при регистрации, и при вызове; по умолчанию **draft**, а не строгий read-only [11,26,39] |
-| Отдельное разрешение отправки | P06 | [код] `SEND_ENABLED=false`; проверка адресатов, лимит отправок и подтверждение, связанное с содержимым черновика [11,39] |
-| Сначала черновик | P03 Google, P07 ShermanGu | [док][код] У Google в опубликованном наборе нет send; ShermanGu готовит черновики. Это не доказывает отсутствие иных побочных эффектов [8,12] |
-| Флаг read-only | P04 Softeria, P09 Workspace, P10 codefuturist | [код] Явно настраивается; у P10 по умолчанию false и ограничивает только изменения почты, оставляя другие записи [9,14–15] |
-| Проверка типов и границ файлов | P12 ni-c, P09 Workspace | [код] P12 проверяет объявленный тип, сигнатуру, путь и создаёт файл без перезаписи; P09 ограничивает каталоги чтения, блокирует чувствительные пути [14,17,27] |
-| Недоверенное содержимое письма | P12 ni-c | [код] Метки `untrusted`, случайные разделители на вызов, построчная маркировка, сигналы подозрительных инструкций; это средство ограничения риска, не доказательство невозможности атаки [17,29–30] |
-| Проверка запросов/ответов против внедрения инструкций | P03 Google | [док] Инструкция требует проверять содержимое через Model Armor либо своё документированное решение; сам факт подключения MCP не включает такую защиту автоматически [7] |
-| Скрытие секретов в журнале | P04 Softeria | [код] По умолчанию очищаются JWT, Bearer, поля токенов и адреса в логах; это **не** очистка тела письма перед моделью [9] |
-| Разделение доступа пользователей | P11 RushB | [код] Права на ящики/группы и шифрование сохранённых почтовых реквизитов AES-256-GCM; не подтверждает фильтр содержимого писем [16] |
+| Default prohibition on changes | P02 Work IQ | [docs] Tenant policy blocks change requests; an administrator can allow paths/methods. This is not a local flag in our server [6] |
+| Capability levels and tool exclusion | P06 azizmazrou | [code] `read`/`draft`/`full`, checked both at registration and invocation; default is **draft**, not strict read-only [11,26,39] |
+| Separate permission to send | P06 | [code] `SEND_ENABLED=false`; recipient checks, send limit, and confirmation tied to draft content [11,39] |
+| Draft first | P03 Google, P07 ShermanGu | [docs][code] Google's published set has no send tool; ShermanGu prepares drafts. This does not prove there are no other side effects [8,12] |
+| Read-only flag | P04 Softeria, P09 Workspace, P10 codefuturist | [code] Explicitly configurable; P10 defaults to false and limits only mail changes, leaving other writes possible [9,14–15] |
+| File type and boundary checks | P12 ni-c, P09 Workspace | [code] P12 checks declared type, signature, and path, and creates files without overwriting; P09 restricts read directories and blocks sensitive paths [14,17,27] |
+| Untrusted email content | P12 ni-c | [code] `untrusted` labels, per-call random delimiters, line-by-line marking, and suspicious-instruction signals; this limits risk but does not prove attacks are impossible [17,29–30] |
+| Check prompts/responses for instruction injection | P03 Google | [docs] Instructions require checking content with Model Armor or a documented alternative; connecting MCP does not automatically enable this protection [7] |
+| Secret masking in logs | P04 Softeria | [code] JWTs, Bearer values, token fields, and addresses are sanitized from logs by default; this is **not** sanitizing email bodies before they reach the model [9] |
+| Separate user access | P11 RushB | [code] Mailbox/group permissions and AES-256-GCM encryption of stored mail credentials; this does not confirm email-content filtering [16] |
 
-[код] Существенное исключение P12: `list_new_messages` регистрируется при непустом
-`IMAP_SEEN_KEYWORD` (по умолчанию `AiSeen`), выбирает папку для записи и вызывает `tagSeen`,
-если не задан `dry_run`. Общий `IMAP_READ_ONLY` эту ветку не закрывает; аннотация инструмента
-честно имеет `readOnlyHint: false`. Для строгого чтения нужен пустой keyword либо исключение
-инструмента. Не переносить эту семантику в наш MVP. [27–28,42]
+[code] A significant P12 exception: `list_new_messages` is registered when
+`IMAP_SEEN_KEYWORD` (default `AiSeen`), selects a folder for writing and calls `tagSeen`,
+unless `dry_run` is set. The general `IMAP_READ_ONLY` does not block this path; the tool annotation
+correctly sets `readOnlyHint: false`. Strict reading requires an empty keyword or excluding the
+tool. Do not carry this behavior into our MVP. [27–28,42]
 
-[код][предположение] P12 не имеет SMTP, но отсутствие отправки в одном сервере не защищает
-агента, у которого есть другой сетевой инструмент. Аналогично метки недоверенного текста
-не скрывают пароль, который письмо содержит как обычные данные. Нужны самостоятельные
-границы действий и фильтр секретов для каждого пути выдачи, включая ресурсы и файлы. [17,30]
+[code][assumption] P12 has no SMTP, but the lack of sending in one server does not protect
+an agent that has another network tool. Similarly, untrusted-text labels
+do not hide a password that an email contains as ordinary data. Separate
+action boundaries and a secret filter are needed for every output path, including resources and files. [17,30]
 
-[код] В изученных материалах P01–P17 не подтверждён готовый единый фильтр паролей, токенов
-и русских персональных данных для тела, поискового фрагмента и извлечённого вложения.
-Это ограничение обзора, а не утверждение об отсутствии любых защит во всех версиях проектов. [3–42]
+[code] The reviewed P01–P17 materials did not confirm a ready-made unified filter for passwords, tokens,
+and Russian personal data in message bodies, search snippets, and extracted attachments.
+This is a limitation of the review, not a claim that every version of every project lacks all protection. [3–42]
 
-### В5. Как устроены инструменты, идентификаторы, страницы и пределы ответа?
+### В5. How are tools, identifiers, pages, and response limits implemented?
 
-| Строка Т1 | Набор и идентификация | Страницы и ограничения |
+| Т1 row | Tool set and identification | Pages and limits |
 |---|---|---|
-| P01 Mail | [док] 10 опубликованных инструментов; Graph message ID, отдельно draft ID; KQL-поиск | `from`/`size` для поиска, `top` для sent; локального состояния страниц не описано [3] |
-| P02 Work IQ | [док] Общие глаголы + пути `/me/messages`; схема запрашивается отдельно | `fetch`: `$top` 25 по умолчанию, максимум 100; `$skip`/`$skiptoken` запрещены. Обход всех страниц по этому интерфейсу не подтверждён [5–6] |
-| P03 Google | [док] Thread-first: `search_threads` → `get_thread`; отдельные ID писем, цепочек и меток | Точная схема страниц и численные пределы здесь не проверены; см. расхождение количества в В1 [7–8] |
-| P06 azizmazrou | [код] README заявляет 28 инструментов, плюс опциональный `find_similar`; короткие псевдонимы `m…`, `t…`, `f…`, разрешаемые сервером | Поиск 20, максимум 50; `offset`/`next_offset`; тело 4000 символов по умолчанию; `source`, `as_of`, `fresh` [11,23,26,39] |
-| P09 Workspace | [код] README: более 120 всего, 15 Gmail; уровни core/extended/complete, выбор сервиса | Компактный набор уменьшает число схем в контексте; точные пределы почтовых ответов не проверены [14] |
-| P10 codefuturist | [код] README: 52 инструмента; внутренний ключ account/mailbox/UIDVALIDITY/UID | Есть локальная база и ограничения кэша; полного подсчёта зарегистрированных инструментов этой версии не делалось [15,35] |
-| P12 ni-c | [код] До 11; UID + папка в процессе одного аккаунта; цепочки через Message-ID/References | `offset`/`next_offset`; для извлечённого текста — символьное смещение; общий предел результата 200 000 по коду [17,27,29] |
-| P14 DreamC0der-AI | [код] **14** декораторов инструментов, хотя README пишет 13; UID + папка, один аккаунт | `page`/`page_size`, тело до 50 000 символов; FTS и IMAP-поиск имеют разные возможности [19,33–34] |
-| P15 JonLaliberte | [код] 6 общих инструментов + 4 только на macOS; Message-ID/путь/короткий хэш при подготовке файлов | `query_emails` ограничен по умолчанию 1000, сообщает `truncated`; продолжение через сужение даты, не стабильный курсор [20,32] |
-| P17 zayansalman | [код] 3 инструмента; Gmail thread ID, скачивание всей цепочки | Поиск по умолчанию 10; комбинированный инструмент берёт последнюю подходящую цепочку [22] |
+| P01 Mail | [docs] 10 published tools; Graph message ID and separate draft ID; KQL search | `from`/`size` for search, `top` for sent; no local page state described [3] |
+| P02 Work IQ | [docs] General verbs + `/me/messages` paths; schema requested separately | `fetch`: `$top` defaults to 25, max 100; `$skip`/`$skiptoken` prohibited. Traversing all pages through this interface unconfirmed [5–6] |
+| P03 Google | [docs] Thread-first: `search_threads` → `get_thread`; separate IDs for messages, threads, and labels | Exact page schema and numeric limits not checked here; see count discrepancy in В1 [7–8] |
+| P06 azizmazrou | [code] README claims 28 tools, plus optional `find_similar`; short aliases `m…`, `t…`, `f…` resolved by server | Search 20, max 50; `offset`/`next_offset`; body defaults to 4,000 characters; `source`, `as_of`, `fresh` [11,23,26,39] |
+| P09 Workspace | [code] README: over 120 total, 15 for Gmail; core/extended/complete tiers, service selection | A compact set reduces the number of schemas in context; exact mail response limits not checked [14] |
+| P10 codefuturist | [code] README: 52 tools; internal key account/mailbox/UIDVALIDITY/UID | Local database and cache limits exist; a full count of registered tools for this version was not made [15,35] |
+| P12 ni-c | [code] Up to 11; UID + folder within one account; threads through Message-ID/References | `offset`/`next_offset`; character offset for extracted text; code sets total result limit at 200,000 [17,27,29] |
+| P14 DreamC0der-AI | [code] **14** tool decorators although README says 13; UID + folder, one account | `page`/`page_size`, body up to 50,000 characters; FTS and IMAP search have different capabilities [19,33–34] |
+| P15 JonLaliberte | [code] 6 general tools + 4 macOS-only; Message-ID/path/short hash when staging files | `query_emails` defaults to limit 1,000 and reports `truncated`; continue by narrowing date, not with a stable cursor [20,32] |
+| P17 zayansalman | [code] 3 tools; Gmail thread ID, download entire thread | Search defaults to 10; combined tool returns the latest matching thread [22] |
 
-[предположение] Для нас удачен подход P06/P12: сначала карточки без тел и двоичных данных,
-потом подробное чтение по ID. Идентификатор должен включать соединение; показанный IMAP UID
-без папки и `UIDVALIDITY` недостаточен для долгоживущей ссылки — это непосредственно учитывает
-схема P10. Псевдонимы P06 удобны модели, но не заменяют внутреннюю идентичность письма. [23,35]
+[assumption] The P06/P12 approach suits us: first return cards without bodies or binary data,
+then read details by ID. The identifier should include the connection; an IMAP UID
+without folder and `UIDVALIDITY` is insufficient for a long-lived reference — P10's schema directly accounts for this.
+P06 aliases are convenient for a model, but do not replace internal message identity. [23,35]
 
-[предположение] Не следует копировать один инструмент для произвольного Graph/IMAP-запроса
-ради малого числа имён: в P02 безопасность зависит от отдельной серверной политики путей.
-Для ограниченного EWS/IMAP MVP легче проверять небольшой набор почтовых операций. [5–6]
+[assumption] Do not copy a single tool for arbitrary Graph/IMAP requests
+just to reduce the number of tool names: P02 security depends on a separate server-side path policy.
+A small set of mail operations is easier to verify for a bounded EWS/IMAP MVP. [5–6]
 
-### В6. Несколько аккаунтов и хранение учётных данных
+### В6. Multiple accounts and credential storage
 
-| Строки Т1 | Модель аккаунтов | Хранение / граница доверия |
+| Т1 rows | Account model | Storage / trust boundary |
 |---|---|---|
-| P01–P03 | [док] Идентичность пользователя/агента через OAuth; собственный список EWS+IMAP-соединений не описан | Учётные данные обслуживает поставщик/клиент; детали локального кэша зависят от MCP-клиента [3–8] |
-| P04 Softeria | [код] Несколько Microsoft-аккаунтов в процессе; `account` автоматически добавляется при их множественности; есть общий выбранный аккаунт и строгая привязка | MSAL-кэш шифруется AES-256-GCM, ключ в системном хранилище; резервный путь — файл `.cache-key`, поэтому фактическая защита зависит от режима [9] |
-| P05 ryaker | [код] Один документированный пользовательский токен; список аккаунтов не подтверждён | Параметры приложения в env, токены `~/.outlook-mcp-tokens.json` [10] |
-| P06 azizmazrou | [код] Один набор EWS-реквизитов в Settings; для изоляции разных логинов нужен отдельный процесс и каталог | env/`.env`; данные в `DATA_DIR`; не переносить в наш проект специфичные автору предположения об автоматическом выборе auth [11,26] |
-| P07 ShermanGu | [код] Настройка текущего пользователя; одновременный список независимых соединений не подтверждён | Windows Credential Manager; учётные данные скрыты от фасада инструментов [12] |
-| P08 GongRzhe | [код] Один документированный набор OAuth-файлов на процесс | `~/.gmail-mcp/credentials.json` и файл OAuth-клиента; хранение «локально» само по себе не доказывает шифрование [13] |
-| P09 Workspace | [код] Несколько пользователей, OAuth 2.1 в HTTP; выбор идентичности пользователя в запросах | Локальный каталог реквизитов; необязательные внешние хранилища и шлюз идентичности; это сложнее локального списка ящиков [14] |
-| P10 codefuturist | [код] Несколько именованных аккаунтов в TOML, общий набор инструментов | Значения непосредственно, `env:…`, `keychain:…`; описанные keychain-механизмы — macOS/Linux, поддержку Windows этим утверждением не подразумеваем [15] |
-| P11 RushB | [код] Много пользователей и ящиков, собственные/общие ящики организаций | База приложения; шифрование почтовых реквизитов, OAuth/статический Bearer для доступа к MCP [16] |
-| P12 ni-c | [код] Один IMAP-аккаунт на процесс | env; пароль удаляется из окружения после чтения, что не устраняет его копию в конфигурации запуска [17] |
-| P13 Tillman32 | [код] Несколько аккаунтов `ACCOUNT_N_*`, выбор `account_name`; поиск может охватывать все | env/`.env`; шифрованное системное хранилище не подтверждено [18] |
-| P14 DreamC0der-AI | [код] Один Bridge-аккаунт, несколько папок | env/`.env`, общий локальный каталог базы и вложений [19,34] |
-| P15 JonLaliberte | [код] Один локальный архив может содержать разные аккаунты; это не управление входом в несколько серверов | Почтовые пароли не нужны: читает `.eml`; фильтр `account` есть у списка входящих [20,32] |
-| P16 marshalltech81 | [код] Документированный путь через локальный Bridge/Maildir; несколько независимых логинов не проверены | Файлы `.secrets/` с правами владельца; адреса внешних моделей задаются отдельно [21] |
-| P17 zayansalman | [код] Один документированный OAuth-набор; отдельные процессы/пути для изоляции | Файл refresh token с режимом 0600; пути перенастраиваются env [22] |
+| P01–P03 | [docs] User/agent identity through OAuth; no custom list of EWS+IMAP connections described | Credentials handled by vendor/client; local cache details depend on MCP client [3–8] |
+| P04 Softeria | [code] Several Microsoft accounts per process; `account` is added automatically when multiple; shared selected account and strict binding also exist | MSAL cache encrypted with AES-256-GCM, key in system storage; fallback is `.cache-key` file, so actual protection depends on mode [9] |
+| P05 ryaker | [code] One documented user token; account list unconfirmed | App settings in env, tokens in `~/.outlook-mcp-tokens.json` [10] |
+| P06 azizmazrou | [code] One set of EWS credentials in Settings; separate process and directory needed to isolate different logins | env/`.env`; data in `DATA_DIR`; do not carry author-specific assumptions about automatic auth selection into our project [11,26] |
+| P07 ShermanGu | [code] Current-user configuration; simultaneous list of independent connections unconfirmed | Windows Credential Manager; credentials hidden from tool facade [12] |
+| P08 GongRzhe | [code] One documented set of OAuth files per process | `~/.gmail-mcp/credentials.json` and OAuth client file; “local” storage alone does not prove encryption [13] |
+| P09 Workspace | [code] Multiple users, OAuth 2.1 over HTTP; user identity selected in requests | Local credential directory; optional external stores and identity gateway; more complex than a local mailbox list [14] |
+| P10 codefuturist | [code] Multiple named accounts in TOML, shared tool set | Literal values, `env:…`, `keychain:…`; described keychain mechanisms are macOS/Linux, not a claim of Windows support [15] |
+| P11 RushB | [code] Many users and mailboxes, personal/shared organizational mailboxes | Application database; mail credential encryption, OAuth/static Bearer for MCP access [16] |
+| P12 ni-c | [code] One IMAP account per process | env; password removed from environment after reading, which does not remove its copy in launch configuration [17] |
+| P13 Tillman32 | [code] Multiple `ACCOUNT_N_*` accounts, selected by `account_name`; search may cover all | env/`.env`; encrypted system storage unconfirmed [18] |
+| P14 DreamC0der-AI | [code] One Bridge account, multiple folders | env/`.env`, shared local database and attachment directory [19,34] |
+| P15 JonLaliberte | [code] One local archive may contain multiple accounts; this is not managing sign-in to multiple servers | No mail passwords needed: reads `.eml`; incoming list has an `account` filter [20,32] |
+| P16 marshalltech81 | [code] Documented path through local Bridge/Maildir; multiple independent logins not checked | `.secrets/` files with owner permissions; external model endpoints configured separately [21] |
+| P17 zayansalman | [code] One documented OAuth set; separate processes/paths for isolation | Refresh-token file with mode 0600; paths reconfigured through env [22] |
 
-[предположение] Для нашего проекта полезнее именованные аккаунты P10/P13 и изоляция каталогов
-P06, чем неявный аккаунт по умолчанию P04/P11: явное `connection` делает выбор ящика проверяемым.
-Это рекомендация интерфейса, а не изменение уже принятого плана. [9,11,15–16,18]
+[assumption] For our project, named accounts in P10/P13 and P06's directory isolation
+are more useful than P04/P11's implicit default account: an explicit `connection` makes mailbox choice verifiable.
+This is an interface recommendation, not a change to the accepted plan. [9,11,15–16,18]
 
-### В7. Что заимствовать и каких решений избегать?
+### В7. What should be borrowed, and what approaches should be avoided?
 
-[предположение] Конкретные предложения и их компромиссы собраны в разделе «Рекомендация»:
-по восемь полезных приёмов и нежелательных образцов, со ссылками на строки Т1 и первоисточники.
+[assumption] Specific proposals and their tradeoffs are collected in the “Recommendation” section:
+eight useful techniques and eight undesirable patterns, with references to Т1 rows and primary sources.
 
-## Сравнительные таблицы
+## Comparison tables
 
-### Т1. Основная таблица
+### Т1. Main table
 
-Обозначения: `?` — не установлено по изученным материалам, а не «нет»; `н/п` — неприменимо.
-Каждая строка наследует пометку и источники в первом столбце. Для README используется `[код]`:
-это сведения из репозитория, они не означают выполненную проверку в почтовом ящике.
-Даты коммитов и звёзды получены из GitHub API 2026-10-24; указана вершина основной ветки,
-не время `pushed_at` и не дата последнего релиза. У закрытых сервисов дата обновления документа
-**не** заменяет неизвестную дату релиза. Метаданные и короткие SHA приведены после таблицы. [37]
+Notation: `?` means “not established in the reviewed materials,” not “no”; `n/a` means not applicable.
+Each row inherits the label and sources in its first column. `[code]` is used for README claims:
+these are repository information and do not mean a mailbox check was performed.
+Commit dates and stars were obtained from the GitHub API on 2026-10-24; the main branch tip is shown,
+not `pushed_at` or the latest release date. For closed services, the document update date
+does **not** replace an unknown release date. Metadata and short SHAs follow the table. [37]
 
-| Проект | Ссылка | Язык | Протоколы (IMAP/SMTP/EWS/Graph/Gmail API/…) | Вход (пароль/OAuth/…) | Несколько ящиков | Вложения | Поиск (сервер/локальный индекс/векторы) | Режим только чтения / отправка | Защита данных | Лицензия | Последний релиз или коммит | Звёзды (≈) |
+| Project | Link | Language | Protocols (IMAP/SMTP/EWS/Graph/Gmail API/…) | Sign-in (password/OAuth/…) | Multiple mailboxes | Attachments | Search (server/local index/vectors) | Read-only mode / sending | Data protection | License | Latest release or commit | Stars (≈) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| P01 Microsoft Mail MCP [док] [3–4] | [Microsoft](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-mail-tools) | ? закрытый | Graph | OAuth/Entra | Идентичность пользователя; список соединений ? | Поиск по вложениям; выдача файлов ? | Серверный Graph Search/KQL | Создание/отправка/удаление; отдельный read-only ? | Права M365; фильтр содержимого ? | Условия Microsoft, не OSS | ?; справочник 2026-09-30, legacy | н/п |
-| P02 Microsoft Work IQ MCP [док] [4–6] | [Microsoft](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/work-iq/mcp/overview) | ? закрытый | Пути Graph/Work IQ | OAuth/Entra | По идентичности; конфигурация смешанных ящиков ? | Общий `fetch_blob`; почтовые типы ? | Облачный поиск/получение контекста | Изменения запрещены политикой по умолчанию | Политики по пути/методу; PII-фильтр ответа ? | Условия Microsoft | ?; обзор 2026-10-13 | н/п |
-| P03 Google Gmail MCP [док] [7–8] | [Google](https://developers.google.com/workspace/gmail/api/reference/mcp) | ? закрытый | Gmail MCP/API | OAuth 2.0 | По OAuth-пользователю; список аккаунтов ? | Отдельный download в наборе не указан | Серверный поиск цепочек | Чтение, черновики, метки; send в списке нет | Права Google; проверка внедрения инструкций возложена на интеграцию | Условия Google | ?; Developer Preview | н/п |
-| P04 Softeria/ms-365-mcp-server [код] [9] | [GitHub](https://github.com/Softeria/ms-365-mcp-server) | TypeScript | Graph | OAuth/MSAL, готовый токен | Да; `account`, общие ящики | Base64/blob/файл, MIME | Серверный | `--read-only`; отправка есть | Шифрованный кэш токенов, очистка логов | MIT | 2026-10-24 | 1075 |
-| P05 ryaker/outlook-mcp [код] [10] | [GitHub](https://github.com/ryaker/outlook-mcp) | JavaScript | Graph | OAuth 2.0 | Один документирован; несколько ? | Почтовые файлы ? | Серверный | Read/send/mark/move; read-only ? | OAuth; PII/инструкции ? | ? API не определил | 2026-03-30 | 447 |
-| P06 azizmazrou/ews-mcp, линия 4.5 в `v5/` [код] [11,23–26] | [GitHub](https://github.com/azizmazrou/ews-mcp) | Python | EWS/exchangelib | Пароль, auto-negotiation; принудительный auth опционален | Один набор реквизитов/процесс | Метаданные/UTF-8/файл | FTS5; pgvector опционально | По умолчанию draft; send выключен | Уровни, адресаты, подтверждение, аудит | MIT | 2026-07-12 | 36 |
-| P07 ShermanGu/exchange-ews-mcp [код] [12] | [GitHub](https://github.com/ShermanGu/exchange-ews-mcp) | Python | EWS/NTLM | Пароль | Текущий пользователь; список ? | При создании/редактировании черновиков | EWS; локальный индекс ? | Сначала черновик; строгий read-only ? | Windows Credential Manager; уточнение адресатов | MIT | 2026-08-21 | 8 |
-| P08 GongRzhe/Gmail-MCP-Server [код] [13,37] | [GitHub](https://github.com/GongRzhe/Gmail-MCP-Server) | JavaScript; есть TS-файлы | Gmail API | OAuth 2.0 | Один набор файлов; несколько ? | Скачивание/отправка | Серверный Gmail | Прямая отправка, удаление, пакетные изменения; read-only ? | Локальные OAuth-файлы; фильтр ответа ? | MIT | 2025-08-06; **архивирован** | 1169 |
-| P09 taylorwilsdon/google_workspace_mcp [код] [14] | [GitHub](https://github.com/taylorwilsdon/google_workspace_mcp) | Python | Gmail API, другие Workspace API | OAuth; служебные аккаунты опционально | Да, несколько пользователей | Файлы/ссылки; GCS опционально | Серверный Gmail | `--read-only`, уровни инструментов; send есть | Ограничения путей, прав и идентичности | MIT | 2026-10-24 | 3407 |
-| P10 codefuturist/email-mcp [код] [15,35–36] | [GitHub](https://github.com/codefuturist/email-mcp) | TypeScript | IMAP/SMTP | Пароль; OAuth2 экспериментальный | Да, TOML | Base64/диск/кэш | Локальный FTS5, IMAP | `MCP_EMAIL_READ_ONLY=false` по умолчанию; send есть | Каталоги, аудит, ссылки на секреты | LGPL-3.0 по API | 2026-10-16 | 136 |
-| P11 RushB-fr/mcp_email [код] [16] | [GitHub](https://github.com/RushB-fr/mcp_email) | TypeScript | IMAP/SMTP | Почтовый пароль; MCP OAuth/Bearer | Да, собственные и общие | Отдельный инструмент ? | IMAP; локальный индекс ? | Send и mark доступны; read-only ? | AES-256-GCM для реквизитов, права организаций | PolyForm Shield 1.0.0; source-available | 2026-08-27 | 2 |
-| P12 ni-c/imap-mcp [код] [17,27–30,42] | [GitHub](https://github.com/ni-c/imap-mcp) | TypeScript | IMAP | Пароль приложения/пароль; OAuth нет | Один аккаунт/процесс | Файл/ресурс/извлечённый текст | Серверный IMAP | Write-tools off; **исключение служебного флага**, В4; send нет | Недоверенный текст, изоляция парсера, лимиты | MIT | 2026-10-22 | 3 |
-| P13 Tillman32/mcp-email [код] [18] | [GitHub](https://github.com/Tillman32/mcp-email) | Go | IMAP/SMTP | Пароль приложения/пароль | Да, env `ACCOUNT_N_*` | Отправка файлов/URL; входящие байты ? | FTS5 заявлен; детали синхронизации ? | Send и операции с черновиками; read-only ? | Лимиты отправляемых файлов; фильтр ответа ? | MIT в README; API не определил | 2026-09-14 | 1 |
-| P14 DreamC0der-AI/proton-mail-mcp [код] [19,33–34] | [GitHub](https://github.com/DreamC0der-AI/proton-mail-mcp) | Python | IMAP/SMTP через Bridge | Реквизиты Bridge | Один аккаунт | Скачивание на диск | Локальный FTS5 + IMAP | Send/reply/move/mark/delete; общего флага чтения не найдено | Очистка имени; фильтр секретов ? | MIT в README; API не определил | 2026-03-09 | 4 |
-| P15 JonLaliberte/mail-semantic-search [код] [20,31–32,40] | [GitHub](https://github.com/JonLaliberte/mail-semantic-search) | Python | Локальные `.eml`/MailMate | Почтовый вход не нужен | Разные аккаунты в архиве | Извлечение текста/копии файлов | SQLite + ChromaDB/локальные векторы | Поиск; на macOS есть изменения состояния писем | Лимиты извлечения; фильтр секретов ? | MIT | 2026-10-04 | 2 |
-| P16 marshalltech81/protonmail-local-ai [код] [21,41] | [GitHub](https://github.com/marshalltech81/protonmail-local-ai) | Python | Bridge IMAP → mbsync/Maildir | Реквизиты Bridge; Bearer MCP | Несколько логинов ? | Текст вложений в индексе | FTS5 + sqlite-vec/RRF | MCP только чтение | Права файлов, закрепление TLS-сертификата; выбор внешних моделей | MIT | 2026-10-24 | 1 |
-| P17 zayansalman/gmail-attachments-mcp [код] [22] | [GitHub](https://github.com/zayansalman/gmail-attachments-mcp) | Python | Gmail API | OAuth 2.0 | Один OAuth-набор/процесс | Только скачивание файлов | Серверный Gmail | `gmail.readonly`; send нет | Токен 0600; PII/инструкции ? | MIT | 2026-06-09 | 3 |
+| P01 Microsoft Mail MCP [docs] [3–4] | [Microsoft](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-mail-tools) | ? closed | Graph | OAuth/Entra | User identity; connection list ? | Attachment search; file return ? | Server-side Graph Search/KQL | Create/send/delete; separate read-only mode ? | M365 permissions; content filter ? | Microsoft terms, not OSS | ?; reference 2026-09-30, legacy | n/a |
+| P02 Microsoft Work IQ MCP [docs] [4–6] | [Microsoft](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/work-iq/mcp/overview) | ? closed | Graph/Work IQ paths | OAuth/Entra | By identity; mixed mailbox configuration ? | Generic `fetch_blob`; mail types ? | Cloud search/context retrieval | Changes prohibited by default policy | Path/method policies; response PII filter ? | Microsoft terms | ?; overview 2026-10-13 | n/a |
+| P03 Google Gmail MCP [docs] [7–8] | [Google](https://developers.google.com/workspace/gmail/api/reference/mcp) | ? closed | Gmail MCP/API | OAuth 2.0 | By OAuth user; account list ? | No separate download tool listed | Server-side thread search | Read, drafts, labels; send not listed | Google permissions; instruction-injection checks delegated to integration | Google terms | ?; Developer Preview | n/a |
+| P04 Softeria/ms-365-mcp-server [code] [9] | [GitHub](https://github.com/Softeria/ms-365-mcp-server) | TypeScript | Graph | OAuth/MSAL, ready token | Yes; `account`, shared mailboxes | Base64/blob/file, MIME | Server-side | `--read-only`; sending available | Encrypted token cache, log sanitization | MIT | 2026-10-24 | 1075 |
+| P05 ryaker/outlook-mcp [code] [10] | [GitHub](https://github.com/ryaker/outlook-mcp) | JavaScript | Graph | OAuth 2.0 | One documented; multiple ? | Mail files ? | Server-side | Read/send/mark/move; read-only ? | OAuth; PII/instructions ? | ? API did not determine | 2026-03-30 | 447 |
+| P06 azizmazrou/ews-mcp, 4.5 line in `v5/` [code] [11,23–26] | [GitHub](https://github.com/azizmazrou/ews-mcp) | Python | EWS/exchangelib | Password, auto-negotiation; forced auth optional | One credential set/process | Metadata/UTF-8/file | FTS5; optional pgvector | Draft by default; send disabled | Tiers, recipients, confirmation, audit | MIT | 2026-07-12 | 36 |
+| P07 ShermanGu/exchange-ews-mcp [code] [12] | [GitHub](https://github.com/ShermanGu/exchange-ews-mcp) | Python | EWS/NTLM | Password | Current user; list ? | When creating/editing drafts | EWS; local index ? | Draft first; strict read-only ? | Windows Credential Manager; recipient clarification | MIT | 2026-08-21 | 8 |
+| P08 GongRzhe/Gmail-MCP-Server [code] [13,37] | [GitHub](https://github.com/GongRzhe/Gmail-MCP-Server) | JavaScript; TS files present | Gmail API | OAuth 2.0 | One file set; multiple ? | Download/send | Server-side Gmail | Direct send, delete, batch changes; read-only ? | Local OAuth files; response filter ? | MIT | 2025-08-06; **archived** | 1169 |
+| P09 taylorwilsdon/google_workspace_mcp [code] [14] | [GitHub](https://github.com/taylorwilsdon/google_workspace_mcp) | Python | Gmail API, other Workspace APIs | OAuth; service accounts optional | Yes, multiple users | Files/links; optional GCS | Server-side Gmail | `--read-only`, tool tiers; send available | Path, permission, and identity restrictions | MIT | 2026-10-24 | 3407 |
+| P10 codefuturist/email-mcp [code] [15,35–36] | [GitHub](https://github.com/codefuturist/email-mcp) | TypeScript | IMAP/SMTP | Password; experimental OAuth2 | Yes, TOML | Base64/disk/cache | Local FTS5, IMAP | `MCP_EMAIL_READ_ONLY=false` by default; send available | Directories, audit, secret references | LGPL-3.0 per API | 2026-10-16 | 136 |
+| P11 RushB-fr/mcp_email [code] [16] | [GitHub](https://github.com/RushB-fr/mcp_email) | TypeScript | IMAP/SMTP | Mail password; MCP OAuth/Bearer | Yes, personal and shared | Separate tool ? | IMAP; local index ? | Send and mark available; read-only ? | AES-256-GCM credentials, organization permissions | PolyForm Shield 1.0.0; source-available | 2026-08-27 | 2 |
+| P12 ni-c/imap-mcp [code] [17,27–30,42] | [GitHub](https://github.com/ni-c/imap-mcp) | TypeScript | IMAP | App password/password; no OAuth | One account/process | File/resource/extracted text | Server-side IMAP | Write tools off; **service-flag exception**, В4; no send | Untrusted text, parser isolation, limits | MIT | 2026-10-22 | 3 |
+| P13 Tillman32/mcp-email [code] [18] | [GitHub](https://github.com/Tillman32/mcp-email) | Go | IMAP/SMTP | App password/password | Yes, env `ACCOUNT_N_*` | Send files/URLs; incoming bytes ? | FTS5 claimed; sync details ? | Send and draft operations; read-only ? | Outgoing file limits; response filter ? | MIT in README; API did not determine | 2026-09-14 | 1 |
+| P14 DreamC0der-AI/proton-mail-mcp [code] [19,33–34] | [GitHub](https://github.com/DreamC0der-AI/proton-mail-mcp) | Python | IMAP/SMTP through Bridge | Bridge credentials | One account | Download to disk | Local FTS5 + IMAP | Send/reply/move/mark/delete; no general read-only flag found | Name sanitization; secret filter ? | MIT in README; API did not determine | 2026-03-09 | 4 |
+| P15 JonLaliberte/mail-semantic-search [code] [20,31–32,40] | [GitHub](https://github.com/JonLaliberte/mail-semantic-search) | Python | Local `.eml`/MailMate | No mail sign-in needed | Multiple accounts in archive | Text extraction/file copies | SQLite + ChromaDB/local vectors | Search; on macOS, can change message state | Extraction limits; secret filter ? | MIT | 2026-10-04 | 2 |
+| P16 marshalltech81/protonmail-local-ai [code] [21,41] | [GitHub](https://github.com/marshalltech81/protonmail-local-ai) | Python | Bridge IMAP → mbsync/Maildir | Bridge credentials; MCP Bearer | Multiple logins ? | Attachment text indexed | FTS5 + sqlite-vec/RRF | MCP read-only | File permissions, TLS certificate pinning; external model selection | MIT | 2026-10-24 | 1 |
+| P17 zayansalman/gmail-attachments-mcp [code] [22] | [GitHub](https://github.com/zayansalman/gmail-attachments-mcp) | Python | Gmail API | OAuth 2.0 | One OAuth set/process | File downloads only | Server-side Gmail | `gmail.readonly`; no send | Token 0600; PII/instructions ? | MIT | 2026-06-09 | 3 |
 
-[код] Снимок основных веток для воспроизводимости чтения: P04 `991aa5c`; P05 `95d6ff2`;
+[code] Main-branch snapshot for reproducible review: P04 `991aa5c`; P05 `95d6ff2`;
 P06 `d34f69f`; P07 `859b275`; P08 `a890d19`; P09 `7573911`; P10 `7d31cd5`;
 P11 `415e062`; P12 `255a23c`; P13 `de79bb1`; P14 `f8f540d`; P15 `9d642f7`;
-P16 `1cf5859`; P17 `2f54ec5`. В P06 имя каталога `v5` не означает релиз 5.x:
-корневой README называет эту линию 4.5, а `src/` — старой линией 4.0. [11,37]
+P16 `1cf5859`; P17 `2f54ec5`. In P06, the directory name `v5` does not mean a 5.x release:
+the root README calls this line 4.5, while `src/` is the older 4.0 line. [11,37]
 
-### Т2. Инструменты четырёх наиболее полезных для сравнения проектов
+### Т2. Tools in the four projects most useful for comparison
 
-[код] Имена сверены с определениями, а не только с каталогом. Для P06 приведены все почтовые
-и эксплуатационные инструменты; календарь, люди и задачи исключены согласно брифу.
-У P12 перечислен максимальный набор; доступный набор зависит от конфигурации.
-У P14 и P15 таблица полная, включая изменения файлов и состояния писем. [23,27–28,32,34,38–39]
+[code] Names were checked against definitions, not only the catalog. For P06, all mail
+and operational tools are listed; calendar, people, and tasks are excluded per the brief.
+P12 lists the maximum set; the available set depends on configuration.
+For P14 and P15, the table is complete, including file and message-state changes. [23,27–28,32,34,38–39]
 
-| Проект | Инструмент → назначение |
+| Project | Tool → purpose |
 |---|---|
-| P06 [23] | `list_folders` → дерево папок |
-| P06 [23] | `search_messages` → карточки по фильтрам/запросу; опционально гибридный поиск |
-| P06 [23] | `get_message` → письмо в кратком или полном формате |
-| P06 [23] | `get_thread` → цепочка по одному письму с продолжением истории |
-| P06 [23] | `get_attachment` → сведения, UTF-8-текст либо сохранение вложения |
-| P06 [23] | `get_mailbox_overview` → сводка ящика; включает также ближайшие события |
-| P06 [23] | `find_similar` → похожие письма; только при включённых векторах |
-| P06 [38] | `create_draft` → новый черновик/ответ/пересылка |
-| P06 [38] | `update_draft` → изменить черновик |
-| P06 [38] | `delete_draft` → убрать черновик в корзину |
-| P06 [38] | `update_messages` → изменить свойства выбранных писем |
-| P06 [38] | `move_messages` → переместить выбранные письма |
-| P06 [38] | `send_draft` → отправить подтверждённый черновик |
-| P06 [38] | `delete_messages` → удалить выбранные письма |
-| P06 [38] | `set_oof` → изменить автоответ; вне нашего MVP |
-| P06 [11] | `get_server_status` → соединение, режим и состояние локального зеркала |
-| P12 [27] | `get_server_info` → возможности, лимиты и флаги |
-| P12 [27] | `list_mailboxes` → папки и счётчики |
-| P12 [27] | `list_messages` → список/поиск с фильтрами |
-| P12 [27] | `list_new_messages` → ещё не выданные письма, затем служебная отметка; см. В4 |
-| P12 [27] | `get_message` → тело, заголовки и оценка подозрительного содержимого |
-| P12 [27] | `get_attachments` → список, чтение, извлечение либо сохранение части |
-| P12 [17,28] | `set_message_flags` → обратимые флаги, без установки `\Deleted` |
-| P12 [17,28] | `move_messages` → перемещение либо копирование |
-| P12 [17,28] | `delete_messages` → удаление с подтверждением |
-| P12 [17,28] | `manage_mailbox` → создать/переименовать/удалить папку |
-| P12 [17,28] | `save_draft` → сохранить черновик без отправки |
-| P14 [34] | `list_mailboxes` → папки |
-| P14 [34] | `list_emails` → список из базы, иначе IMAP |
-| P14 [34] | `read_email` → полное письмо с ленивым кэшированием тела |
-| P14 [34] | `search_emails` → FTS5 в синхронизированной папке, иначе IMAP |
-| P14 [34] | `send_email` → отправка через SMTP |
-| P14 [34] | `reply_email` → ответ с заголовками цепочки |
-| P14 [34] | `move_email` → перемещение между папками |
-| P14 [34] | `mark_email` → прочитанность/флаг |
-| P14 [34] | `delete_email` → перемещение в корзину |
-| P14 [34] | `download_attachment` → сохранить вложение |
-| P14 [34] | `list_downloads` → список ранее скачанных файлов |
-| P14 [34] | `sync_emails` → синхронизировать заголовки |
-| P14 [34] | `sync_status` → состояние синхронизации папок |
-| P14 [34] | `local_search` → непосредственный FTS5-запрос |
-| P15 [32] | `search_emails` → векторный поиск с метаданными |
-| P15 [32] | `query_emails` → точные фильтры без векторного ранжирования |
-| P15 [32] | `get_status` → доступность и конфигурация индекса |
-| P15 [32] | `list_inbox_emails` → входящие, опционально по аккаунту |
-| P15 [32] | `stage_email_attachments` → копии вложений и `.eml` в доступный клиенту каталог |
-| P15 [32] | `clear_staged_emails` → удалить созданные временные копии |
-| P15 [32] | `open_email` → открыть письмо в MailMate; только macOS |
-| P15 [32] | `mark_email_read` → отметить прочитанным; только macOS |
-| P15 [32] | `archive_email` → архивировать; только macOS |
-| P15 [32] | `mark_read_and_archive` → отметить и архивировать; только macOS |
+| P06 [23] | `list_folders` → folder tree |
+| P06 [23] | `search_messages` → cards by filters/query; optional hybrid search |
+| P06 [23] | `get_message` → message in brief or full format |
+| P06 [23] | `get_thread` → thread for a message with history continuation |
+| P06 [23] | `get_attachment` → metadata, UTF-8 text, or save attachment |
+| P06 [23] | `get_mailbox_overview` → mailbox summary; also includes upcoming events |
+| P06 [23] | `find_similar` → similar messages; only when vectors are enabled |
+| P06 [38] | `create_draft` → create draft/reply/forward |
+| P06 [38] | `update_draft` → update draft |
+| P06 [38] | `delete_draft` → move draft to trash |
+| P06 [38] | `update_messages` → change properties of selected messages |
+| P06 [38] | `move_messages` → move selected messages |
+| P06 [38] | `send_draft` → send confirmed draft |
+| P06 [38] | `delete_messages` → delete selected messages |
+| P06 [38] | `set_oof` → change automatic reply; outside our MVP |
+| P06 [11] | `get_server_status` → connection, mode, and local mirror state |
+| P12 [27] | `get_server_info` → capabilities, limits, and flags |
+| P12 [27] | `list_mailboxes` → folders and counts |
+| P12 [27] | `list_messages` → list/search with filters |
+| P12 [27] | `list_new_messages` → messages not yet returned, then service flag; see В4 |
+| P12 [27] | `get_message` → body, headers, and suspicious-content assessment |
+| P12 [27] | `get_attachments` → list, read, extract, or save a part |
+| P12 [17,28] | `set_message_flags` → reversible flags, without setting `\Deleted` |
+| P12 [17,28] | `move_messages` → move or copy |
+| P12 [17,28] | `delete_messages` → delete with confirmation |
+| P12 [17,28] | `manage_mailbox` → create/rename/delete folder |
+| P12 [17,28] | `save_draft` → save draft without sending |
+| P14 [34] | `list_mailboxes` → folders |
+| P14 [34] | `list_emails` → list from database, otherwise IMAP |
+| P14 [34] | `read_email` → full message with lazy body caching |
+| P14 [34] | `search_emails` → FTS5 in synced folder, otherwise IMAP |
+| P14 [34] | `send_email` → send via SMTP |
+| P14 [34] | `reply_email` → reply with thread headers |
+| P14 [34] | `move_email` → move between folders |
+| P14 [34] | `mark_email` → read state/flag |
+| P14 [34] | `delete_email` → move to trash |
+| P14 [34] | `download_attachment` → save attachment |
+| P14 [34] | `list_downloads` → list previously downloaded files |
+| P14 [34] | `sync_emails` → sync headers |
+| P14 [34] | `sync_status` → folder synchronization state |
+| P14 [34] | `local_search` → direct FTS5 query |
+| P15 [32] | `search_emails` → vector search with metadata |
+| P15 [32] | `query_emails` → exact filters without vector ranking |
+| P15 [32] | `get_status` → index availability and configuration |
+| P15 [32] | `list_inbox_emails` → inbox, optionally by account |
+| P15 [32] | `stage_email_attachments` → copy attachments and `.eml` to client-accessible directory |
+| P15 [32] | `clear_staged_emails` → delete created temporary copies |
+| P15 [32] | `open_email` → open message in MailMate; macOS only |
+| P15 [32] | `mark_email_read` → mark as read; macOS only |
+| P15 [32] | `archive_email` → archive; macOS only |
+| P15 [32] | `mark_read_and_archive` → mark read and archive; macOS only |
 
-## Рекомендация
+## Recommendation
 
-[предположение] Использовать P06 как пример EWS-зеркала, P10 — корректной идентификации IMAP,
-P12 — ограничений выдачи и разбора, P15/P16 — поиска по вложениям. Это рекомендация изучить
-конкретные приёмы, а не переносить код или выбирать зависимости; решение остаётся за пользователем.
+[assumption] Use P06 as an example of an EWS mirror, P10 for correct IMAP identification,
+P12 for output and parsing limits, and P15/P16 for attachment search. This recommends studying
+specific techniques, not copying code or choosing dependencies; the decision remains with the user.
 
-| № | Что стоит заимствовать | Проект и основание | Компромисс для нашего сервера |
+| No. | What to borrow | Project and evidence | Tradeoff for our server |
 |---|---|---|---|
-| 1 | Состояние синхронизации на диске, источник ответа и время актуальности | P06 [23–25] | Отдельно показывать устаревание и возможность свежего запроса |
-| 2 | Составной ключ IMAP и сверку удалений | P10 [35–36] | Больше состояния, зато UID не перепутается после пересоздания папки |
-| 3 | Карточки поиска отдельно от полных тел и файлов | P06/P12 [23,27] | Дополнительный вызов чтения уменьшает размер обычных ответов |
-| 4 | Разные пределы ответа, диска, извлечения; продолжение текста | P12 [17,27,29] | Требует явного отчёта об усечении и ошибках разбора |
-| 5 | Проверку сигнатуры, каталог назначения, создание без перезаписи, изоляцию парсера | P12 [17,27] | Больше отказов для редких форматов; нужен понятный запасной путь |
-| 6 | Отдельный поиск по метаданным наряду с семантическим | P15 [32] | Точный список писем не должен зависеть от близости векторов |
-| 7 | Метки недоверенного текста и отдельный контроль записи | P12/P06 [30,39] | Не заменяют фильтр секретов и ограничения других инструментов агента |
-| 8 | Состояния извлечения и возможность повторного разбора вложений | P15/P16 [20,40–41] | Индекс должен знать версию извлечения и неполное покрытие |
+| 1 | On-disk sync state, response source, and freshness time | P06 [23–25] | Show staleness and the option to request fresh data separately |
+| 2 | Composite IMAP key and deletion reconciliation | P10 [35–36] | More state, but UIDs will not be confused after a folder is recreated |
+| 3 | Search cards separate from full bodies and files | P06/P12 [23,27] | An extra read call reduces the size of ordinary responses |
+| 4 | Separate response, disk, and extraction limits; text continuation | P12 [17,27,29] | Requires explicit reporting of truncation and parse errors |
+| 5 | Signature checks, destination directory, create without overwrite, parser isolation | P12 [17,27] | More refusals for rare formats; needs a clear fallback path |
+| 6 | Separate metadata search alongside semantic search | P15 [32] | Exact message lists must not depend on vector similarity |
+| 7 | Untrusted-text labels and separate write controls | P12/P06 [30,39] | Do not replace secret filtering or limits on other agent tools |
+| 8 | Extraction states and ability to reparse attachments | P15/P16 [20,40–41] | The index must know extraction version and incomplete coverage |
 
-| № | Чего избегать | Конкретный пример | Почему и что делать вместо этого |
+| No. | What to avoid | Concrete example | Why and what to do instead |
 |---|---|---|---|
-| 1 | Называть режим строгим read-only при служебной записи | P12 `list_new_messages` [27,42] | Учёт уже выданных писем вести локально, не IMAP-флагом |
-| 2 | Считать флаг запретом всех изменений среды | P10 mailbox-only guard; P15 операции macOS [15,32] | Проверять каждую операцию, включая файлы, буфер обмена и ресурсы |
-| 3 | Считать двухшаговый токен доказательством человеческого согласия | P06 протокол preview/token [39] | Модель тоже способна выполнить оба вызова; человеческое разрешение требует отдельной доверенной границы |
-| 4 | Выдавать бинарные данные в обычном поисковом ответе | P04/P10 base64, P02 blob [6,9,15] | Предпочитать путь/ресурс и отдельную явную загрузку |
-| 5 | Считать синхронизированные заголовки полным индексом | P14 ленивые тела [33–34] | Отмечать покрытие, не обещать поиск по ещё не загруженному тексту |
-| 6 | Вкладывать весь документ в один ограниченный вектор письма | P15 общий текст [20,40] | Для длинных вложений нужны самостоятельные фрагменты и ссылки на оригинал |
-| 7 | Сохранять файл только под исходным именем | P06 `attachments/<safe-name>` [23] | Добавлять ключ письма/вложения, проверять путь и запрещать перезапись |
-| 8 | Принимать слово «локальный» за отсутствие внешней передачи | P16 настраиваемый embedder [21,41] | Учитывать отдельно эмбеддинги, повторное ранжирование, внутреннюю модель и модель MCP-клиента |
+| 1 | Calling a mode strict read-only when it performs a service write | P12 `list_new_messages` [27,42] | Track already-returned messages locally, not with an IMAP flag |
+| 2 | Treating a flag as a ban on all environment changes | P10 mailbox-only guard; P15 macOS operations [15,32] | Check every operation, including files, clipboard, and resources |
+| 3 | Treating a two-step token as proof of human consent | P06 preview/token protocol [39] | A model can make both calls; human approval requires a separate trusted boundary |
+| 4 | Returning binary data in an ordinary search response | P04/P10 base64, P02 blob [6,9,15] | Prefer a path/resource and separate explicit download |
+| 5 | Treating synced headers as a complete index | P14 lazy bodies [33–34] | Mark coverage; do not promise search over text not yet fetched |
+| 6 | Embedding an entire document in one limited message vector | P15 combined text [20,40] | Long attachments need independent chunks and links to the original |
+| 7 | Saving a file only under its original name | P06 `attachments/<safe-name>` [23] | Add message/attachment key, validate the path, and prohibit overwrites |
+| 8 | Assuming “local” means no external transfer | P16 configurable embedder [21,41] | Account separately for embeddings, reranking, internal model, and MCP client model |
 
-## Что не удалось проверить
+## What could not be verified
 
-- [предположение] Не проверялись реальные почтовые операции, скорость, совместимость с нашим Exchange 2013, Gmail и Mail.ru: задача запрещает установку и вход. Позже пользователь может проверить выбранные сценарии на тестовых данных и с минимальными правами.
-- [код] Все `?` Т1 относятся к конкретному непроверенному полю: закрытый язык/релиз, многопользовательская модель, режим чтения, выдача вложений либо фильтр. Для P05 не установлена лицензия; для P13/P14 MIT заявлена README, но GitHub API её не распознал. Это не юридическая проверка условий копирования. [10,18–19,37]
-- [код] README/API — снимок основной ветки, не аудит выпускаемого пакета. Фактические инструменты P04/P09/P10 не пересчитывались через `tools/list`; расхождения P02/P03/P14 перечислены в В1/В5. [4–9,14–15,19,34]
-- [код] Глубина проверки неодинакова: определения инструментов прочитаны у P06/P12/P14/P15; схема и синхронизация дополнительно у P10. P13 оставлен как подтверждённое README направление, без утверждения о корректности его индекса. [18,23–36]
-- [код] После получения метаданных дополнительные запросы GitHub API стали возвращать ограничение анонимных запросов. Дополнительная проверка дерева P13/P16 не состоялась; P16 дополнительно прочитан через публичный `docs/architecture.md`. Полученные до ограничения даты и звёзды не экстраполировались. [37,41]
-- [предположение] Наличие защитного текста/регулярного выражения не измеряет устойчивость модели к внедрению инструкций. Для проверки нужен отдельный набор вредоносных писем, вложений и сценариев с другими инструментами агента; статистические заявления README здесь не принимались как наши результаты.
-- [док] Не выяснены все доступные пути вложений/страниц Work IQ и изменения набора Gmail Preview без входа. Проверять по актуальному справочнику, политике арендатора и `tools/list`, а не переносить старые имена. [4–8]
-- [код] Для воспроизводимости поиска использованы запросы: `mcp server email IMAP EWS local search`, `gmail mcp server attachment read only`, `Microsoft official Outlook mail MCP server`, `MCP EWS exchangelib`, `email mcp local FTS5`, `email mcp ChromaDB`, `imap-mcp`, `microsoft-365-mcp-server`. Порог 15 выполнен; полнота всего рынка не заявляется. [1–22]
+- [assumption] Real mail operations, speed, and compatibility with our Exchange 2013, Gmail, and Mail.ru were not checked: the task prohibited installation and sign-in. The user can later check selected scenarios using test data and minimal permissions.
+- [code] Every `?` in Т1 refers to a specific unchecked field: closed-source language/release, multi-user model, read-only mode, attachment return, or filter. P05's license was not established; P13/P14 claim MIT in the README, but the GitHub API did not recognize it. This is not a legal review of copying terms. [10,18–19,37]
+- [code] README/API is a snapshot of the main branch, not an audit of the released package. Actual tools for P04/P09/P10 were not recounted through `tools/list`; P02/P03/P14 discrepancies are listed in В1/В5. [4–9,14–15,19,34]
+- [code] Review depth varied: tool definitions were read for P06/P12/P14/P15; schema and synchronization were also reviewed for P10. P13 is included as a direction claimed by its README, without asserting that its index is correct. [18,23–36]
+- [code] After metadata was retrieved, further GitHub API requests began returning anonymous-request rate limits. Additional tree checks for P13/P16 were not completed; P16 was also reviewed through its public `docs/architecture.md`. Dates and stars obtained before the limit were not extrapolated. [37,41]
+- [assumption] The presence of defensive text/regex does not measure model resilience to instruction injection. Testing would require a separate set of malicious emails, attachments, and scenarios involving other agent tools; README statistical claims were not accepted as our results.
+- [docs] All available Work IQ attachment/page paths and changes to the Gmail Preview tool set were not established without signing in. Check the current reference, tenant policy, and `tools/list`; do not carry over old names. [4–8]
+- [code] The following queries were used for reproducible search: `mcp server email IMAP EWS local search`, `gmail mcp server attachment read only`, `Microsoft official Outlook mail MCP server`, `MCP EWS exchangelib`, `email mcp local FTS5`, `email mcp ChromaDB`, `imap-mcp`, `microsoft-365-mcp-server`. The threshold of 15 was met; completeness of the entire market is not claimed. [1–22]
 
-## Что ещё стоит изучить
+## Further topics to study
 
-- [предположение] Проверку EWS/NTLM и схем операций оставить RT-02/RT-03, способы входа IMAP — RT-04; обзор проектов их не заменяет.
-- [предположение] Русскую морфологию, фрагменты вложений и качество моделей P15/P16 изучать в RT-06/RT-07; англоязычная модель P15 не подтверждает качество на русской почте. [20]
-- [предположение] Обход очистки через оригинальные файлы и MCP-ресурсы связать с RT-08/RT-09/RT-10.
-- [код] P01/P02/P04–P07/P09/P10 также охватывают календарь, контакты, задачи либо другие приложения; их функции не исследовались. [3–6,9–12,14–15]
+- [assumption] Leave EWS/NTLM and operation schemas to RT-02/RT-03, and IMAP sign-in methods to RT-04; this project survey does not replace them.
+- [assumption] Study Russian morphology, attachment chunks, and model quality for P15/P16 in RT-06/RT-07; P15's English-language model does not establish quality on Russian mail. [20]
+- [assumption] Relate bypasses through original files and MCP resources to RT-08/RT-09/RT-10.
+- [code] P01/P02/P04–P07/P09/P10 also cover calendars, contacts, tasks, or other applications; those features were not reviewed. [3–6,9–12,14–15]
 
-## Источники
+## Sources
 
-Все ссылки ниже прочитаны 2026-10-24. Для файлов репозиториев дата публикации не обозначена;
-даты последних коммитов и снимки веток приведены в Т1. Ссылки на `main` изменяемы: для
-повторной проверки можно заменить `main` соответствующим SHA из снимка после Т1.
+All links below were read on 2026-10-24. Repository files have no stated publication date;
+latest commit dates and branch snapshots are given in Т1. Links to `main` can change; for
+rechecking, replace `main` with the corresponding SHA from the snapshot after Т1.
 
-1. [Официальный реестр MCP](https://registry.modelcontextprotocol.io/) — отправная точка поиска; прочитано 2026-10-24.
-2. [modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers) — каталог и ссылки на реестр; прочитано 2026-10-24.
-3. [Microsoft Mail reference](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-mail-tools) — обновлено 2026-09-30; прочитано 2026-10-24.
-4. [Microsoft: варианты MCP в Agent 365](https://learn.microsoft.com/en-us/microsoft-agent-365/tooling-servers-overview) — обновлено 2026-10-13; прочитано 2026-10-24.
-5. [Work IQ MCP overview](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/work-iq/mcp/overview) — обновлено 2026-10-13; прочитано 2026-10-24.
-6. [Work IQ MCP tool reference](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/work-iq/mcp/tool-reference) — политика изменений, `fetch`, `fetch_blob`; прочитано 2026-10-24.
-7. [Google: Configure the Gmail MCP server](https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server) — Developer Preview, OAuth, безопасность; прочитано 2026-10-24.
-8. [Google: Gmail MCP reference](https://developers.google.com/workspace/gmail/api/reference/mcp) — опубликованный набор инструментов; прочитано 2026-10-24.
-9. [Softeria README](https://github.com/Softeria/ms-365-mcp-server/blob/main/README.md) — аккаунты, ограничения, режимы, токены; прочитано 2026-10-24.
-10. [ryaker README](https://github.com/ryaker/outlook-mcp/blob/main/README.md) — инструменты и OAuth; прочитано 2026-10-24.
-11. azizmazrou: [корневой README](https://github.com/azizmazrou/ews-mcp/blob/main/README.md), [линия 4.5](https://github.com/azizmazrou/ews-mcp/blob/main/v5/README.md) — прочитано 2026-10-24.
-12. [ShermanGu README](https://github.com/ShermanGu/exchange-ews-mcp/blob/main/README.md) — EWS/NTLM, черновики, Windows Credential Manager; прочитано 2026-10-24.
-13. [GongRzhe README](https://github.com/GongRzhe/Gmail-MCP-Server/blob/main/README.md) — инструменты, вложения, OAuth-файлы; прочитано 2026-10-24.
-14. [Google Workspace MCP README](https://github.com/taylorwilsdon/google_workspace_mcp/blob/main/README.md) — режимы, аккаунты, ограничения файлов; прочитано 2026-10-24.
-15. [codefuturist README](https://github.com/codefuturist/email-mcp/blob/main/README.md) — аккаунты, режим чтения, кэш, секреты; прочитано 2026-10-24.
-16. [RushB-fr README](https://github.com/RushB-fr/mcp_email/blob/main/README.md) — шесть инструментов, организации, шифрование, лицензия; прочитано 2026-10-24.
-17. [ni-c README](https://github.com/ni-c/imap-mcp/blob/main/README.md) — режимы, вложения, лимиты, недоверенный текст; прочитано 2026-10-24.
-18. [Tillman32 README](https://github.com/Tillman32/mcp-email/blob/main/README.md) — заявленный FTS5, несколько аккаунтов, вложения; прочитано 2026-10-24.
-19. [DreamC0der-AI README](https://github.com/DreamC0der-AI/proton-mail-mcp/blob/main/README.md) — локальная база и Bridge; прочитано 2026-10-24.
-20. [JonLaliberte README](https://github.com/JonLaliberte/mail-semantic-search/blob/main/README.md) — локальные модели, индексирование, обслуживание; прочитано 2026-10-24.
-21. [marshalltech81 README](https://github.com/marshalltech81/protonmail-local-ai/blob/main/README.md) — текущие режимы моделей и передача текста; прочитано 2026-10-24. Текущий `INFERENCE_MODE=none` отличается от старого поискового фрагмента с `anthropic` по умолчанию; использован текущий файл.
-22. [zayansalman README](https://github.com/zayansalman/gmail-attachments-mcp/blob/main/README.md) — три инструмента и read-only OAuth; прочитано 2026-10-24.
-23. [EWS: tools/mail_read.py](https://github.com/azizmazrou/ews-mcp/blob/main/v5/ewsmcp/tools/mail_read.py) — определения, страницы, сохранение вложений; прочитано 2026-10-24.
-24. [EWS: cache/store.py](https://github.com/azizmazrou/ews-mcp/blob/main/v5/ewsmcp/cache/store.py) — SQLite/FTS5; прочитано 2026-10-24.
-25. [EWS: cache/sync.py](https://github.com/azizmazrou/ews-mcp/blob/main/v5/ewsmcp/cache/sync.py) — состояния изменений, поля индекса и векторы; прочитано 2026-10-24.
-26. [EWS: config.py](https://github.com/azizmazrou/ews-mcp/blob/main/v5/ewsmcp/config.py) — значения по умолчанию; прочитано 2026-10-24.
-27. [ni-c: tools/read.ts](https://github.com/ni-c/imap-mcp/blob/main/src/tools/read.ts) — определения и обработчики чтения; прочитано 2026-10-24.
-28. [ni-c: server.ts](https://github.com/ni-c/imap-mcp/blob/main/src/server.ts) — условная регистрация записи; прочитано 2026-10-24.
-29. [ni-c: result.ts](https://github.com/ni-c/imap-mcp/blob/main/src/result.ts) — предел ответа и оформление недоверенного текста; прочитано 2026-10-24.
-30. [ni-c: SECURITY.md](https://github.com/ni-c/imap-mcp/blob/main/SECURITY.md) — модель доверия и ограничения защиты; прочитано 2026-10-24.
-31. [JonLaliberte: attachment_extractor.py](https://github.com/JonLaliberte/mail-semantic-search/blob/main/mail_semantic_search/attachment_extractor.py) — форматы и предел 10 MiB; прочитано 2026-10-24.
-32. [JonLaliberte: mcp_server.py](https://github.com/JonLaliberte/mail-semantic-search/blob/main/mail_semantic_search/mcp_server.py) — полный набор инструментов; прочитано 2026-10-24.
-33. [DreamC0der-AI: db.py](https://github.com/DreamC0der-AI/proton-mail-mcp/blob/main/db.py) — FTS5, синхронизация и ленивые тела; прочитано 2026-10-24.
-34. [DreamC0der-AI: server.py](https://github.com/DreamC0der-AI/proton-mail-mcp/blob/main/server.py) — 14 инструментов, предел тела, файлы; прочитано 2026-10-24.
-35. [codefuturist: cache/schema.ts](https://github.com/codefuturist/email-mcp/blob/main/src/cache/schema.ts) — ключи сообщений и поля FTS5; прочитано 2026-10-24.
-36. [codefuturist: cache/sync-engine.ts](https://github.com/codefuturist/email-mcp/blob/main/src/cache/sync-engine.ts) — UIDVALIDITY, CONDSTORE, ограничения QRESYNC; прочитано 2026-10-24.
-37. GitHub REST API, метаданные и вершины веток — прочитано 2026-10-24; для каждого репозитория также выполнен `GET /repos/{owner}/{repo}/commits?per_page=1`:
-    - [P04 Softeria](https://api.github.com/repos/Softeria/ms-365-mcp-server), [коммит](https://github.com/Softeria/ms-365-mcp-server/commit/991aa5c63726470019d6c7a01ba03bc8c7cbf678).
-    - [P05 ryaker](https://api.github.com/repos/ryaker/outlook-mcp), [коммит](https://github.com/ryaker/outlook-mcp/commit/95d6ff2d248903c086f17782c2de28e16016e6aa).
-    - [P06 azizmazrou](https://api.github.com/repos/azizmazrou/ews-mcp), [коммит](https://github.com/azizmazrou/ews-mcp/commit/d34f69f148c9e67f8324f84add0f803c516fecf6).
-    - [P07 ShermanGu](https://api.github.com/repos/ShermanGu/exchange-ews-mcp), [коммит](https://github.com/ShermanGu/exchange-ews-mcp/commit/859b275db83184c9125ae50551c8d0fe89ad1c39).
-    - [P08 GongRzhe](https://api.github.com/repos/GongRzhe/Gmail-MCP-Server), [коммит](https://github.com/GongRzhe/Gmail-MCP-Server/commit/a890d19189bbc1325b8728fab830fc278cfd8804).
-    - [P09 taylorwilsdon](https://api.github.com/repos/taylorwilsdon/google_workspace_mcp), [коммит](https://github.com/taylorwilsdon/google_workspace_mcp/commit/75739112ceced23d8c8514216a774c6313de9685).
-    - [P10 codefuturist](https://api.github.com/repos/codefuturist/email-mcp), [коммит](https://github.com/codefuturist/email-mcp/commit/7d31cd5eac8788bd69237c18e3ee1e1fe2816ab7).
-    - [P11 RushB-fr](https://api.github.com/repos/RushB-fr/mcp_email), [коммит](https://github.com/RushB-fr/mcp_email/commit/415e062f39649f658703a98345662135cb8f5260).
-    - [P12 ni-c](https://api.github.com/repos/ni-c/imap-mcp), [коммит](https://github.com/ni-c/imap-mcp/commit/255a23c65c6e62eb41b5846b38015b2951e3ed7e).
-    - [P13 Tillman32](https://api.github.com/repos/Tillman32/mcp-email), [коммит](https://github.com/Tillman32/mcp-email/commit/de79bb1521cd7783985c9a3fc664d1fba1043427).
-    - [P14 DreamC0der-AI](https://api.github.com/repos/DreamC0der-AI/proton-mail-mcp), [коммит](https://github.com/DreamC0der-AI/proton-mail-mcp/commit/f8f540da9bc416ad668a1a80f2a1d2516290c711).
-    - [P15 JonLaliberte](https://api.github.com/repos/JonLaliberte/mail-semantic-search), [коммит](https://github.com/JonLaliberte/mail-semantic-search/commit/9d642f7cf8b52b20f66b2277fd0c156c4966ad36).
-    - [P16 marshalltech81](https://api.github.com/repos/marshalltech81/protonmail-local-ai), [коммит](https://github.com/marshalltech81/protonmail-local-ai/commit/1cf5859c0693331bd330985cd81505599ce9b21a).
-    - [P17 zayansalman](https://api.github.com/repos/zayansalman/gmail-attachments-mcp), [коммит](https://github.com/zayansalman/gmail-attachments-mcp/commit/2f54ec5677fd04d351fe2796c56be058ebabad8a).
-38. [EWS: tools/writes.py](https://github.com/azizmazrou/ews-mcp/blob/main/v5/ewsmcp/tools/writes.py) — имена инструментов записи; прочитано 2026-10-24.
-39. [EWS: tools/base.py](https://github.com/azizmazrou/ews-mcp/blob/main/v5/ewsmcp/tools/base.py) — диспетчер, уровни и подтверждение содержимого; прочитано 2026-10-24.
-40. [JonLaliberte: index.py](https://github.com/JonLaliberte/mail-semantic-search/blob/main/mail_semantic_search/index.py) — объединение текста вложений и дедупликация; прочитано 2026-10-24.
-41. [marshalltech81: docs/architecture.md](https://github.com/marshalltech81/protonmail-local-ai/blob/main/docs/architecture.md) — синхронизация, таблицы и поисковые проходы; прочитано 2026-10-24.
-42. [ni-c: config.ts](https://github.com/ni-c/imap-mcp/blob/main/src/config.ts) — read-only и служебный keyword по умолчанию; прочитано 2026-10-24.
+1. [Official MCP Registry](https://registry.modelcontextprotocol.io/) — starting point for the search; read 2026-10-24.
+2. [modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers) — catalog and links to the registry; read 2026-10-24.
+3. [Microsoft Mail reference](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-mail-tools) — updated 2026-09-30; read 2026-10-24.
+4. [Microsoft: MCP options in Agent 365](https://learn.microsoft.com/en-us/microsoft-agent-365/tooling-servers-overview) — updated 2026-10-13; read 2026-10-24.
+5. [Work IQ MCP overview](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/work-iq/mcp/overview) — updated 2026-10-13; read 2026-10-24.
+6. [Work IQ MCP tool reference](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/work-iq/mcp/tool-reference) — change policy, `fetch`, `fetch_blob`; read 2026-10-24.
+7. [Google: Configure the Gmail MCP server](https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server) — Developer Preview, OAuth, security; read 2026-10-24.
+8. [Google: Gmail MCP reference](https://developers.google.com/workspace/gmail/api/reference/mcp) — published tool set; read 2026-10-24.
+9. [Softeria README](https://github.com/Softeria/ms-365-mcp-server/blob/main/README.md) — accounts, limits, modes, tokens; read 2026-10-24.
+10. [ryaker README](https://github.com/ryaker/outlook-mcp/blob/main/README.md) — tools and OAuth; read 2026-10-24.
+11. azizmazrou: [root README](https://github.com/azizmazrou/ews-mcp/blob/main/README.md), [4.5 line](https://github.com/azizmazrou/ews-mcp/blob/main/v5/README.md) — read 2026-10-24.
+12. [ShermanGu README](https://github.com/ShermanGu/exchange-ews-mcp/blob/main/README.md) — EWS/NTLM, drafts, Windows Credential Manager; read 2026-10-24.
+13. [GongRzhe README](https://github.com/GongRzhe/Gmail-MCP-Server/blob/main/README.md) — tools, attachments, OAuth files; read 2026-10-24.
+14. [Google Workspace MCP README](https://github.com/taylorwilsdon/google_workspace_mcp/blob/main/README.md) — modes, accounts, file limits; read 2026-10-24.
+15. [codefuturist README](https://github.com/codefuturist/email-mcp/blob/main/README.md) — accounts, read mode, cache, secrets; read 2026-10-24.
+16. [RushB-fr README](https://github.com/RushB-fr/mcp_email/blob/main/README.md) — six tools, organizations, encryption, license; read 2026-10-24.
+17. [ni-c README](https://github.com/ni-c/imap-mcp/blob/main/README.md) — modes, attachments, limits, untrusted text; read 2026-10-24.
+18. [Tillman32 README](https://github.com/Tillman32/mcp-email/blob/main/README.md) — claimed FTS5, multiple accounts, attachments; read 2026-10-24.
+19. [DreamC0der-AI README](https://github.com/DreamC0der-AI/proton-mail-mcp/blob/main/README.md) — local database and Bridge; read 2026-10-24.
+20. [JonLaliberte README](https://github.com/JonLaliberte/mail-semantic-search/blob/main/README.md) — local models, indexing, maintenance; read 2026-10-24.
+21. [marshalltech81 README](https://github.com/marshalltech81/protonmail-local-ai/blob/main/README.md) — current model modes and text transfer; read 2026-10-24. Current `INFERENCE_MODE=none` differs from an older search snippet with `anthropic` as the default; the current file was used.
+22. [zayansalman README](https://github.com/zayansalman/gmail-attachments-mcp/blob/main/README.md) — three tools and read-only OAuth; read 2026-10-24.
+23. [EWS: tools/mail_read.py](https://github.com/azizmazrou/ews-mcp/blob/main/v5/ewsmcp/tools/mail_read.py) — definitions, pagination, attachment saving; read 2026-10-24.
+24. [EWS: cache/store.py](https://github.com/azizmazrou/ews-mcp/blob/main/v5/ewsmcp/cache/store.py) — SQLite/FTS5; read 2026-10-24.
+25. [EWS: cache/sync.py](https://github.com/azizmazrou/ews-mcp/blob/main/v5/ewsmcp/cache/sync.py) — change states, index fields, and vectors; read 2026-10-24.
+26. [EWS: config.py](https://github.com/azizmazrou/ews-mcp/blob/main/v5/ewsmcp/config.py) — default values; read 2026-10-24.
+27. [ni-c: tools/read.ts](https://github.com/ni-c/imap-mcp/blob/main/src/tools/read.ts) — definitions and read handlers; read 2026-10-24.
+28. [ni-c: server.ts](https://github.com/ni-c/imap-mcp/blob/main/src/server.ts) — conditional registration of write tools; read 2026-10-24.
+29. [ni-c: result.ts](https://github.com/ni-c/imap-mcp/blob/main/src/result.ts) — response limit and untrusted-text formatting; read 2026-10-24.
+30. [ni-c: SECURITY.md](https://github.com/ni-c/imap-mcp/blob/main/SECURITY.md) — trust model and protection limitations; read 2026-10-24.
+31. [JonLaliberte: attachment_extractor.py](https://github.com/JonLaliberte/mail-semantic-search/blob/main/mail_semantic_search/attachment_extractor.py) — formats and 10 MiB limit; read 2026-10-24.
+32. [JonLaliberte: mcp_server.py](https://github.com/JonLaliberte/mail-semantic-search/blob/main/mail_semantic_search/mcp_server.py) — complete tool set; read 2026-10-24.
+33. [DreamC0der-AI: db.py](https://github.com/DreamC0der-AI/proton-mail-mcp/blob/main/db.py) — FTS5, synchronization, and lazy bodies; read 2026-10-24.
+34. [DreamC0der-AI: server.py](https://github.com/DreamC0der-AI/proton-mail-mcp/blob/main/server.py) — 14 tools, body limit, files; read 2026-10-24.
+35. [codefuturist: cache/schema.ts](https://github.com/codefuturist/email-mcp/blob/main/src/cache/schema.ts) — message keys and FTS5 fields; read 2026-10-24.
+36. [codefuturist: cache/sync-engine.ts](https://github.com/codefuturist/email-mcp/blob/main/src/cache/sync-engine.ts) — UIDVALIDITY, CONDSTORE, QRESYNC limitations; read 2026-10-24.
+37. GitHub REST API, metadata and branch tips — read 2026-10-24; for each repository, `GET /repos/{owner}/{repo}/commits?per_page=1` was also issued:
+    - [P04 Softeria](https://api.github.com/repos/Softeria/ms-365-mcp-server), [commit](https://github.com/Softeria/ms-365-mcp-server/commit/991aa5c63726470019d6c7a01ba03bc8c7cbf678).
+    - [P05 ryaker](https://api.github.com/repos/ryaker/outlook-mcp), [commit](https://github.com/ryaker/outlook-mcp/commit/95d6ff2d248903c086f17782c2de28e16016e6aa).
+    - [P06 azizmazrou](https://api.github.com/repos/azizmazrou/ews-mcp), [commit](https://github.com/azizmazrou/ews-mcp/commit/d34f69f148c9e67f8324f84add0f803c516fecf6).
+    - [P07 ShermanGu](https://api.github.com/repos/ShermanGu/exchange-ews-mcp), [commit](https://github.com/ShermanGu/exchange-ews-mcp/commit/859b275db83184c9125ae50551c8d0fe89ad1c39).
+    - [P08 GongRzhe](https://api.github.com/repos/GongRzhe/Gmail-MCP-Server), [commit](https://github.com/GongRzhe/Gmail-MCP-Server/commit/a890d19189bbc1325b8728fab830fc278cfd8804).
+    - [P09 taylorwilsdon](https://api.github.com/repos/taylorwilsdon/google_workspace_mcp), [commit](https://github.com/taylorwilsdon/google_workspace_mcp/commit/75739112ceced23d8c8514216a774c6313de9685).
+    - [P10 codefuturist](https://api.github.com/repos/codefuturist/email-mcp), [commit](https://github.com/codefuturist/email-mcp/commit/7d31cd5eac8788bd69237c18e3ee1e1fe2816ab7).
+    - [P11 RushB-fr](https://api.github.com/repos/RushB-fr/mcp_email), [commit](https://github.com/RushB-fr/mcp_email/commit/415e062f39649f658703a98345662135cb8f5260).
+    - [P12 ni-c](https://api.github.com/repos/ni-c/imap-mcp), [commit](https://github.com/ni-c/imap-mcp/commit/255a23c65c6e62eb41b5846b38015b2951e3ed7e).
+    - [P13 Tillman32](https://api.github.com/repos/Tillman32/mcp-email), [commit](https://github.com/Tillman32/mcp-email/commit/de79bb1521cd7783985c9a3fc664d1fba1043427).
+    - [P14 DreamC0der-AI](https://api.github.com/repos/DreamC0der-AI/proton-mail-mcp), [commit](https://github.com/DreamC0der-AI/proton-mail-mcp/commit/f8f540da9bc416ad668a1a80f2a1d2516290c711).
+    - [P15 JonLaliberte](https://api.github.com/repos/JonLaliberte/mail-semantic-search), [commit](https://github.com/JonLaliberte/mail-semantic-search/commit/9d642f7cf8b52b20f66b2277fd0c156c4966ad36).
+    - [P16 marshalltech81](https://api.github.com/repos/marshalltech81/protonmail-local-ai), [commit](https://github.com/marshalltech81/protonmail-local-ai/commit/1cf5859c0693331bd330985cd81505599ce9b21a).
+    - [P17 zayansalman](https://api.github.com/repos/zayansalman/gmail-attachments-mcp), [commit](https://github.com/zayansalman/gmail-attachments-mcp/commit/2f54ec5677fd04d351fe2796c56be058ebabad8a).
+38. [EWS: tools/writes.py](https://github.com/azizmazrou/ews-mcp/blob/main/v5/ewsmcp/tools/writes.py) — write-tool names; read 2026-10-24.
+39. [EWS: tools/base.py](https://github.com/azizmazrou/ews-mcp/blob/main/v5/ewsmcp/tools/base.py) — dispatcher, tiers, and content confirmation; read 2026-10-24.
+40. [JonLaliberte: index.py](https://github.com/JonLaliberte/mail-semantic-search/blob/main/mail_semantic_search/index.py) — combining attachment text and deduplication; read 2026-10-24.
+41. [marshalltech81: docs/architecture.md](https://github.com/marshalltech81/protonmail-local-ai/blob/main/docs/architecture.md) — synchronization, tables, and search passes; read 2026-10-24.
+42. [ni-c: config.ts](https://github.com/ni-c/imap-mcp/blob/main/src/config.ts) — read-only and default service keyword; read 2026-10-24.

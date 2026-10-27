@@ -1,443 +1,272 @@
-# RT-08 — Детекторы секретов и персональных данных
+# RT-08 — Secret and personal-data detectors
 
-- Дата: 2026-10-24
-- Исполнитель: Codex / сессия RT-08
-- Бриф: `docs/research-tasks/RT-08-redaction-detectors.md`
+- Date: 2026-10-24
+- Author: Codex / session RT-08
+- Brief: `docs/research-tasks/RT-08-redaction-detectors.md`
 
-## Кратко
+## Summary
 
-- [код] Gitleaks даёт правила для токенов, ключей и общих присваиваний секретов;
-  detect-secrets — плагины, проверки энтропии и исключения. Это источники правил, а не готовый фильтр писем [1–7].
-- [док] MIT у Gitleaks и Presidio, Apache-2.0 у detect-secrets допускают перенос с соблюдением
-  условий; в отдельных файлах detect-secrets есть дополнительные уведомления MIT [3, 5, 8, 9].
-- [док][код] Presidio разделяет распознавание и замену; английский настроен по умолчанию.
-  Готовые российские паспорт, СНИЛС, ИНН и ОМС в проверенном перечне не найдены [10–13].
-- [предположение] Для почты нужны собственные русские и английские метки и выделение только
-  значения: кавычки, разделитель, граница следующего поля; энтропия не должна отсекать короткие пароли.
-- [док][код] Контрольные суммы доступны для СНИЛС, ИНН, ОГРН/ОГРНИП, карт и ОМС;
-  счёт проверяется вместе с БИК. Они проверяют структуру, а не владельца или факт выдачи [17–23].
-- [предположение] Каталог ниже содержит 34 детектора. Рекомендация для MVP — 15 конкретных
-  правил, перечисленных в разделе «Рекомендация»; остальные включать после оценки ошибок.
-- [предположение] Замена по умолчанию: `[скрыто: пароль; письмо=m-001; дата=2026-03-12]`.
-  Тип и ссылка сохраняют смысл; исходное значение, его длина и последние символы не передаются.
-- [док][предположение] Phileas — существующая Java-библиотека; Commons Validator и
-  libphonenumber подходят для отдельных проверок. Полный готовый набор для русской почты не подтверждён [14–16].
-- [док][предположение] В таблицах нужны связи между ячейками, в сканах — OCR.
-  Отсутствие извлечённого текста нельзя считать отсутствием чувствительных данных [24, 25].
+- [code] Gitleaks provides rules for tokens, keys, and general secret assignments; detect-secrets provides plugins, entropy checks, and exclusions. These are sources of rules, not a ready-made email filter [1–7].
+- [docs] MIT for Gitleaks and Presidio and Apache-2.0 for detect-secrets allow reuse subject to their conditions; individual detect-secrets files contain additional MIT notices [3, 5, 8, 9].
+- [docs][code] Presidio separates recognition and replacement; English is configured by default. No ready-made Russian passport, SNILS, INN, or OMS recognizers were found in the reviewed list [10–13].
+- [assumption] Email requires custom Russian and English labels and extraction of the value only: quotation marks, delimiter, and next-field boundary; entropy must not reject short passwords.
+- [docs][code] Check digits are available for SNILS, INN, OGRN/OGRNIP, cards, and OMS; an account number is checked together with BIC. They validate structure, not the owner or whether the item was issued [17–23].
+- [assumption] The catalog below contains 34 detectors. The MVP recommendation is 15 specific rules listed in the “Recommendation” section; enable the rest after evaluating errors.
+- [assumption] Default replacement: `[redacted: password; message=m-001; date=2026-03-12]`. Type and reference preserve meaning; the original value, its length, and its last characters are not passed through.
+- [docs][assumption] Phileas is an existing Java library; Commons Validator and libphonenumber are suitable for specific checks. A complete ready-made set for Russian email is unconfirmed [14–16].
+- [docs][assumption] Tables require relationships between cells; scanned documents require OCR. The absence of extracted text must not be treated as proof that sensitive data is absent [24, 25].
 
-## Ответы на вопросы
+## Answers to the questions
 
-### В1. Существующие наборы правил, Java и лицензии
+### В1. Existing rule sets, Java, and licenses
 
-**Gitleaks.** [док] Правила описываются в TOML: `[[rules]]`, `id`, `description`,
-`regex`, `secretGroup`, `entropy`, `keywords`; есть ограничения по пути и исключения.
-`secretGroup` задаёт захватываемую группу секрета, для неё же оценивается энтропия [1].
-[код] В `config/gitleaks.toml` проверен тег `v8.30.1`, а не только изменяемая ветка [2].
+**Gitleaks.** [docs] Rules are described in TOML: `[[rules]]`, `id`, `description`, `regex`, `secretGroup`, `entropy`, `keywords`; path restrictions and exclusions are supported. `secretGroup` specifies the captured secret group, and entropy is evaluated for that group [1]. [code] The `v8.30.1` tag was checked in `config/gitleaks.toml`, not only the mutable branch [2].
 
-[код] Полезны семейства `github-pat`, `github-fine-grained-pat`, `gitlab-pat`,
-`aws-access-token`, `generic-api-key`, `jwt`, `private-key` и правила конкретных поставщиков.
-Общее правило требует достаточно длинного значения и энтропии: оно не заменяет поиск
-короткого человеческого пароля по русской метке [2, 6].
-[предположение] Строки подключения следует разбирать отдельно: один шаблон общего API-ключа
-не гарантирует выделения всех полей URI, JDBC или ADO.NET.
+[code] Useful families include `github-pat`, `github-fine-grained-pat`, `gitlab-pat`, `aws-access-token`, `generic-api-key`, `jwt`, `private-key`, and provider-specific rules. The generic rule requires a sufficiently long value and entropy; it does not replace finding a short human password by a Russian label [2, 6]. [assumption] Parse connection strings separately: one generic API-key pattern does not guarantee extraction of every URI, JDBC, or ADO.NET field.
 
-[док] README Gitleaks на дату чтения объявляет функциональность завершённой и дальнейшие
-выпуски ограничивает исправлениями безопасности; на странице выпусков виден `v8.30.1` [1, 26].
-[предположение] Это повод закреплять версию правил и отслеживать изменения форматов токенов,
-а не автоматически импортировать всю конфигурацию репозиторного сканера.
+[docs] As of the access date, the Gitleaks README states that feature development is complete and future releases are limited to security fixes; `v8.30.1` is visible on the releases page [1, 26]. [assumption] This is a reason to pin the rule version and track token-format changes, not to import the entire configuration of a repository scanner automatically.
 
-**detect-secrets.** [док] Python-плагины обнаруживают кандидатов, фильтры уменьшают шум;
-есть `KeywordDetector`, `BasicAuthDetector`, `PrivateKeyDetector`, `JwtTokenDetector`,
-`AWSKeyDetector`, `GitHubTokenDetector`, `GitLabTokenDetector` и другие [4].
-[код] `Base64HighEntropyString` использует порог 4.5, `HexHighEntropyString` — 3.0;
-обычный поиск ориентирован на строки в кавычках, для числовых строк есть поправка [7].
-[код] В словаре `KeywordDetector` есть `password`, `passwd`, `pwd`, `secret`,
-`api_?key` и другие метки, но русских `пароль` и `код подтверждения` не найдено [6].
-[док] Выпуск 1.5.0 опубликован 2024-05-06; исходники `master` могут отличаться от него [27].
+**detect-secrets.** [docs] Python plugins detect candidates and filters reduce noise; available plugins include `KeywordDetector`, `BasicAuthDetector`, `PrivateKeyDetector`, `JwtTokenDetector`, `AWSKeyDetector`, `GitHubTokenDetector`, `GitLabTokenDetector`, and others [4]. [code] `Base64HighEntropyString` uses a threshold of 4.5, `HexHighEntropyString` uses 3.0; ordinary scanning targets quoted strings, with an adjustment for numeric strings [7]. [code] The `KeywordDetector` dictionary includes `password`, `passwd`, `pwd`, `secret`, `api_?key`, and other labels, but no Russian `пароль` or `код подтверждения` [6]. [docs] Release 1.5.0 was published on 2024-05-06; `master` sources may differ from it [27].
 
-[док] У detect-secrets предусмотрена сетевая проверка обнаруженных секретов [4].
-[предположение] Для будущего локального фильтра заимствовать только автономные проверки;
-не проверять найденные учётные данные входом в сервис. В этой сессии инструменты не запускались.
+[docs] detect-secrets provides a network check for discovered secrets [4]. [assumption] For a future local filter, borrow only offline checks; do not test discovered credentials by signing in to a service. No tools were run in this session.
 
-**Presidio.** [док] `EntityRecognizer` — объект Python, который возвращает тип сущности,
-границы и оценку уверенности. `PatternRecognizer` поддерживает шаблоны и списки значений;
-можно добавлять контекст, проверку результата, собственные и внешние распознаватели [10].
-[док] Есть `CREDIT_CARD`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `IBAN_CODE`, `DATE_TIME`,
-`IP_ADDRESS`, а также распознавание имён и мест средствами языковых моделей [11].
-Распознавание имён посредством ML здесь только отмечено, сравнение моделей вне задачи.
+**Presidio.** [docs] `EntityRecognizer` is a Python object that returns an entity type, boundaries, and confidence score. `PatternRecognizer` supports patterns and value lists; context, result validation, and custom or external recognizers can be added [10]. [docs] Entities include `CREDIT_CARD`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `IBAN_CODE`, `DATE_TIME`, and `IP_ADDRESS`, as well as names and locations detected using language models [11]. ML-based name recognition is noted here only; comparing models is outside scope.
 
-[док][код] По умолчанию выбран `en`; для нового языка адаптируют языковой модуль и
-распознаватели, прежде всего слова контекста. Само наличие модели русского языка
-не добавляет контрольные суммы российских документов [12, 13].
-[код] В проверенных `default_recognizers.yaml` и перечне сущностей российских
-паспортов, СНИЛС, ИНН, ОГРН и ОМС не найдено [11, 13].
-[предположение] Русский возможен через настройку и собственные правила, но считать его
-полностью готовым к нашей задаче оснований нет.
+[docs][code] `en` is selected by default; adding a language requires adapting the language module and recognizers, especially context words. The mere availability of a Russian language model does not add check digits for Russian documents [12, 13]. [code] The reviewed `default_recognizers.yaml` and entity list contain no Russian passports, SNILS, INN, OGRN, or OMS [11, 13]. [assumption] Russian is possible with configuration and custom rules, but there is no basis to treat it as fully ready for our task.
 
-**Что доступно в Java.**
+**What is available in Java.**
 
-| Решение | Подтверждённая возможность | Ограничение для этой задачи |
+| Solution | Confirmed capability | Limitation for this task |
 |---|---|---|
-| Phileas | [док] Java-библиотека поиска и замены PII; политики, собственные идентификаторы и валидаторы, включая Luhn [14] | [предположение] Кандидат на изучение интерфейсов; готовые российские правила и совместимость с Java 25 не проверены |
-| Apache Commons Validator | [док] `LuhnCheckDigit`, `CreditCardValidator`, отдельные валидаторы форматов [15] | [предположение] Строительный блок; не выделяет секреты из русского письма |
-| Google libphonenumber | [док] Java, `findNumbers`, `isPossibleNumber`, `isValidNumber`, сведения о длине и префиксах [16] | [предположение] Проверяет телефонный формат, не факт принадлежности человеку |
-| Gitleaks / detect-secrets / Presidio | [код][док] Соответственно Go / Python / Python [1, 4, 10] | [предположение] Перенос идей и правил проще для MVP, чем обязательный дополнительный процесс |
+| Phileas | [docs] Java library for PII detection and replacement; policies, custom identifiers and validators, including Luhn [14] | [assumption] Candidate for interface study; ready-made Russian rules and Java 25 compatibility unverified |
+| Apache Commons Validator | [docs] `LuhnCheckDigit`, `CreditCardValidator`, and separate format validators [15] | [assumption] Building block; does not extract secrets from Russian email |
+| Google libphonenumber | [docs] Java, `findNumbers`, `isPossibleNumber`, `isValidNumber`, length and prefix metadata [16] | [assumption] Checks phone format, not whether it belongs to a person |
+| Gitleaks / detect-secrets / Presidio | [code][docs] Go / Python / Python respectively [1, 4, 10] | [assumption] Reusing ideas and rules is simpler for an MVP than requiring an additional process |
 
-**Условия переноса.** [док] Ниже приведены условия самих лицензий; при переносе нужно
-сохранить уведомления конкретного файла, а не только название проекта [3, 5, 8, 9, 28].
+**Reuse conditions.** [docs] The conditions below come from the licenses themselves; when reusing code, preserve notices for the specific file, not only the project name [3, 5, 8, 9, 28].
 
-| Источник | Лицензия | Практический вывод |
+| Source | License | Practical conclusion |
 |---|---|---|
-| Gitleaks, включая проверенную конфигурацию | [код] MIT [3] | [док] Разрешены изменение и распространение с сохранением copyright и текста разрешения |
-| detect-secrets | [код] Apache-2.0 [5] | [док] Сохранить лицензию, уведомления, отметить изменения; учитывать `NOTICE`, если он есть в переносимом материале |
-| `plugins/keyword.py`, `plugins/private_key.py` | [код] Есть встроенные уведомления MIT об исходном заимствовании [6, 8] | [предположение] При прямом переносе сохранить также эти уведомления |
-| Presidio | [код] MIT [9] | [док] Те же условия сохранения уведомлений, что выше |
-| Phileas | [код][док] Apache-2.0 начиная с 2.2.1; более ранние версии имели другую лицензию [14, 28] | [предположение] Проверять лицензию выбранного тега и дополнительных моделей отдельно |
+| Gitleaks, including reviewed configuration | [code] MIT [3] | [docs] Modification and redistribution permitted if copyright and permission text are retained |
+| detect-secrets | [code] Apache-2.0 [5] | [docs] Retain license and notices, mark changes, and account for `NOTICE` if it is present in reused material |
+| `plugins/keyword.py`, `plugins/private_key.py` | [code] Contain embedded MIT notices for original reuse [6, 8] | [assumption] Preserve these notices too if copying the files directly |
+| Presidio | [code] MIT [9] | [docs] Same notice-retention conditions as above |
+| Phileas | [code][docs] Apache-2.0 starting with 2.2.1; earlier versions had a different license [14, 28] | [assumption] Check the license of the selected tag and any additional models separately |
 
-[предположение] Шаблоны ниже — собственные наброски по идеям источников, не готовый
-дословный перенос. Перед реализацией закрепить версии заимствований и происхождение каждого правила.
+[assumption] The patterns below are original sketches based on source ideas, not ready-made verbatim copies. Before implementation, pin the versions of reused material and record the provenance of each rule.
 
-### В2. Секреты в письмах и границы значения
+### В2. Secrets in email and value boundaries
 
-[предположение] Словарь меток: `пароль`, `временный пароль`, `пароль от Wi-Fi`,
-`логин`, `пин-код`, `код подтверждения`, `одноразовый код`; английские соответствия:
-`password`, `temporary password`, `passwd`, `pwd`, `PIN`, `OTP`, `verification code`.
-Метки доступа: `VPN`, `RDP`, `удалённый доступ`, `remote desktop`.
-Идея поиска присваивания взята из `KeywordDetector`, русские расширения предложены здесь [6].
+[assumption] Label dictionary: `пароль`, `временный пароль`, `пароль от Wi-Fi`, `логин`, `пин-код`, `код подтверждения`, `одноразовый код`; English equivalents: `password`, `temporary password`, `passwd`, `pwd`, `PIN`, `OTP`, `verification code`. Access labels: `VPN`, `RDP`, `удалённый доступ`, `remote desktop`. The assignment-search idea comes from `KeywordDetector`; Russian extensions are proposed here [6].
 
-[предположение] Рекомендуемый порядок выделения:
+[assumption] Recommended extraction order:
 
-1. Находить метку как отдельное слово/поле, без перехода через абзац или ячейку.
-2. После `:` или `=` допускать только горизонтальные пробелы.
-3. Если значение заключено в кавычки, брать до парной кавычки с учётом экранирования.
-4. Без кавычек брать один ограниченный фрагмент до пробела, разделителя или следующей метки.
-5. Пароль с пробелами без кавычек считать неоднозначным: искать границу следующего поля;
-   при её отсутствии скрывать ограниченный фрагмент поля целиком, отмечая неоднозначность.
-6. Заменять диапазон значения, сохраняя `логин:`, `пароль:` и деловой текст вокруг.
+1. Find the label as a separate word/field, without crossing a paragraph or cell.
+2. After `:` or `=`, allow horizontal whitespace only.
+3. If the value is quoted, capture through the matching quote, accounting for escaping.
+4. If unquoted, capture one bounded fragment up to whitespace, a delimiter, or the next label.
+5. An unquoted password containing spaces is ambiguous: look for the next field boundary; if absent, redact the entire bounded field fragment and mark the ambiguity.
+6. Replace only the value range, preserving `логин:`, `пароль:`, and surrounding business text.
 
-[предположение] Набросок для простого случая, отдельными правилами для кавычек и без них:
+[assumption] Sketch for the simple case, with separate rules for quoted and unquoted values:
 
 ```text
 (?iu)(?:пароль|password|passwd|pwd)[ \t]*[:=][ \t]*"(?<value>[^"\r\n]{1,256})"
 (?iu)(?:пароль|password|passwd|pwd)[ \t]*[:=][ \t]*(?<value>[^\s;,"<>]{1,128})
 ```
 
-[предположение] Это не готовые регулярные выражения: добавить левые границы метки,
-остановку перед следующим полем, обработку экранирования и одиночных кавычек.
-Достижение лимита длины означает неопределённую границу, а не разрешение оставить хвост открытым.
-Для такого поля нужен запасной вариант скрытия; нельзя просто обрезать совпадение на 128 символах.
+[assumption] These are not ready-to-use regular expressions: add left boundaries for labels, stop before the next field, handle escaping and single quotes. Reaching the length limit means the boundary is uncertain; it does not authorize leaving the remainder visible. Such a field needs a fallback redaction; do not simply truncate the match at 128 characters.
 
-[предположение] Символ `;` может быть частью пароля. Разделители надёжнее определять
-по грамматике формата: пары полей, кавычки, JSON, XML, URI. Универсального безопасного
-шаблона для произвольного предложения нет; `пароль:.*` поглощает лишний текст.
-В примере `логин: user; пароль: [значение]; срок: 2026-03-12` скрывается только поле пароля;
-`[значение]` здесь обозначает место данных, действительный пароль не приводится.
+[assumption] `;` can be part of a password. Delimiters are more reliably identified from the format grammar: field pairs, quotes, JSON, XML, URI. There is no universally safe pattern for an arbitrary sentence; `пароль:.*` consumes unrelated text. In `логин: user; пароль: [значение]; срок: 2026-03-12`, redact only the password field; `[значение]` is a placeholder, and no actual password is shown.
 
-[док] URI допускает `userinfo`; формат `user:password` в нём устарел, но встречается [29].
-[док] HTTP Basic кодирует пару пользователя и пароля в Base64 [30].
-[предположение] В URI скрывать весь `userinfo`, в Basic — весь закодированный фрагмент;
-декодирование допустимо лишь внутри проверки, декодированное значение в отчёт не выводить.
+[docs] A URI permits `userinfo`; the `user:password` format is deprecated but still occurs [29]. [docs] HTTP Basic encodes the username/password pair in Base64 [30]. [assumption] In a URI, redact all of `userinfo`; in Basic, redact the entire encoded fragment. Decoding is allowed only inside validation; do not show the decoded value in a report.
 
-[док] JWT может представлять JWS или JWE [31].
-[предположение] Ищем три сегмента JWS и отдельно пять сегментов JWE, проверяем
-Base64url/JSON заголовка с лимитами. Подпись не проверяем, истечение срока не исключает
-скрытие: содержимое и старые токены тоже могут быть чувствительными.
-PEM-ключ скрывается целым блоком, а не одной строкой `BEGIN` [8].
+[docs] A JWT can represent JWS or JWE [31]. [assumption] Look for three JWS segments and separately five JWE segments; validate Base64url/header JSON with limits. Do not verify the signature; expiration does not exempt a token from redaction, since its contents and old tokens may still be sensitive. Redact a PEM key as a whole block, not just the `BEGIN` line [8].
 
-### В3. Российские персональные данные: форматы и проверки
+### В3. Russian personal data: formats and checks
 
-[предположение] Общая нормализация: сохранить исходные позиции, убрать только допустимые
-пробелы/дефисы внутри кандидата; запретить извлечение подстроки из более длинного числа.
-Для контрольных сумм использовать ASCII-цифры и целочисленную арифметику.
-Не исправлять OCR `О→0` молча: это отдельный кандидат с пониженной уверенностью.
+[assumption] General normalization: preserve original positions; remove only permitted spaces/hyphens inside a candidate; prohibit extracting a substring from a longer number. Use ASCII digits and integer arithmetic for check digits. Do not silently convert OCR `О→0`: treat it as a separate, lower-confidence candidate.
 
-**Паспорт РФ.** [док] Описание бланка: четыре цифры серии и шесть цифр номера [17].
-[предположение] Искать слитно или группами `2+2+6` рядом с `паспорт`, `серия`, `номер`.
-Проверка контрольной суммы для этой напечатанной комбинации в описании не установлена;
-не подменять её проверкой машинно-считываемой строки документа.
-Жёсткая проверка «год серии равен году выдачи» здесь не предлагается.
+**Russian passport.** [docs] The form description specifies four series digits and six number digits [17]. [assumption] Look for a contiguous value or groups `2+2+6` near `паспорт`, `серия`, `номер`. A check digit for this printed combination is not established in the description; do not substitute validation of the document's machine-readable line. No strict check that “series year equals issue year” is proposed.
 
-**СНИЛС.** [док] Для девяти цифр `d1…d9` вычислить `S = Σ(di × (10−i))`.
-Контрольные две цифры: `(S mod 101) mod 100`, с ведущим нулём.
-Суммы 100 и 101 дают `00`; историческое описание ограничивает проверку номерами
-выше `001-001-998` [18].
-[предположение] Более ранний номер — «контрольная сумма не проверяется», а не автоматический
-пропуск фильтра: при метке СНИЛС его всё равно скрывать.
+**SNILS.** [docs] For nine digits `d1…d9`, calculate `S = Σ(di × (10−i))`. The two check digits are `(S mod 101) mod 100`, with a leading zero. Sums of 100 and 101 produce `00`; the historical description limits validation to numbers above `001-001-998` [18]. [assumption] For earlier numbers, the result is “check digit not validated,” not automatic filter bypass: still redact when labelled SNILS.
 
-**ИНН.** [док] ФНС подтверждает 10 цифр для организации и 12 для физического лица;
-разъяснение 2025-11-07 говорит, что с 2026-01-01 методика контроля не меняется [19].
-[код] В `stdnum/ru/inn.py` проверены следующие веса [20]:
+**INN.** [docs] The Federal Tax Service confirms 10 digits for an organization and 12 for an individual; its 2025-11-07 explanation says the check method does not change as of 2026-01-01 [19]. [code] The following weights were checked in `stdnum/ru/inn.py` [20]:
 
-- ИНН-10: первые 9 цифр × `[2,4,10,3,5,9,4,6,8]`; `(сумма mod 11) mod 10` = цифра 10.
-- ИНН-12: первые 10 × `[7,2,4,10,3,5,9,4,6,8]` дают цифру 11 тем же способом;
-  первые 11 × `[3,7,2,4,10,3,5,9,4,6,8]` дают цифру 12.
+- INN-10: first 9 digits × `[2,4,10,3,5,9,4,6,8]`; `(sum mod 11) mod 10` = digit 10.
+- INN-12: first 10 × `[7,2,4,10,3,5,9,4,6,8]` produce digit 11 by the same method; first 11 × `[3,7,2,4,10,3,5,9,4,6,8]` produce digit 12.
 
-[предположение] ИНН организации полезен в деловой переписке; скрывать его и ОГРН
-отдельной настройкой. Контрольная сумма ИНН-12 сильнее простого подсчёта цифр,
-но технические повторяющиеся значения требуют отдельного рассмотрения.
+[assumption] An organization's INN is useful in business correspondence; make it and OGRN separately configurable for redaction. The INN-12 check is stronger than merely counting digits, but technically repeated values require separate consideration.
 
-**ОГРН / ОГРНИП.** [док] По п. 7 порядка Минфина: 13 / 15 цифр,
-контроль = `(первые 12 mod 11) mod 10` / `(первые 14 mod 13) mod 10`.
-Начальные признаки ОГРН — `1` или `5`, ОГРНИП — `3`; прочие ГРН — другой тип [21].
-[код] В просмотренном `stdnum/ru/ogrn.py` для 15 цифр отсутствует завершающее `mod 10`:
-остатки 10–12 не совпадут с одной контрольной цифрой [32].
-[предположение] Не переносить эту реализацию без исправления; ориентироваться на описание
-формулы в нормативном тексте. Актуальность всей редакции порядка отдельно не установлена.
+**OGRN / OGRNIP.** [docs] Under paragraph 7 of the Ministry of Finance procedure: 13 / 15 digits, check digit = `(first 12 mod 11) mod 10` / `(first 14 mod 13) mod 10`. Initial OGRN indicators are `1` or `5`, OGRNIP is `3`; other GRN numbers are another type [21]. [code] In the reviewed `stdnum/ru/ogrn.py`, the 15-digit case lacks a final `mod 10`: remainders 10–12 cannot match a single check digit [32]. [assumption] Do not reuse this implementation without correction; follow the formula in the regulatory text. The current status of the full procedure edition has not been established separately.
 
-**Карта.** [док] Luhn удваивает каждую вторую цифру справа, начиная с предпоследней;
-для результата больше 9 вычитает 9; сумма всех цифр должна делиться на 10 [15].
-[предположение] Кандидаты 12–19 цифр, с пробелами/дефисами; требовать карточный контекст
-для неоднозначных номеров. Список известных префиксов повышает точность, но может
-пропускать новые диапазоны; сам Luhn не доказывает, что карта существует.
+**Card.** [docs] Luhn doubles every second digit from the right, starting with the penultimate digit; subtract 9 from a result greater than 9; the sum of all digits must be divisible by 10 [15]. [assumption] Candidates are 12–19 digits, with spaces/hyphens; require card context for ambiguous numbers. A known-prefix list improves precision but may miss new ranges; Luhn alone does not prove that a card exists.
 
-**Счёт + БИК.** [док] Для обычного счёта в кредитной организации приписать слева к
-20 цифрам счёта последние 3 цифры БИК, веса по 23 позициям — повтор `7,1,3`.
-Сумма произведений должна делиться на 10. Для счёта в РКЦ используется иной префикс:
-`0` и разряды 5–6 БИК; это отдельная ветвь проверки [22].
-[предположение] Связывать реквизиты в одной записи/строке таблицы; не подбирать произвольный
-БИК из другого письма. Без БИК — контекстное обнаружение без статуса «проверено».
-Для казначейских и иных специальных счетов правила нужно исследовать отдельно.
+**Account + BIC.** [docs] For an ordinary account at a credit institution, prepend the last 3 digits of the BIC to the 20 account digits, then apply repeating weights `7,1,3` across 23 positions. The sum of products must be divisible by 10. An account at an RCC uses a different prefix: `0` and BIC digits 5–6; this is a separate validation branch [22]. [assumption] Link the details within one record/row of a table; do not match an arbitrary BIC from another email. Without a BIC, detect contextually but do not mark “validated.” Treasury and other special accounts need separate research.
 
-**ОМС.** [док] ТФОМС описывает ЕНП как 16 цифр: 15 основных и контрольная;
-Mod10 по ISO/HL7 27931:2009 [23]. Из основных 15 цифр выбрать нечётные позиции
-справа, полученное число удвоить; добавить цифры остальных позиций к подсчёту суммы
-цифр. Контроль = `(10 − сумма mod 10) mod 10`.
-[предположение] Этот подсчёт эквивалентен Луну при правильной чётности позиций;
-обычный «остаток самого номера от 10» ему не соответствует.
-Полис старого образца и временное свидетельство этим правилом не покрываются.
+**OMS.** [docs] The regional TFOMS describes the unified policy number as 16 digits: 15 main digits and one check digit; Mod10 under ISO/HL7 27931:2009 [23]. Select odd-positioned digits among the first 15 from the right and double the resulting number; add the digits of the other positions to the digit sum. Check digit = `(10 − sum mod 10) mod 10`. [assumption] This is equivalent to Luhn with the correct parity; the ordinary “number remainder mod 10” does not match it. This rule does not cover old-form policies or temporary certificates.
 
-**Телефон / дата рождения.** [док] libphonenumber различает возможную длину и допустимые
-региональные префиксы [16]. [предположение] `+7` сам по себе недостаточен для определения
-страны; локальные номера разбирать с заданным регионом и контекстом.
-Дата требует календарной проверки и метки `дата рождения` / `DOB` / `born`;
-не скрывать каждую дату договора или письма. Само совпадение даты с календарём не определяет её смысл.
+**Phone / date of birth.** [docs] libphonenumber distinguishes possible length from valid regional prefixes [16]. [assumption] `+7` alone is insufficient to determine a country; parse local numbers with a specified region and context. A date requires calendar validation and a label such as `дата рождения` / `DOB` / `born`; do not redact every contract or email date. A date being calendar-valid does not establish its meaning.
 
-**Синтетические примеры, рассчитанные вручную.** [предположение] Это придуманные строки,
-не данные из источников; проверка ниже означает только указанное арифметическое свойство.
-Они не объявляются выданными документами. Код детекторов не запускался.
+**Synthetic examples, calculated by hand.** [assumption] These are invented strings, not data from sources; the check below means only the stated arithmetic property. They are not claimed to be issued documents. Detector code was not run.
 
-| Кандидат | Ожидаемая проверка | Отрицательный вариант |
+| Candidate | Expected check | Negative variant |
 |---|---|---|
-| СНИЛС `987-654-320 82` | `S=284`, остаток 82 | Конец `83` — ошибка |
-| ИНН-10 `9900123403` | Сумма 113, контроль 3 | Последняя цифра `4` — ошибка |
-| ИНН-12 `990012340050` | Суммы 137 и 197, контроль `50` | Конец `51` — ошибка |
-| Последовательность `9000000000000001` | Luhn: `9+1=10`; карточная система не подтверждена | Конец `2` — ошибка |
-| ЕНП `7000000000000005` | Удвоение выбранных цифр даёт сумму 5; контроль 5 | Конец `6` — ошибка |
-| Паспорт `99 99 000001` | Только длина и группировка; выдача не подтверждена | `99 99 00001` — не хватает цифры |
-| Дата `2000-02-29` | Допустимая календарная дата, скрытие зависит от метки | `2001-02-29` — недопустимая дата |
+| SNILS `987-654-320 82` | `S=284`, remainder 82 | Ending `83` is invalid |
+| INN-10 `9900123403` | Sum 113, check digit 3 | Last digit `4` is invalid |
+| INN-12 `990012340050` | Sums 137 and 197, check `50` | Ending `51` is invalid |
+| Sequence `9000000000000001` | Luhn: `9+1=10`; card system unconfirmed | Ending `2` is invalid |
+| Unified policy `7000000000000005` | Doubling selected digits gives sum 5; check digit 5 | Ending `6` is invalid |
+| Passport `99 99 000001` | Length and grouping only; issuance unconfirmed | `99 99 00001` is one digit short |
+| Date `2000-02-29` | Valid calendar date; redaction depends on label | `2001-02-29` is invalid |
 
-### В4. Ложные срабатывания
+### В4. False positives
 
-[код] Gitleaks сочетает формат, энтропию и исключения; detect-secrets использует
-эвристические фильтры, а Presidio позволяет усиливать оценку контекстом [1, 4, 7, 10].
-[предположение] Для деловой почты нужны следующие ограничения; риск в каталоге —
-экспертная оценка, численные показатели на почтовом корпусе не измерены.
+[code] Gitleaks combines format, entropy, and exclusions; detect-secrets uses heuristic filters, while Presidio can raise confidence using context [1, 4, 7, 10]. [assumption] Business email requires the following constraints; catalog risk levels are expert estimates, and numerical rates on an email corpus have not been measured.
 
-| Источник ошибки | Что делать | Цена ограничения |
+| Error source | Mitigation | Cost of constraint |
 |---|---|---|
-| Номера заказов, счетов-фактур, накладных | Контрольная сумма + метка документа + границы числового поля | Опечатка в чувствительном номере может не пройти сумму |
-| Версии, даты поставки, суммы, артикулы | Не склеивать цифры через точки/строки; для DOB требовать смысловую метку | Разбитый переносом документ можно пропустить |
-| Хеши сборок, UUID, Base64 вложений | Не использовать одну энтропию; учитывать `sha256`, `checksum`, структуру MIME | Немаркированный секрет без префикса сложнее обнаружить |
-| БИК, ИНН и ОГРН компании в подписи | Настройка по типу сущности; исключения ограничивать конкретным правилом | Снижается объём скрытия корпоративных реквизитов |
-| Инструкция «сменить пароль», «пароль не требуется» | Требовать присваивание/поле; проверять явно пустые значения | Свободная фраза с настоящим секретом сложнее |
-| OTP против номера заявки | Метка подтверждения и ограниченная длина, связь с одним полем | Код без подписи может остаться незамеченным |
+| Order numbers, invoices, delivery notes | Check digit + document label + numeric-field boundaries | A typo in a sensitive number may fail the check digit |
+| Versions, delivery dates, amounts, SKUs | Do not join digits across punctuation/lines; require a semantic label for DOB | A document split by line breaks may be missed |
+| Build hashes, UUIDs, Base64 attachments | Do not rely on entropy alone; account for `sha256`, `checksum`, MIME structure | An unlabelled secret without a prefix is harder to detect |
+| Company BIC, INN, and OGRN in signatures | Configure by entity type; scope exclusions to a specific rule | Less redaction of corporate details |
+| Instruction “change password,” “password not required” | Require assignment/field; validate explicitly empty values | A genuine secret in free text is harder to detect |
+| OTP versus request number | Confirmation label and bounded length; link to one field | An unlabeled code may go unnoticed |
 
-[предположение] Неверная сумма при явной метке `паспорт`, `СНИЛС`, `ИНН` —
-основание скрыть как подозрительное значение с меньшей уверенностью, а не раскрыть его.
-Списки исключений должны описывать конкретные технические значения и тип правила.
-Репозиторные baseline и комментарии `allowlist secret` из письма не считать разрешением
-на выдачу: письмо не является доверенной конфигурацией фильтра.
+[assumption] A failed check digit beside an explicit label `паспорт`, `СНИЛС`, or `ИНН` is a reason to redact it as a suspicious value with lower confidence, not reveal it. Exclusion lists should describe specific technical values and rule types. Repository baselines and `allowlist secret` comments in an email must not be treated as permission to disclose: an email is not trusted filter configuration.
 
-### В5. Стиль замены
+### В5. Replacement style
 
-[док] Gitleaks `--redact` скрывает секрет в диагностике и отчётах, включая частичное
-скрытие по проценту; это не API переписывания произвольного письма [1].
-[код] detect-secrets сохраняет в записи находки хеш значения для сопоставления [33].
-[док] Presidio имеет `replace`, `redact`, `mask`, `hash`, `encrypt`, `custom`;
-стандартный `replace` выдаёт метку типа, например `<PHONE_NUMBER>` [34].
+[docs] Gitleaks `--redact` hides secrets in diagnostics and reports, including partial redaction by percentage; it is not an API for rewriting arbitrary email [1]. [code] detect-secrets stores a hash of the value in a finding record for comparison [33]. [docs] Presidio has `replace`, `redact`, `mask`, `hash`, `encrypt`, and `custom`; its standard `replace` emits a type label, such as `<PHONE_NUMBER>` [34].
 
-| Способ | Полезность для LLM | Ограничение / рекомендация |
+| Method | Usefulness for an LLM | Limitation / recommendation |
 |---|---|---|
-| Фиксированное `[скрыто]` | [предположение] Видно наличие пропуска | Теряется различие пароля и номера документа |
-| Метка типа + ссылка на письмо | [предположение] Сохраняются смысл и происхождение | Рекомендуемый вариант по умолчанию |
-| Одинаковый псевдоним одинаковому значению | [док][предположение] Presidio показывает отображение в `<PERSON_14>`; помогает сопоставлению [35] | Ограничивать область одним ответом/цепочкой; таблицу соответствий не выдавать |
-| Последние цифры / сохранение длины | [предположение] Может помогать человеку | Для секретов раскрывает часть значения; по умолчанию отключить |
-| Хеш | [предположение] Позволяет сравнивать значения | Без типа мало полезен модели; короткие коды перебираются; не рекомендуется наружу |
-| Реалистичная вымышленная замена | [предположение] Текст выглядит естественно | Модель может принять выдуманные реквизиты за фактические |
+| Fixed `[redacted]` | [assumption] Makes an omission visible | Loses distinction between a password and a document number |
+| Type label + email reference | [assumption] Preserves meaning and provenance | Recommended default |
+| Same alias for identical values | [docs][assumption] Presidio shows mapping to `<PERSON_14>`; helps matching [35] | Limit scope to one response/thread; do not expose mapping table |
+| Last digits / preserve length | [assumption] May help a human | Reveals part of a secret; disabled by default |
+| Hash | [assumption] Allows values to be compared | Little model value without type; short codes can be brute-forced; not recommended externally |
+| Realistic fabricated replacement | [assumption] Text looks natural | Model may mistake fabricated details for facts |
 
-[док] В документации Presidio начиная с 2.2.361 `hash` имеет случайную соль по умолчанию;
-для постоянного соответствия соль нужно задавать отдельно [34].
-[предположение] Для нашего простого варианта хеши и глобальные постоянные псевдонимы не нужны.
-Ссылка должна использовать непрозрачный внутренний идентификатор и известную дату,
-без логина, адреса отправителя и части исходного секрета.
+[docs] Presidio documentation states that starting in 2.2.361, `hash` uses a random salt by default; a salt must be specified separately for stable matching [34]. [assumption] Our simple version needs neither hashes nor global persistent aliases. The reference should use an opaque internal ID and known date, without login, sender address, or any portion of the original secret.
 
-### В6. Вложения и границы текстового обнаружения
+### В6. Attachments and limits of text detection
 
-[док] POI различает типы ячеек и форматированное представление (`DataFormatter`),
-формулы и комментарии [24]. [предположение] Заголовок «Пароль» может быть в одной
-ячейке, значение в соседней; сохранять координаты и связь заголовок–значение.
-Скрытые листы, комментарии, гиперссылки и формулы не считать автоматически просмотренными.
-Значения с ведущими нулями и показанные в экспоненциальной форме требуют отдельной обработки;
-утраченную при сохранении файла цифру детектор восстановить не может.
+[docs] POI distinguishes cell types and formatted representation (`DataFormatter`), formulas, and comments [24]. [assumption] A “Password” heading can be in one cell and its value in a neighboring cell; preserve coordinates and heading–value relationship. Do not assume hidden sheets, comments, hyperlinks, and formulas have been inspected automatically. Values with leading zeroes and values displayed in scientific notation require separate handling; a digit lost when saving the file cannot be restored by a detector.
 
-[предположение] Для `.env`, INI, YAML, JSON, XML, конфигураций VPN/RDP учитывать
-кавычки, экранирование, многострочные значения, пары ключ–значение и ссылки `${VAR}`.
-Поиск только в видимом результате формулы или только в первой строке ключа неполон.
-Не выполнять формулы, макросы, команды конфигурации и переходы по URL ради проверки.
+[assumption] For `.env`, INI, YAML, JSON, XML, VPN/RDP configurations, account for quotes, escaping, multiline values, key–value pairs, and `${VAR}` references. Searching only the displayed formula result or only the first line of a key is incomplete. Do not execute formulas, macros, configuration commands, or URL navigation to validate them.
 
-[док] Presidio Image Redactor использует OCR, по умолчанию Tesseract [25].
-[предположение] Обычный текстовый детектор не видит текст внутри картинки, подпись,
-штрихкод/QR, скрытую область изображения и содержимое зашифрованного архива.
-OCR может потерять цифру или спутать символ; неправильная сумма не гарантирует безопасность.
-Отдельно отмечать «текст не извлечён» / «извлечён частично»; очищенный текст
-не означает, что исходный PDF, изображение или таблица также очищены.
+[docs] Presidio Image Redactor uses OCR, with Tesseract by default [25]. [assumption] An ordinary text detector cannot see text inside an image, a signature, barcode/QR code, hidden image region, or encrypted archive contents. OCR can lose a digit or confuse a character; a failed check digit does not guarantee safety. Mark “text not extracted” / “partially extracted” separately; cleaned text does not mean the original PDF, image, or spreadsheet is also cleaned.
 
-## Сравнительные таблицы
+## Comparison tables
 
-### Каталог: 34 детектора
+### Catalog: 34 detectors
 
-[предположение] Это наброски, а не протестированная Java-конфигурация. `K` — метка,
-`V` — ограниченное значение по правилам В2, `N(n)` — ровно n цифр с разрешёнными
-разделителями. Для чисел нужны внешние границы; для меток — регистр и кириллица.
-Для Markdown знак альтернативы записан `\|`; при реализации убрать только экранирование таблицы.
-Слова «низкий/средний/высокий» оценивают риск ложного совпадения после указанной проверки.
-Факты о форматах подтверждены источниками; адаптация к письмам и оценки риска — предложения.
+[assumption] These are sketches, not a tested Java configuration. `K` is a label, `V` is a bounded value under the rules in В2, and `N(n)` is exactly n digits with permitted separators. Numbers need outer boundaries; labels need case and Cyrillic handling. For Markdown, the alternative symbol is written `\|`; remove only the table escaping during implementation. “Low/medium/high” estimates false-positive risk after the stated check. Format facts are source-backed; adaptation to email and risk ratings are proposals.
 
-| Детектор | Что ищет | Шаблон (набросок регулярного выражения) | Проверка (контрольная сумма, контекст) | Риск ложных срабатываний | Источник идеи |
+| Detector | What it finds | Pattern (regex sketch) | Validation (check digit, context) | False-positive risk | Source of idea |
 |---|---|---|---|---|---|
-| D01 Пароль RU/EN | Значение человеческого пароля | `(?:пароль\|password\|passwd\|pwd)[ \t]*[:=][ \t]*V` | Только значение; кавычки и границы В2, без порога энтропии | Средний: инструкции | [код] [6]; [предположение] русский словарь |
-| D02 Временный пароль | Пароль после выдачи доступа | `(?:временный пароль\|temporary password)[ \t]*[:=][ \t]*V` | Не захватывать срок действия | Средний | [предположение], расширение [6] |
-| D03 Wi-Fi | Пароль/PSK сети | `(?:пароль от Wi-?Fi\|Wi-?Fi password\|psk)[ \t]*[:=][ \t]*V` | Связь с сетью; SSID отдельно не считать паролем | Средний | [предположение], принцип [6] |
-| D04 PIN | Пин-код | `(?:пин[- ]?код\|PIN)[ \t]*[:=][ \t]*[0-9]{4,8}` | Метка обязательна; длина настраивается | Средний: артикул | [предположение], принцип [6] |
-| D05 OTP | Код подтверждения | `(?:код подтверждения\|одноразовый код\|OTP\|verification code)[ \t]*[:=]?[ \t]*[0-9]{4,10}` | Одно поле; текст о входе/подтверждении; нет проверки сроком | Средний: номер заявки | [предположение], принцип [6] |
-| D06 Логин–пароль | Пару полей или табличную запись | `(?:логин\|login\|username)...(?:пароль\|password)[:=]V` | Не `.*` через абзацы; локально связать поля и скрыть секрет | Средний | [предположение], [6] |
-| D07 VPN/RDP | Доступ к удалённой системе | `(?:VPN\|RDP\|удалённый доступ)...K[:=]V` | Контекст одного блока + метка пароля/PSK; не любой адрес сервера | Средний | [предположение], [6] |
-| D08 URI userinfo | Учётные данные перед `@` | `[A-Za-z][A-Za-z0-9+.-]*://[^/@\s]+:[^/@\s]+@` | Разбор URI, percent-encoding; заменить весь userinfo | Низкий/средний: учебные URI | [док][код] [29, 36] |
-| D09 HTTP Basic | Закодированную пару | `(?i)Authorization:[ \t]*Basic[ \t]+[A-Za-z0-9+/]+={0,2}` | Корректный Base64 и разделитель пары; скрыть целиком | Низкий | [док] [30] |
-| D10 Bearer | Токен доступа | `(?i)Authorization:[ \t]*Bearer[ \t]+[^\s,;]+` | Заголовок/поле авторизации; не требовать JWT | Низкий/средний | [предположение], общие токены [2] |
-| D11 JWT/JWE | Три/пять сегментов токена | `[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]*){2}`; отдельно `{4}` | Base64url, JSON заголовка, допустимые пустые сегменты; скрыть весь токен | Средний до разбора | [док][код] [31, 37] |
-| D12 PEM private key | Приватный ключ | `-----BEGIN (?:RSA \|EC \|DSA \|ENCRYPTED )?PRIVATE KEY-----` | Парный END того же типа, включая OPENSSH отдельной ветвью; весь блок | Низкий; сертификат не равен ключу | [код] [8] |
-| D13 PGP/PuTTY | Другие контейнеры приватного ключа | `BEGIN PGP PRIVATE KEY BLOCK\|PuTTY-User-Key-File-[23]` | Для PuTTY найти `Private-Lines`; скрыть контейнер целиком | Низкий | [код] [8]; [предположение] версия 3 |
-| D14 GitHub PAT | Токены GitHub | `ghp_[A-Za-z0-9]{36}\|github_pat_[A-Za-z0-9_]{82}` | Границы и длина, остальные семейства отдельными вариантами | Низкий: учебные строки | [код] [38] |
-| D15 GitLab PAT | Токен GitLab | `glpat-[A-Za-z0-9_-]{20}` | Это один известный формат, не полный набор GitLab | Низкий; возможен пропуск новых форматов | [код] [2] |
-| D16 AWS access key ID | Идентификатор AWS-ключа | `(?:AKIA\|ASIA)[A-Z2-7]{16}` | Проверенный префикс; ID не секретная половина, искать соседний secret | Низкий | [код] [39] |
-| D17 AWS secret/session | Секретную половину и токен сессии | `(?:aws_secret_access_key\|aws_session_token)[ \t]*[:=][ \t]*V` | Метка и поле, автономно, без запросов к AWS | Средний | [предположение], [6, 39] |
-| D18 Общий API-ключ | Ключи без устойчивого префикса | `(?:api[_-]?key\|token\|secret)[ \t]*[:=][ \t]*V` | Контекст; энтропия как дополнительный признак, не обязательный отказ | Средний/высокий | [код] [2, 6, 7] |
-| D19 OAuth | Client secret, refresh/access token | `(?:client_secret\|refresh_token\|access_token)[ \t]*[:=][ \t]*V` | Ключ поля; client_id отдельно не считать секретом | Низкий/средний | [предположение], [6] |
-| D20 Строка подключения | Пароль и параметры подключения | `(?:Password\|Pwd)[ \t]*=V`; URI-ветвь D08 | Грамматика JDBC/ADO.NET; несколько секретных полей, кавычки и `;` | Средний | [предположение], [6, 29] |
-| D21 `.env` и конфигурация | Присваивания секретам | `^[ \t]*(?:export[ \t]+)?[A-Z0-9_]*(?:PASSWORD\|TOKEN\|SECRET)[A-Z0-9_]*[ \t]*=V` | Парсер кавычек/продолжений; `${VAR}` — ссылка, не найденное значение | Средний | [предположение], [6] |
-| D22 Паспорт РФ | Серию и номер | `[0-9]{2}[ \t]?[0-9]{2}[ \t]?[0-9]{6}` | Метки паспорта/серии/номера; контрольная сумма не установлена | Высокий без контекста | [док] [17] |
-| D23 СНИЛС | 9 цифр + контроль | `[0-9]{3}[- ]?[0-9]{3}[- ]?[0-9]{3}[ ]?[0-9]{2}` | Алгоритм В3 и историческое исключение | Средний | [док] [18] |
-| D24 ИНН-10 | Реквизит организации | `N(10)` | Веса В3 + `ИНН`; отдельная настройка | Средний: телефон/заказ | [док][код] [19, 20] |
-| D25 ИНН-12 | ИНН физического лица | `N(12)` | Две контрольные цифры В3 | Низкий/средний | [док][код] [19, 20] |
-| D26 ОГРН | Номер организации | `[15][0-9]{12}` | mod 11 затем mod 10; метка ОГРН | Средний: корпоративный реквизит | [док] [21] |
-| D27 ОГРНИП | Номер предпринимателя | `3[0-9]{14}` | mod 13 затем mod 10; метка ОГРНИП | Средний | [док] [21] |
-| D28 Номер карты | Полный PAN | `(?:[0-9][ -]?){11,18}[0-9]` | Luhn, длина, контекст; не выделять кусок длинного номера | Средний: 16 цифр ОМС | [док] [11, 15] |
-| D29 Счёт + БИК | Платёжный счёт | `N(20)` и `N(9)` | Веса 7/1/3 и подходящий БИК одной записи | Средний без связи полей | [док] [22] |
-| D30 БИК | Банковский идентификатор | `(?:БИК\|BIC)[ \t]*[:=]?[ \t]*[0-9]{9}` | Нет предлагаемой собственной суммы; связь с D29 | Высокий без метки; часто публичен | [док] [22]; [предположение] отдельное скрытие |
-| D31 ОМС / ЕНП | Полис единого образца | `N(16)` | Mod10 В3 и метки `ОМС`, `ЕНП`, `полис` | Высокий без метки: совпадает с картой | [док] [23] |
-| D32 Телефон | Международный/российский номер | `(?:\+7\|8)[ ()-]*[0-9]{3}[ ()-]*[0-9]{3}[ -]*[0-9]{2}[ -]*[0-9]{2}` | libphonenumber, регион/контекст; международные отдельно через `findNumbers` | Средний: накладная | [док] [16] |
-| D33 Дата рождения | Дату после метки DOB | `(?:дата рождения\|DOB\|born)[ \t:]+(?:[0-9]{2}\.[0-9]{2}\.[0-9]{4}\|[0-9]{4}-[0-9]{2}-[0-9]{2})` | Календарь и семантика метки; не все даты | Средний | [предположение], подход контекста [10] |
-| D34 Email | Адрес человека/организации | `[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}` | Набросок не покрывает весь синтаксис; заголовки разбирать MIME-парсером | Средний: служебный адрес | [док] [11]; [предположение] профиль скрытия |
+| D01 Password RU/EN | Human password value | `(?:пароль\|password\|passwd\|pwd)[ \t]*[:=][ \t]*V` | Value only; quoting and boundaries from В2, no entropy threshold | Medium: instructions | [code] [6]; [assumption] Russian vocabulary |
+| D02 Temporary password | Password issued for access | `(?:временный пароль\|temporary password)[ \t]*[:=][ \t]*V` | Do not capture validity period | Medium | [assumption], extension of [6] |
+| D03 Wi-Fi | Network password/PSK | `(?:пароль от Wi-?Fi\|Wi-?Fi password\|psk)[ \t]*[:=][ \t]*V` | Link to network; do not treat SSID alone as password | Medium | [assumption], principle [6] |
+| D04 PIN | PIN code | `(?:пин[- ]?код\|PIN)[ \t]*[:=][ \t]*[0-9]{4,8}` | Label required; length configurable | Medium: SKU | [assumption], principle [6] |
+| D05 OTP | Confirmation code | `(?:код подтверждения\|одноразовый код\|OTP\|verification code)[ \t]*[:=]?[ \t]*[0-9]{4,10}` | One field; sign-in/confirmation text; no expiry validation | Medium: request number | [assumption], principle [6] |
+| D06 Login–password | Pair of fields or table record | `(?:логин\|login\|username)...(?:пароль\|password)[:=]V` | No `.*` across paragraphs; link fields locally and redact secret | Medium | [assumption], [6] |
+| D07 VPN/RDP | Remote-system access | `(?:VPN\|RDP\|удалённый доступ)...K[:=]V` | Context of one block + password/PSK label; not any server address | Medium | [assumption], [6] |
+| D08 URI userinfo | Credentials before `@` | `[A-Za-z][A-Za-z0-9+.-]*://[^/@\s]+:[^/@\s]+@` | Parse URI, percent-encoding; replace all userinfo | Low/medium: sample URIs | [docs][code] [29, 36] |
+| D09 HTTP Basic | Encoded pair | `(?i)Authorization:[ \t]*Basic[ \t]+[A-Za-z0-9+/]+={0,2}` | Valid Base64 and pair separator; redact entirely | Low | [docs] [30] |
+| D10 Bearer | Access token | `(?i)Authorization:[ \t]*Bearer[ \t]+[^\s,;]+` | Authorization header/field; do not require JWT | Low/medium | [assumption], general tokens [2] |
+| D11 JWT/JWE | Three/five token segments | `[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]*){2}`; separate `{4}` | Base64url, header JSON, allowed empty segments; redact full token | Medium before parsing | [docs][code] [31, 37] |
+| D12 PEM private key | Private key | `-----BEGIN (?:RSA \|EC \|DSA \|ENCRYPTED )?PRIVATE KEY-----` | Matching END of same type, including OPENSSH as separate branch; whole block | Low; certificate is not a key | [code] [8] |
+| D13 PGP/PuTTY | Other private-key containers | `BEGIN PGP PRIVATE KEY BLOCK\|PuTTY-User-Key-File-[23]` | For PuTTY, find `Private-Lines`; redact whole container | Low | [code] [8]; [assumption] version 3 |
+| D14 GitHub PAT | GitHub tokens | `ghp_[A-Za-z0-9]{36}\|github_pat_[A-Za-z0-9_]{82}` | Boundaries and length; other families as separate variants | Low: sample strings | [code] [38] |
+| D15 GitLab PAT | GitLab token | `glpat-[A-Za-z0-9_-]{20}` | One known format, not the full set of GitLab formats | Low; new formats may be missed | [code] [2] |
+| D16 AWS access key ID | AWS key identifier | `(?:AKIA\|ASIA)[A-Z2-7]{16}` | Known prefix; ID is not the secret half, find adjacent secret | Low | [code] [39] |
+| D17 AWS secret/session | Secret half and session token | `(?:aws_secret_access_key\|aws_session_token)[ \t]*[:=][ \t]*V` | Label and field, offline, no AWS requests | Medium | [assumption], [6, 39] |
+| D18 Generic API key | Keys without stable prefix | `(?:api[_-]?key\|token\|secret)[ \t]*[:=][ \t]*V` | Context; entropy as an additional signal, not a mandatory rejection | Medium/high | [code] [2, 6, 7] |
+| D19 OAuth | Client secret, refresh/access token | `(?:client_secret\|refresh_token\|access_token)[ \t]*[:=][ \t]*V` | Field key; do not treat `client_id` alone as secret | Low/medium | [assumption], [6] |
+| D20 Connection string | Password and connection parameters | `(?:Password\|Pwd)[ \t]*=V`; URI branch D08 | JDBC/ADO.NET grammar; multiple secret fields, quotes, and `;` | Medium | [assumption], [6, 29] |
+| D21 `.env` and configuration | Secret assignments | `^[ \t]*(?:export[ \t]+)?[A-Z0-9_]*(?:PASSWORD\|TOKEN\|SECRET)[A-Z0-9_]*[ \t]*=V` | Quote/continuation parser; `${VAR}` is a reference, not a found value | Medium | [assumption], [6] |
+| D22 Russian passport | Series and number | `[0-9]{2}[ \t]?[0-9]{2}[ \t]?[0-9]{6}` | Passport/series/number labels; check digit not established | High without context | [docs] [17] |
+| D23 SNILS | 9 digits + check digits | `[0-9]{3}[- ]?[0-9]{3}[- ]?[0-9]{3}[ ]?[0-9]{2}` | Algorithm in В3 and historical exception | Medium | [docs] [18] |
+| D24 INN-10 | Organization identifier | `N(10)` | Weights from В3 + `ИНН`; separate setting | Medium: phone/order number | [docs][code] [19, 20] |
+| D25 INN-12 | Individual's INN | `N(12)` | Two check digits in В3 | Low/medium | [docs][code] [19, 20] |
+| D26 OGRN | Organization number | `[15][0-9]{12}` | mod 11 then mod 10; OGRN label | Medium: corporate detail | [docs] [21] |
+| D27 OGRNIP | Individual entrepreneur number | `3[0-9]{14}` | mod 13 then mod 10; OGRNIP label | Medium | [docs] [21] |
+| D28 Card number | Full PAN | `(?:[0-9][ -]?){11,18}[0-9]` | Luhn, length, context; do not extract a piece of a longer number | Medium: 16-digit OMS | [docs] [11, 15] |
+| D29 Account + BIC | Payment account | `N(20)` and `N(9)` | Weights 7/1/3 and matching BIC in one record | Medium without field linkage | [docs] [22] |
+| D30 BIC | Bank identifier | `(?:БИК\|BIC)[ \t]*[:=]?[ \t]*[0-9]{9}` | No proposed standalone check digit; link to D29 | High without label; often public | [docs] [22]; [assumption] redact separately |
+| D31 OMS / unified policy | Unified-form policy | `N(16)` | Mod10 in В3 and labels `ОМС`, `ЕНП`, `полис` | High without label: overlaps card | [docs] [23] |
+| D32 Phone | International/Russian number | `(?:\+7\|8)[ ()-]*[0-9]{3}[ ()-]*[0-9]{3}[ -]*[0-9]{2}[ -]*[0-9]{2}` | libphonenumber, region/context; international separately via `findNumbers` | Medium: delivery note | [docs] [16] |
+| D33 Date of birth | Date following DOB label | `(?:дата рождения\|DOB\|born)[ \t:]+(?:[0-9]{2}\.[0-9]{2}\.[0-9]{4}\|[0-9]{4}-[0-9]{2}-[0-9]{2})` | Calendar and label semantics; not every date | Medium | [assumption], context approach [10] |
+| D34 Email | Person/organization address | `[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}` | Sketch does not cover all syntax; parse headers with MIME parser | Medium: service address | [docs] [11]; [assumption] redaction profile |
 
-## Рекомендация
+## Recommendation
 
-[предположение] Для MVP рекомендую ровно 15 детекторов: **D01, D03, D05, D08, D09,
-D10, D11, D12, D14, D18, D20, D22, D23, D25, D28**.
-Они покрывают человеческие пароли, одноразовые коды, распространённые машинные секреты
-и основные персональные идентификаторы; все допускают автономную реализацию.
-D01 применять и к метке пароля внутри блока VPN/RDP, D18 — к структурированным полям.
+[assumption] For the MVP, I recommend exactly 15 detectors: **D01, D03, D05, D08, D09, D10, D11, D12, D14, D18, D20, D22, D23, D25, D28**. They cover human passwords, one-time codes, common machine secrets, and major personal identifiers; all can be implemented offline. Apply D01 to password labels inside VPN/RDP blocks too, and D18 to structured fields.
 
-[предположение] PIN, отдельные форматы провайдеров, ОМС и банковские счета добавить
-следом после проверки извлечения структуры. Телефоны, email и реквизиты организаций
-вынести в явно настраиваемые категории: их скрытие часто мешает понять деловой запрос.
-Этот выбор уменьшает объём MVP, но оставляет перечисленные категории вне его покрытия.
+[assumption] Add PIN, provider-specific formats, OMS, and bank accounts later, after validating structural extraction. Put phones, email, and organization details in explicitly configurable categories: redacting them often interferes with understanding a business request. This choice reduces the MVP scope but leaves the listed categories outside its coverage.
 
-[предположение] Использовать типизированную полную замену из раздела «Кратко»;
-для совпадающих значений при необходимости выдавать одинаковый номер только в пределах
-одного ответа. Не выводить исходный фрагмент в объяснение срабатывания.
-Сохранять внутренние границы, тип, правило, уверенность и ссылку на источник.
-При пересечениях сначала объединять покрываемые диапазоны, затем заменять справа налево:
-меньшая находка не должна оставлять видимым хвост большей.
+[assumption] Use the typed full replacement from the “Summary” section; if needed, assign the same number to matching values only within one response. Do not include the source fragment in the explanation of a detection. Preserve internal boundaries, type, rule, confidence, and source reference. For overlaps, first merge covered ranges, then replace from right to left: a smaller finding must not leave the tail of a larger one visible.
 
-[предположение] Перед реализацией подготовить синтетический корпус положительных и
-отрицательных примеров: RU/EN, кавычки, переносы, таблицы, ошибочные суммы и OCR,
-пересечения правил, длинные значения. Измерять пропуски и ложные срабатывания по типам;
-не переносить пороги из анализа исходного кода без оценки на письмах.
-Это предложение следующей проверки, а не выполненные испытания.
-Место применения фильтра относительно индекса и хранилища остаётся решением пользователя.
+[assumption] Before implementation, prepare a synthetic corpus of positive and negative examples: RU/EN, quotes, line breaks, tables, invalid check digits and OCR, overlapping rules, and long values. Measure false negatives and false positives by type; do not carry thresholds from source-code analysis over without evaluating on emails. This is a proposed next check, not completed testing. Where the filter belongs relative to the index and storage remains a user decision.
 
-## Что не удалось проверить
+## What could not be verified
 
-- [предположение] Точность и полнота на реальной русской/английской почте: корпуса нет,
-  код не запускался по границам задания. Проверить позднее на синтетических данных,
-  затем пользователю локально на разрешённой выборке без отправки исходных значений.
-- [предположение] Совместимость Phileas и конкретных версий зависимостей с Java 25:
-  нужен отдельный технический эксперимент. README содержит разные номера в примере
-  зависимости и таблице схем; не считать их подтверждением последнего выпуска [14].
-- [предположение] Полная актуальная нормативная цепочка СНИЛС, ОГРН и старых полисов:
-  приведены проверенные алгоритмы из датированных документов; их статус на 2026-10-24
-  не во всех случаях установлен. Перед формальным валидатором перепроверить редакции.
-- [предположение] Обязательные префиксы/внутренняя структура всех ЕНП и старые форматы ОМС:
-  открытый источник подтверждает 16 цифр и контроль, но не все ограничения выдачи [23].
-- [предположение] Даты выпуска Gitleaks `v8.30.1` и Presidio `2.2.364` с полным годом
-  не извлечены надёжно; теги видны в официальных списках выпусков [26, 40].
-  Выводы о правилах относятся к указанному тегу либо состоянию ветки на дату чтения.
-- [предположение] Переносимость каждого выражения Go/Python в Java и устойчивость к
-  долгому перебору не испытывались. Нужна проверка границ, флагов Unicode и лимитов;
-  приведённые наброски не являются готовой конфигурацией.
+- [assumption] Accuracy and recall on real Russian/English email: no corpus is available, and the code was not run under this task's scope. Check later with synthetic data, then locally with the user on an approved sample, without sending original values.
+- [assumption] Compatibility of Phileas and specific dependency versions with Java 25 requires a separate technical experiment. The README gives different numbers in the dependency example and schema table; do not treat either as confirmation of the latest release [14].
+- [assumption] The complete current regulatory chain for SNILS, OGRN, and old policy formats: verified algorithms from dated documents are cited, but their status as of 2026-10-24 was not established in every case. Check current editions before implementing a formal validator.
+- [assumption] Required prefixes/internal structure of all unified policies and old OMS formats: an open source confirms 16 digits and a check digit, but not every issuance restriction [23].
+- [assumption] Exact release years for Gitleaks `v8.30.1` and Presidio `2.2.364` were not reliably retrieved; tags are visible in official release lists [26, 40]. Rule conclusions refer to the stated tag or branch state on the access date.
+- [assumption] Portability of each Go/Python expression to Java and resistance to pathological backtracking were not tested. Check boundaries, Unicode flags, and limits; the sketches are not a ready configuration.
 
-## Что ещё стоит изучить
+## What else to investigate
 
-- [предположение] Безопасная выдача исходных файлов и очищенных копий — отдельный вопрос
-  из `docs/plan.md`, раздел 5.4; обнаружение в тексте его не решает.
-- [предположение] Очистка QR/штрихкодов, изображений и метаданных документов — отдельное
-  исследование после выбора извлечения текста.
-- [док] Gitleaks указывает преемника Betterleaks; здесь его правила не сравнивались [1].
+- [assumption] Safe delivery of original files and cleaned copies is a separate issue in `docs/plan.md`, section 5.4; text detection does not solve it.
+- [assumption] Redaction of QR/barcodes, images, and document metadata is a separate study after choosing text extraction.
+- [docs] Gitleaks identifies Betterleaks as its successor; its rules were not compared here [1].
 
-## Источники
+## Sources
 
-Все URL ниже прочитаны **2026-10-24**. Для изменяемых страниц без указанной даты публикации
-зафиксирована дата чтения; это не дата выпуска. Нормативные тексты в справочных системах
-помечены как воспроизведение первичного документа, а не комментарий его редактора.
+All URLs below were read on **2026-10-24**. For mutable pages without a stated publication date, the access date is recorded; it is not the release date. Regulatory texts in reference systems are marked as reproductions of primary documents, not commentary by their editors.
 
-1. Gitleaks README: формат TOML, исключения, диагностика, статус проекта — <https://raw.githubusercontent.com/gitleaks/gitleaks/master/README.md> (прочитано 2026-10-24; ветка master, дата публикации не указана).
-2. Gitleaks `config/gitleaks.toml`, тег v8.30.1 — <https://raw.githubusercontent.com/gitleaks/gitleaks/v8.30.1/config/gitleaks.toml> (прочитано 2026-10-24; закреплённый тег).
-3. Gitleaks MIT LICENSE — <https://raw.githubusercontent.com/gitleaks/gitleaks/master/LICENSE> (прочитано 2026-10-24; уведомление copyright 2019).
-4. Yelp detect-secrets README: плагины, фильтры, сетевая проверка — <https://raw.githubusercontent.com/Yelp/detect-secrets/master/README.md> (прочитано 2026-10-24; master).
-5. detect-secrets Apache-2.0 LICENSE — <https://raw.githubusercontent.com/Yelp/detect-secrets/master/LICENSE> (прочитано 2026-10-24; текст лицензии 2004-01).
-6. detect-secrets `plugins/keyword.py` — <https://raw.githubusercontent.com/Yelp/detect-secrets/master/detect_secrets/plugins/keyword.py> (прочитано 2026-10-24; код и встроенное уведомление MIT, copyright 2014).
-7. detect-secrets `plugins/high_entropy_strings.py` — <https://raw.githubusercontent.com/Yelp/detect-secrets/master/detect_secrets/plugins/high_entropy_strings.py> (прочитано 2026-10-24; master).
-8. detect-secrets `plugins/private_key.py` — <https://raw.githubusercontent.com/Yelp/detect-secrets/master/detect_secrets/plugins/private_key.py> (прочитано 2026-10-24; код и встроенное уведомление MIT, copyright 2014).
-9. Presidio MIT LICENSE — <https://raw.githubusercontent.com/microsoft/presidio/main/LICENSE> (прочитано 2026-10-24; текущий текст Presidio Contributors).
-10. Presidio: Developing PII recognizers — <https://presidio.dataprivacystack.org/analyzer/adding_recognizers/> (прочитано 2026-10-24; дата публикации не указана).
-11. Presidio: Supported entities — <https://presidio.dataprivacystack.org/supported_entities/> (прочитано 2026-10-24; прежний адрес microsoft.github.io перенаправляет на этот сайт).
-12. Presidio: PII detection in different languages — <https://raw.githubusercontent.com/data-privacy-stack/presidio/main/docs/analyzer/languages.md> (прочитано 2026-10-24; main).
-13. Presidio `conf/default_recognizers.yaml` — <https://raw.githubusercontent.com/microsoft/presidio/main/presidio-analyzer/presidio_analyzer/conf/default_recognizers.yaml> (прочитано 2026-10-24; main).
-14. Phileas README — <https://raw.githubusercontent.com/philterd/phileas/master/README.md> (прочитано 2026-10-24; master, уведомления 2024–2026, единую дату выпуска не установлено).
-15. Apache Commons Validator: LuhnCheckDigit — <https://commons.apache.org/proper/commons-validator/apidocs/org/apache/commons/validator/routines/checkdigit/LuhnCheckDigit.html> и CreditCardValidator — <https://commons.apache.org/proper/commons-validator/apidocs/org/apache/commons/validator/routines/CreditCardValidator.html> (прочитано 2026-10-24; документация 1.11.0).
-16. Google libphonenumber README — <https://raw.githubusercontent.com/google/libphonenumber/master/README.md> (прочитано 2026-10-24; master).
-17. Постановление Правительства РФ № 2267, описание бланка паспорта, п. 3 — <https://www.consultant.ru/document/cons_doc_LAW_466454/51d3a2d43a726e22847dd3be33f75c45c756b8a7/> (прочитано 2026-10-24; акт 2023-12-23, воспроизведение нормативного текста).
-18. Распоряжение Правления ПФР № 323р, п. 2.7 — <https://legalacts.ru/doc/rasporjazhenie-pravlenija-pf-rf-ot-31072014-n/> (прочитано 2026-10-24; акт 2014-07-31, воспроизведение нормативного текста).
-19. ФНС: ИНН — <https://www.nalog.gov.ru/rn77/fl/interest/inn/>; разъяснение структуры с 2026-01-01 — <https://www.nalog.gov.ru/rn77/news/activities_fts/16575267/> (прочитано 2026-10-24; разъяснение опубликовано 2025-11-07, сайт помечает его архивным).
-20. python-stdnum `stdnum/ru/inn.py` — <https://raw.githubusercontent.com/arthurdejong/python-stdnum/master/stdnum/ru/inn.py> (прочитано 2026-10-24; первичный код, LGPL-2.1-or-later; код не переносился).
-21. Приказ Минфина № 165н, п. 7 порядка ведения реестров — <https://www.consultant.ru/document/cons_doc_LAW_288080/bfda7a84013d0ad8a3d6e57b229b1bbcbf923868/> (прочитано 2026-10-24; акт 2017-10-30, редакция 2022-12-19, воспроизведение нормативного текста).
-22. Банк России № 515: порядок расчёта контрольного ключа — <https://www.consultant.ru/document/cons_doc_LAW_16053/08c1d0eacf880db80ef56f68c3469e2ea24502d7/> (прочитано 2026-10-24; акт 1997-09-08, воспроизведение первичного текста с весами).
-23. ТФОМС Ростовской области: структура ЕНП и контрольный разряд — <https://rostov-tfoms.ru/services/zasedaniya-rabochih-grupp/erp/enp-struct> (прочитано 2026-10-24; первичное описание фонда, дата публикации не указана); ФФОМС № 54, приложение Г.2 — <https://sudact.ru/law/prikaz-ffoms-ot-23032018-n-54-o/prilozhenie-13/g.2-algoritm-rascheta-kontrolnogo-chisla/> (прочитано 2026-10-24; акт 2018-03-23, воспроизведение нормативного текста).
-24. Apache POI: Busy Developers’ Guide to HSSF and XSSF Features — <https://poi.apache.org/components/spreadsheet/quick-guide.html> (прочитано 2026-10-24; дата публикации не указана).
-25. Presidio Image Redactor — <https://presidio.dataprivacystack.org/image-redactor/> (прочитано 2026-10-24; дата публикации не указана).
-26. Gitleaks releases — <https://github.com/gitleaks/gitleaks/releases> (прочитано 2026-10-24; видимый тег v8.30.1).
-27. detect-secrets 1.5.0, публикация автора на PyPI — <https://pypi.org/project/detect-secrets/1.5.0/> (прочитано 2026-10-24; опубликовано 2024-05-06).
-28. Phileas Apache-2.0 LICENSE — <https://raw.githubusercontent.com/philterd/phileas/master/LICENSE> (прочитано 2026-10-24).
-29. RFC 3986, § 3.2.1 User Information — <https://www.rfc-editor.org/rfc/rfc3986> (прочитано 2026-10-24; опубликовано 2005-01).
-30. RFC 7617: Basic HTTP Authentication — <https://www.rfc-editor.org/rfc/rfc7617> (прочитано 2026-10-24; опубликовано 2015-09).
-31. RFC 7519: JSON Web Token — <https://www.rfc-editor.org/rfc/rfc7519> (прочитано 2026-10-24; опубликовано 2015-05).
-32. python-stdnum `stdnum/ru/ogrn.py`, `calc_check_digit` — <https://raw.githubusercontent.com/arthurdejong/python-stdnum/master/stdnum/ru/ogrn.py> (прочитано 2026-10-24; master, copyright 2024–2025, обнаруженное расхождение описано в В3).
-33. detect-secrets `core/potential_secret.py` — <https://raw.githubusercontent.com/Yelp/detect-secrets/master/detect_secrets/core/potential_secret.py> (прочитано 2026-10-24; master).
-34. Presidio Anonymizer: операторы и соль для hash — <https://presidio.dataprivacystack.org/anonymizer/> (прочитано 2026-10-24; изменение hash обозначено начиная с 2.2.361).
-35. Presidio: Pseudonymization notebook — <https://raw.githubusercontent.com/data-privacy-stack/presidio/main/docs/samples/python/pseudonymization.ipynb> (прочитано 2026-10-24; main).
-36. detect-secrets `plugins/basic_auth.py` — <https://raw.githubusercontent.com/Yelp/detect-secrets/master/detect_secrets/plugins/basic_auth.py> (прочитано 2026-10-24; master).
-37. Gitleaks `cmd/generate/config/rules/jwt.go` — <https://raw.githubusercontent.com/gitleaks/gitleaks/v8.30.1/cmd/generate/config/rules/jwt.go> (прочитано 2026-10-24; тег v8.30.1).
-38. Gitleaks `cmd/generate/config/rules/github.go` — <https://raw.githubusercontent.com/gitleaks/gitleaks/v8.30.1/cmd/generate/config/rules/github.go> (прочитано 2026-10-24; тег v8.30.1).
-39. Gitleaks `cmd/generate/config/rules/aws.go` — <https://raw.githubusercontent.com/gitleaks/gitleaks/v8.30.1/cmd/generate/config/rules/aws.go> (прочитано 2026-10-24; тег v8.30.1).
-40. Presidio releases — <https://github.com/data-privacy-stack/presidio/releases> (прочитано 2026-10-24; видимый тег 2.2.364).
+1. Gitleaks README: TOML format, exclusions, diagnostics, project status — <https://raw.githubusercontent.com/gitleaks/gitleaks/master/README.md> (read 2026-10-24; `master`, publication date not stated).
+2. Gitleaks `config/gitleaks.toml`, tag v8.30.1 — <https://raw.githubusercontent.com/gitleaks/gitleaks/v8.30.1/config/gitleaks.toml> (read 2026-10-24; pinned tag).
+3. Gitleaks MIT LICENSE — <https://raw.githubusercontent.com/gitleaks/gitleaks/master/LICENSE> (read 2026-10-24; copyright notice 2019).
+4. Yelp detect-secrets README: plugins, filters, network check — <https://raw.githubusercontent.com/Yelp/detect-secrets/master/README.md> (read 2026-10-24; `master`).
+5. detect-secrets Apache-2.0 LICENSE — <https://raw.githubusercontent.com/Yelp/detect-secrets/master/LICENSE> (read 2026-10-24; license text dated 2004-01).
+6. detect-secrets `plugins/keyword.py` — <https://raw.githubusercontent.com/Yelp/detect-secrets/master/detect_secrets/plugins/keyword.py> (read 2026-10-24; code and embedded MIT notice, copyright 2014).
+7. detect-secrets `plugins/high_entropy_strings.py` — <https://raw.githubusercontent.com/Yelp/detect-secrets/master/detect_secrets/plugins/high_entropy_strings.py> (read 2026-10-24; `master`).
+8. detect-secrets `plugins/private_key.py` — <https://raw.githubusercontent.com/Yelp/detect-secrets/master/detect_secrets/plugins/private_key.py> (read 2026-10-24; code and embedded MIT notice, copyright 2014).
+9. Presidio MIT LICENSE — <https://raw.githubusercontent.com/microsoft/presidio/main/LICENSE> (read 2026-10-24; current Presidio Contributors text).
+10. Presidio: Developing PII recognizers — <https://presidio.dataprivacystack.org/analyzer/adding_recognizers/> (read 2026-10-24; publication date not stated).
+11. Presidio: Supported entities — <https://presidio.dataprivacystack.org/supported_entities/> (read 2026-10-24; former microsoft.github.io address redirects to this site).
+12. Presidio: PII detection in different languages — <https://raw.githubusercontent.com/data-privacy-stack/presidio/main/docs/analyzer/languages.md> (read 2026-10-24; `main`).
+13. Presidio `conf/default_recognizers.yaml` — <https://raw.githubusercontent.com/microsoft/presidio/main/presidio-analyzer/presidio_analyzer/conf/default_recognizers.yaml> (read 2026-10-24; `main`).
+14. Phileas README — <https://raw.githubusercontent.com/philterd/phileas/master/README.md> (read 2026-10-24; `master`, notices 2024–2026, single release date not established).
+15. Apache Commons Validator: LuhnCheckDigit — <https://commons.apache.org/proper/commons-validator/apidocs/org/apache/commons/validator/routines/checkdigit/LuhnCheckDigit.html> and CreditCardValidator — <https://commons.apache.org/proper/commons-validator/apidocs/org/apache/commons/validator/routines/CreditCardValidator.html> (read 2026-10-24; documentation 1.11.0).
+16. Google libphonenumber README — <https://raw.githubusercontent.com/google/libphonenumber/master/README.md> (read 2026-10-24; `master`).
+17. Russian Government Resolution No. 2267, passport form description, paragraph 3 — <https://www.consultant.ru/document/cons_doc_LAW_466454/51d3a2d43a726e22847dd3be33f75c45c756b8a7/> (read 2026-10-24; act dated 2023-12-23, reproduction of regulatory text).
+18. Pension Fund Board Order No. 323r, paragraph 2.7 — <https://legalacts.ru/doc/rasporjazhenie-pravlenija-pf-rf-ot-31072014-n/> (read 2026-10-24; act dated 2014-07-31, reproduction of regulatory text).
+19. Federal Tax Service: INN — <https://www.nalog.gov.ru/rn77/fl/interest/inn/>; explanation of structure as of 2026-01-01 — <https://www.nalog.gov.ru/rn77/news/activities_fts/16575267/> (read 2026-10-24; explanation published 2025-11-07, site marks it archived).
+20. python-stdnum `stdnum/ru/inn.py` — <https://raw.githubusercontent.com/arthurdejong/python-stdnum/master/stdnum/ru/inn.py> (read 2026-10-24; source code, LGPL-2.1-or-later; code was not ported).
+21. Ministry of Finance Order No. 165n, paragraph 7 of the register-keeping procedure — <https://www.consultant.ru/document/cons_doc_LAW_288080/bfda7a84013d0ad8a3d6e57b229b1bbcbf923868/> (read 2026-10-24; act dated 2017-10-30, revision 2022-12-19, reproduction of regulatory text).
+22. Bank of Russia No. 515: procedure for calculating check key — <https://www.consultant.ru/document/cons_doc_LAW_16053/08c1d0eacf880db80ef56f68c3469e2ea24502d7/> (read 2026-10-24; act dated 1997-09-08, reproduction of primary text with weights).
+23. Rostov Region TFOMS: unified policy structure and check digit — <https://rostov-tfoms.ru/services/zasedaniya-rabochih-grupp/erp/enp-struct> (read 2026-10-24; primary fund description, publication date not stated); FFOMS No. 54, Appendix Г.2 — <https://sudact.ru/law/prikaz-ffoms-ot-23032018-n-54-o/prilozhenie-13/g.2-algoritm-rascheta-kontrolnogo-chisla/> (read 2026-10-24; act dated 2018-03-23, reproduction of regulatory text).
+24. Apache POI: Busy Developers’ Guide to HSSF and XSSF Features — <https://poi.apache.org/components/spreadsheet/quick-guide.html> (read 2026-10-24; publication date not stated).
+25. Presidio Image Redactor — <https://presidio.dataprivacystack.org/image-redactor/> (read 2026-10-24; publication date not stated).
+26. Gitleaks releases — <https://github.com/gitleaks/gitleaks/releases> (read 2026-10-24; visible tag v8.30.1).
+27. detect-secrets 1.5.0, author's PyPI release — <https://pypi.org/project/detect-secrets/1.5.0/> (read 2026-10-24; published 2024-05-06).
+28. Phileas Apache-2.0 LICENSE — <https://raw.githubusercontent.com/philterd/phileas/master/LICENSE> (read 2026-10-24).
+29. RFC 3986, § 3.2.1 User Information — <https://www.rfc-editor.org/rfc/rfc3986> (read 2026-10-24; published 2005-01).
+30. RFC 7617: Basic HTTP Authentication — <https://www.rfc-editor.org/rfc/rfc7617> (read 2026-10-24; published 2015-09).
+31. RFC 7519: JSON Web Token — <https://www.rfc-editor.org/rfc/rfc7519> (read 2026-10-24; published 2015-05).
+32. python-stdnum `stdnum/ru/ogrn.py`, `calc_check_digit` — <https://raw.githubusercontent.com/arthurdejong/python-stdnum/master/stdnum/ru/ogrn.py> (read 2026-10-24; `master`, copyright 2024–2025, discrepancy described in В3).
+33. detect-secrets `core/potential_secret.py` — <https://raw.githubusercontent.com/Yelp/detect-secrets/master/detect_secrets/core/potential_secret.py> (read 2026-10-24; `master`).
+34. Presidio Anonymizer: operators and hash salt — <https://presidio.dataprivacystack.org/anonymizer/> (read 2026-10-24; hash change noted from 2.2.361).
+35. Presidio: Pseudonymization notebook — <https://raw.githubusercontent.com/data-privacy-stack/presidio/main/docs/samples/python/pseudonymization.ipynb> (read 2026-10-24; `main`).
+36. detect-secrets `plugins/basic_auth.py` — <https://raw.githubusercontent.com/Yelp/detect-secrets/master/detect_secrets/plugins/basic_auth.py> (read 2026-10-24; `master`).
+37. Gitleaks `cmd/generate/config/rules/jwt.go` — <https://raw.githubusercontent.com/gitleaks/gitleaks/v8.30.1/cmd/generate/config/rules/jwt.go> (read 2026-10-24; tag v8.30.1).
+38. Gitleaks `cmd/generate/config/rules/github.go` — <https://raw.githubusercontent.com/gitleaks/gitleaks/v8.30.1/cmd/generate/config/rules/github.go> (read 2026-10-24; tag v8.30.1).
+39. Gitleaks `cmd/generate/config/rules/aws.go` — <https://raw.githubusercontent.com/gitleaks/gitleaks/v8.30.1/cmd/generate/config/rules/aws.go> (read 2026-10-24; tag v8.30.1).
+40. Presidio releases — <https://github.com/data-privacy-stack/presidio/releases> (read 2026-10-24; visible tag 2.2.364).

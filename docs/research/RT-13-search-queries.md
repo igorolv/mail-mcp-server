@@ -1,123 +1,123 @@
-# RT-13 — Контрольные запросы и синтетическая переписка
+# RT-13 — Control queries and synthetic correspondence
 
-- Дата: 2026-10-25
-- Исполнитель: Codex
-- Бриф: docs/research-tasks/RT-13-search-queries.md
-- Данные: testdata/search/
+- Date: 2026-10-25
+- Author: Codex
+- Brief: docs/research-tasks/RT-13-search-queries.md
+- Data: testdata/search/
 
-## Кратко
+## Summary
 
-- [код] Созданы 48 писем и 80 запросов; 16 писем содержат вложение.
-- [код] Все 14 категорий имеют необходимое число запросов; языковые минимумы соблюдены.
-- [код] В JSON сохранены буквальные подтверждения для каждого ожидаемого и исключённого письма.
-- [код] Две выдуманные чувствительные строки есть только в исходниках и исключаются из поиска.
-- [предположение] Нужное качество поиска размечено вручную; анализатор не запускался.
+- [code] Created 48 messages and 80 queries; 16 messages contain an attachment.
+- [code] All 14 categories have the required query counts; language minimums are met.
+- [code] JSON stores literal evidence for every expected and excluded message.
+- [code] Two invented sensitive strings exist only in originals and are excluded from search.
+- [assumption] Desired search quality is manually annotated; no analyzer was run.
 
-## Состав набора
+## Set contents
 
-| Категория | Запросов | Прогноз miss | Примечание |
+| Category | Queries | Predicted misses | Note |
 |---|---:|---:|---|
-| `ru-noun-forms` | 10 | 0 | Подтверждения — в `evidence` и `nearMissEvidence` |
-| `ru-irregular` | 6 | 6 | Подтверждения — в `evidence` и `nearMissEvidence` |
-| `ru-verb-adj` | 5 | 0 | Подтверждения — в `evidence` и `nearMissEvidence` |
-| `ru-yo` | 3 | 0 | Подтверждения — в `evidence` и `nearMissEvidence` |
-| `ru-names` | 5 | 0 | Подтверждения — в `evidence` и `nearMissEvidence` |
-| `en-forms` | 15 | 0 | Подтверждения — в `evidence` и `nearMissEvidence` |
-| `mixed-lang` | 5 | 0 | Подтверждения — в `evidence` и `nearMissEvidence` |
-| `address` | 6 | 0 | Подтверждения — в `evidence` и `nearMissEvidence` |
-| `filename` | 6 | 0 | Подтверждения — в `evidence` и `nearMissEvidence` |
-| `identifier` | 5 | 0 | Подтверждения — в `evidence` и `nearMissEvidence` |
-| `precision` | 6 | 0 | Подтверждения — в `evidence` и `nearMissEvidence` |
-| `stopwords-phrase` | 4 | 0 | Подтверждения — в `evidence` и `nearMissEvidence` |
-| `case` | 2 | 0 | Подтверждения — в `evidence` и `nearMissEvidence` |
-| `redacted` | 2 | 0 | Подтверждения — в `evidence` и `nearMissEvidence` |
+| `ru-noun-forms` | 10 | 0 | Evidence is in `evidence` and `nearMissEvidence` |
+| `ru-irregular` | 6 | 6 | Evidence is in `evidence` and `nearMissEvidence` |
+| `ru-verb-adj` | 5 | 0 | Evidence is in `evidence` and `nearMissEvidence` |
+| `ru-yo` | 3 | 0 | Evidence is in `evidence` and `nearMissEvidence` |
+| `ru-names` | 5 | 0 | Evidence is in `evidence` and `nearMissEvidence` |
+| `en-forms` | 15 | 0 | Evidence is in `evidence` and `nearMissEvidence` |
+| `mixed-lang` | 5 | 0 | Evidence is in `evidence` and `nearMissEvidence` |
+| `address` | 6 | 0 | Evidence is in `evidence` and `nearMissEvidence` |
+| `filename` | 6 | 0 | Evidence is in `evidence` and `nearMissEvidence` |
+| `identifier` | 5 | 0 | Evidence is in `evidence` and `nearMissEvidence` |
+| `precision` | 6 | 0 | Evidence is in `evidence` and `nearMissEvidence` |
+| `stopwords-phrase` | 4 | 0 | Evidence is in `evidence` and `nearMissEvidence` |
+| `case` | 2 | 0 | Evidence is in `evidence` and `nearMissEvidence` |
+| `redacted` | 2 | 0 | Evidence is in `evidence` and `nearMissEvidence` |
 
-### Проверяемые группы
+### Groups checked
 
 - `ru-noun-forms`: Q001, Q002, Q003, Q004, Q005, Q006, Q007, Q008, Q009, Q010.
-  Ожидаемые результаты относятся только к указанному полю; остальные письма не оцениваются.
+  Expected results apply only to the specified field; other messages are not evaluated.
 - `ru-irregular`: Q011, Q012, Q013, Q014, Q015, Q016.
-  Ожидаемые результаты относятся только к указанному полю; остальные письма не оцениваются.
+  Expected results apply only to the specified field; other messages are not evaluated.
 - `ru-verb-adj`: Q017, Q018, Q019, Q020, Q021.
-  Ожидаемые результаты относятся только к указанному полю; остальные письма не оцениваются.
+  Expected results apply only to the specified field; other messages are not evaluated.
 - `ru-yo`: Q022, Q023, Q024.
-  Ожидаемые результаты относятся только к указанному полю; остальные письма не оцениваются.
+  Expected results apply only to the specified field; other messages are not evaluated.
 - `ru-names`: Q025, Q026, Q027, Q028, Q029.
-  Ожидаемые результаты относятся только к указанному полю; остальные письма не оцениваются.
+  Expected results apply only to the specified field; other messages are not evaluated.
 - `en-forms`: Q030, Q031, Q032, Q033, Q034, Q035, Q036, Q037, Q038, Q039, Q040, Q041, Q042, Q043, Q044.
-  Ожидаемые результаты относятся только к указанному полю; остальные письма не оцениваются.
+  Expected results apply only to the specified field; other messages are not evaluated.
 - `mixed-lang`: Q045, Q046, Q047, Q048, Q049.
-  Ожидаемые результаты относятся только к указанному полю; остальные письма не оцениваются.
+  Expected results apply only to the specified field; other messages are not evaluated.
 - `address`: Q050, Q051, Q052, Q053, Q054, Q055.
-  Ожидаемые результаты относятся только к указанному полю; остальные письма не оцениваются.
+  Expected results apply only to the specified field; other messages are not evaluated.
 - `filename`: Q056, Q057, Q058, Q059, Q060, Q061.
-  Ожидаемые результаты относятся только к указанному полю; остальные письма не оцениваются.
+  Expected results apply only to the specified field; other messages are not evaluated.
 - `identifier`: Q062, Q063, Q064, Q065, Q066.
-  Ожидаемые результаты относятся только к указанному полю; остальные письма не оцениваются.
+  Expected results apply only to the specified field; other messages are not evaluated.
 - `precision`: Q067, Q068, Q069, Q070, Q071, Q072.
-  Ожидаемые результаты относятся только к указанному полю; остальные письма не оцениваются.
+  Expected results apply only to the specified field; other messages are not evaluated.
 - `stopwords-phrase`: Q073, Q074, Q075, Q076.
-  Ожидаемые результаты относятся только к указанному полю; остальные письма не оцениваются.
+  Expected results apply only to the specified field; other messages are not evaluated.
 - `case`: Q077, Q078.
-  Ожидаемые результаты относятся только к указанному полю; остальные письма не оцениваются.
+  Expected results apply only to the specified field; other messages are not evaluated.
 - `redacted`: Q079, Q080.
-  Ожидаемые результаты относятся только к указанному полю; остальные письма не оцениваются.
+  Expected results apply only to the specified field; other messages are not evaluated.
 
-## Как получены файлы
+## File generation
 
-- Python 3.14.3, только стандартная библиотека: email, json, hashlib.
-- Генератор — `testdata/.work/RT-13/generate.py`, исключён из git.
-- Тексты, темы, адреса и имена вложений придуманы для этого набора.
-- `.eml` создаются через EmailMessage с политикой SMTP и телом UTF-8/Base64.
-- Имена файлов передаются через MIME-параметры; даты нормализуются email.
-- JSON записывается в UTF-8 без BOM с LF; письма — в двоичном режиме с CRLF.
-- SHA-256 считается по конечным байтам каждого файла.
-- Манифест перечисляет все файлы; свой хэш не содержит во избежание самоссылки.
+- Python 3.14.3, standard library only: email, json, hashlib.
+- Generator: `testdata/.work/RT-13/generate.py`, excluded from git.
+- Text, subjects, addresses and attachment names were invented for this set.
+- `.eml` files are created with EmailMessage, SMTP policy and a UTF-8/Base64 body.
+- Filenames are passed through MIME parameters; dates are normalized by email.
+- JSON is written as UTF-8 without BOM with LF; messages in binary mode with CRLF.
+- SHA-256 is calculated over each file's final bytes.
+- The manifest lists all files; it omits its own hash to avoid a self-reference.
 
-## Проверка
+## Verification
 
-- [код] Обратный разбор каждого письма через Python email, сравнение тем и тел.
-- [код] Сверены декодированные имена и тексты всех 16 вложений.
-- [код] Проверены минимум 40 русских и 15 английских запросов, минимум 70 всего.
-- [код] Проверены минимумы каждой категории и отсутствие пересечения списков.
-- [код] Каждый evidence действительно присутствует в указанном поле исходного письма.
-- [код] Проверены SHA-256 и отсутствие одиночных LF в `.eml`.
-- [код] Все значения query ссылаются только на существующие ID.
-- [код] Обе выдуманные строки удалены из redactedBody.
-- Анализаторы, индекс, детекторы и сетевые сервисы не запускались.
+- [code] Every message was parsed back with Python email; subjects and bodies were compared.
+- [code] Decoded names and text of all 16 attachments were checked.
+- [code] Minimums checked: 40 Russian, 15 English and 70 total queries.
+- [code] Per-category minimums and non-overlapping lists were checked.
+- [code] Every evidence value occurs in the specified field of the original message.
+- [code] SHA-256 and the absence of bare LF in `.eml` were checked.
+- [code] All query values reference existing IDs only.
+- [code] Both invented strings were removed from redactedBody.
+- No analyzers, index, detectors or network services were run.
 
-### Первые запросы для проверки морфологии
+### First morphology queries to check
 
-- `Q011`: «письмо», ожидаются S010.
-- `Q012`: «писем», ожидаются S009, S011.
-- `Q013`: «письмами», ожидаются S010.
-- `Q014`: «человек», ожидаются S013.
-- `Q015`: «ребёнок», ожидаются S015.
-- `Q016`: «год», ожидаются S017.
+- `Q011`: `письмо`, expected S010.
+- `Q012`: `писем`, expected S009, S011.
+- `Q013`: `письмами`, expected S010.
+- `Q014`: `человек`, expected S013.
+- `Q015`: `ребёнок`, expected S015.
+- `Q016`: `год`, expected S017.
 
-## Спорные места
+## Disputed cases
 
-- Списки expected отражают желаемое совпадение, а не измеренное поведение Snowball.
-- Прогноз miss для письмо/писем основан на RT-06 В2; остальные нерегулярные основы — предположение.
-- Результаты по имени Анна не включают уменьшительное Аня.
-- Запросы к части адреса не совпадают с полным адресом: это предложение контракта из RT-06.
-- Если позже будет разрешён поиск по частям адресов, эти ожидания надо пересмотреть.
-- Имена файлов сохраняются целиком и разбиваются на части; поля — предложение для будущих тестов.
-- Порядок результатов не оценивается, rankFirst везде null.
-- Общая основа слова не доказывает близость смысла; precision содержит явные исключения.
+- Expected lists describe desired matches, not measured Snowball behavior.
+- Predicted misses for `письмо`/`писем` are based on RT-06 В2; other irregular stems are assumptions.
+- Results for the name `Анна` exclude its diminutive `Аня`.
+- Address-part queries do not match full addresses: this is the contract proposed in RT-06.
+- If address-part search is allowed later, these expectations must be revised.
+- Filenames are preserved whole and split into parts; fields are a proposal for future tests.
+- Result order is not evaluated; rankFirst is null everywhere.
+- A shared stem does not prove similar meaning; precision cases contain explicit exclusions.
 
-## Что не удалось сделать
+## What could not be done
 
-- Поведение Lucene не измерялось: это вне задания.
-- Конкретные пропуски или лишние совпадения станут известны при подключении индекса.
-- Подписи корпусов не имитируют реальные DKIM или S/MIME: это обычные письма.
+- Lucene behavior was not measured: outside the task.
+- Specific misses or extra matches will become known when the index is connected.
+- Corpus signatures do not imitate real DKIM or S/MIME: these are ordinary messages.
 
-## Что ещё стоит изучить
+## Further research
 
-- Сравнить оценки по категориям при запуске RussianAnalyzer и EnglishAnalyzer.
-- Только при заметных пропусках сравнить словарный анализатор на том же наборе.
+- Compare per-category results when running RussianAnalyzer and EnglishAnalyzer.
+- Compare a dictionary analyzer on the same set only if misses are significant.
 
-## Источники
+## Sources
 
-- Локальные требования: docs/research-tasks/RT-13-search-queries.md, прочитано 2026-10-25.
-- Локальный разбор морфологии: docs/research/RT-06-search-engine.md, В2, прочитано 2026-10-25.
+- Local requirements: docs/research-tasks/RT-13-search-queries.md, read on 2026-10-25.
+- Local morphology analysis: docs/research/RT-06-search-engine.md, В2, read on 2026-10-25.

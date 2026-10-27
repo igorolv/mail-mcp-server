@@ -1,172 +1,173 @@
-# mail-mcp-server — план
+# mail-mcp-server — plan
 
-Рабочий документ проекта: статус, что ждёт проверки на реальной почте, принципы устройства и
-состав версии `0.1.0`. Рядом:
+Working project document: status, checks pending on real mail, design principles and the scope of
+version `0.1.0`. Related documents:
 
-- [results.md](results.md) — проверенные факты об окружении и результаты на реальной почте;
-- [decisions.md](decisions.md) — действующие решения пользователя и чего не делаем без его решения;
-- [backlog.md](backlog.md) — доработки после версии `0.1.0`;
-- `docs/*-agent.md` — инженерные документы об устройстве кода (список — в [AGENTS.md](../AGENTS.md));
-- `docs/connections.md`, `clients.md`, `commands.md`, `search.md`, `security.md` и
-  [README.md](../README.md) — документы для пользователей, на английском;
-- [research/](research/README.md) — исследования 2026-10-24.
+- [results.md](results.md) — verified environment facts and real-mailbox results;
+- [decisions.md](decisions.md) — current user decisions and what requires a user decision;
+- [backlog.md](backlog.md) — improvements after version `0.1.0`;
+- `docs/*-agent.md` — engineering documents describing the code (listed in [AGENTS.md](../AGENTS.md));
+- `docs/connections.md`, `clients.md`, `commands.md`, `search.md`, `security.md` and
+  [README.md](../README.md) — user documentation;
+- [research/](research/README.md) — research from 2026-10-24.
 
-История обсуждения — в истории git.
+Discussion history is in git history.
 
-**Статус (2026-10-28): черновой вариант готов, готовится первая публикуемая версия `0.1.0`
-(Д18).** Работают оба ящика пользователя — рабочий Exchange (EWS) и Mail.ru (IMAP). Готово:
+**Status (2026-10-28): the draft is complete; the first published version, `0.1.0`, is in
+preparation (Д18).** Both user mailboxes work: corporate Exchange (EWS) and Mail.ru (IMAP).
+Implemented:
 
-- полная и инкрементальная синхронизация;
-- письма и вложения на диске, тело и вложения в Markdown;
-- поиск с русской и английской морфологией, в том числе по тексту вложений;
-- необязательный пользовательский файл словоформ и офлайн-команда `mail-analyze`;
-- фильтры дат в поиске и списках писем, поиск только по периоду;
-- локальные цепочки писем между папками одного соединения;
-- копии одного письма считаются один раз в поиске и цепочках, остальные перечислены в `copies`;
-- распознавание однозначных перемещений между папками без повторного скачивания MIME;
-- снимки признаков «прочитано» и пользовательского флажка/звезды без записи в ящик;
-- раскрытие вложенных писем и архивов (EML, ZIP, MSG, TNEF), текст DOC/XLS/PPT;
-- необязательный фильтр секретов в ответах;
-- девять инструментов MCP.
+- full and incremental synchronization;
+- messages and attachments on disk, with bodies and attachment text in Markdown;
+- search with Russian and English morphology, including attachment text;
+- an optional user word forms file and the offline `mail-analyze` command;
+- date filters in search and message lists, and date-only search;
+- local conversations across folders of one connection;
+- message copies counted once in search and conversations, with other copies listed in `copies`;
+- detection of unambiguous moves between folders without downloading MIME again;
+- snapshots of read status and user flags/stars, without writing to the mailbox;
+- expansion of attached messages and archives (EML, ZIP, MSG, TNEF), and DOC/XLS/PPT text;
+- an optional secret filter in responses;
+- nine MCP tools.
 
-Что сделано, но ещё не проверено на реальной почте, — в разделе 2. Дальше — версия `0.1.0`
-(раздел 4); остальные доработки — в [backlog.md](backlog.md).
+Features implemented but not yet checked on real mail are in section 2. Next is version `0.1.0`
+(section 4); other improvements are in [backlog.md](backlog.md).
 
-## 1. Идея
+## 1. Idea
 
-Локальный stdio MCP-сервер, через который AI-агент (Claude Code, opencode, Codex и т. п.) читает
-несколько почтовых ящиков: рабочий Exchange по EWS, Mail.ru и Gmail по IMAP. Сервер:
+A local stdio MCP server through which an AI agent (Claude Code, opencode, Codex, etc.) reads
+several mailboxes: corporate Exchange over EWS, Mail.ru and Gmail over IMAP. The server:
 
-- скачивает письма как есть (`.eml`);
-- сохраняет вложения файлами и переводит тело и вложения в Markdown;
-- строит локальный индекс Lucene;
-- отвечает агенту только по локальным данным.
+- downloads messages unchanged (`.eml`);
+- saves attachments as files and converts bodies and attachments to Markdown;
+- builds a local Lucene index;
+- answers the agent from local data only.
 
-В ящик сервер ничего не пишет. Он сделан по образцу соседних проектов: `C:\git\redmine-mcp-server`
-(вложения, ограниченные ответы) и `C:\git\jdbc-mcp-server` (список соединений).
+The server writes nothing to the mailbox. It follows the sibling projects:
+`C:\git\redmine-mcp-server` (attachments, bounded responses) and `C:\git\jdbc-mcp-server`
+(connections list).
 
-Зачем своё:
+Why build our own:
 
-- веб-интерфейс OWA неудобен;
-- готовые почтовые MCP-серверы не дают поиска по вложениям, локального индекса с русской
-  морфологией и работы с Exchange 2013 по NTLM.
+- the OWA web interface is inconvenient;
+- existing mail MCP servers lack attachment search, a local index with Russian morphology and
+  support for Exchange 2013 over NTLM.
 
-## 2. Ждёт проверки на реальной почте
+## 2. Checks pending on real mail
 
-Сделано и принято по офлайн-проверке; проверку запускает пользователь. Результат проверки
-записывается в [results.md](results.md), строка отсюда удаляется. До публикации `0.1.0`
-обязательна только первая строка (решение 2026-10-28); остальные проверки — по мере
-использования.
+Implemented and accepted through offline verification; the user runs the checks. Record results
+in [results.md](results.md) and remove the corresponding row here. Only the first row is required
+before publishing `0.1.0` (decision of 2026-10-28); the remaining checks happen during use.
 
-| Что | Как проверить | Принято |
+| Feature | How to check | Accepted |
 |---|---|---|
-| **До публикации.** Раскрытие EML/ZIP/MSG/TNEF и текст DOC/XLS/PPT (`docs/mime-agent.md`) | `mail-reprocess` для каждого соединения, затем поиск по тексту файлов из архивов и старых форматов Office | 2026-10-27; 582 теста, 1 штатный пропуск, 0 ошибок |
-| Поиск по полному адресу без отображаемых имён (`docs/search.md`) | Перезапустить MCP-сервер и искать в `from`/`to` по полному адресу | 2026-10-26 |
-| Итог фоновой синхронизации и отдельный признак повторного обхода EWS (`docs/tools-agent.md`) | При следующем запрошенном пользователем `sync` проверить одну итоговую строку в логе; `rescanned` наблюдать только при естественном восстановлении EWS, не сбрасывая курсор специально | 2026-10-27; 592 теста, 1 штатный пропуск, 0 ошибок |
-| Фильтры дат и поиск только по периоду (`docs/search.md`) | После пересборки индекса до схемы 4 перезапустить MCP-сервер; проверить известный период через `search` без слов и `listMessages` с `since`/`until` на сохранённых данных; отдельная синхронизация для проверки дат не нужна | 2026-10-27; 603 теста, 1 штатный пропуск, 0 ошибок |
-| Локальные цепочки писем (`docs/search.md`) | После пересборки индекса до схемы 4 перезапустить MCP-сервер; вызвать `getThread` по ключу известной переписки и проверить состав, порядок и страницы на сохранённых данных; отдельная синхронизация для проверки цепочек не нужна | 2026-10-27; 612 тестов, 1 штатный пропуск, 0 ошибок |
-| Перемещения без повторного скачивания (`docs/storage-agent.md`) | Пользователь запускает синхронизацию для заполнения отпечатков, вручную перемещает тестовое письмо между включёнными папками в почтовом клиенте и снова синхронизирует; проверить прежние UUID, путь и содержимое, отсутствие повторного скачивания MIME. Доступность запросов метаданных EWS/IMAP на реальных серверах — проверить | 2026-10-27; 635 тестов, 1 штатный пропуск, 0 ошибок |
-| Порог перевода XLSX в текст 5 MiB (`docs/mime-agent.md`) | Необязательная пользовательская `mail-reprocess` применит порог к сохранённым письмам: для XLSX свыше 5 MiB старый текст исчезнет из файлов `.md` и поиска, оригиналы сохранятся. До переобработки прежний текст доступен; чтение и `mail-reindex` для `converted` его сохраняют | 2026-10-27; 640 тестов, 1 штатный пропуск, 0 ошибок |
-| Снимки read/flagged (`docs/storage-agent.md`, `docs/tools-agent.md`) | Пользователь меняет прочитанность и флажок/звезду в своём клиенте, запускает `sync` или `mail-sync` для EWS и IMAP, сравнивает `getMessage`, `listMessages`, текстовый поиск, поиск по датам и `getThread`; повторяет со снятием флагов. Проверить отсутствие повторного скачивания известных писем и сохранность содержимого. Реальные запросы флагов — проверить | 2026-10-27; 655 тестов, 1 штатный пропуск, 0 ошибок |
-| Группировка копий письма (`docs/search.md`) | Перезапустить MCP-сервер и найти сохранённое письмо, присутствующее в нескольких папках, например отправленное самому себе: в `search` и `getThread` одна карточка с остальными ключами и папками в `copies`, итог и страницы считают группу один раз. Для текущей схемы 4 пересборка индекса и синхронизация не нужны | 2026-10-27; 665 тестов, 1 штатный пропуск, 0 ошибок |
-| Пользовательские словоформы (`docs/search.md`) | Необязательно создать `word-forms.txt`, проверить правила через `mail-analyze`, выполнить `mail-reindex` для каждого соединения и искать нерегулярные формы на сохранённых данных. После редактирования проверить отказ текстового поиска до пересборки; списки, цепочки и поиск только по датам должны работать. При отсутствии файла пересборка не нужна | 2026-10-27; 681 тест, 1 штатный пропуск, 0 ошибок; контрольный набор с правилами: 7/7 нерегулярных форм, 86/86 всего, 7 ложных находок |
-| Пароль из Windows Credential Manager и менеджеров паролей (`docs/connections.md`) | `windowsCredential`: заменить `passwordCommand` на `"windowsCredential": "mail-mcp/<имя>"`, выполнить `mail-sync` для `work` и `mailru`, затем перезапустить MCP-сервер и выполнить `sync` и `syncStatus`. `passwordCommand` в `mail-sync` для EWS уже проверен ([results.md, раздел 1](results.md#1-рабочий-exchange)); в сервере и с конкретными менеджерами паролей, а также `cmdkey /pass` без значения — проверить | 2026-10-27; 702 теста, 1 штатный пропуск, 0 ошибок |
+| **Before publication.** EML/ZIP/MSG/TNEF expansion and DOC/XLS/PPT text (`docs/mime-agent.md`) | Run `mail-reprocess` for each connection, then search text in files from archives and older Office formats | 2026-10-27; 582 tests, 1 expected skip, 0 failures |
+| Search by full address without display names (`docs/search.md`) | Restart the MCP server and search `from`/`to` by a full address | 2026-10-26 |
+| Background sync summary and a separate EWS rescan indicator (`docs/tools-agent.md`) | On the next user-requested `sync`, check for one summary line in the log; observe `rescanned` only during natural EWS recovery, without deliberately resetting the cursor | 2026-10-27; 592 tests, 1 expected skip, 0 failures |
+| Date filters and date-only search (`docs/search.md`) | After rebuilding the index to schema 4, restart the MCP server; check a known period with `search` without words and `listMessages` with `since`/`until` on saved data; no separate sync is needed to check dates | 2026-10-27; 603 tests, 1 expected skip, 0 failures |
+| Local conversations (`docs/search.md`) | After rebuilding the index to schema 4, restart the MCP server; call `getThread` with the key of a known conversation and check its membership, order and pages on saved data; no separate sync is needed to check conversations | 2026-10-27; 612 tests, 1 expected skip, 0 failures |
+| Moves without downloading again (`docs/storage-agent.md`) | The user runs sync to populate fingerprints, manually moves a test message between included folders in a mail client and syncs again; check that UUID, path and content are preserved and MIME is not downloaded again. Availability of EWS/IMAP metadata requests on real servers: to verify | 2026-10-27; 635 tests, 1 expected skip, 0 failures |
+| 5 MiB XLSX text conversion threshold (`docs/mime-agent.md`) | An optional user-run `mail-reprocess` applies the threshold to saved messages: for XLSX files over 5 MiB, old text disappears from `.md` files and search, while originals remain. Until reprocessing, old text is available; reads and `mail-reindex` retain it for `converted` messages | 2026-10-27; 640 tests, 1 expected skip, 0 failures |
+| read/flagged snapshots (`docs/storage-agent.md`, `docs/tools-agent.md`) | The user changes read status and flag/star in their client, runs `sync` or `mail-sync` for EWS and IMAP, and compares `getMessage`, `listMessages`, text search, date search and `getThread`; repeat after clearing flags. Check that known messages are not downloaded again and content is preserved. Real flag requests: to verify | 2026-10-27; 655 tests, 1 expected skip, 0 failures |
+| Message copy grouping (`docs/search.md`) | Restart the MCP server and find a saved message present in several folders, such as a message sent to yourself: `search` and `getThread` show one card, with other keys and folders in `copies`; totals and paging count the group once. No index rebuild or sync is needed for current schema 4 | 2026-10-27; 665 tests, 1 expected skip, 0 failures |
+| User word forms (`docs/search.md`) | Optionally create `word-forms.txt`, check rules with `mail-analyze`, run `mail-reindex` for each connection and search for irregular forms on saved data. After editing, check that text search refuses until a rebuild; lists, conversations and date-only search should work. No rebuild is needed if the file is absent | 2026-10-27; 681 tests, 1 expected skip, 0 failures; control set with rules: 7/7 irregular forms, 86/86 overall, 7 false positives |
+| Passwords from Windows Credential Manager and password managers (`docs/connections.md`) | `windowsCredential`: replace `passwordCommand` with `"windowsCredential": "mail-mcp/<name>"`, run `mail-sync` for `work` and `mailru`, then restart the MCP server and run `sync` and `syncStatus`. `passwordCommand` in `mail-sync` for EWS is already verified ([results.md, section 1](results.md#1-corporate-exchange)); server use, specific password managers and `cmdkey /pass` without a value: to verify | 2026-10-27; 702 tests, 1 expected skip, 0 failures |
 
-## 3. Как устроено
+## 3. Design
 
-Здесь — принципы и поток данных. Подробности — в инженерных документах (раздел 3.3).
+Principles and data flow. Details are in the engineering documents (section 3.3).
 
-### 3.1. Принципы
+### 3.1. Principles
 
-1. **Диск — полная копия.** У каждого письма свой каталог:
-   - `message.eml` — как его отдал сервер;
-   - `meta.json` — то, чего в `.eml` нет: папка, ссылка на сервере, состояние;
-   - `body.md` — тело;
-   - вложения файлами, рядом с каждым его текст `<файл>.md`.
-2. **Lucene — производный индекс.** Один индекс на соединение служит и каталогом, и поиском. Он
-   пересобирается с диска без сети (`mail-reindex`). Версия схемы хранится в данных коммита;
-   индекс старой схемы или с другим хешем словоформ пересоздаётся при открытии писателя.
-3. **Курсоры синхронизации — в `folders.json`:** в IMAP — `UIDVALIDITY` и список UID, в EWS —
-   `SyncState` из `SyncFolderItems`.
-4. **Всё хранится как есть, без фильтрации.** `MAIL_MCP_REDACT_SECRETS=true` включает замену
-   секретов только в текстовых полях ответов tools; по умолчанию выключено. Это защита от
-   случайного попадания в контекст, а не от намеренного извлечения. Пути к оригиналам и имена
-   файлов для обращения к вложениям сохраняются.
-5. **Только чтение на уровне протокола:**
-   - EWS: разрешённый список из 10 операций чтения;
-   - IMAP: `EXAMINE`, `BODY.PEEK`, `CLOSE`, а `SELECT` и любые изменения запрещены защитой команд.
-6. **Один вход за запуск, без повторов.** После отклонённого входа синхронизация этого соединения
-   останавливается: устаревший пароль быстро блокирует доменную учётную запись.
-7. **Pandoc обязателен** для синхронизации и переобработки. Инструменты чтения работают без него.
-8. **Проще — лучше.** Пороги: письмо до 64 MiB; вложение для перевода в текст — до 20 MiB,
-   XLSX — до 5 MiB включительно; ответ инструмента — страницами. Место на диске не экономим.
-   Чего не делаем без решения пользователя — [decisions.md, раздел 1](decisions.md#1-чего-не-делаем-без-решения-пользователя).
+1. **The disk is the complete copy.** Each message has its own directory:
+   - `message.eml` — exactly as delivered by the server;
+   - `meta.json` — information absent from `.eml`: folder, remote reference, state;
+   - `body.md` — the body;
+   - attachments as files, each with its text in `<file>.md` alongside it.
+2. **Lucene is a derived index.** One index per connection serves as both catalog and search.
+   It can be rebuilt from disk without the network (`mail-reindex`). The schema version is stored
+   in commit data; an index with an older schema or a different word forms hash is recreated when
+   the writer opens.
+3. **Sync cursors are in `folders.json`:** IMAP uses `UIDVALIDITY` and a UID list; EWS uses
+   `SyncState` from `SyncFolderItems`.
+4. **Everything is stored unchanged, without filtering.** `MAIL_MCP_REDACT_SECRETS=true` enables
+   secret replacement only in text fields of tool responses; it is off by default. This protects
+   against accidental context exposure, not intentional extraction. Original paths and filenames
+   used to access attachments remain available.
+5. **Read-only at protocol level:**
+   - EWS: an allow-list of 10 read operations;
+   - IMAP: `EXAMINE`, `BODY.PEEK`, `CLOSE`; the command guard forbids `SELECT` and all mutations.
+6. **One sign-in per run, without retries.** A rejected sign-in stops sync for that connection:
+   an outdated password can quickly lock a domain account.
+7. **Pandoc is required** for sync and reprocessing. Read tools work without it.
+8. **Simpler is better.** Thresholds: messages up to 64 MiB; attachments for text conversion up
+   to 20 MiB, XLSX up to 5 MiB inclusive; tool responses are paged. Disk space is not a constraint.
+   What requires a user decision: [decisions.md, section 1](decisions.md#1-what-requires-a-user-decision).
 
-### 3.2. Поток данных
+### 3.2. Data flow
 
 ```
 MailSource (EWS | IMAP): folders() · changes() · metadata() · download()
         │
         ▼
-SyncRunner — один запуск на соединение, только в процессе, взявшем IndexWriter
-  1. восстановление: каталоги без meta.json удалить, документы без каталога удалить,
-     каталоги без документа доделать по состоянию; при расхождении папки/ссылки/флагов с meta.json
-     восстановить только затронутые документы из сохранённого содержимого
-  2. папки: сопоставить по remoteId; новые — ключ f<n>; собрать изменения и метаданные
-     всех включённых папок до удалений; сохранить папки со старыми/null курсорами,
-     включая пропавшие папки до завершения их удалений
-  3. однозначные перемещения: атомарно изменить meta.json → загрузить сохранённое
-     содержимое в индекс → commit; затем остальные удаления и скачивание пачками по 100
-       message.eml + meta.json (downloaded) → разбор MIME → вложения, body.md, <файл>.md
-       → meta.json (converted | failed) → документ индекса; commit после пачки
-  4. после всех изменений и коммитов — все новые курсоры и итоговый список папок
-     одним сохранением folders.json; ход — в sync-status.json
+SyncRunner — one run per connection, only in the process holding IndexWriter
+  1. recovery: remove directories without meta.json and documents without directories;
+     finish directories without documents according to their state; if folder/ref/flags
+     differ from meta.json, rebuild only affected documents from saved content
+  2. folders: match by remoteId; assign f<n> keys to new ones; collect changes and metadata
+     from all included folders before deletions; save folders with old/null cursors,
+     keeping missing folders until their deletions finish
+  3. unambiguous moves: atomically update meta.json → load saved content into the index
+     → commit; then process remaining deletions and downloads in batches of 100
+       message.eml + meta.json (downloaded) → MIME parsing → attachments, body.md, <file>.md
+       → meta.json (converted | failed) → index document; commit after each batch
+  4. after all changes and commits, save all new cursors and the final folder list
+     in one folders.json write; progress goes to sync-status.json
         │
         ▼
-Инструменты MCP: folders.json, sync-status.json, индекс и каталоги писем; в сеть не ходят
+MCP tools: folders.json, sync-status.json, index and message directories; no network access
 ```
 
-### 3.3. Где описано подробно
+### 3.3. Detailed documentation
 
-| Тема | Документ |
+| Topic | Document |
 |---|---|
-| Пакеты, слои, стек, транспорт stdio | `docs/architecture-agent.md` |
-| Каталоги писем, `meta.json`, `folders.json`, индекс, порядок записи, синхронизация, перемещения, флаги, сверка | `docs/storage-agent.md` |
-| Разбор MIME, вложения и их имена, контейнеры, pandoc, текст вложений | `docs/mime-agent.md` |
-| Инструменты, аргументы и пределы, поиск, цепочки, копии, `sync-status.json`, единственный писатель | `docs/tools-agent.md` |
-| Источники: EWS, IMAP, Gmail OAuth2 | `docs/ews-source-agent.md`, `docs/imap-source-agent.md`, `docs/gmail-oauth-agent.md` |
-| Фильтр секретов | `docs/redaction-agent.md` |
-| Сборка, настройки, реализация файла соединений и команд | `docs/build-config-agent.md` |
-| Для пользователей: соединения, клиенты, команды, поиск, безопасность | `docs/connections.md`, `docs/clients.md`, `docs/commands.md`, `docs/search.md`, `docs/security.md` |
+| Packages, layers, stack, stdio transport | `docs/architecture-agent.md` |
+| Message directories, `meta.json`, `folders.json`, index, write order, sync, moves, flags, reconciliation | `docs/storage-agent.md` |
+| MIME parsing, attachments and their names, containers, pandoc, attachment text | `docs/mime-agent.md` |
+| Tools, arguments and limits, search, conversations, copies, `sync-status.json`, single writer | `docs/tools-agent.md` |
+| Sources: EWS, IMAP, Gmail OAuth2 | `docs/ews-source-agent.md`, `docs/imap-source-agent.md`, `docs/gmail-oauth-agent.md` |
+| Secret filter | `docs/redaction-agent.md` |
+| Build, settings, connections file and command implementation | `docs/build-config-agent.md` |
+| User documentation: connections, clients, commands, search, security | `docs/connections.md`, `docs/clients.md`, `docs/commands.md`, `docs/search.md`, `docs/security.md` |
 
-## 4. Версия 0.1.0
+## 4. Version 0.1.0
 
-Первая публикуемая версия, лицензия Apache 2.0 (решения 2026-10-28). В неё входят только
-строки этой таблицы; остальные доработки — в [backlog.md](backlog.md), отклонённые идеи — в
-[decisions.md](decisions.md).
+The first published version, licensed under Apache 2.0 (decisions of 2026-10-28). It includes
+only the rows in this table; other improvements are in [backlog.md](backlog.md), rejected ideas
+in [decisions.md](decisions.md).
 
-Статус: ⬜ не начато · 🔨 в работе. Размер: S — часы, M — бриф на одну сессию, L — несколько
-брифов. Когда пункт берётся в работу, ему ставится 🔨 и пишется бриф в `docs/impl-tasks/`.
-Принятый пункт удаляется из таблицы: сделанное описано в инженерных и пользовательских
-документах, непроверенное на реальной почте — в разделе 2, история — в git. Номера не
-переиспользуются; сделаны Д1–Д6, Д8, Д9, Д10, Д11, Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29,
-Д30.
+Status: ⬜ not started · 🔨 in progress. Size: S — hours, M — a brief for one session, L — several
+briefs. When work starts, mark the item 🔨 and write a brief in `docs/impl-tasks/`.
+Remove accepted items from the table: completed behavior is described in engineering and user
+documents, pending real-mail checks in section 2, history in git. Numbers are never reused;
+completed: Д1–Д6, Д8, Д9, Д10, Д11, Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30.
 
-| № | Доработка | Суть | Откуда | Размер | Статус |
+| ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|
-| Д7 | Gmail | Подключить личный ящик и проверить его на реальной почте: пароль приложения через `windowsCredential` или `passwordCommand`; OAuth2 — если пароли приложений недоступны (тогда проверить вход; шифрование токена — [backlog.md](backlog.md), Д27); «Вся почта» один раз с метками, дедупликация по `X-GM-MSGID` | П3; в 0.1.0 по решению 2026-10-28 | M | ⬜ |
-| Д18 | Публикация `0.1.0` | Сделано: документы разделены, пользовательские документы вынесены, README переписан по образцу jdbc-mcp-server. Осталось: `LICENSE` и `THIRD_PARTY_NOTICES.md` (тогда ссылка на `LICENSE` в README), версия в сборке, CI и релиз jar на GitHub Actions по тегу (тогда в README — скачивание jar из релиза и бейджи CI, Release, License) | полировка | M | 🔨 |
+| Д7 | Gmail | Connect the personal mailbox and check it on real mail: app password through `windowsCredential` or `passwordCommand`; OAuth2 if app passwords are unavailable (then verify sign-in; token encryption is in [backlog.md](backlog.md), Д27); All Mail once with labels, deduplication by `X-GM-MSGID` | П3; included in 0.1.0 by the decision of 2026-10-28 | M | ⬜ |
+| Д18 | Publish `0.1.0` | Done: documents separated, user documentation extracted, README rewritten following jdbc-mcp-server. Remaining: `LICENSE` and `THIRD_PARTY_NOTICES.md` (then link `LICENSE` from README), build version, CI and jar releases through GitHub Actions on tags (then add release jar download and CI, Release, License badges to README) | polish | M | 🔨 |
 
-Перед публикацией, кроме этих пунктов, нужна только проверка из первой строки раздела 2
-(`mail-reprocess` на обоих ящиках).
+Before publication, in addition to these items, only the first check in section 2 is required
+(`mail-reprocess` on both mailboxes).
 
-## 5. Как ведётся работа
+## 5. Workflow
 
-- Состав версии — раздел 4; пользователь переносит туда пункты из [backlog.md](backlog.md).
-- Для каждой пишется бриф в [docs/impl-tasks/](impl-tasks/README.md); там же — цикл из трёх
-  сессий (реализация, проверка, запись и коммит), готовые промты и правила записи результата.
-  Брифы больших доработок (L) и проверку рискованных изменений делает сильная модель (Claude).
-  Остальное — любая способная модель (ChatGPT/Codex).
-- Проверки на настоящих ящиках запускает только пользователь. В документы попадают только числа,
-  без имён папок, адресов и содержимого писем.
-- Куда что записывать — `AGENTS.md`, раздел «Working with the plan».
+- Version scope is in section 4; the user moves items there from [backlog.md](backlog.md).
+- Write a brief for each improvement in [docs/impl-tasks/](impl-tasks/README.md); that directory
+  also describes the three-session cycle (implementation, review, recording and commit), ready
+  prompts and result-recording rules. A strong model (Claude) writes briefs for large improvements
+  (L) and reviews risky changes. Any capable model (ChatGPT/Codex) can do the rest.
+- Only the user runs checks on real mailboxes. Documents contain numbers only, without folder
+  names, addresses or message content.
+- Where to record each kind of information: `AGENTS.md`, "Working with the plan".

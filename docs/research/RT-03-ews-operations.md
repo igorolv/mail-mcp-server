@@ -1,49 +1,49 @@
-# RT-03 — операции EWS для Exchange 2013
+# RT-03 — EWS Operations for Exchange 2013
 
-- Дата: 2026-10-24
-- Исполнитель: Codex / исследовательская сессия RT-03
-- Бриф: docs/research-tasks/RT-03-ews-operations.md
-- Область: Exchange 2013 CU23, SOAP EWS, `RequestServerVersion="Exchange2013_SP1"`.
-- Метод: официальная документация Microsoft и RFC; запросы к почтовому серверу не выполнялись,
-  `.local/` не открывался. Контекст проекта прочитан в `docs/plan.md` и `docs/research.md`;
-  эти документы не изменены.
+- Date: 2026-10-24
+- Author: Codex / RT-03 research session
+- Brief: docs/research-tasks/RT-03-ews-operations.md
+- Scope: Exchange 2013 CU23, SOAP EWS, `RequestServerVersion="Exchange2013_SP1"`.
+- Method: official Microsoft documentation and RFCs; no requests were made to the mail server,
+  and `.local/` was not opened. Project context was read in `docs/plan.md` and `docs/research.md`;
+  those documents were not changed.
 
-## Кратко
+## Summary
 
-1. [док] Все десять исследованных операций доступны в Exchange 2013; `GetConversationItems`
-   появился именно в 2013, `FindConversation` — в 2010 SP1. [30: версии операций][30]
-2. [док] Дерево папок можно получить через `FindFolder Traversal="Deep"` и затем поддерживать
-   через `SyncFolderHierarchy`. Изменения только `TotalCount`/`UnreadCount` последняя операция
-   не сообщает: счётчики надо освежать отдельно. [2: FindFolder][2], [3: SyncFolderHierarchy][3]
-3. [док] `FindItem` не заменяет `GetItem`: полного тела и списков получателей в выдаче нет;
-   для потоковых свойств действует усечение. [6: FindItem][6]
-4. [док] `SyncFolderItems` работает отдельно для каждой папки, возвращает максимум 512 изменений
-   и непрозрачный `SyncState`; окончание обхода задаёт `IncludesLastItemInRange`.
-   [9: SyncFolderItems][9], [11: синхронизация][11]
-5. [док] `GetItem` получает письмо без установки `IsRead`; официальный пример с MIME возвращает
-   `IsRead=false`. Установка флага и связанные уведомления — отдельное действие записи.
-   [14: GetItem для письма][14], [16: IsRead][16]
-6. [док] `MimeContent` — base64 от MIME-байтов. Exchange строит MIME из хранилища, поэтому это
-   не гарантия побайтового оригинала SMTP и не полный снимок всех EWS-свойств.
-   [15: MimeContent][15], [17: экспорт][17]
-7. [док] `GetAttachment` получает файлы и вложенные items; MIME вложенного письма запрашивается
-   через `AttachmentShape/IncludeMimeContent`. [18: GetAttachment][18], [20: IncludeMimeContent][20]
-8. [док] AQS `attachment:report` ищет в имени и индексированном содержимом вложения; полнота
-   зависит от Exchange Search и поддержанного формата. [24: QueryString][24], [27: форматы][27]
-9. [док] `ItemId` может измениться при перемещении, `ChangeKey` обозначает версию;
-   `ConvertId` меняет формат идентификатора. [28: идентификаторы][28], [29: ConvertId][29]
-10. [предположение; рекомендация] Для постоянного ключа нужен локальный UUID в пространстве
-    соединения, с отдельными текущими EWS-идентификаторами. `InternetMessageId` и хэш полезны
-    для сопоставления, но не доказывают тождество экземпляров; подробности — В8.
+1. [docs] All ten reviewed operations are available in Exchange 2013; `GetConversationItems`
+   first appeared in 2013, and `FindConversation` in 2010 SP1. [30: operation versions][30]
+2. [docs] The folder tree can be retrieved with `FindFolder Traversal="Deep"` and then maintained
+   with `SyncFolderHierarchy`. This operation does not report changes limited to `TotalCount`/`UnreadCount`;
+   refresh counts separately. [2: FindFolder][2], [3: SyncFolderHierarchy][3]
+3. [docs] `FindItem` does not replace `GetItem`: results do not include the full body or recipient lists;
+   streaming properties may be truncated. [6: FindItem][6]
+4. [docs] `SyncFolderItems` runs separately for each folder, returns at most 512 changes
+   and an opaque `SyncState`; `IncludesLastItemInRange` indicates completion of the traversal.
+   [9: SyncFolderItems][9], [11: synchronization][11]
+5. [docs] `GetItem` retrieves a message without setting `IsRead`; the official MIME example returns
+   `IsRead=false`. Setting the flag and related notifications are separate write actions.
+   [14: GetItem for an email message][14], [16: IsRead][16]
+6. [docs] `MimeContent` is base64-encoded MIME bytes. Exchange constructs MIME from its store, so this
+   is not a guarantee of a byte-for-byte original SMTP message or a complete snapshot of all EWS properties.
+   [15: MimeContent][15], [17: export][17]
+7. [docs] `GetAttachment` retrieves files and embedded items; MIME for an embedded message is requested
+   through `AttachmentShape/IncludeMimeContent`. [18: GetAttachment][18], [20: IncludeMimeContent][20]
+8. [docs] AQS `attachment:report` searches attachment names and indexed content; completeness
+   depends on Exchange Search and supported formats. [24: QueryString][24], [27: formats][27]
+9. [docs] `ItemId` may change on move, while `ChangeKey` represents a version;
+   `ConvertId` changes identifier format. [28: identifiers][28], [29: ConvertId][29]
+10. [assumption; recommendation] A stable key requires a local UUID within the
+    connection namespace, with current EWS identifiers stored separately. `InternetMessageId` and a hash are useful
+    for matching but do not prove instance identity; see В8 for details.
 
-## Ответы на вопросы
+## Answers to the questions
 
-### Общая форма SOAP-примеров
+### Common form of the SOAP examples
 
-[док] Ниже показано содержимое `s:Body`. Для каждого примера используется одна оболочка
-SOAP 1.1 с указанными пространствами имён и версией схемы. Значения `ITEM_ID`, `FOLDER_ID`,
-`ATTACHMENT_ID`, `CONVERSATION_ID`, `SYNC_STATE` — обозначения, которые заменяются значениями
-из ответа сервера; это не рабочие идентификаторы. [30: схема и версии EWS][30]
+[docs] The content of `s:Body` is shown below. Each example uses one SOAP 1.1 envelope
+with the specified namespaces and schema version. `ITEM_ID`, `FOLDER_ID`,
+`ATTACHMENT_ID`, `CONVERSATION_ID`, and `SYNC_STATE` are placeholders to be replaced with values
+from a server response; they are not usable identifiers. [30: EWS schema and versions][30]
 
 ```xml
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
@@ -56,18 +56,18 @@ SOAP 1.1 с указанными пространствами имён и вер
 </s:Envelope>
 ```
 
-[док] Во всех ответах следует проверять `ResponseClass`, `ResponseCode`, а при ошибке —
-`MessageText`/`MessageXml`; HTTP 200 сам по себе не означает успех. Пакет может содержать
-разные результаты для разных IDs. [31: проверка результатов][31]
+[docs] Check `ResponseClass` and `ResponseCode` in every response, and on errors check
+`MessageText`/`MessageXml`; HTTP 200 alone does not indicate success. A batch may contain
+different results for different IDs. [31: verifying results][31]
 
-### В1. Папки: GetFolder, FindFolder, SyncFolderHierarchy
+### В1. Folders: GetFolder, FindFolder, SyncFolderHierarchy
 
-**GetFolder.** [док] Получает свойства конкретных папок, в том числе по distinguished ID.
-`Default` возвращает ID, имя и счётчики; для построения дерева явно добавим родителя и класс.
-Ответ: `Folders`, конкретный тип папки, `FolderId/@Id`, `@ChangeKey`, `ParentFolderId`,
-`DisplayName`, `FolderClass`, `TotalCount`, `UnreadCount`, `ChildFolderCount`.
-`FolderIds` позволяет перечислить несколько папок; постраничного обхода у `GetFolder` нет.
-В 2013 `AllProperties` не включает права папки без явного запроса `PermissionSet`.
+**GetFolder.** [docs] Retrieves properties of specific folders, including by distinguished ID.
+`Default` returns ID, name, and counts; explicitly add parent and class to build a tree.
+Response fields include `Folders`, the concrete folder type, `FolderId/@Id`, `@ChangeKey`, `ParentFolderId`,
+`DisplayName`, `FolderClass`, `TotalCount`, `UnreadCount`, and `ChildFolderCount`.
+`FolderIds` can list several folders; `GetFolder` does not support paging.
+In 2013, `AllProperties` does not include folder permissions unless `PermissionSet` is explicitly requested.
 [1: GetFolder][1]
 
 ```xml
@@ -83,11 +83,11 @@ SOAP 1.1 с указанными пространствами имён и вер
 </m:GetFolder>
 ```
 
-**FindFolder.** [док] `Deep` возвращает потомков указанной папки. Ответ содержит
+**FindFolder.** [docs] `Deep` returns descendants of the specified folder. The response contains
 `RootFolder/@IncludesLastItemInRange`, `@IndexedPagingOffset`, `@TotalItemsInView`, `Folders`.
-Следующую страницу запрашивают по возвращённому смещению; запрошенный размер не гарантирован.
-Сортировки у `FindFolder` нет; deep traversal для public folders не поддержан.
-Ограничение потоковых свойств — 512 байт / первые 255 Unicode-символов.
+Request the next page using the returned offset; the requested size is not guaranteed.
+`FindFolder` has no sort order; deep traversal is not supported for public folders.
+Streaming-property limit is 512 bytes / first 255 Unicode characters.
 [2: FindFolder][2], [7: paging][7]
 
 ```xml
@@ -104,35 +104,35 @@ SOAP 1.1 с указанными пространствами имён и вер
 </m:FindFolder>
 ```
 
-[док] Distinguished IDs не зависят от локализованного имени: `inbox`, `sentitems`, `drafts`,
-`deleteditems`, `junkemail`, `outbox`; `msgfolderroot` — корень дерева сообщений, `root` —
-корень всего ящика. Есть также `calendar`, `contacts`, `tasks`, `searchfolders`,
-`recoverableitemsroot`, `archivemsgfolderroot`. Последние не означают, что архив включён или
-всякая служебная папка доступна. [4: DistinguishedFolderId][4]
+[docs] Distinguished IDs do not depend on localized names: `inbox`, `sentitems`, `drafts`,
+`deleteditems`, `junkemail`, `outbox`; `msgfolderroot` — root of the message tree, `root` —
+the root of the entire mailbox. Other IDs include `calendar`, `contacts`, `tasks`, `searchfolders`,
+`recoverableitemsroot`, and `archivemsgfolderroot`. The latter do not mean that an archive is enabled or
+that every system folder is accessible. [4: DistinguishedFolderId][4]
 
-[предположение; рекомендация] «Полное дерево» для MVP означает всё доступное пользовательское
-дерево под `msgfolderroot`, включая корень, полученный отдельным `GetFolder`. Это не обещание
-обхода public folders, Recoverable Items и отдельного archive mailbox. Сохранить каркас дерева
-всех типов, затем выбирать папки почты на клиенте — так родитель исключённого типа не потеряется.
+[assumption; recommendation] For the MVP, “full tree” means the entire accessible user
+tree under `msgfolderroot`, including the root retrieved with a separate `GetFolder`. This does not promise
+to traverse public folders, Recoverable Items, or a separate archive mailbox. Preserve the tree structure
+for all types, then select mail folders on the client so a parent of an excluded type is not lost.
 
-[док] Почтовый класс — `IPF.Note`, календарь — `IPF.Appointment`, контакты — `IPF.Contact`,
-задачи — `IPF.Task`. Допускаются расширения классов (`IPF.Note.Custom`); `SearchFolder` тоже
-может иметь `IPF.Note`, но представляет виртуальную выборку чужих items. Неизвестный префикс
-Exchange трактует как generic mail folder. [5: типы папок][5]
+[docs] The mail class is `IPF.Note`, calendar is `IPF.Appointment`, contacts are `IPF.Contact`,
+and tasks are `IPF.Task`. Class extensions are allowed (`IPF.Note.Custom`); `SearchFolder` may also
+have `IPF.Note` but represents a virtual selection of other items. Exchange treats an unknown prefix
+as a generic mail folder. [5: folder types][5]
 
-[предположение; рекомендация] Синхронизировать физические mail folders, распознавая `IPF.Note`
-и его подклассы; исключать `SearchFolder` независимо от класса, чтобы не создавать дубли.
-Для отсутствующего/неизвестного класса оставить явный статус «проверить», учитывать XML-тип
-и разрешать ручной выбор. `TotalCount` — счётчик items папки, а не обещание числа только обычных
-писем; при фильтрации items число проиндексированных писем может отличаться. Основание —
-семантика типов и счётчиков [1], [5].
+[assumption; recommendation] Sync physical mail folders by recognizing `IPF.Note`
+and its subclasses; exclude `SearchFolder` regardless of class to avoid duplicates.
+For a missing/unknown class, retain an explicit “verify” status, consider the XML type,
+and allow manual selection. `TotalCount` counts folder items; it does not promise a count of ordinary
+messages only. When items are filtered, the number of indexed messages may differ. Basis:
+type and count semantics [1], [5].
 
-**SyncFolderHierarchy.** [док] Первоначальный запрос без `SyncState` получает иерархию,
-последующие — `Changes/Create|Update|Delete`. Ответ: новый `SyncState`,
-`IncludesLastFolderInRange`, свойства изменённых папок. Повторять с новым состоянием, пока
-`IncludesLastFolderInRange=true`. Отдельного `MaxChangesReturned` в этой операции нет;
-численный максимум страницы в использованной справке не указан. Изменения одних счётчиков
-не порождают изменение иерархии. [3: SyncFolderHierarchy][3], [33: форма запроса][33]
+**SyncFolderHierarchy.** [docs] The initial request without `SyncState` retrieves the hierarchy,
+subsequent requests return `Changes/Create|Update|Delete`. The response includes a new `SyncState`,
+`IncludesLastFolderInRange`, and properties of changed folders. Repeat with the new state until
+`IncludesLastFolderInRange=true`. This operation has no `MaxChangesReturned`;
+the reference used does not specify a numeric page maximum. Changes to counts alone
+do not produce a hierarchy change. [3: SyncFolderHierarchy][3], [33: request form][33]
 
 ```xml
 <m:SyncFolderHierarchy>
@@ -141,21 +141,21 @@ Exchange трактует как generic mail folder. [5: типы папок][5
 </m:SyncFolderHierarchy>
 ```
 
-[док] В последующие запросы после `SyncFolderId` добавляется
-`<m:SyncState>SYNC_STATE</m:SyncState>`. Нельзя смешивать состояния разных корней или менять
-между запросами «корень не задан» на `root`: это разные области синхронизации.
-[12: ошибки синхронизации][12]
+[docs] In subsequent requests, add after `SyncFolderId`
+`<m:SyncState>SYNC_STATE</m:SyncState>`. Do not mix states for different roots or change
+between requests. Do not switch from “root not specified” to `root`: these are different synchronization scopes.
+[12: synchronization errors][12]
 
-[предположение; рекомендация] Для новых/изменённых папок догружать класс и родителя через
-`GetFolder`, если их нет в выбранной форме ответа; счётчики обновлять им же при показе списка
-или периодически. Не полагаться на hierarchy delta для счётчиков.
+[assumption; recommendation] For new/changed folders, retrieve class and parent with
+`GetFolder` if they are absent from the chosen response shape; refresh counts with it when displaying a list
+or periodically. Do not rely on hierarchy deltas for counts.
 
-### В2. Списки писем: FindItem и IndexedPageItemView
+### В2. Message lists: FindItem and IndexedPageItemView
 
-[док] `FindItem Traversal="Shallow"` перечисляет непосредственные items папки. Поддержаны
-`SortOrder`, `IndexedPageItemView` и выбранные дополнительные свойства. В ответе:
+[docs] `FindItem Traversal="Shallow"` lists direct items in a folder. Supported features include
+`SortOrder`, `IndexedPageItemView`, and selected additional properties. The response includes:
 `RootFolder/@IndexedPagingOffset`, `@IncludesLastItemInRange`, `@TotalItemsInView`,
-`Items/Message/ItemId` и запрошенные доступные поля. [6: FindItem][6], [7: paging][7]
+`Items/Message/ItemId` and the requested available fields. [6: FindItem][6], [7: paging][7]
 
 ```xml
 <m:FindItem Traversal="Shallow">
@@ -179,33 +179,33 @@ Exchange трактует как generic mail folder. [5: типы папок][5
 </m:FindItem>
 ```
 
-[док] Доступны метаданные, например тема, время, размер, importance, `IsRead`,
-`HasAttachments`; это не полный объект письма. Справка ограничивает потоковые свойства 512
-байтами / 255 Unicode-символами; тела и полных recipient lists нет, есть recipient summary.
-Для `From`/`Sender` справка `FindItem` обещает имя, но не `EmailAddress`; SMTP-адреса следует
-получать через `GetItem`. [6: ограничения FindItem][6], [25: пример набора полей][25]
+[docs] Metadata is available, such as subject, time, size, importance, `IsRead`,
+and `HasAttachments`; this is not a complete message object. The reference limits streaming properties to 512
+bytes / 255 Unicode characters; bodies and full recipient lists are absent, with only recipient summaries.
+For `From`/`Sender`, the `FindItem` reference promises a name, but not `EmailAddress`; retrieve SMTP addresses
+using `GetItem`. [6: FindItem limitations][6], [25: example property set][25]
 
-[док] По умолчанию выдача без ограничения — до 1000 результатов за запрос; для AQS или
-`Restriction` в Exchange 2013 — до 250. `EWSFindCountLimit` также учитывает совокупность
-результатов одновременно выполняющихся поисков пользователя. Это не предел общего размера
-папки. [8: throttling][8]
+[docs] By default, an unrestricted query returns up to 1000 results per request; for AQS or
+`Restriction` in Exchange 2013, up to 250. `EWSFindCountLimit` also accounts for the combined
+results of simultaneously executing searches for a user. This is not a limit on total folder size.
+[8: throttling][8]
 
-[док] `MaxEntriesReturned` — верхняя заявка, сервер может вернуть меньше. Следовать
-`IndexedPagingOffset`, завершать по `IncludesLastItemInRange`, а не по сравнению количества
-строк с размером страницы. Offset paging не создаёт snapshot: вставки и удаления способны
-сдвигать страницы; Microsoft описывает проверку anchor item. [7: paging][7]
+[docs] `MaxEntriesReturned` is an upper request; the server may return fewer. Follow
+`IndexedPagingOffset`, and stop based on `IncludesLastItemInRange`, not by comparing the number
+of rows with page size. Offset paging does not create a snapshot: inserts and deletes can
+shift pages; Microsoft describes checking an anchor item. [7: paging][7]
 
-[предположение; рекомендация] Для UI взять 100 строк и дедупликацию ID; для полного наполнения
-хранилища предпочесть `SyncFolderItems` с начальным пустым состоянием. Одной сортировки по
-времени недостаточно для гарантированного обхода меняющейся папки: время может совпадать.
+[assumption; recommendation] For the UI, use 100 rows and deduplicate IDs; to fully populate
+the store, prefer `SyncFolderItems` starting with an empty state. Sorting by
+time alone is not enough to guarantee traversal of a changing folder: timestamps may tie.
 
-### В3. Инкрементальная синхронизация: SyncFolderItems
+### В3. Incremental synchronization: SyncFolderItems
 
-[док] Синхронизация идёт по одной папке. В начальном запросе `SyncState` отсутствует,
-в продолжениях содержит ровно blob из предыдущего успешного ответа. `MaxChangesReturned`
-допускает **1–512 включительно**. `NormalItems` исключает folder-associated information.
-Сервер возвращает `SyncState`, `IncludesLastItemInRange`, `Changes`.
-[9: SyncFolderItems][9], [10: MaxChangesReturned][10], [11: синхронизация][11]
+[docs] Synchronization is per folder. The initial request omits `SyncState`;
+continuations contain exactly the blob from the previous successful response. `MaxChangesReturned`
+allows **1–512 inclusive**. `NormalItems` excludes folder-associated information.
+The server returns `SyncState`, `IncludesLastItemInRange`, and `Changes`.
+[9: SyncFolderItems][9], [10: MaxChangesReturned][10], [11: synchronization][11]
 
 ```xml
 <m:SyncFolderItems>
@@ -216,48 +216,48 @@ Exchange трактует как generic mail folder. [5: типы папок][5
 </m:SyncFolderItems>
 ```
 
-[док] Для продолжения вставить `<m:SyncState>SYNC_STATE</m:SyncState>` перед
-`MaxChangesReturned`. Повторять до `IncludesLastItemInRange=true`, затем сохранять состояние
-для следующего цикла. `IdOnly` уменьшает обращения к Exchange; MIME, `Body` и коллекцию
-`Attachments` получать через `GetItem`. [9: SyncFolderItems][9], [11: best practices][11]
+[docs] For a continuation, insert `<m:SyncState>SYNC_STATE</m:SyncState>` before
+`MaxChangesReturned`. Repeat until `IncludesLastItemInRange=true`, then save the state
+for the next cycle. `IdOnly` reduces requests to Exchange; retrieve MIME, `Body`, and the
+`Attachments` collection with `GetItem`. [9: SyncFolderItems][9], [11: best practices][11]
 
-| Изменение | Что содержит / означает | Обработка в локальном store |
+| Change | Contains / means | Handling in local store |
 |---|---|---|
-| `Create` | [док] Новый item с ID и выбранными полями | [предположение] Upsert locator; поставить скачивание в очередь |
-| `Update` | [док] Изменившийся item | [предположение] Обновить метаданные; не считать каждое изменение причиной повторного MIME |
-| `Delete` | [док] ID исчезнувшего из папки item | [предположение] Пометить локальный экземпляр отсутствующим; не удалять ничего на сервере |
-| `ReadFlagChange` | [док] `ItemId` и новое `IsRead` | [предположение] Обновить только локальный флаг |
+| `Create` | [docs] New item with ID and selected fields | [assumption] Upsert locator; queue download |
+| `Update` | [docs] Changed item | [assumption] Update metadata; do not treat every change as a reason to refetch MIME |
+| `Delete` | [docs] ID of item that disappeared from folder | [assumption] Mark local instance absent; do not delete anything on server |
+| `ReadFlagChange` | [docs] `ItemId` and new `IsRead` | [assumption] Update only the local flag |
 
-[док] Источники таблицы: SOAP-пример содержит именно `ReadFlagChange`;
-обзор Microsoft [11] называет этот тип `ReadStateChange` для EWS — расхождение терминов.
-Для XML следовать форме ответа операции, не названию в обзорном тексте.
-[34: пример изменений SyncFolderItems][34], [11: обзор][11]
+[docs] Sources for the table: the SOAP example uses `ReadFlagChange`;
+Microsoft's overview [11] calls this type `ReadStateChange` for EWS — a terminology discrepancy.
+For XML, follow the operation's response shape, not the name in overview text.
+[34: SyncFolderItems change example][34], [11: overview][11]
 
-[док] При потерянном состоянии новый initial sync выполняется без `SyncState`.
-`ErrorInvalidSyncStateData` требует пересинхронизации без него. Состояния hierarchy/items,
-разных папок и разных областей невзаимозаменяемы. [12: ошибки][12], [13: ResponseCodeType][13]
+[docs] If state is lost, start a new initial sync without `SyncState`.
+`ErrorInvalidSyncStateData` requires resynchronization without it. Hierarchy/item states,
+different folders, and different scopes are not interchangeable. [12: errors][12], [13: ResponseCodeType][13]
 
-[предположение; рекомендация] Хранить blob без разбора/усечения вместе с соединением,
-папкой и scope. Применять страницу изменений и фиксировать новое состояние одной локальной
-транзакцией либо вместе с надёжной очередью догрузки. После сбоя повторять идемпотентно;
-не продвигать checkpoint поверх потерянной работы. При `ErrorSyncFolderNotFound` сначала
-освежить иерархию, при `ErrorItemNotFound` во время догрузки повторно сверить delta.
-Основание для разделения ошибок — [12], [13].
+[assumption; recommendation] Store the blob without parsing/truncation together with the connection,
+folder, and scope. Apply a change page and commit the new state in one local
+transaction or together with a reliable follow-up queue. Retry idempotently after failure;
+do not advance the checkpoint past lost work. On `ErrorSyncFolderNotFound`,
+refresh the hierarchy first; on `ErrorItemNotFound` during follow-up retrieval, reconcile the delta again.
+The basis for distinguishing errors is [12], [13].
 
-**Слишком старое состояние.** [док] Проверенные источники описывают invalid state и recovery,
-но не задают гарантированный TTL для Exchange 2013. Утверждения «протухает через N дней»
-или «никогда не протухает» здесь не подтверждены. [12], [13]
-[предположение; рекомендация] При отказе сервера использовать тот же путь полной сверки:
-построить новую локальную генерацию присутствия, завершить все страницы, только затем
-пометить пропавшие locators. Не очищать рабочий индекс до успешного окончания initial sync.
+**State expiration.** [docs] The reviewed sources describe invalid state and recovery,
+but do not specify a guaranteed TTL for Exchange 2013. Claims that it “expires after N days”
+or “never expires” are not confirmed here. [12], [13]
+[assumption; recommendation] If the server rejects state, use the same full-reconciliation path:
+build a new local generation of presence, finish all pages, and only then
+mark missing locators. Do not clear the working index until the initial sync completes successfully.
 
-### В4. Содержимое письма: GetItem с IncludeMimeContent
+### В4. Message content: GetItem with IncludeMimeContent
 
-[док] `GetItem` получает выбранные свойства нескольких IDs в одном `ItemIds`; каждую запись
-`GetItemResponseMessage` проверяют отдельно. В ответе нужны `Items/Message/ItemId`,
-`MimeContent`, а также явно запрошенные `InternetMessageId`, `IsRead`, `Attachments`.
-Коллекция `Attachments` здесь содержит метаданные, а не отдельные скачанные payloads.
-[14: GetItem для письма][14], [19: получение вложений][19], [31: результаты][31]
+[docs] `GetItem` retrieves selected properties for several IDs in one `ItemIds`; check each
+`GetItemResponseMessage` separately. The response needs `Items/Message/ItemId`,
+`MimeContent`, and explicitly requested `InternetMessageId`, `IsRead`, and `Attachments`.
+The `Attachments` collection here contains metadata, not separately downloaded payloads.
+[14: GetItem for an email message][14], [19: retrieving attachments][19], [31: results][31]
 
 ```xml
 <m:GetItem>
@@ -274,45 +274,44 @@ Exchange трактует как generic mail folder. [5: типы папок][5
 </m:GetItem>
 ```
 
-[док] `MimeContent` — XML base64Binary, атрибут `CharacterSet` не заменяет MIME-заголовки.
-После снятия внешнего base64 получается поток для `.eml`; внутри письма ещё могут быть
-собственные transfer encodings и разные charset. [15: уровни кодирования][15]
-[предположение; рекомендация] Сохранять декодированные байты напрямую; текст извлекать MIME-
-парсером, не преобразовывать весь поток через `new String(..., UTF_8)`.
+[docs] `MimeContent` is XML base64Binary; the `CharacterSet` attribute does not replace MIME headers.
+After decoding the outer base64, the result is a stream for `.eml`; the message may also contain
+its own transfer encodings and different charsets. [15: encoding layers][15]
+[assumption; recommendation] Save the decoded bytes directly; extract text with a MIME
+parser instead of converting the whole stream using `new String(..., UTF_8)`.
 
-**IsRead.** [док] Операция получает свойства, а не устанавливает флаг. В официальном
-примере `GetItem` с `IncludeMimeContent=true` в ответе остаётся `IsRead=false`.
-Таким образом, получение MIME само по себе не помечает письмо прочитанным. Изменение
-`IsRead` является отдельной записью; при запрошенном read receipt установка `true` может
-отправить уведомление. [14: пример GetItem][14], [16: IsRead][16]
-[предположение; рекомендация] Не добавлять «восстановление непрочитанности» через `UpdateItem`:
-оно само нарушает read-only. Проверку на конкретном CU пользователь сможет выполнить
-повторным чтением `IsRead`; агент её не запускал.
+**IsRead.** [docs] The operation retrieves properties; it does not set the flag. In the official
+`GetItem` example with `IncludeMimeContent=true`, the response still has `IsRead=false`.
+Thus, retrieving MIME does not itself mark a message as read. Changing
+`IsRead` is a separate write; setting it to `true` may send a notification if a read receipt was requested.
+[14: GetItem example][14], [16: IsRead][16]
+[assumption; recommendation] Do not add “restore unread state” with `UpdateItem`:
+that itself violates read-only. The user can check this on the specific CU by rereading
+`IsRead`; the agent did not run that check.
 
-**Размеры и цена.** [док] MIME-конверсия затратна и содержит ограниченный набор свойств;
-Microsoft не рекомендует массовый частый MIME-экспорт. [17: экспорт][17]
-[док] В Exchange 2013 документированы EWS `maxAllowedContentLength` и
-`maxReceivedMessageSize` по 67 108 864 байта (64 MiB), с учётом base64 usable size меньше.
-Это настройки принимаемых запросов/IIS/bindings, **не доказательство предела 48 MiB для
-ответа `GetItem` или скачиваемого вложения**. Универсальный лимит MIME-ответа для CU23
-в этих источниках не установлен. [32: размеры в Exchange 2013][32]
+**Size and cost.** [docs] MIME conversion is expensive and includes a limited set of properties;
+Microsoft does not recommend frequent bulk MIME export. [17: export][17]
+[docs] In Exchange 2013, EWS `maxAllowedContentLength` and
+`maxReceivedMessageSize` are documented as 67,108,864 bytes (64 MiB); accounting for base64, usable size is smaller.
+These are settings for accepted requests/IIS/bindings, **not proof of a 48 MiB limit for
+`GetItem` responses or downloaded attachments**. These sources do not establish a universal MIME-response limit for CU23. [32: Exchange 2013 sizes][32]
 
-[док] Microsoft рекомендует при синхронизации `GetItem`-пакеты по 10 items.
+[docs] Microsoft recommends `GetItem` batches of 10 items during synchronization.
 [11: best practices][11]
-[предположение; рекомендация] Для MIME начать с одного крупного письма или небольшого пакета
-до 10 мелких; ограничивать суммарные байты и время локально. Не принимать количество 10 за
-протокольный максимум. Повторно не скачивать MIME только из-за смены read flag; метаданные
-версии и состояния хранить отдельно от `.eml`.
+[assumption; recommendation] For MIME, start with one large message or a small batch
+of up to 10 small ones; limit total bytes and time locally. Do not treat 10 as a
+protocol maximum. Do not download MIME again only because the read flag changed; store version
+and state metadata separately from `.eml`.
 
-### В5. Вложения: GetAttachment
+### В5. Attachments: GetAttachment
 
-[док] Сначала получить `item:Attachments` через `GetItem`, затем вызвать `GetAttachment`
-с одним или несколькими attachment IDs. Файл приходит как `FileAttachment/Content` (base64),
-вложенный item — как `ItemAttachment/Message` или другой тип item. Важны `AttachmentId`,
-`Name`, `ContentType`, `ContentId`, `IsInline`, `Size`; значения метаданных могут зависеть
-от исходного вложения. [18: GetAttachment][18], [19: процесс получения][19]
+[docs] First retrieve `item:Attachments` with `GetItem`, then call `GetAttachment`
+with one or more attachment IDs. A file arrives as `FileAttachment/Content` (base64),
+an embedded item arrives as `ItemAttachment/Message` or another item type. Relevant fields include `AttachmentId`,
+`Name`, `ContentType`, `ContentId`, `IsInline`, and `Size`; metadata values may depend
+on the source attachment. [18: GetAttachment][18], [19: retrieval process][19]
 
-Файл, минимальный запрос [док; 18]:
+File, minimal request [docs; 18]:
 
 ```xml
 <m:GetAttachment>
@@ -321,7 +320,7 @@ Microsoft не рекомендует массовый частый MIME-экс�
 </m:GetAttachment>
 ```
 
-MIME вложенного письма [док; 20]:
+Embedded message MIME [docs; 20]:
 
 ```xml
 <m:GetAttachment>
@@ -330,28 +329,28 @@ MIME вложенного письма [док; 20]:
 </m:GetAttachment>
 ```
 
-[док] Во втором случае `ItemAttachment/Message/MimeContent` надо декодировать как `.eml`.
-Пустой `AttachmentShape` MIME item attachment не запрашивает. Пагинации или byte-range
-в форме `GetAttachment` нет: получаем полное вложение, а не его очередной кусок.
+[docs] In the second case, decode `ItemAttachment/Message/MimeContent` as `.eml`.
+An empty `AttachmentShape` does not request MIME for an item attachment. `GetAttachment` has no pagination or byte-range:
+it retrieves the full attachment, not a segment.
 [18: GetAttachment][18], [20: IncludeMimeContent][20]
 
-[док] Вложения могут вкладываться рекурсивно. `HasAttachments` не сигнализирует об одних
-inline-вложениях; для HTML с `cid:` надо читать коллекцию. Файл `.msg` относится к file
-attachment и не превращается автоматически в EWS item attachment. [21: типы вложений][21]
+[docs] Attachments may be nested recursively. `HasAttachments` does not signal inline-only
+attachments; for HTML containing `cid:`, inspect the collection. A `.msg` file is a file
+attachment and does not automatically become an EWS item attachment. [21: attachment types][21]
 
-[предположение; рекомендация] Для больших вложений — один ID на запрос, потоковое base64-
-декодирование в ограниченный локальный файл, лимиты размера и глубины распаковки. Численный
-предел скачивания для CU23 — **не установлен**; настройки 64 MiB из В4 нельзя механически
-считать пределом файла. [32] описывает транспортные настройки, а не range download.
-Если полный MIME родителя уже сохранён, повторное скачивание file attachment может быть
-излишним; выбор между MIME-частью и EWS attachment требует сопоставления метаданных.
+[assumption; recommendation] For large attachments, use one ID per request, stream-decode base64
+into a bounded local file, and enforce size and unpacking-depth limits. The numeric
+download limit for CU23 is **not established**; the 64 MiB settings from В4 cannot automatically
+be treated as a file limit. [32] describes transport settings, not range download.
+If the complete parent MIME is already saved, downloading the file attachment again may be
+unnecessary; choosing between the MIME part and EWS attachment requires matching metadata.
 
-### В6. Цепочки: ConversationId, FindConversation, GetConversationItems
+### В6. Conversations: ConversationId, FindConversation, GetConversationItems
 
-[док] `item:ConversationId` связывает item с разговором; его можно запросить среди
-метаданных. `FindConversation` перечисляет разговоры папки, доступен с 2010 SP1.
-`GetConversationItems` появился в 2013 и поддерживает primary/archive mailbox.
-[22: FindConversation][22], [23: GetConversationItems][23], [30: версии][30]
+[docs] `item:ConversationId` links an item to a conversation and can be requested among
+the metadata. `FindConversation` lists conversations in a folder and has been available since 2010 SP1.
+`GetConversationItems` first appeared in 2013 and supports primary/archive mailboxes.
+[22: FindConversation][22], [23: GetConversationItems][23], [30: versions][30]
 
 ```xml
 <m:FindConversation>
@@ -360,15 +359,15 @@ attachment и не превращается автоматически в EWS it
 </m:FindConversation>
 ```
 
-[док] Ответ: `Conversations/Conversation`, `ConversationId`, `ConversationTopic`,
-`LastDeliveryTime`, `MessageCount`, `UnreadCount`, `ItemIds`; варианты `Global*` описывают
-разговор шире текущей папки. Есть индексированный view; образец ответа и справка
-`FindConversationResponse` не показывают `RootFolder` с курсором как у `FindItem`.
-Точный потолок страницы CU23 в этих источниках не указан. [22: операция][22],
-[36: форма ответа][36]
-[предположение; рекомендация] Не переносить парсер paging от `FindItem` без проверки;
-использовать небольшие страницы и проверить завершение обхода на CU23. Для полноты локального
-индекса исходить из folder/item sync, а не из перечисления conversations.
+[docs] The response includes `Conversations/Conversation`, `ConversationId`, `ConversationTopic`,
+`LastDeliveryTime`, `MessageCount`, `UnreadCount`, `ItemIds`; `Global*` variants describe
+conversation beyond the current folder. An indexed view is available; the response example and
+`FindConversationResponse` reference do not show a `RootFolder` cursor like `FindItem` has.
+These sources do not state the exact CU23 page ceiling. [22: operation][22],
+[36: response shape][36]
+[assumption; recommendation] Do not reuse the `FindItem` paging parser without checking it;
+use small pages and verify traversal completion on CU23. For a complete local
+index, rely on folder/item sync rather than conversation listing.
 
 ```xml
 <m:GetConversationItems>
@@ -385,24 +384,24 @@ attachment и не превращается автоматически в EWS it
 </m:GetConversationItems>
 ```
 
-[док] Ответ: `ConversationId`, собственный `SyncState`, `ConversationNodes/ConversationNode`
-с `InternetMessageId`, `ParentInternetMessageId` и `Items`. Можно исключить папки через
-`FoldersToIgnore`; передача conversation sync state ограничивает выдачу новыми/изменёнными
-items. Это другое состояние, чем у `SyncFolderItems`.
+[docs] The response contains `ConversationId`, its own `SyncState`, `ConversationNodes/ConversationNode`
+with `InternetMessageId`, `ParentInternetMessageId`, and `Items`. Folders can be excluded with
+`FoldersToIgnore`; passing conversation sync state limits results to new/changed
+items. This state differs from `SyncFolderItems` state.
 [23: GetConversationItems][23]
-[док] `MaxItemsToReturn` ограничивает размер выдачи, но его справка не устанавливает
-численный default/max; 100 в примере — выбранный размер, не подтверждённый максимум.
+[docs] `MaxItemsToReturn` limits result size, but its reference does not establish
+a numeric default/max; 100 in the example is a chosen size, not a confirmed maximum.
 [35: MaxItemsToReturn][35]
-[предположение; рекомендация] Не считать ограниченный ответ полной историей и не использовать
-conversation sync state как offset-курсор для всей старой цепочки. При необходимости полноту
-цепочки обеспечивать локальными проиндексированными items по conversation ID, догружая MIME
-через `GetItem`. Между разными соединениями conversation IDs не объединять автоматически.
+[assumption; recommendation] Do not treat a limited response as complete history or use
+conversation sync state as an offset cursor for the entire old thread. If needed, ensure thread
+completeness using locally indexed items by conversation ID, fetching MIME
+with `GetItem`. Do not automatically merge conversation IDs across different connections.
 
-### В7. Поиск: Restriction против QueryString (AQS)
+### В7. Search: Restriction versus QueryString (AQS)
 
-[док] `Restriction` задаёт сравнения полей, `And`/`Or`/`Not`, `Exists`, `Contains`, диапазоны
-и extended properties; `Contains` управляет case/containment. Это предпочтительный путь
-для точного поиска по конкретным свойствам. [26: search filters][26]
+[docs] `Restriction` defines field comparisons, `And`/`Or`/`Not`, `Exists`, `Contains`, ranges,
+and extended properties; `Contains` controls case/containment. This is the preferred path
+for precise searches over specific properties. [26: search filters][26]
 
 ```xml
 <m:FindItem Traversal="Shallow">
@@ -418,11 +417,11 @@ conversation sync state как offset-курсор для всей старой 
 </m:FindItem>
 ```
 
-[док] AQS ищет по content index: без имени поля — по индексированным свойствам, с именем —
-например `subject:`, `body:`, `from:`, `attachment:`. Произвольные custom properties в этот
-индекс не входят. `QueryString` и `Restriction` в одном запросе взаимоисключаются.
-В 2013 `QueryString` получил тип `QueryStringType` с дополнительными необязательными
-атрибутами; сам AQS существовал до 2013. [24: QueryString][24], [25: AQS][25]
+[docs] AQS searches the content index: without a field name, it searches indexed properties; with a field name,
+for example `subject:`, `body:`, `from:`, or `attachment:`. Arbitrary custom properties are not in this
+index. `QueryString` and `Restriction` are mutually exclusive in one request.
+In 2013, `QueryString` gained the `QueryStringType` type with additional optional
+attributes; AQS itself predates 2013. [24: QueryString][24], [25: AQS][25]
 
 ```xml
 <m:FindItem Traversal="Shallow">
@@ -433,46 +432,45 @@ conversation sync state как offset-курсор для всей старой 
 </m:FindItem>
 ```
 
-[док] `attachment:` охватывает имя и тело файла, а не только название. Однако Exchange Search
-индексирует лишь поддержанные форматы; в Exchange 2013 обработка идёт в transport pipeline
-или вскоре после создания/доставки. Это не численный SLA задержки. [24: attachment][24],
-[27: поддержанные форматы][27], [37: Exchange Search 2013][37]
+[docs] `attachment:` covers the filename and file content, not only the name. However, Exchange Search
+indexes only supported formats; in Exchange 2013, processing occurs in the transport pipeline
+or soon after creation/delivery. This is not a numeric latency SLA. [24: attachment][24],
+[27: supported formats][27], [37: Exchange Search 2013][37]
 
-[док] AQS использует регистронезависимое сопоставление, по умолчанию prefix matching;
-кавычки задают слово/фразу. Возможны ошибки `ErrorContentIndexingNotEnabled`,
-`ErrorInvalidQueryString` и `ErrorQueryFilterTooLong`; последняя ограничивает restriction
-255 выражениями. [24: синтаксис][24], [13: коды ошибок][13]
-[предположение; рекомендация] Не обещать, что найдено содержимое всех PDF/архивов/сканов:
-повреждение, шифрование, отсутствие текстового слоя и состояние индекса требуют локальной
-проверки. Серверный поиск использовать как дополнительный канал, полный поиск вложений
-строить по локально извлечённому тексту.
+[docs] AQS uses case-insensitive matching and prefix matching by default;
+quotes specify a word/phrase. Possible errors include `ErrorContentIndexingNotEnabled`,
+`ErrorInvalidQueryString`, and `ErrorQueryFilterTooLong`; the latter limits a restriction
+to 255 expressions. [24: syntax][24], [13: error codes][13]
+[assumption; recommendation] Do not promise that content in all PDFs/archives/scans will be found:
+corruption, encryption, missing text layers, and index state require local
+verification. Use server search as an additional channel; build complete attachment search
+over locally extracted text.
 
-[док] Для обоих видов поиска применять ограничения страницы и paging из В2.
-[предположение; рекомендация] Не создавать search folders ради read-only поиска:
-их создание меняет ящик. Обход поддерева выполнять по известным физическим папкам;
-`FindItem` с `Shallow` сам не рекурсивен. Основание — [6], [30].
+[docs] Apply the page limits and paging from В2 to both search types.
+[assumption; recommendation] Do not create search folders for read-only search:
+creating them changes the mailbox. Traverse subtrees through known physical folders;
+`FindItem` with `Shallow` is not recursive. Basis: [6], [30].
 
-### В8. Идентификаторы и ключ сообщения
+### В8. Identifiers and message key
 
-| Значение | Проверенное поведение | Следствие для store |
+| Value | Verified behavior | Store implication |
 |---|---|---|
-| `ItemId/@Id` | [док] Непрозрачный, регистрозависимый; при move может смениться, поскольку move реализуется через copy/delete. [28] | [предположение] Текущий адрес экземпляра, не постоянный ключ |
-| Copy | [док] Копирование создаёт новый item; исходный остаётся. [30], [28] | [предположение] Два экземпляра нельзя сливать только по одинаковому содержимому |
-| Sync IDs | [док] Sync возвращает ID текущих items и ID удалений; полноценного move-события среди четырёх типов delta нет. [9], [34] | [предположение] Межпапочный move наблюдать как исчезновение/появление; корреляция не всегда однозначна |
-| `ChangeKey` | [док] Меняется при изменении item; используется для контроля версии. [28] | [предположение] Хранить отдельно; изменение не доказывает изменение MIME |
-| `InternetMessageId` | [док] EWS Internet message identifier; RFC `Message-ID` описывает версию сообщения, а не его положение в ящике. [38], [39] | [предположение] Поле корреляции/дедупликации контента, не уникальный ключ экземпляра |
-| `ConvertId` | [док] Конверсия между EwsId, EntryId/HexEntryId и другими форматами, доступна с 2007 SP1. [29] | [предположение] Не даёт обещания неизменяемости после move |
+| `ItemId/@Id` | [docs] Opaque, case-sensitive; may change on move because move is implemented as copy/delete. [28] | [assumption] Current instance locator, not a permanent key |
+| Copy | [docs] Copy creates a new item; the original remains. [30], [28] | [assumption] Do not merge two instances based only on equal content |
+| Sync IDs | [docs] Sync returns IDs of current items and deleted IDs; the four delta types have no full move event. [9], [34] | [assumption] Observe cross-folder move as disappearance/appearance; correlation is not always unambiguous |
+| `ChangeKey` | [docs] Changes when an item changes; used for version control. [28] | [assumption] Store separately; a change does not prove MIME changed |
+| `InternetMessageId` | [docs] EWS Internet message identifier; RFC `Message-ID` identifies a message version, not its mailbox location. [38], [39] | [assumption] Correlation/content-deduplication field, not a unique instance key |
+| `ConvertId` | [docs] Converts between EwsId, EntryId/HexEntryId, and other formats; available since 2007 SP1. [29] | [assumption] Does not promise immutability after a move |
 
-[док] RFC 5322 требует глобальную уникальность корректно сформированного `Message-ID`, но
-его наличие для сообщения — `SHOULD`, а не универсальное `MUST`. Копии одного сообщения
-не превращаются из-за копирования в разные версии сообщения. [39: RFC 5322, §3.6.4][39]
-[предположение] В реальных данных надо допускать отсутствующий/некорректный/повторённый ID;
-даже корректный ID может присутствовать в нескольких экземплярах и разных ящиках. Поэтому
-`connection + InternetMessageId` не обеспечивает уникальность item.
+[docs] RFC 5322 requires a globally unique well-formed `Message-ID`, but its presence in a message is
+`SHOULD`, not a universal `MUST`. Copies of one message do not become distinct message versions merely by copying. [39: RFC 5322, §3.6.4][39]
+[assumption] Real data must allow for missing/invalid/duplicated IDs;
+even a valid ID may appear in multiple instances and mailboxes. Therefore,
+`connection + InternetMessageId` does not make an item unique.
 
-[док] `ConvertId` принимает массив `SourceIds`, возвращает `AlternateId` с `Format`, `Id`,
-`Mailbox`; пагинации нет. Операция проверяет формат SMTP-адреса, но не существование ящика.
-Универсальный размер пакета для CU23 в справке не задан. [29: ConvertId][29]
+[docs] `ConvertId` accepts an array of `SourceIds` and returns `AlternateId` with `Format`, `Id`,
+and `Mailbox`; there is no paging. The operation validates SMTP address format, but not mailbox existence.
+The reference does not define a universal batch size for CU23. [29: ConvertId][29]
 
 ```xml
 <m:ConvertId DestinationFormat="EwsId">
@@ -482,231 +480,230 @@ conversation sync state как offset-курсор для всей старой 
 </m:ConvertId>
 ```
 
-**Рекомендация по ключу** [предположение, не принятое решение]: постоянный ключ записи
-`(connectionId, localMessageUuid)`, где локальный UUID назначается экземпляру и не зависит
-от сервера. Отдельно хранить:
+**Key recommendation** [assumption, not an accepted decision]: a permanent record key
+`(connectionId, localMessageUuid)`, where the local UUID is assigned to an instance and does not depend
+on the server. Store separately:
 
-- текущий locator `(connectionId, mailboxScope, ewsItemId)` с регистрозависимым сравнением,
-  родительскую папку, `ChangeKey`, состояние присутствия и историю aliases;
-- `InternetMessageId`, даты, отправителя, размер и fingerprint нормализованного содержимого
-  для поиска кандидатов при перемещении;
-- SHA-256 скачанных MIME-байтов для целостности/повторного использования blob, без требования
-  стабильности этого хэша между повторными EWS-конверсиями.
+- current locator `(connectionId, mailboxScope, ewsItemId)` with case-sensitive comparison,
+  parent folder, `ChangeKey`, presence state, and alias history;
+- `InternetMessageId`, dates, sender, size, and normalized-content fingerprint
+  for finding move candidates;
+- SHA-256 of downloaded MIME bytes for integrity/blob reuse, without requiring
+  this hash to remain stable across repeated EWS conversions.
 
-[предположение; рекомендация] После delete/create переносить UUID на новый locator только
-при достаточно однозначном сопоставлении в том же ящике; при нескольких одинаковых копиях
-сохранять разные UUID и при необходимости связь «то же содержимое». Удаление locator не
-должно уничтожать blob, если есть другие ссылки. Это сохраняет стабильность локальных URI
-и не теряет дубли; компромисс — абсолютное распознавание move против copy+delete по этим
-операциям не гарантируется. Основание: изменчивость IDs [28], семантика MIME [17] и
-`Message-ID` [39].
+[assumption; recommendation] After delete/create, transfer the UUID to the new locator only
+when the match in the same mailbox is sufficiently unambiguous; with several identical copies,
+retain separate UUIDs and, if needed, a “same content” link. Removing a locator must not
+delete a blob that has other references. This keeps local URIs stable
+and preserves duplicates; the tradeoff is that these operations cannot guarantee definitive distinction between move and copy+delete.
+Basis: ID mutability [28], MIME semantics [17], and `Message-ID` [39].
 
-### В9. Throttling, лимиты и повтор запросов
+### В9. Throttling, limits, and request retries
 
-[док] Exchange 2013 использует budget/recharge и microdelays; администратор может переопределить
-глобальную политику через Organization/Regular scopes. Значение по документации не доказывает
-действующую политику конкретного пользователя. [40: workload management 2013][40]
+[docs] Exchange 2013 uses budget/recharge and microdelays; an administrator can override
+the global policy through Organization/Regular scopes. A documented value does not prove
+the effective policy for a specific user. [40: workload management 2013][40]
 
-| Параметр | Что применимо к Exchange 2013 | Статус значения / источник |
+| Parameter | What applies to Exchange 2013 | Value status / source |
 |---|---|---|
-| `EWSMaxConcurrency` | [док] Одновременные запросы пользователя | **27** в версии-специфичной таблице EWS [8]; справка cmdlet пишет **10** без разделения версий [41]. Конфликт источников; проверить effective policy |
-| `EWSPercentTimeInCAS` | [док] Параметр Exchange 2010 | Для 2013 неприменим как документированный процентный default; не переносить старые числа [41] |
-| `EWSPercentTimeInAD` | [док] Параметр Exchange 2010 | То же; для 2013 не задаём процент [41] |
-| `EWSPercentTimeInMailboxRPC` | [док] Параметр Exchange 2010 | То же; для 2013 не задаём процент [41] |
-| `EwsMaxBurst`, `EwsRechargeRate`, `EwsCutoffBalance` | [док] Модель бюджета с Exchange 2013 | Численные defaults для CU23 здесь не установлены; effective policy проверяет администратор [40], [41] |
-| `EWSFindCountLimit` | [док] Числа и учёт параллельных поисков — В2 | С 2013 не доступен для чтения/изменения через cmdlet [8] |
-| `EWSMaxBatchSize` | [предположение] Публичного параметра с этим именем не найдено | В перечне параметров cmdlet [41] отсутствует; утверждать «default 100» нельзя |
+| `EWSMaxConcurrency` | [docs] Simultaneous user requests | **27** in version-specific EWS table [8]; cmdlet reference says **10** without version distinction [41]. Source conflict; check effective policy |
+| `EWSPercentTimeInCAS` | [docs] Exchange 2010 parameter | Not applicable as a documented percentage default for 2013; do not carry over old values [41] |
+| `EWSPercentTimeInAD` | [docs] Exchange 2010 parameter | Same; do not set a percentage for 2013 [41] |
+| `EWSPercentTimeInMailboxRPC` | [docs] Exchange 2010 parameter | Same; do not set a percentage for 2013 [41] |
+| `EwsMaxBurst`, `EwsRechargeRate`, `EwsCutoffBalance` | [docs] Budget model since Exchange 2013 | Numeric defaults for CU23 not established here; administrator checks effective policy [40], [41] |
+| `EWSFindCountLimit` | [docs] Counts and concurrent-search accounting — В2 | Since 2013, cannot be read/changed through the cmdlet [8] |
+| `EWSMaxBatchSize` | [assumption] No public parameter with this name found | Absent from cmdlet parameter list [41]; do not claim “default 100” |
 
-[док] Справка [41] охватывает несколько версий и прямо помечает три `PercentTimeIn*`
-как применимые только к 2010. Строка `Default value: None` в метаданных cmdlet не означает
-«бюджет отключён» или действующий policy default. [41: New-ThrottlingPolicy][41]
+[docs] Reference [41] covers several versions and explicitly marks the three `PercentTimeIn*`
+parameters as applying only to 2010. `Default value: None` in cmdlet metadata does not mean
+“budget disabled” or represent the effective policy default. [41: New-ThrottlingPolicy][41]
 
-[предположение; рекомендация] Рабочая гипотеза для 2013 — 27 по специализированной таблице,
-но начинать с одного выполняемого запроса на соединение. Не планировать нагрузку исходя
-из максимума: тот же пользователь может обращаться к EWS другими клиентами.
+[assumption; recommendation] The working hypothesis for 2013 is 27 based on the specialized table,
+but start with one active request per connection. Do not plan load around
+the maximum: the same user may access EWS through other clients.
 
-[док] EWS проверяет бюджет в пакетах по items; слишком большой пакет может не уложиться
-в документированную минуту выполнения batch. [8: batch throttling][8]
-[предположение; рекомендация] Размер пакета выбирать по байтам/латентности, а не искать
-единственный «максимум items». Рекомендованные 10 при sync — ориентир, не `EWSMaxBatchSize`.
+[docs] EWS checks budget in batches of items; an oversized batch may exceed
+the documented one-minute batch execution time. [8: batch throttling][8]
+[assumption; recommendation] Choose batch size based on bytes/latency rather than seeking
+a single “maximum items” value. The recommended 10 for sync is a guideline, not `EWSMaxBatchSize`.
 [11: sync best practices][11]
 
-| Ошибка / ответ | Что делать |
+| Error / response | Action |
 |---|---|
-| `ErrorServerBusy`, включая SOAP fault / inner error | [док] Выдержать `BackOffMilliseconds`, когда сервер его прислал [8] |
-| `ErrorExceededConnectionCount` | [док] Превышена concurrency [13]; [предположение] уменьшить параллелизм, поставить запрос в очередь |
-| `ErrorExceededFindCountLimit` | [док] Превышен find budget [13]; [предположение] уменьшить страницу и число одновременных поисков |
-| HTTP 503 / 500 / 200 с EWS error | [док] Все могут сопровождать throttling; разбирать HTTP и SOAP [8], [31] |
-| `ErrorInvalidSyncStateData` | [док] Полная синхронизация без состояния, не бесконечный retry [13] |
-| `ErrorContentConversionFailed`, `ErrorItemCorrupt` | [док] Ошибка MIME/свойств [13]; [предположение] оставить явную ошибку контента, отдельно попробовать метаданные |
-| `ErrorItemNotFound`, `ErrorAccessDenied`, 401/403 | [предположение] Не повторять автоматически вход; проверить права/конфигурацию или сверить locator с delta. Значения EWS ошибок — [13] |
+| `ErrorServerBusy`, including SOAP fault / inner error | [docs] Honor `BackOffMilliseconds` when the server sends it [8] |
+| `ErrorExceededConnectionCount` | [docs] Concurrency exceeded [13]; [assumption] reduce parallelism and queue the request |
+| `ErrorExceededFindCountLimit` | [docs] Find budget exceeded [13]; [assumption] reduce page size and concurrent searches |
+| HTTP 503 / 500 / 200 with EWS error | [docs] All may accompany throttling; parse both HTTP and SOAP [8], [31] |
+| `ErrorInvalidSyncStateData` | [docs] Full sync without state, not an endless retry [13] |
+| `ErrorContentConversionFailed`, `ErrorItemCorrupt` | [docs] MIME/property error [13]; [assumption] retain an explicit content error, and try metadata separately |
+| `ErrorItemNotFound`, `ErrorAccessDenied`, 401/403 | [assumption] Do not retry sign-in automatically; check permissions/configuration or reconcile locator with delta. EWS error definitions: [13] |
 
-[предположение; рекомендация] На transient failure повторять только неуспешную часть read-only
-пакета. Остановить запросы затронутого соединения как минимум на серверный backoff; если его
-нет — ограниченный exponential backoff с jitter, например 1, 2, 4, 8, 16, 32 секунды,
-с общим deadline и возможностью отмены. Серверный backoff нельзя сокращать до клиентского
-потолка. После нескольких неудач вернуть состояние «временно недоступно», сохранив checkpoint.
-Это предлагаемые настройки клиента, не defaults Exchange; основание для прекращения потока
-запросов при throttling — [11].
+[assumption; recommendation] On transient failure, retry only the failed part of a read-only
+batch. Pause requests for the affected connection for at least the server backoff; if none is
+provided, use bounded exponential backoff with jitter, for example 1, 2, 4, 8, 16, 32 seconds,
+with an overall deadline and cancellation. Do not cap a server backoff to a shorter client
+maximum. After several failures, return a “temporarily unavailable” state while retaining the checkpoint.
+These are proposed client settings, not Exchange defaults; [11] supports pausing the request flow
+when throttled.
 
-### В10. Безопасность режима только чтения
+### В10. Read-only mode safety
 
-[док] `GetFolder`, `FindFolder`, `FindItem`, `GetItem`, `GetAttachment`, `FindConversation`,
-`GetConversationItems` получают данные; `SyncFolderHierarchy`/`SyncFolderItems` сообщают
-изменения клиенту; `ConvertId` преобразует ID. Эти операции не дают команды изменения
-письма, папки или настроек. В частности, `Create`/`Update`/`Delete` в **ответе sync** —
-описание уже произошедших изменений, не команда записать их обратно. Подтверждения по каждой
-операции и ограничения собраны в сравнительной таблице ниже. [1], [2], [3], [6], [9], [14],
+[docs] `GetFolder`, `FindFolder`, `FindItem`, `GetItem`, `GetAttachment`, `FindConversation`,
+and `GetConversationItems` retrieve data; `SyncFolderHierarchy`/`SyncFolderItems` report
+changes to the client; `ConvertId` converts IDs. These operations do not issue commands to change
+a message, folder, or settings. In particular, `Create`/`Update`/`Delete` in a **sync response**
+describe changes that have already occurred; they are not commands to write them back. Evidence and
+limitations for each operation are collected in the comparison table below. [1], [2], [3], [6], [9], [14],
 [18], [22], [23], [29]
 
-[предположение; рекомендация] Использовать строгий allowlist этих SOAP operations;
-не предоставлять модели произвольный SOAP. Имена методов SDK вроде `Load`/`Bind` проверять
-по отправляемому wire request; UI-действие «открыть письмо» не должно вызывать дополнительную
-запись. Эта рекомендация относится к будущей реализации, кода в этом исследовании нет.
+[assumption; recommendation] Use a strict allowlist of these SOAP operations;
+do not expose arbitrary SOAP to the model. Check SDK method names such as `Load`/`Bind`
+against the wire request they send; a UI action to “open a message” must not trigger an additional
+write. This recommendation is for a future implementation; this research contains no code.
 
-Запрещённые в read-only операции [док: назначения в каталоге EWS][30]:
+Operations prohibited in read-only mode [docs: definitions in EWS operations catalog][30]:
 
-- items: `CreateItem` (включая draft, reply/forward, response objects и `SuppressReadReceipt`),
-  `UpdateItem` (включая `IsRead`, флаги, категории), `DeleteItem`, `MoveItem`, `CopyItem`,
+- items: `CreateItem` (including draft, reply/forward, response objects, and `SuppressReadReceipt`),
+  `UpdateItem` (including `IsRead`, flags, categories), `DeleteItem`, `MoveItem`, `CopyItem`,
   `SendItem`, `ArchiveItem`, `MarkAllItemsAsRead`, `MarkAsJunk`;
-- вложения и папки: `CreateAttachment`, `DeleteAttachment`, `CreateFolder`, `CreateFolderPath`,
+- attachments and folders: `CreateAttachment`, `DeleteAttachment`, `CreateFolder`, `CreateFolderPath`,
   `CreateManagedFolder`, `UpdateFolder`, `DeleteFolder`, `EmptyFolder`, `MoveFolder`, `CopyFolder`;
-- conversation actions и настройки: `ApplyConversationAction`, `UpdateInboxRules`,
+- conversation actions and settings: `ApplyConversationAction`, `UpdateInboxRules`,
   `SetUserOofSettings`, `AddDelegate`, `UpdateDelegate`, `RemoveDelegate`,
   `CreateUserConfiguration`, `UpdateUserConfiguration`, `DeleteUserConfiguration`, `UploadItems`.
 
-[предположение; рекомендация] Список запрещённых примеров не заменяет allowlist: все остальные
-операции, включая подписки и управление search folders, вне разрешённого набора MVP.
-Возвращаемые в `ResponseObjects` возможности ответа не исполнять. Переключать прочитанность
-для «проверки» и затем возвращать её обратно также нельзя.
+[assumption; recommendation] This list of prohibited examples does not replace an allowlist: all other
+operations, including subscriptions and search-folder management, are outside the MVP's allowed set.
+Do not execute response actions returned in `ResponseObjects`. Do not toggle read state
+“for testing” and then change it back.
 
-## Сравнительные таблицы
+## Comparison tables
 
-Все строки относятся к `Exchange2013_SP1`. «Да» означает отсутствие изменения содержимого и
-настроек ящика самой указанной операцией, а не отсутствие серверного учёта нагрузки.
+All rows apply to `Exchange2013_SP1`. “Yes” means the operation itself does not change mailbox content or
+settings; it does not mean the server incurs no load.
 
-| Операция | Зачем нам | Только чтение? | Лимиты | Особенности Exchange 2013 | Источник |
+| Operation | Why we need it | Read-only? | Limits | Exchange 2013 specifics | Source |
 |---|---|---|---|---|---|
-| `GetFolder` | Свойства и актуальные счётчики | [док] Да | Нет paging; численный batch max не установлен | `AllProperties` не возвращает права без явного запроса | [1] |
-| `FindFolder` | Дерево папок | [док] Да | Paging; find budget; усечение streamable properties | Deep для private tree; не для public folders | [2], [7], [8] |
-| `SyncFolderHierarchy` | Изменения дерева | [док] Да | `IncludesLastFolderInRange`; нет клиентского max changes | Изменения одних счётчиков не сообщаются | [3], [33] |
-| `FindItem` | Список и серверный поиск | [док] Да | 1000 без filter / 250 с filter или AQS; paging | Нет полного тела/recipient lists; AQS поддержан | [6], [8], [24] |
-| `SyncFolderItems` | Delta каждой физической папки | [док] Да | 1–512 изменений; цикл до last=true | Нет полноценного MIME; не использовать для search folders | [9], [10], [11] |
-| `GetItem` | MIME и полные выбранные свойства | [док] Да, `IsRead` не устанавливает | Нет paging; MIME response max не установлен; рекомендованы малые пакеты | MIME-конверсия затратна; это не raw backup | [14], [17] |
-| `GetAttachment` | Файлы и вложенные письма | [док] Да | Целое вложение; нет byte-range; download max не установлен | Item MIME требует `IncludeMimeContent` | [18], [20] |
-| `FindConversation` | Список разговоров | [док] Да | Indexed view; численный max CU23 не установлен | С 2010 SP1; folder/global свойства различаются | [22], [36] |
-| `GetConversationItems` | Узлы и items цепочки | [док] Да | `MaxItemsToReturn`; default/max не установлены | С 2013; отдельный conversation sync state | [23], [35] |
-| `ConvertId` | Совместимость форматов IDs | [док] Да | Массив IDs; нет paging; численный max не установлен | Не гарантирует постоянный ID при move | [29], [28] |
+| `GetFolder` | Folder properties and current counts | [docs] Yes | No paging; numeric batch maximum not established | `AllProperties` omits permissions unless explicitly requested | [1] |
+| `FindFolder` | Folder tree | [docs] Yes | Paging; find budget; streamable-property truncation | Deep for private tree; not public folders | [2], [7], [8] |
+| `SyncFolderHierarchy` | Tree changes | [docs] Yes | `IncludesLastFolderInRange`; no client max changes | Count-only changes are not reported | [3], [33] |
+| `FindItem` | List and server-side search | [docs] Yes | 1000 without filter / 250 with filter or AQS; paging | No full body/recipient lists; AQS supported | [6], [8], [24] |
+| `SyncFolderItems` | Delta for each physical folder | [docs] Yes | 1–512 changes; loop until last=true | No full MIME; do not use for search folders | [9], [10], [11] |
+| `GetItem` | MIME and selected full properties | [docs] Yes, does not set `IsRead` | No paging; MIME response max not established; small batches recommended | MIME conversion is expensive; not a raw backup | [14], [17] |
+| `GetAttachment` | Files and embedded messages | [docs] Yes | Whole attachment; no byte-range; download max not established | Item MIME requires `IncludeMimeContent` | [18], [20] |
+| `FindConversation` | Conversation list | [docs] Yes | Indexed view; numeric max for CU23 not established | Since 2010 SP1; folder/global properties differ | [22], [36] |
+| `GetConversationItems` | Conversation nodes and items | [docs] Yes | `MaxItemsToReturn`; default/max not established | Since 2013; separate conversation sync state | [23], [35] |
+| `ConvertId` | ID format compatibility | [docs] Yes | ID array; no paging; numeric max not established | Does not guarantee stable ID after move | [29], [28] |
 
-## Рекомендация
+## Recommendation
 
-[предположение; рекомендация, решение за пользователем] Для MVP: одно соединение —
-одна очередь ограниченных read-only запросов. Получить дерево под `msgfolderroot`, выбрать
-физические mail folders, для каждой выполнить initial `SyncFolderItems IdOnly`, затем
-догрузить метаданные и MIME. Поддерживать отдельно hierarchy state, item state каждой папки
-и при необходимости conversation state. Счётчики освежать через `GetFolder`.
+[assumption; recommendation, decision belongs to user] For the MVP: one connection —
+one queue of bounded read-only requests. Retrieve the tree under `msgfolderroot`, select
+physical mail folders, run initial `SyncFolderItems IdOnly` for each, then
+fetch metadata and MIME. Maintain hierarchy state, each folder's item state,
+and, if needed, conversation state separately. Refresh counts with `GetFolder`.
 
-[предположение; рекомендация] Использовать локальный UUID с изменяемым EWS locator по В8;
-`InternetMessageId` и fingerprint оставить для корреляции. Это сложнее единственного
-`ItemId` или `Message-ID`, зато позволяет хранить копии и переживать перемещения без обещания
-невозможной стопроцентной корреляции.
+[assumption; recommendation] Use a local UUID with a mutable EWS locator as in В8;
+retain `InternetMessageId` and fingerprint for correlation. This is more complex than a single
+`ItemId` or `Message-ID`, but it supports stored copies and moves without promising
+unattainable perfect correlation.
 
-[предположение; рекомендация] Сохранять `.eml` и EWS-метаданные раздельно. Первичную MIME-
-загрузку дозировать; при повторных sync не скачивать MIME из-за read flag. Серверные AQS/
-restriction запросы оставить для оперативного поиска и сверок; основной поиск вложений —
-локальный индекс. Основание и компромиссы приведены в В2–В9; это предложения, не изменение
-принятых решений проекта.
+[assumption; recommendation] Store `.eml` separately from EWS metadata. Pace initial MIME
+downloads; on later syncs, do not download MIME because of a read-flag change. Keep server-side AQS/
+restriction queries for live search and reconciliation; use a local index as the primary attachment
+search. Basis and tradeoffs are in В2–В9; these are proposals, not changes to
+the project's accepted decisions.
 
-## Что не удалось проверить
+## What could not be verified
 
-- [предположение / требуется проверка] Effective throttling policy пользователя CU23,
-  фактические максимумы пакетов и download response. Агент не входит в ящик. Администратор
-  может **только прочитать** `Get-ThrottlingPolicyAssociation` и соответствующую
-  `Get-ThrottlingPolicy`, учитывая наследование; отдельно сверить применимые EWS/IIS настройки.
-  Число 27 не подставлять как гарантированную ёмкость.
-- [док / пробел источников] Конфликт источников о concurrency описан в В9;
-  документированный для CU23 `EWSMaxBatchSize` не найден. Проверка policy не заменяет
-  адаптивную обработку throttling.
-- [док / пробел источников] Гарантированный срок годности `SyncState` Exchange 2013 не найден.
-  Recovery при invalid state подтверждён; TTL нельзя заимствовать у Graph или subscriptions.
-- [док / пробел источников] Численные пределы страницы `SyncFolderHierarchy`,
-  `FindConversation`, default/max `MaxItemsToReturn` и универсальный предел MIME/attachment
-  **ответа** CU23 не установлены. При реализации проверить документацию схемы/клиентского
-  SDK и затем ограниченные чтения, запускаемые пользователем. 64 MiB входящего транспорта
-  и 512 изменений item sync не переносить на другие операции.
-- [предположение / требуется проверка] Завершение paging `FindConversation` и полнота длинной
-  цепочки при `MaxItemsToReturn` требуют отдельной проверки на CU23; до неё эти операции
-  не использовать как единственный способ полного наполнения store.
-- [док / без live-проверки] Read-only семантика `GetItem` и пример с `IsRead=false`
-  подтверждены документацией; конкретный mailbox не проверялся. Пользователь при реализации
-  может дважды получить `IsRead` вокруг MIME-чтения непрочитанного письма, без `UpdateItem`
-  и без одновременного открытия этого письма в другом клиенте.
-- [предположение / требуется проверка] Реальные классы пользовательских папок, состояние
-  Exchange Search, задержка индексации и покрытие нужных русскоязычных вложений. Пользователь
-  сможет сопоставить серверную AQS-выдачу с уже имеющимися известными письмами/вложениями;
-  исследование не создаёт и не отправляет тестовые письма.
-- [предположение / ограничение модели] Отличить внешнее перемещение от copy+delete
-  одинаковых экземпляров безошибочно по этим delta нельзя; это ограничение схемы ключей,
-  а не обещанный будущий тест, который обязательно его устранит.
+- [assumption / needs verification] The effective throttling policy for the CU23 user,
+  actual batch maxima, and download response. The agent did not sign in to the mailbox. An administrator
+  can **read only** `Get-ThrottlingPolicyAssociation` and the corresponding
+  `Get-ThrottlingPolicy`, accounting for inheritance; separately check applicable EWS/IIS settings.
+  Do not use 27 as guaranteed capacity.
+- [docs / source gap] The source conflict about concurrency is described in В9;
+  no `EWSMaxBatchSize` documented for CU23 was found. Checking policy does not replace
+  adaptive throttling handling.
+- [docs / source gap] No guaranteed lifetime for Exchange 2013 `SyncState` was found.
+  Recovery from invalid state is confirmed; do not borrow a TTL from Graph or subscriptions.
+- [docs / source gap] Numeric page limits for `SyncFolderHierarchy`,
+  `FindConversation`, the default/max `MaxItemsToReturn`, and a universal MIME/attachment
+  **response** limit for CU23 are not established. During implementation, check schema/client
+  SDK documentation and then perform bounded reads run by the user. Do not transfer the 64 MiB incoming transport
+  limit or 512 item-sync changes to other operations.
+- [assumption / needs verification] Completion of `FindConversation` paging and completeness of a long
+  conversation with `MaxItemsToReturn` need a separate check on CU23; until then, do
+  not use these operations as the sole way to fully populate the store.
+- [docs / not live-checked] The documented read-only semantics of `GetItem` and the `IsRead=false`
+  example are confirmed; a specific mailbox was not checked. During implementation, the user
+  can read `IsRead` twice around MIME retrieval for an unread message, without `UpdateItem`
+  and without opening that message in another client at the same time.
+- [assumption / needs verification] Actual user-folder classes, Exchange Search state,
+  indexing delay, and coverage of the required Russian-language attachments. The user
+  can compare server AQS results with already known messages/attachments;
+  this research creates and sends no test messages.
+- [assumption / model limitation] These deltas cannot reliably distinguish an external move from copy+delete
+  of identical instances; this is a limitation of the key scheme,
+  not a promised future test that is certain to resolve it.
 
-## Что ещё стоит изучить
+## Further topics to study
 
-- За пределами RT-03: конкретный Java-клиент, NTLM и контроль создаваемых им SOAP-вызовов
-  относятся к RT-02.
-- За пределами RT-03: сохранение inline/TNEF, S/MIME, `.msg`, рекурсивных MIME-вложений
-  и сопоставление MIME-частей с attachment IDs относятся к RT-09.
-- За пределами RT-03: уведомления как оптимизация polling, отдельный archive mailbox
-  и public folders требуют самостоятельной спецификации области синхронизации.
+- Outside RT-03: the specific Java client, NTLM, and control over the SOAP calls it creates
+  belong to RT-02.
+- Outside RT-03: preserving inline/TNEF, S/MIME, `.msg`, recursive MIME attachments,
+  and matching MIME parts to attachment IDs belong to RT-09.
+- Outside RT-03: notifications as a polling optimization, a separate archive mailbox,
+  and public folders need a separate synchronization-scope specification.
 
-## Источники
+## Sources
 
-Все источники прочитаны **2026-10-24**. Ниже приведены даты обновления, когда они были
-зафиксированы при чтении; они не означают дату появления API. Для старого Exchange 2013
-версия операции важнее свежести публикации; современные свойства без подтверждения
-совместимости не перенесены. Числа в тексте ссылаются на эти же URL.
+All sources were read on **2026-10-24**. Update dates are given below where they were
+recorded during review; they do not indicate when an API appeared. For legacy Exchange 2013,
+the operation version is more important than publication recency; modern properties without confirmed
+compatibility were not carried over. Numbers in the text refer to these same URLs.
 
-1. [GetFolder operation][1] (обновлено 2023-03-29).
-2. [FindFolder operation][2] (справочник EWS).
-3. [SyncFolderHierarchy operation][3] (справочник EWS).
-4. [DistinguishedFolderId][4] (обновлено 2023-03-29).
-5. [Folders and items in EWS in Exchange][5] (официальная таблица типов; дата публикации не зафиксирована).
-6. [FindItem operation][6] (справочник EWS).
-7. [Perform paged searches by using EWS in Exchange][7] (официальное руководство).
-8. [EWS throttling in Exchange][8] (обновлено 2022-02-11; таблица различает 2010/2013/Online).
-9. [SyncFolderItems operation][9] (справочник EWS).
-10. [MaxChangesReturned][10] (обновлено 2023-03-28).
-11. [Mailbox synchronization and EWS in Exchange][11] (обновлено 2022-02-10).
-12. [Handling synchronization-related errors in EWS in Exchange][12] (обновлено 2021-09-15).
-13. [[MS-OXWSCDATA]: m:ResponseCodeType Simple Type][13] (официальная спецификация протокола).
-14. [GetItem operation (email message)][14] (обновлено 2023-03-29).
-15. [MimeContent][15] (обновлено 2023-03-29).
-16. [IsRead][16] (обновлено 2023-03-29).
-17. [Export items by using EWS in Exchange][17] (официальное руководство MIME-экспорта).
-18. [GetAttachment operation][18] (справочник EWS).
-19. [Get attachments by using EWS in Exchange][19] (официальное руководство).
-20. [IncludeMimeContent][20] (обновлено 2023-03-29).
-21. [Attachments and EWS in Exchange][21] (официальный обзор; использована семантика file/item/inline).
-22. [FindConversation operation][22] (справочник EWS).
-23. [GetConversationItems operation][23] (справочник EWS; прямо указано появление в 2013).
-24. [QueryString (QueryStringType)][24] (справочник EWS; различия типов 2010/2013).
-25. [Perform an AQS search by using EWS in Exchange][25] (обновлено 2020-01-15).
-26. [Use search filters with EWS in Exchange][26] (официальное руководство).
-27. [File formats indexed by Exchange Search: Exchange 2013 Help][27] (версия явно Exchange 2013).
-28. [EWS Identifiers in Exchange][28] (обновлено 2020-01-15).
-29. [ConvertId operation][29] (обновлено 2023-03-29).
-30. [EWS operations in Exchange][30] (официальный каталог с версиями появления операций).
-31. [Verifying the results of an EWS or EWS Managed API call][31] (официальное руководство).
-32. [Configure client-specific message size limits: Exchange 2013 Help][32] (версия явно Exchange 2013).
-33. [SyncFolderHierarchy — request element][33] (обновлено 2024-09-06).
-34. [Synchronize items by using EWS in Exchange][34] (SOAP-пример изменений и continuation).
-35. [MaxItemsToReturn][35] (обновлено 2023-03-29).
-36. [FindConversationResponse][36] (обновлено 2023-03-29).
-37. [Exchange Search: Exchange 2013 Help][37] (обновлено 2023-01-26).
-38. [InternetMessageId][38] (обновлено 2023-03-29).
-39. [RFC 5322 — Internet Message Format, §3.6.4][39] (опубликован 2008-10).
-40. [Exchange workload management: Exchange 2013 Help][40] (версия явно Exchange 2013).
-41. [New-ThrottlingPolicy — Exchange PowerShell][41] (справочник с применимостью параметров по версиям;
-    значение concurrency противоречит [8], см. В9).
+1. [GetFolder operation][1] (updated 2023-03-29).
+2. [FindFolder operation][2] (EWS reference).
+3. [SyncFolderHierarchy operation][3] (EWS reference).
+4. [DistinguishedFolderId][4] (updated 2023-03-29).
+5. [Folders and items in EWS in Exchange][5] (official type table; publication date not recorded).
+6. [FindItem operation][6] (EWS reference).
+7. [Perform paged searches by using EWS in Exchange][7] (official guide).
+8. [EWS throttling in Exchange][8] (updated 2022-02-11; table distinguishes 2010/2013/Online).
+9. [SyncFolderItems operation][9] (EWS reference).
+10. [MaxChangesReturned][10] (updated 2023-03-28).
+11. [Mailbox synchronization and EWS in Exchange][11] (updated 2022-02-10).
+12. [Handling synchronization-related errors in EWS in Exchange][12] (updated 2021-09-15).
+13. [[MS-OXWSCDATA]: m:ResponseCodeType Simple Type][13] (official protocol specification).
+14. [GetItem operation (email message)][14] (updated 2023-03-29).
+15. [MimeContent][15] (updated 2023-03-29).
+16. [IsRead][16] (updated 2023-03-29).
+17. [Export items by using EWS in Exchange][17] (official MIME export guide).
+18. [GetAttachment operation][18] (EWS reference).
+19. [Get attachments by using EWS in Exchange][19] (official guide).
+20. [IncludeMimeContent][20] (updated 2023-03-29).
+21. [Attachments and EWS in Exchange][21] (official overview; file/item/inline semantics used).
+22. [FindConversation operation][22] (EWS reference).
+23. [GetConversationItems operation][23] (EWS reference; explicitly states introduction in 2013).
+24. [QueryString (QueryStringType)][24] (EWS reference; differences between 2010/2013 types).
+25. [Perform an AQS search by using EWS in Exchange][25] (updated 2020-01-15).
+26. [Use search filters with EWS in Exchange][26] (official guide).
+27. [File formats indexed by Exchange Search: Exchange 2013 Help][27] (explicitly Exchange 2013 version).
+28. [EWS Identifiers in Exchange][28] (updated 2020-01-15).
+29. [ConvertId operation][29] (updated 2023-03-29).
+30. [EWS operations in Exchange][30] (official catalog with operation introduction versions).
+31. [Verifying the results of an EWS or EWS Managed API call][31] (official guide).
+32. [Configure client-specific message size limits: Exchange 2013 Help][32] (explicitly Exchange 2013 version).
+33. [SyncFolderHierarchy — request element][33] (updated 2024-09-06).
+34. [Synchronize items by using EWS in Exchange][34] (SOAP change and continuation example).
+35. [MaxItemsToReturn][35] (updated 2023-03-29).
+36. [FindConversationResponse][36] (updated 2023-03-29).
+37. [Exchange Search: Exchange 2013 Help][37] (updated 2023-01-26).
+38. [InternetMessageId][38] (updated 2023-03-29).
+39. [RFC 5322 — Internet Message Format, §3.6.4][39] (published 2008-10).
+40. [Exchange workload management: Exchange 2013 Help][40] (explicitly Exchange 2013 version).
+41. [New-ThrottlingPolicy — Exchange PowerShell][41] (reference with parameter applicability by version;
+    concurrency value conflicts with [8], see В9).
 
 [1]: https://learn.microsoft.com/en-us/exchange/client-developer/web-service-reference/getfolder-operation
 [2]: https://learn.microsoft.com/en-us/exchange/client-developer/web-service-reference/findfolder-operation

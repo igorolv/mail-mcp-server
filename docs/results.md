@@ -1,83 +1,83 @@
-# mail-mcp-server — проверки на реальной почте
+# mail-mcp-server — real-mailbox checks
 
-Проверенные факты об окружении и результаты запусков на реальных ящиках пользователя. Только
-числа: без имён папок, адресов, имён файлов и содержимого писем. Что сделано, но ещё ждёт
-проверки на реальной почте, — в [plan.md, раздел 2](plan.md#2-ждёт-проверки-на-реальной-почте).
+Verified environment facts and results of runs on the user's real mailboxes. Numbers only:
+no folder names, addresses, filenames or message content. Features implemented but still awaiting
+real-mail checks are in [plan.md, section 2](plan.md#2-checks-pending-on-real-mail).
 
-Реальные хосты, домен и логин в репозиторий не попадают. В документах вместо них заглушки:
+Real hosts, domain and login stay out of the repository. Documents use these placeholders:
 
-- `example.com` — домен;
-- `webmail.example.com` — OWA и EWS;
-- `mail.example.com` — ActiveSync, тот же сервер;
-- `user` — логин.
+- `example.com` — domain;
+- `webmail.example.com` — OWA and EWS;
+- `mail.example.com` — ActiveSync, the same server;
+- `user` — login.
 
-Соответствие заглушек и настоящих значений — только в `.local/environment.md`, который git
-игнорирует.
+The mapping between placeholders and real values exists only in `.local/environment.md`, which
+git ignores.
 
-## 1. Рабочий Exchange
+## 1. Corporate Exchange
 
-| Что | Факт | Когда проверено |
+| Item | Fact | Verified on |
 |---|---|---|
-| Сервер | Exchange 2013 CU23 (сборка 15.0.1497.x, IIS 8.5); `webmail.` и `mail.example.com` — один сервер | 2026-10-24, анонимные запросы |
-| EWS | `https://webmail.example.com/EWS/Exchange.asmx` доступен из интернета; без входа отвечает `401` и предлагает `Negotiate`, `NTLM`, `Basic` | 2026-10-24 |
-| Autodiscover | Только по пути `/autodiscover/…` на основных хостах; хоста `autodiscover.` нет | 2026-10-24 |
-| Вход | Работает **NTLM с логином без домена** (`user`); Basic с таким логином — `401`; Basic с доменом не проверяли | 2026-10-24, PowerShell-скрипт проверки входа (удалён в IT-11) |
-| Версия схемы | `RequestServerVersion Exchange2013_SP1` принимается, кириллица приходит в UTF-8 | 2026-10-24 |
-| NTLM из Java | Apache HttpClient 5: рукопожатие — 3 запроса, дальше соединение используется повторно; запасной транспорт не нужен | 2026-10-25, `ews-spike` |
-| Синхронизация | 11 папок, 8345 писем скачано, 0 ошибок, `ErrorServerBusy` не было. Повторный запуск: 0 новых писем, 102 удаления, сделанных пользователем, применены. `ItemId` стабильны, `SyncState` принимается | 2026-10-25, `mail-sync work` |
-| Переобработка | 8243 письма, все `converted` | 2026-10-26, `mail-reprocess work` |
-| Синхронизация без изменений (Д29, Д30) | 2,4 с вместо 48,6 с. Запуск с 1916 удалениями и 2195 письмами с изменившейся прочитанностью — 112,8 с: время растёт с числом изменений, а не с размером ящика | 2026-10-28, `mail-sync work` |
-| Флажок через `Update` (Д29) | Флажок, поставленный на одно письмо в почтовом клиенте, пришёл как `Update`: запуск 3,2 с, переписан один `meta.json` с `flagged: true`, остальные не затронуты | 2026-10-28, `mail-sync work` |
-| Прочитанность через `ReadFlagChange` (Д29) | После отметки всех писем папки прочитанными в почтовом клиенте запуск занял 7 с: у 735 писем папки `read: true`, переписано 112 `meta.json` (ранее непрочитанные), другие папки не затронуты | 2026-10-28, `mail-sync work` |
-| Пароль из Windows Credential Manager | Вход NTLM с паролем из общей учётной записи Credential Manager, полученным через `passwordCommand` и PowerShell-скрипт (до Д28): 11 папок, 49 новых писем, 0 ошибок. Окно добавления общих учётных данных отвергает имя пользователя с `@` (ошибка `0x80070057`) | 2026-10-27, `mail-sync work` |
+| Server | Exchange 2013 CU23 (build 15.0.1497.x, IIS 8.5); `webmail.` and `mail.example.com` are the same server | 2026-10-24, anonymous requests |
+| EWS | `https://webmail.example.com/EWS/Exchange.asmx` is accessible from the internet; without sign-in it returns `401` and offers `Negotiate`, `NTLM`, `Basic` | 2026-10-24 |
+| Autodiscover | Only at `/autodiscover/…` on the main hosts; no `autodiscover.` host | 2026-10-24 |
+| Sign-in | **NTLM with a bare login** (`user`) works; Basic with that login returns `401`; Basic with a domain was not checked | 2026-10-24, PowerShell sign-in probe (removed in IT-11) |
+| Schema version | `RequestServerVersion Exchange2013_SP1` is accepted; Cyrillic arrives in UTF-8 | 2026-10-24 |
+| NTLM from Java | Apache HttpClient 5: 3-request handshake, then connection reuse; no fallback transport needed | 2026-10-25, `ews-spike` |
+| Sync | 11 folders, 8345 messages downloaded, 0 errors, no `ErrorServerBusy`. Repeat run: 0 new messages, 102 user deletions applied. `ItemId` values are stable and `SyncState` is accepted | 2026-10-25, `mail-sync work` |
+| Reprocessing | 8243 messages, all `converted` | 2026-10-26, `mail-reprocess work` |
+| Sync without changes (Д29, Д30) | 2.4 s instead of 48.6 s. A run with 1916 deletions and 2195 messages with changed read status took 112.8 s: time grows with the number of changes, not mailbox size | 2026-10-28, `mail-sync work` |
+| Flag through `Update` (Д29) | A flag set on one message in the mail client arrived as `Update`: 3.2 s run, one `meta.json` rewritten with `flagged: true`, others untouched | 2026-10-28, `mail-sync work` |
+| Read status through `ReadFlagChange` (Д29) | After marking all messages in a folder as read in the mail client, the run took 7 s: 735 messages in the folder had `read: true`, 112 `meta.json` files were rewritten (previously unread), other folders untouched | 2026-10-28, `mail-sync work` |
+| Password from Windows Credential Manager | NTLM sign-in with a password from a generic Credential Manager entry, obtained through `passwordCommand` and a PowerShell script (before Д28): 11 folders, 49 new messages, 0 errors. The Add Generic Credentials dialog rejects a username containing `@` (error `0x80070057`) | 2026-10-27, `mail-sync work` |
 
-В список папок попадают служебные папки класса `IPF.Note*` (RSS-каналы, «Ошибки
-синхронизации»); это безвредно.
+The folder list includes service folders of class `IPF.Note*` (RSS feeds, Sync Issues); this is
+harmless.
 
-## 2. Mail.ru и Gmail
+## 2. Mail.ru and Gmail
 
-| Что | Факт | Когда проверено |
+| Item | Fact | Verified on |
 |---|---|---|
-| Mail.ru, вход | IMAP с паролем приложения через Angus Mail; флаг `\Seen` после скачивания не меняется (проверено на прочитанном письме) | 2026-10-25, `imap-spike mailru` |
-| Mail.ru, синхронизация | 39 папок из 41 после фильтра папок, 38327 писем, 0 ошибок. Повторный запуск: 0 новых писем, 4296 удалений, сделанных пользователем, применены | 2026-10-25, `mail-sync mailru` |
-| Mail.ru, переобработка | 34031 письмо, 34005 `converted`, 26 `failed`: 19 — `ParseException` Angus, 7 — кодировки, которой нет в Java. Около 35 минут вместе с вложениями | 2026-10-26, `mail-reprocess mailru` |
-| Mail.ru, первый запуск с проходом метаданных (Д8, флаги read/star) | Вход успешен; индекс пересобран со схемы 4 (более 20 тыс. писем с диска), затем `RESULT: FAILED (IMAP operation failed; no automatic retry)` — вид `PROTOCOL`, ни одна папка не завершена, запуск 1115 с. После добавления очищенной диагностики повтор упал за 25 с на пакете 1 из 132 первой папки: Angus не разобрал ответ `FETCH (ENVELOPE … FLAGS UID)` хотя бы для одного письма, а строгая проверка IT-19 прерывала весь запуск. Исправлено: такие письма пропускаются с неизвестными метаданными (`docs/imap-source-agent.md`). Следующий запуск: 1–2 неразобранных ответа примерно в каждом третьем пакете из 100, полный проход — около 13,5 с на пакет (больше часа на ящик); прерван пользователем, после чего полный проход убран (Д29) | 2026-10-27, `mail-sync mailru` |
-| Mail.ru, синхронизация без изменений (Д29, Д30) | 14 с на 39 папок и 34 тыс. писем — сетевые `EXAMINE` и `FETCH (FLAGS UID)`; до Д30 — 297 с, до Д29 — больше часа. Первый запуск после Д29 разово записал флаги всех писем: около 12,5 минуты, без сетевой нагрузки | 2026-10-28, `mail-sync mailru` |
-| Mail.ru, прочитанность и флажок (Д29) | Изменения из веб-интерфейса приходят с `FETCH (FLAGS UID)`: три письма, отмеченные прочитанными, — переписаны три `meta.json` с `read: true`; флажок на одном письме — переписан один `meta.json` с `flagged: true`. Запуски по 15 с, другие письма не затронуты | 2026-10-28, `mail-sync mailru` |
-| Gmail | OAuth2 (Desktop PKCE, XOAUTH2) готов в коде, реальный вход не проверялся. В конфигурации пользователя пока только `work` и `mailru`; подключение Gmail входит в `0.1.0` (Д7) | 2026-10-25 |
+| Mail.ru sign-in | IMAP with an app password through Angus Mail; downloading does not change `\Seen` (checked on a read message) | 2026-10-25, `imap-spike mailru` |
+| Mail.ru sync | 39 of 41 folders after folder filtering, 38327 messages, 0 errors. Repeat run: 0 new messages, 4296 user deletions applied | 2026-10-25, `mail-sync mailru` |
+| Mail.ru reprocessing | 34031 messages, 34005 `converted`, 26 `failed`: 19 Angus `ParseException`, 7 charsets unavailable in Java. About 35 minutes including attachments | 2026-10-26, `mail-reprocess mailru` |
+| Mail.ru first run with a metadata pass (Д8, read/star flags) | Sign-in succeeded; index rebuilt from schema 4 (over 20 thousand messages from disk), then `RESULT: FAILED (IMAP operation failed; no automatic retry)`, kind `PROTOCOL`, no folder completed, 1115 s run. After sanitized diagnostics were added, a repeat failed in 25 s on batch 1 of 132 in the first folder: Angus could not parse the `FETCH (ENVELOPE … FLAGS UID)` response for at least one message, and strict IT-19 validation aborted the entire run. Fixed: skip such messages with unknown metadata (`docs/imap-source-agent.md`). Next run: 1–2 unparsed responses in about every third batch of 100, a full pass at about 13.5 s per batch (over an hour per mailbox); interrupted by the user, after which the full pass was removed (Д29) | 2026-10-27, `mail-sync mailru` |
+| Mail.ru sync without changes (Д29, Д30) | 14 s for 39 folders and 34 thousand messages: network `EXAMINE` and `FETCH (FLAGS UID)`; before Д30: 297 s, before Д29: over an hour. The first run after Д29 wrote all message flags once: about 12.5 minutes, without network load | 2026-10-28, `mail-sync mailru` |
+| Mail.ru read status and flag (Д29) | Changes from the web interface arrive through `FETCH (FLAGS UID)`: three messages marked as read rewrote three `meta.json` files with `read: true`; flagging one message rewrote one `meta.json` with `flagged: true`. Runs took 15 s, other messages untouched | 2026-10-28, `mail-sync mailru` |
+| Gmail | OAuth2 (Desktop PKCE, XOAUTH2) is implemented; real sign-in is unverified. The user's configuration currently has only `work` and `mailru`; connecting Gmail is part of `0.1.0` (Д7) | 2026-10-25 |
 
-## 3. Инструменты из MCP-клиента (opencode)
+## 3. Tools from an MCP client (opencode)
 
-2026-10-26 проверены восемь исходных инструментов на обоих ящиках:
+On 2026-10-26, the eight original tools were checked on both mailboxes:
 
-- **`listFolders`:** числа совпадают со скачанным.
-- **`listMessages`, `getMessage`, `getAttachment`:** отдают данные страницами и кусками с `nextOffset`, пути к файлам абсолютные.
-- **`sync` и `syncStatus`:** `sync` отвечает сразу; `syncStatus` показывает ход и итог.
-- **`search`:** находит другие формы русских слов, английские слова, полный адрес отправителя, часть имени файла и слово, которое есть только во вложении DOCX.
+- **`listFolders`:** counts match downloaded data.
+- **`listMessages`, `getMessage`, `getAttachment`:** return pages and chunks with `nextOffset`;
+  file paths are absolute.
+- **`sync` and `syncStatus`:** `sync` responds immediately; `syncStatus` shows progress and result.
+- **`search`:** finds other Russian word forms, English words, a full sender address, a filename
+  part and a word present only in a DOCX attachment.
 
-2026-10-27, повторная проверка:
+Repeat checks on 2026-10-27:
 
-- **`sync` на `work`:** до запуска `syncStatus` показывал `never` — данные `work` скачаны
-  сборкой, которая ещё не писала `sync-status.json`. Первый запуск инструментом — 10 с: 90 новых
-  писем, 0 ошибок, 357 удалений — все письма одной папки; на сервере эта папка теперь пустая
-  (очистка пользователем или политика хранения — проверить). Повторный запуск — 1,8 с, нули.
-- **Скорость:** `listMessages` — 3–24 мс на страницу, `getMessage` — 29–49 мс, `search` с тремя
-  результатами — 23–102 мс, страница из 100 результатов — 0,1–2 с.
-- **Формы слов:** запрос в форме множественного и единственного числа даёт одинаковое число
-  результатов (362).
-- **Чего не хватило:** выборки по дате — для «писем за два дня» агент листал `listMessages` по
-  всем папкам (Д24); итога фонового запуска в логе (Д25).
+- **`sync` on `work`:** before the run, `syncStatus` showed `never`: `work` data had been downloaded
+  by a build that did not yet write `sync-status.json`. The first tool run took 10 s: 90 new
+  messages, 0 errors, 357 deletions, all from one folder; that folder is now empty on the server
+  (user cleanup or a retention policy: to verify). Repeat run: 1.8 s, all zeroes.
+- **Speed:** `listMessages`: 3–24 ms per page; `getMessage`: 29–49 ms; `search` with three results:
+  23–102 ms; a page of 100 results: 0.1–2 s.
+- **Word forms:** singular and plural queries return the same result count (362).
+- **Missing features:** date selection: for "messages from two days", the agent paged through
+  `listMessages` in every folder (Д24); a background run summary in the log (Д25).
 
-## 4. Контрольный набор поиска
+## 4. Search control set
 
-Синтетический набор `testdata/search`, не реальная почта; записан здесь, потому что задаёт
-планку качества поиска. Без файла словоформ (48 писем, 80 запросов): полнота 79/86 = 0,919,
-ложных находок 7. Пропущены 7 неправильных форм вроде «письмо»/«писем» — это предел Snowball
-без пользовательских правил. Ложные находки: 3 по именам («Тестову»→«Тестова»), 2 по точности
-и 2 из-за старого ожидания фильтрации секретов до индекса. Индекс по действующему решению
-хранит исходный текст, а фильтр ответов не меняет совпадения поиска. Порог в тесте:
-полнота ≥ 0,91, ложных ≤ 7.
+Synthetic `testdata/search`, not real mail; recorded here because it sets the search quality
+baseline. Without a word forms file (48 messages, 80 queries): recall 79/86 = 0.919, 7 false
+positives. The 7 missed irregular forms, such as `письмо`/`писем`, are a Snowball limitation
+without user rules. False positives: 3 name matches (`Тестову`→`Тестова`), 2 precision cases and
+2 due to an old expectation of secret filtering before indexing. Under the current decision,
+the index holds original text and the response filter does not change search matches. Test
+threshold: recall ≥ 0.91, false positives ≤ 7.
 
-С тестовым файлом словоформ из четырёх групп (2026-10-27): 7/7 нерегулярных форм и 86/86
-совпадений всего при тех же 7 ложных находках. Подробности по категориям —
-`docs/tools-agent.md`, раздел «Search».
+With the four-group test word forms file (2026-10-27): 7/7 irregular forms and 86/86 matches
+overall, with the same 7 false positives. Category details are in `docs/tools-agent.md`, "Search".

@@ -1,322 +1,322 @@
-# RT-05 — Повторное использование кода соседних проектов
+# RT-05 — Reusing code from sibling projects
 
-- Дата: 2026-10-24
-- Исполнитель: Codex, сессия RT-05
-- Бриф: docs/research-tasks/RT-05-sibling-code-reuse.md
-- Проверены локальные рабочие деревья: `C:\git\redmine-mcp-server` и `C:\git\jdbc-mcp-server`.
-- Ревизии: Redmine `f62b3e5d546d04533e4259a573293d949939a48d` (2026-09-30), JDBC `c2c4362121b4b51868add386f4916346aacc38a9` (2026-09-25); оба дерева без изменений. [код][1][9]
+- Date: 2026-10-24
+- Author: Codex, RT-05 session
+- Brief: docs/research-tasks/RT-05-sibling-code-reuse.md
+- Local working trees inspected: `C:\git\redmine-mcp-server` and `C:\git\jdbc-mcp-server`.
+- Revisions: Redmine `f62b3e5d546d04533e4259a573293d949939a48d` (2026-09-30), JDBC `c2c4362121b4b51868add386f4916346aacc38a9` (2026-09-25); both trees clean. [code][1][9]
 
-## Кратко
+## Summary
 
-- [код] В Redmine проверены все 24 файла `extraction/`, включая 14 файлов `parser/`, и все 13 файлов `compression/`, включая `steps/`. Почти всё извлечение независимо от Redmine REST, но восемь классов прямо используют `RedmineMcpProperties`. [2][4]
-- [код] Конвейер запускает **все** подходящие PRIMARY-парсеры, затем FALLBACK-парсеры. DOCX даёт один текст благодаря `hasTextPart()`, а изображения и вложенные объекты обрабатываются отдельно. [2]
-- [код] Готовой общей защиты по глубине и суммарным байтам нет: глубину проверяет ZIP, счётчик байтов начинается заново для каждого архива, DOCX распаковывается без этих проверок. Перенос требует усиления ограничений. [2]
-- [код] Из сжатия ответов общие только `ResponseCompressor`, `CompressionStep`, `CompressionResult`; обработчики вложений зависят от `api.AttachmentContent`, остальное — от задач и журналов Redmine. [4]
-- [код] В обоих проектах одинаковый приём `immediateExecution(true)`, Jackson 3 с `NON_NULL`, вывод журналов в stderr и файл. У JDBC дополнительно есть MDC с именем соединения и тест последовательных stdio-ответов. [5][11][13]
-- [код] В JDBC проверены все девять файлов `connection/` и три требуемых файла инструментов. Полностью общий самостоятельный класс — `EnvironmentPlaceholders`; реестр пригоден после замены типов, а фабрика контекстов сильно связана с JDBC. [10][12]
-- [код] Стек различается: Redmine — Java 25 / Boot `4.2.0-M2` / AI `2.1.0-M1`; JDBC — Java 21 / Boot `4.0.0` / AI `2.0.1`. Gradle одинаковый: `9.3.1`. В JDBC нет объявленных PDFBox, POI, Tika. [7][15]
-- [предположение] Для первого этапа рекомендовано копирование с адаптацией и переносом подходящих тестов. Общую библиотеку стоит выделять после появления второго реального потребителя одного и того же устойчивого контракта; решение остаётся за пользователем.
+- [code] In Redmine, all 24 files in `extraction/` were checked, including 14 `parser/` files, and all 13 files in `compression/`, including `steps/`. Almost all extraction is independent of Redmine REST, but eight classes directly use `RedmineMcpProperties` [2][4].
+- [code] The pipeline runs **all** applicable PRIMARY parsers, then FALLBACK parsers. DOCX produces one text result through `hasTextPart()`, while images and embedded objects are handled separately [2].
+- [code] There is no ready-made common protection for depth and total bytes: ZIP checks depth, its byte counter restarts for every archive, and DOCX is unpacked without these checks. Reuse requires stronger limits [2].
+- [code] Of response compression, only `ResponseCompressor`, `CompressionStep`, and `CompressionResult` are common; attachment handlers depend on `api.AttachmentContent`, and the rest depend on Redmine issues and journals [4].
+- [code] Both projects use the same `immediateExecution(true)` pattern, Jackson 3 with `NON_NULL`, and logging to stderr and a file. JDBC additionally has MDC with the connection name and a test for serialized stdio responses [5][11][13].
+- [code] In JDBC, all nine files in `connection/` and the three required tool files were checked. `EnvironmentPlaceholders` is fully generic as a standalone class; the registry is reusable after replacing types, while the context factory is strongly coupled to JDBC [10][12].
+- [code] The stacks differ: Redmine uses Java 25 / Boot `4.2.0-M2` / AI `2.1.0-M1`; JDBC uses Java 21 / Boot `4.0.0` / AI `2.0.1`. Gradle is the same: `9.3.1`. JDBC does not declare PDFBox, POI, or Tika [7][15].
+- [assumption] For the first stage, copying with adaptation and transferring suitable tests is recommended. Consider a shared library after a second real consumer of the same stable contract appears; the decision remains with the user.
 
-## Ответы на вопросы
+## Answers to the questions
 
-### В1. Конвейер извлечения: назначение, зависимости, размер, тесты
+### В1. Extraction pipeline: purpose, dependencies, size, tests
 
-[код] Полная инвентаризация — таблица «Извлечение»: 24 строки по исходным файлам, вложенные типы указаны в строках владельцев. Пакет не импортирует `client/`, `api/`, `service/`; прямые зависимости на свойства есть у `ExtractionLimits`, `ExtractionPipeline`, `ParseContext`, `PandocAvailability`, `DocxPandocParser`, `ZipParser`, `TikaMetadataParser`, `TikaTextFallbackParser` — **восемь классов**, включая два Tika-парсера. [2]
+[code] Full inventory is in the “Extraction” table: 24 rows for source files, with nested types included under their owning files. The package does not import `client/`, `api/`, or `service/`; direct property dependencies occur in `ExtractionLimits`, `ExtractionPipeline`, `ParseContext`, `PandocAvailability`, `DocxPandocParser`, `ZipParser`, `TikaMetadataParser`, and `TikaTextFallbackParser` — **eight classes**, including both Tika parsers [2].
 
-[код] Основной путь: `extract(Path, logicalName, contentType, workDir)` → общий `ParseContext` → PRIMARY → FALLBACK. Spring собирает `List<DocumentParser>` с `@Order`; `processNow()` немедленно запускает дочерний файл и добавляет глубину. `InputSink` дополняет `producer` и `parent`, считает части и наличие текста текущего входа. [2]
+[code] Main path: `extract(Path, logicalName, contentType, workDir)` → shared `ParseContext` → PRIMARY → FALLBACK. Spring assembles `List<DocumentParser>` with `@Order`; `processNow()` immediately runs a child file and adds depth. `InputSink` adds `producer` and `parent`, and counts parts and whether the current input has text [2].
 
-[код] В `docs/retrieval-extraction-agent.md` осталось описание «first canParse wins» и упоминание `shouldStop()`, но реальный интерфейс содержит `applies()`, `emit()`, `processNow()`, `hasTextPart()`, `emittedCount()`, `primaryApplied()`; `shouldStop()` отсутствует. При переносе ориентироваться на исходники. [2][8]
+[code] `docs/retrieval-extraction-agent.md` still says “first canParse wins” and mentions `shouldStop()`, but the real interface has `applies()`, `emit()`, `processNow()`, `hasTextPart()`, `emittedCount()`, and `primaryApplied()`; `shouldStop()` is absent. Use source code when transferring [2][8].
 
-[код] Ограничения находятся в нескольких местах, поэтому название `ExtractionLimits` не означает полной защиты: [2][6]
+[code] Limits are enforced in several places, so the name `ExtractionLimits` does not mean complete protection [2][6]:
 
-- `maxTotalParts` ограничивает выдачу частей и вход в рекурсивный вызов; уже работающий ZIP/DOCX может продолжать читать и писать файлы после достижения лимита.
-- `maxDepth` проверяет только `ZipParser.applies()`. `processNow()` и DOCX-извлекатели общей проверки глубины не делают.
-- `maxTotalBytes` — локальный счётчик одного вызова `ZipParser.parse()`, не общий счётчик всего дерева. ZIP читает каждую запись в `ByteArrayOutputStream`, ограничивая её размер.
-- DOCX-объекты читаются через `readAllBytes()`, изображения — `getData()`; общий лимит распакованных байтов ими не учитывается. PDF/POI/plain text могут построить полный текст в памяти.
-- Ограничение возвращаемых символов выполняет `AttachmentService` **после** извлечения; сам `ExtractionPipeline` его не применяет.
+- `maxTotalParts` limits emitted parts and entry into recursive calls; an already running ZIP/DOCX parser may continue reading and writing files after the limit is reached.
+- `maxDepth` is checked only by `ZipParser.applies()`. `processNow()` and DOCX extractors do not perform a common depth check.
+- `maxTotalBytes` is a local counter for one `ZipParser.parse()` call, not a tree-wide counter. ZIP reads every entry into `ByteArrayOutputStream`, limiting each entry's size.
+- DOCX objects are read through `readAllBytes()`, images through `getData()`; their unpacked bytes do not count against a common limit. PDF/POI/plain text may build all text in memory.
+- `AttachmentService` applies the returned-character limit **after** extraction; `ExtractionPipeline` does not apply it.
 
-[предположение] До использования для почты нужны общий счётчик байтов/частей/глубины, прекращение работы парсеров при исчерпании лимита и раздельные каталоги дочерних файлов. Основание: ZIP использует общий `workDir/zip/<entryName>`, DOCX — хеш только `logicalName`, поэтому одинаковые имена в разных ветвях могут обозначить один путь. [2]
+[assumption] Before using this for mail, add shared counters for bytes/parts/depth, stop parsers when limits are exhausted, and give child files separate directories. ZIP uses shared `workDir/zip/<entryName>`, while DOCX hashes only `logicalName`, so equal names in different branches can refer to the same path [2].
 
-[код] PDFBox извлекает текстовый слой без собственного OCR; отсутствие текста превращается в служебную строку. TXT читается строго UTF-8; HTML также считается plain text и сохраняет разметку. Tika используется для неизвестных форматов, но отдельного MIME-конвейера с моделью вложенных писем здесь нет. [2]
+[code] PDFBox extracts the text layer without its own OCR; a missing text layer becomes a status string. TXT is read strictly as UTF-8; HTML is also treated as plain text and keeps its markup. Tika handles unknown formats, but there is no separate MIME pipeline modeling nested messages [2].
 
-[код] Основные проверки идут через `DocumentExtractionTest` и `AttachmentServiceTest`; есть отдельный `DocxTextParserTest`. Pandoc проверяется тестом с `@Tag("integration")` и условием наличия исполняемого файла; обычный `test` этот тег исключает. Сам факт включения парсера в `ExtractionTestPipelines` не доказывает проверку его ветвей. [3][7]
+[code] Main checks are in `DocumentExtractionTest` and `AttachmentServiceTest`, with a separate `DocxTextParserTest`. Pandoc is checked by a test tagged `@Tag("integration")` and conditional on the executable being present; ordinary `test` excludes that tag. Merely including a parser in `ExtractionTestPipelines` does not prove its branches were tested [3][7].
 
-[код] Границы с приложением находятся за пределами самого пакета извлечения: [2][3][6]
+[code] Boundaries with the application lie outside the extraction package itself [2][3][6]:
 
-| Граница | Что уже отделено | Что остаётся проектным |
+| Boundary | Already separated | Still project-specific |
 |---|---|---|
-| Получение исходного файла | Конвейер принимает готовый `Path` | `AttachmentService` получает RedmineAttachment и вызывает IssueSnapshotService |
-| Рабочий каталог | Передаётся как аргумент `workDir` | Его вычисляет `IssueSnapshotService.attachmentExtractedDir(issueId, attachmentId)` |
-| Внутренний результат | `ExtractedPart` не импортирует MCP API | В `AttachmentContent.Part` его преобразует AttachmentService |
-| Ограничение ответа | Парсеры не знают MCP-запроса | effectiveLimits/toContentPart и признаки truncated/totalChars находятся в AttachmentService |
-| Состав парсеров | Производственная сборка использует Spring-компоненты и @Order | Тестовый помощник создаёт список вручную и отключает Pandoc |
+| Getting the source file | Pipeline accepts a ready `Path` | `AttachmentService` receives RedmineAttachment and calls IssueSnapshotService |
+| Working directory | Passed as `workDir` argument | Computed by `IssueSnapshotService.attachmentExtractedDir(issueId, attachmentId)` |
+| Internal result | `ExtractedPart` does not import MCP API | AttachmentService converts it to `AttachmentContent.Part` |
+| Response limit | Parsers do not know about MCP request | effectiveLimits/toContentPart and truncated/totalChars indicators live in AttachmentService |
+| Parser set | Production uses Spring components and @Order | Test helper builds the list manually and disables Pandoc |
 
-[предположение] Поэтому копирование `extraction/` не требует переноса Redmine-клиента или IssueSnapshotService. Требуется собственная обвязка готового файла, настроек и результата; копировать весь AttachmentService ради его нескольких функций ограничения текста невыгодно.
+[assumption] Therefore copying `extraction/` does not require copying the Redmine client or IssueSnapshotService. It needs its own wrapper for the ready file, settings, and result; copying all of AttachmentService for its few text-limit functions is not worthwhile.
 
-### В2. Ограничение ответов: общая часть и привязка к Redmine
+### В2. Response limits: common code and Redmine coupling
 
-[код] `ResponseCompressor.fit<T>()` последовательно применяет шаги и измеряет `mapper.writeValueAsString(value).length()`. `CompressionStep<T>` и `CompressionResult<T>` не содержат предметных типов. Их можно перенести с механическим изменением пакета; Spring, SLF4J и Jackson остаются зависимостями компрессора. [4]
+[code] `ResponseCompressor.fit<T>()` applies steps in sequence and measures `mapper.writeValueAsString(value).length()`. `CompressionStep<T>` and `CompressionResult<T>` contain no domain types. They can be transferred with a mechanical package change; Spring, SLF4J, and Jackson remain compressor dependencies [4].
 
-[код] Это ограничение числа Java-символов, а не токенов или UTF-8-байтов. После исчерпания шагов компрессор возвращает `overBudget=true`, не отклоняет ответ. `IssueCompression` и `AttachmentContentCompression` добавляют `compressionNotes` после измерения и не обрабатывают `overBudget` как ошибку. [4]
+[code] This limits Java characters, not tokens or UTF-8 bytes. Once steps are exhausted, the compressor returns `overBudget=true` rather than rejecting the response. `IssueCompression` and `AttachmentContentCompression` add `compressionNotes` after measurement and do not treat `overBudget` as an error [4].
 
-[код] `HistoryCompression` отдельно измеряет и символы, и UTF-8, включает примечания в `Draft`, сохраняет `journalId` и выдаёт `nextOffset`. Даже одно слишком большое событие получает восстанавливаемое сокращённое представление. Но все формы данных и способы дочитывания связаны с Redmine. [4]
+[code] `HistoryCompression` separately measures characters and UTF-8, includes notes in `Draft`, preserves `journalId`, and returns `nextOffset`. Even a single oversized event gets a recoverably shortened representation. However, all data shapes and continuation methods are tied to Redmine [4].
 
-[предположение] Для почты пригодны общий механизм шагов и принцип «сократил → указал, как дочитать». Классы про журналы/changesets не нужны; обработчики вложений надо переписать под почтовые записи ответа и очищенные файлы. Конечный размер следует проверять после добавления всех примечаний. [4][6]
+[assumption] The common step mechanism and principle “shorten → explain how to continue” are suitable for mail. Journal/changeset classes are unnecessary; attachment handlers must be rewritten for mail response records and sanitized files. Check the final size after adding all notes [4][6].
 
-### В3. Служебная часть сервера, JSON, журналы и MDC
+### В3. Server infrastructure, JSON, logging, and MDC
 
-[код] Оба `McpServerConfig` регистрируют `McpSyncServerCustomizer`, вызывающий `serverBuilder.immediateExecution(true)`. JDBC-комментарий связывает это с потерей конкурирующих ответов SDK; это свидетельство репозитория, актуальность внешнего исправления отдельно не проверялась. [5][11]
+[code] Both `McpServerConfig` classes register `McpSyncServerCustomizer`, which calls `serverBuilder.immediateExecution(true)`. The JDBC comment ties this to lost competing SDK responses; this is repository evidence, and the status of an upstream fix was not checked separately [5][11].
 
-[код] `McpStdioConcurrencyTest.immediateExecutionKeepsToolResponsesSerialized()` использует локальные каналы ввода/вывода: второй инструмент не начинает работу до окончания первого. Проверка одновременных завершений с обычными настройками SDK помечена `@Disabled`. Тест строит SDK-сервер вручную, а не проверяет регистрацию Spring-бина. [13]
+[code] `McpStdioConcurrencyTest.immediateExecutionKeepsToolResponsesSerialized()` uses local input/output channels: the second tool does not start until the first completes. A test of concurrent completion with ordinary SDK settings is marked `@Disabled`. The test builds an SDK server manually; it does not test Spring bean registration [13].
 
-[предположение] Перенести исправление вместе с тестом и дополнительно проверить подключение customizer при сборке почтового сервера. При этом длительная синхронизация в инструменте будет задерживать последующие вызовы той же сессии; изоляция блокировок реестра этого ограничения транспорта не отменяет. [10][13]
+[assumption] Transfer the fix with its test and additionally verify customizer wiring when building the mail server. A long-running sync tool will delay subsequent calls in the same session; isolating registry locks does not remove this transport limitation [10][13].
 
-[код] `JsonConfig` в обоих проектах одинаков по поведению: Jackson 3 (`tools.jackson`), поиск модулей, `FAIL_ON_EMPTY_BEANS=false`, отключение алфавитной сортировки, исключение null-свойств с сохранением null-элементов содержимого. Отличаются пакет и имя бина. [5][11]
+[code] `JsonConfig` behaves identically in both projects: Jackson 3 (`tools.jackson`), module discovery, `FAIL_ON_EMPTY_BEANS=false`, disabled alphabetical sorting, exclusion of null properties while retaining null content elements. Package and bean name differ [5][11].
 
-[код] У MCP есть собственная сериализация: JDBC `OutputSchemaSmokeTest` воспроизводит mapper сервера отдельно от проектного `JsonConfig`. Поэтому перенос одного бина не заменяет проверки фактического JSON и обязательности полей выходной схемы. [13]
+[code] MCP has its own serialization: JDBC `OutputSchemaSmokeTest` independently reproduces the server mapper from project `JsonConfig`. Thus transferring one bean does not replace checks of actual JSON and required output-schema fields [13].
 
-[код] Оба logback-файла пишут только в stderr и rolling file: 10 MB на файл, история 30 дней, общий предел 512 MB. JDBC добавляет `[connection=%X{connection:-server}]` в оба шаблона. `ToolLogger` у проектов совпадает по методам и сообщениям. [5][11]
+[code] Both logback files write only to stderr and a rolling file: 10 MB per file, 30-day history, 512 MB total. JDBC adds `[connection=%X{connection:-server}]` to both patterns. The projects' `ToolLogger` methods and messages match [5][11].
 
-[код] JDBC MDC-перехватчик создаёт CGLIB-прокси для бинов с `@McpTool`, ищет строковый параметр по Java-имени `connection`, устанавливает MDC до входа в метод и восстанавливает прежнее значение в `finally`. Для переноса важны сохранённые имена параметров и обнаружение аннотаций на прокси; существующий тест проверяет обнаружение Spring AI. [12][13]
+[code] The JDBC MDC interceptor creates CGLIB proxies for beans with `@McpTool`, finds a String parameter by Java name `connection`, sets MDC before entering the method, and restores its previous value in `finally`. Retain parameter names and annotation discovery on proxies; the existing test checks Spring AI detection [12][13].
 
-### В4. Соединения: что общее и что зависит от JDBC
+### В4. Connections: what is common and what depends on JDBC
 
-[код] Полная таблица соединений включает девять исходных файлов `connection/`, три требуемых файла `tools/`, две записи ответа и `config/ConnectionsConfig`. Общий путь: JSON → определения → `ConnectionRegistry` → фабрика → ленивый контекст. `listConnections` читает определения и проверяет локальный файл, не создавая удалённых соединений. [10][12]
+[code] The complete connection inventory includes nine source files in `connection/`, three required files in `tools/`, two response records, and `config/ConnectionsConfig`. Common path: JSON → definitions → `ConnectionRegistry` → factory → lazy context. `listConnections` reads definitions and checks the local file without creating remote connections [10][12].
 
-[код] Общие правила загрузки: порядок записей сохраняется; отсутствующий файл или пустая карта дают пустой реестр; повреждённый JSON, null-запись, неверное имя, отсутствующий `url` и незаданная переменная окружения останавливают запуск. Неизвестный диалект/неподдерживаемый URL и отсутствующий внешний драйвер записываются в `configError` отдельной записи. [10]
+[code] Common loading rules: entry order is preserved; a missing file or empty map gives an empty registry; malformed JSON, a null entry, invalid name, missing `url`, or undefined environment variable stops startup. Unknown dialect/unsupported URL and absent external driver are recorded as `configError` on the individual entry [10].
 
-[код] Имена: `[A-Za-z0-9._-]+(@[A-Za-z0-9._-]+)?`, максимум 64 символа, запрет `.` и `..`, проверка единственного имени каталога. Значение используется для выбора соединения и каталога. Это не проверка всех ограничений файловой системы Windows, например зарезервированных имён устройств. [10]
+[code] Names use `[A-Za-z0-9._-]+(@[A-Za-z0-9._-]+)?`, at most 64 characters, with `.` and `..` forbidden and a single directory name checked. The value selects the connection and directory. This does not check every Windows filesystem restriction, such as reserved device names [10].
 
-[код] `EnvironmentPlaceholders` не зависит от Spring/JDBC: принимает функцию поиска, заменяет несколько `${VAR}` в строке и элементы списка. Нет рекурсивной подстановки, экранирования или синтаксиса значения по умолчанию; имя внутри скобок обрезается по краям, незаданная переменная вызывает ошибку с именем поля. [10]
+[code] `EnvironmentPlaceholders` has no Spring/JDBC dependency: it accepts a lookup function and substitutes multiple `${VAR}` occurrences in a string and in list elements. There is no recursive substitution, escaping, or default-value syntax; the name inside braces is trimmed, and an unset variable raises an error naming the field [10].
 
-[код] Ленивая инициализация реестра использует `volatile` и отдельную блокировку `Holder` на имя. Исключение создания контекста не сохраняется — следующий запрос повторяет создание. Однако уже созданный контекст остаётся зарегистрированным, если позже падает получение его сервиса или удалённый запрос. [10]
+[code] Lazy registry initialization uses `volatile` and a separate `Holder` lock per name. A context-creation exception is not cached — the next request retries creation. However, a created context remains registered if later service lookup or a remote request fails [10].
 
-[код] `isInitialized()` означает наличие контекста; `poolInitialized()` отдельно проверяет создание JDBC-пула. `listConnections.initialized` использует первый признак: он не подтверждает успешную авторизацию или доступность сервера. [10][12]
+[code] `isInitialized()` means a context exists; `poolInitialized()` separately checks JDBC pool creation. `listConnections.initialized` uses the first indicator: it does not confirm successful authorization or server availability [10][12].
 
-[код] JDBC-фабрика создаёт дочерний Spring context, помечает определения ленивыми и сканирует четыре JDBC-пакета; `ConnectionScopeConfig` создаёт DataSource через `DataSourceConfig`/Hikari. Корневое приложение намеренно сканирует только общие пакеты, чтобы службы одного соединения не оказались глобальными. [10][11]
+[code] The JDBC factory creates a child Spring context, marks definitions lazy, and scans four JDBC packages; `ConnectionScopeConfig` creates a DataSource through `DataSourceConfig`/Hikari. The root application intentionally scans only common packages so one connection's services do not become global [10][11].
 
-[предположение] Переносить правила выбора имени, разделения каталогов и закрытия ресурсов; заменить настройки, обнаружение типа, службы и фабрику на почтовые. Автоматическое повторение после ошибки создания нельзя переносить в логику авторизации без отдельной политики: почтовый проект учитывает блокировку учётной записи. Архитектуру новых почтовых классов этот отчёт не задаёт.
+[assumption] Transfer name-selection rules, directory separation, and resource closing; replace settings, type detection, services, and factory with mail equivalents. Do not transfer automatic retries after context-creation errors into authorization without a separate policy: the mail project accounts for account lockout. This report does not define the architecture of new mail classes.
 
-### В5. Привязка настроек и что повторить
+### В5. Settings binding and what to replicate
 
-[код] Redmine связывает `redmine-mcp.*` с вложенными records `RedmineMcpProperties`: `@DefaultValue`, константы и нормализация значений в конструкторах; URL/API key вынесены в `RedmineClientProperties`. Регистрация — `RedmineConfig.@EnableConfigurationProperties`. YAML явно связывает настройки с `REDMINE_MCP_*`. [5][6]
+[code] Redmine binds `redmine-mcp.*` to nested `RedmineMcpProperties` records: `@DefaultValue`, constants, and value normalization in constructors; URL/API key are separated into `RedmineClientProperties`. Registration is through `RedmineConfig.@EnableConfigurationProperties`. YAML explicitly maps settings to `REDMINE_MCP_*` [5][6].
 
-[код] В JDBC `@ConfigurationProperties("jdbc-mcp")` используется для общих путей; `@ConstructorBinding` выбирает конструктор при наличии дополнительных. `JdbcProperties`, `UsageProperties`, `StructureSnapshotProperties`, `DriverProperties` создаёт загрузчик JSON из `DEFAULTS`, а не привязка окружения каждого ящика. [10][11][14]
+[code] JDBC uses `@ConfigurationProperties("jdbc-mcp")` for common paths; `@ConstructorBinding` selects the constructor when additional ones exist. `JdbcProperties`, `UsageProperties`, `StructureSnapshotProperties`, and `DriverProperties` are created by the JSON loader from `DEFAULTS`, not by binding each mailbox's environment [10][11][14].
 
-[код] Флаги `tools.*` в обоих проектах читаются `@ConditionalOnProperty` на классах инструментов; они не являются компонентами основного record свойств. Группы включены по умолчанию. JDBC resources выключены по умолчанию; запись Redmine включена по умолчанию. [5][6][11][12]
+[code] `tools.*` flags in both projects are read using `@ConditionalOnProperty` on tool classes; they are not fields in the main properties record. Groups are enabled by default. JDBC resources are disabled by default; Redmine writes are enabled by default [5][6][11][12].
 
-Предложения ниже — [предположение], значения в колонке «Образец» проверены по [6][10][14]. Имена `MAIL_MCP_*` здесь рекомендации, не существующий интерфейс.
+The proposals below are [assumption]; values in the “Example” column were checked in [6][10][14]. `MAIL_MCP_*` names are recommendations, not an existing interface.
 
-| Настройка | Образец | Что повторить для почты |
+| Setting | Example | What to replicate for mail |
 |---|---|---|
-| Каталог данных | Redmine: абсолютный нормализованный путь; JDBC: поддержка ведущего `~`, без `toAbsolutePath()` | `MAIL_MCP_DATA_DIR`, единое разрешение пути для хранилища, извлечения, индекса и журналов |
-| Файл соединений | JDBC: отдельно от data dir, по умолчанию `<data-dir>/connections.json` | `MAIL_MCP_CONNECTIONS_FILE`, чтение один раз, без соединения по умолчанию |
-| Настройки ящика | JDBC: JSON, строки с `${VAR}`, остальные JSON-типы без подстановки | Тип `ews`/`imap` и свойства из файла; не переносить `REDMINE_URL`/API key или JDBC-поля |
-| Текст вложения | Redmine: 30 000 на часть, 40 000 всего, запрос до 200 000 | Те же три вида лимитов, значения подтвердить под почтовый сценарий |
-| Ответ целиком | Redmine: 50 000 символов, до пяти изображений | Предел ответа и метаданные сокращения; учитывать итоговый JSON, см. В2 |
-| Распаковка | Redmine: глубина 1, 100 частей, 50 MiB всего, 10 MiB на запись, 100 записей ZIP | Повторить набор параметров, исправить область действия счётчиков, см. В1 |
-| Pandoc / Tika | Redmine: probe 2 s, conversion 30 s, Tika 5 242 880 в `BodyContentHandler`, 40 полей | Необязательный Pandoc, лимиты времени и текста; уточнить единицу `body-limit-bytes` |
-| Время сетевого обращения | Redmine HTTP: connect 10 s, read 30 s | Принцип конечных таймаутов; значения и свойства отдельно для EWS/IMAP |
-| Группы инструментов | Оба проекта: YAML → env → `@ConditionalOnProperty` | `MAIL_MCP_TOOLS_*`, условная регистрация групп и проверки состава инструментов |
-| Запись / ресурсы | Redmine write=true; JDBC resources=false | Для почты write=false по принятому плану; ресурсы включать отдельным флагом, если потребуются |
+| Data directory | Redmine: absolute normalized path; JDBC: supports leading `~`, omits `toAbsolutePath()` | `MAIL_MCP_DATA_DIR`, one path-resolution rule for storage, extraction, index, and logs |
+| Connections file | JDBC: separate from data dir, defaults to `<data-dir>/connections.json` | `MAIL_MCP_CONNECTIONS_FILE`, read once, no default connection |
+| Mailbox settings | JDBC: JSON, strings with `${VAR}`, other JSON types not substituted | `ews`/`imap` type and properties from file; do not transfer `REDMINE_URL`/API key or JDBC fields |
+| Attachment text | Redmine: 30,000 per part, 40,000 total, request up to 200,000 | Same three kinds of limits; confirm values for mail use |
+| Whole response | Redmine: 50,000 characters, up to five images | Response limit and truncation metadata; account for final JSON, see В2 |
+| Unpacking | Redmine: depth 1, 100 parts, 50 MiB total, 10 MiB per entry, 100 ZIP entries | Replicate the parameter set, fix counter scope, see В1 |
+| Pandoc / Tika | Redmine: probe 2 s, conversion 30 s, Tika 5 242 880 in `BodyContentHandler`, 40 fields | Optional Pandoc, time/text limits; clarify unit of `body-limit-bytes` |
+| Network request time | Redmine HTTP: connect 10 s, read 30 s | Principle of finite timeouts; separate values/settings for EWS/IMAP |
+| Tool groups | Both projects: YAML → env → `@ConditionalOnProperty` | `MAIL_MCP_TOOLS_*`, conditional group registration and tool-set checks |
+| Write / resources | Redmine write=true; JDBC resources=false | For mail, write=false under accepted plan; enable resources via separate flag if needed |
 
-### В6. Закреплённые версии и последствия для общего кода
+### В6. Pinned versions and implications for shared code
 
-[код] Точные объявления приведены в таблице версий. Бриф ошибочно предполагает одинаковую Java: фактически `JavaLanguageVersion.of(25)` у Redmine и `of(21)` у JDBC. Оба проекта используют Jackson 3 в исходниках, но его точные разрешённые версии не выписываются в каталогах. [5][7][11][15]
+[code] Exact declarations are in the versions table. The brief incorrectly assumes Java versions match: Redmine uses `JavaLanguageVersion.of(25)` and JDBC uses `of(21)`. Both projects use Jackson 3 in source, but the exact resolved Jackson versions are not listed in the catalogs [5][7][11][15].
 
-[предположение] Общий JAR, который должен работать и в существующем JDBC, разумно компилировать под Java 21. Сборка общей библиотеки под 25 потребует поднять минимальную Java JDBC. Обратную совместимость конкретных зависимостей надо проверять сборкой обоих потребителей.
+[assumption] A shared JAR that must also work in existing JDBC should reasonably compile for Java 21. Building the common library for 25 would require raising JDBC's minimum Java version. Compatibility with specific dependencies must be checked by building both consumers.
 
-[предположение] Извлечение лучше отделять от Boot/MCP: принимать собственные настройки и оставлять Spring-регистрацию в приложении. Иначе библиотека потянет несовпадающие версии Boot/AI. Для компрессора особенно важен Jackson 3 API `tools.jackson`, не совместимый по именам типов с Jackson 2. [2][4][7][15]
+[assumption] Extraction should be separated from Boot/MCP: accept its own settings and leave Spring registration in the application. Otherwise the library would pull in incompatible Boot/AI versions. For the compressor, Jackson 3 API `tools.jackson` matters; its type names are incompatible with Jackson 2 [2][4][7][15].
 
-[код] В Redmine отключён обычный `jar`, выпускается `bootJar`; то же в JDBC. Следовательно, опубликование приложения как есть не создаёт отдельную библиотеку извлечения: потребуется самостоятельный модуль с обычным JAR. [7][15]
+[code] Redmine disables ordinary `jar` and produces `bootJar`; JDBC does the same. Therefore publishing either application as-is does not create a separate extraction library: a standalone module producing an ordinary JAR would be required [7][15].
 
-### В7. Копирование, общая библиотека, составная сборка или подмодуль
+### В7. Copying, shared library, composite build, or submodule
 
-Все оценки в таблице — [предположение] для трёх проектов одного автора. Основание: размеры и зависимости в инвентаризации, разные Java/Boot/AI и уже существующее дублирование `JsonConfig`/`ToolLogger`. [2][4][5][7][10][11][15]
+All table assessments are [assumption] for three projects by one author. Basis: inventory size and dependencies, different Java/Boot/AI versions, and existing `JsonConfig`/`ToolLogger` duplication [2][4][5][7][10][11][15].
 
-| Вариант | Независимые выпуски и расхождение версий | Цена разработки и проверки | Когда лучше |
+| Option | Independent releases and version drift | Development and verification cost | Best when |
 |---|---|---|---|
-| Копировать выбранные классы | Каждый проект развивается отдельно; исправления приходится переносить вручную | Минимум инфраструктуры; тесты копии должны остаться локальными, происхождение фиксируется ревизией | Сейчас, пока почтовые контракты меняются и многое требует адаптации |
-| Библиотека + Maven Local | Потребители закрепляют свою версию, но локальный артефакт может отсутствовать на другой машине | Нужны отдельный JAR, версия, публикация перед сборкой; проверка библиотеки и потребителей | Личный прототип выделения общего ядра; не единственный способ воспроизводимой сборки |
-| Библиотека + GitHub Packages | Можно выпускать библиотеку отдельно и обновлять приложения постепенно | Дополнительная настройка публикации и доступа в средах сборки; матрица Java 21/25 и Boot/AI потребителей | Устойчивый контракт и регулярные одинаковые исправления минимум в двух проектах |
-| Gradle composite build | Потребитель может подменять артефакт исходным проектом соседней сборки | Удобны совместные изменения и отладка; нужны согласованные пути/выбор ревизий и проверка всех потребителей | Разработка уже выделенной библиотеки; опубликованный артефакт удобен для обычной сборки |
-| Git submodule | Репозиторий фиксирует точную ревизию исходников, обновляется отдельно | Клонирование/обновление подмодуля, подключение Gradle и проверка остаются отдельными задачами | Когда принципиально нужно хранить общие исходники рядом, без распространения артефакта |
+| Copy selected classes | Projects evolve separately; fixes must be transferred manually | Minimal infrastructure; copied tests remain local, provenance records revision | Now, while mail contracts change and much code needs adaptation |
+| Library + Maven Local | Consumers pin their own version, but local artifact may be absent on another machine | Separate JAR, version, publish-before-build; verify library and consumers | Personal prototype for extracting a common core; not the only reproducible-build method |
+| Library + GitHub Packages | Release library separately and update apps gradually | More publication/access setup in build environments; Java 21/25 and Boot/AI consumer matrix | Stable contract and repeated identical fixes in at least two projects |
+| Gradle composite build | Consumer can substitute source project from a neighboring build | Convenient joint changes and debugging; needs agreed paths/revisions and checks for all consumers | Developing an already separated library; published artifact is convenient for normal builds |
+| Git submodule | Repository pins an exact source revision, updated separately | Clone/update submodule, Gradle hookup, and verification remain separate tasks | When keeping shared source alongside is important and its lifecycle will be maintained |
 
-[предположение] Composite build — способ собрать несколько проектов, submodule — способ доставить исходники; они могут сочетаться, но сами не удаляют связи с `RedmineMcpProperties` или JDBC-моделями. Объединение всех служебных классов в одну библиотеку лишь перенесёт эти связи в общее место.
+[assumption] A composite build is a way to build multiple projects; a submodule is a way to deliver source. They can be combined, but neither removes dependencies on `RedmineMcpProperties` or JDBC models. Putting all infrastructure classes into one library would only move those dependencies to a shared place.
 
-[предположение] **Рекомендация: начать с копирования и адаптации.** Перейти к общей библиотеке, если одинаковый исправленный механизм действительно используется минимум двумя приложениями и изменения регулярно дублируются. Для устойчивого общего ядра предпочтительнее версионированный JAR; Maven Local/composite оставить удобством разработки. Submodule выбирать при явном предпочтении исходников и готовности обслуживать его жизненный цикл.
+[assumption] **Recommendation: start by copying and adapting.** Move to a shared library if the same corrected mechanism is actually used by at least two applications and changes are regularly duplicated. For a stable common core, prefer a versioned JAR; keep Maven Local/composite as development conveniences. Choose a submodule when source code is explicitly preferred and its lifecycle will be maintained.
 
-[предположение] Минимальная проверка каждого варианта отличается:
+[assumption] Minimum verification differs by option:
 
-- При копировании — автономные тесты перенесённых функций в mail и запись исходной ревизии для последующих исправлений.
-- При библиотеке — тесты ядра плюс сборка обоих существующих потребителей на их закреплённых версиях; смена версии артефакта не должна автоматически обновлять все приложения.
-- При composite/submodule — те же проверки потребителей и проверка чистого клонирования с зафиксированными исходниками. Работа только с уже подготовленными соседними каталогами не подтверждает воспроизводимость.
+- Copying: autonomous tests for transferred functionality in mail, and record source revisions for future fixes.
+- Library: core tests plus builds of both existing consumers on their pinned versions; changing the artifact version must not automatically update every app.
+- Composite/submodule: the same consumer checks and a clean-clone check with pinned source. Working only with already prepared neighboring directories does not prove reproducibility.
 
-## Сравнительные таблицы
+## Comparison tables
 
-### Как читать инвентаризацию
+### Reading the inventory
 
-[код] Пути относительно `src/main/java/<org>/<проект>/mcp/`: `E` = Redmine `extraction/`, `C` = Redmine `compression/`, `R` = корень пакета Redmine, `J` = корень пакета JDBC. Ресурсы обозначены полным путём относительно репозитория. Число строк включает пустые строки и комментарии; вложенные типы включены в размер файла владельца. [2][4][5][10][11][12]
+[code] Paths are relative to `src/main/java/<org>/<project>/mcp/`: `E` = Redmine `extraction/`, `C` = Redmine `compression/`, `R` = Redmine package root, `J` = JDBC package root. Resources use full repository-relative paths. Line counts include blank lines and comments; nested types are included in their owner file's size [2][4][5][10][11][12].
 
-Назначение, зависимости, размеры и тесты в таблицах — [код] по указанным источникам; «Вердикт» и «Что адаптировать» — [предположение]. `как есть` допускает механическое переименование пакета/бина и замену проектного примера в комментарии. `Нет отдельного` означает, что целевая проверка не найдена, а не что класс заведомо не исполняется тестами.
+Purpose, dependencies, size, and tests in the tables are [code] from the cited sources; “Verdict” and “What to adapt” are [assumption]. `as is` allows mechanical package/bean renaming and replacing project examples in comments. `No separate test` means no targeted check was found, not that the class is known to be untested.
 
-Обозначения тестов Redmine (пути относительно `src/test/java/<org>/redmine/mcp/`): [3]
+Redmine test abbreviations (paths relative to `src/test/java/<org>/redmine/mcp/`) [3]:
 
 - D = `tools/DocumentExtractionTest`; A = `service/AttachmentServiceTest`; AT = `tools/AttachmentToolsTest`.
-- DX = `extraction/parser/DocxTextParserTest`; DP = `extraction/DocxPandocParserIntegrationTest` (требует Pandoc, тег integration).
+- DX = `extraction/parser/DocxTextParserTest`; DP = `extraction/DocxPandocParserIntegrationTest` (requires Pandoc, integration tag).
 - RC, IC, AC = `service/compression/ResponseCompressorTest`, `IssueCompressionTest`, `AttachmentContentCompressionTest`.
 - CF, JD, JT = `service/compression/steps/ChangesetCommentsFirstLineStepTest`, `JournalDetailsOmitStepTest`, `JournalsTailKeepStepTest`.
-- H = `tools/IssueStructureToolsTest`, включая большие истории, проход по `nextOffset` и одно слишком большое событие.
+- H = `tools/IssueStructureToolsTest`, including large histories, continuation through `nextOffset`, and one oversized event.
 
-### Извлечение
+### Extraction
 
-Источник всех 24 строк: [2]; тесты: [3]. Типы из `extraction/` считаются частью переносимого блока; в зависимостях отдельно отмечены внешние библиотеки и связи с остальным приложением.
+Source for all 24 rows: [2]; tests: [3]. Types from `extraction/` are treated as part of the reusable block; external libraries and links to the rest of the app are called out separately.
 
-| Класс / файл | Назначение | Зависит от проектного кода | ≈ строк | Тесты | Вердикт | Что адаптировать |
-|---|---|---|---|---|---|---|
-| `E/DocumentParser.java` | Контракт парсера; вложенный enum `Phase` | Только ParseInput/ParseSink | 25 | DX, D косвенно | как есть | Сохранить две фазы и несколько применимых парсеров |
-| `E/ExtractedPart.java` | Часть результата, текст и ссылки | Нет вне extraction | 48 | D, A косвенно | адаптировать | Отделить внутренние пути от выдаваемых очищенных файлов |
-| `E/ExtractionLimits.java` | Четыре ограничения извлечения | `RedmineMcpProperties.Limits` | 23 | D косвенно; нет проверки всех лимитов | адаптировать | Убрать фабрику из Redmine-настроек |
-| `E/ExtractionPipeline.java` | Оркестрация и рекурсия; вложенный `InputSink` | `RedmineMcpProperties`, Spring, SLF4J | 129 | D, DX, DP | адаптировать | Общие счётчики, остановка, собственная конфигурация |
-| `E/FileTypeDetector.java` | Тип по расширению и Content-Type | Spring; нет Redmine-типов | 84 | D: PDF/ZIP/XSD с generic Content-Type | адаптировать | Почтовые типы, MIME-параметры, отличие HTML от текста |
-| `E/PandocAvailability.java` | Поиск и проверка Pandoc; вложенный `Detected` | `RedmineMcpProperties`, Spring, SLF4J | 131 | DP; нет отдельного теста поиска всех путей | адаптировать | Каталог, свойства и текст журналов |
-| `E/ParseContext.java` | Контекст одного извлечения | `RedmineMcpProperties.Extraction` | 15 | D, DX косвенно | адаптировать | Независимые настройки и общее изменяемое состояние лимитов |
-| `E/ParseInput.java` | Файл, логическое имя, родитель, глубина | Только ParseContext | 30 | D косвенно | адаптировать | Не использовать только имя как идентичность части; пересмотреть безымянный корень |
-| `E/ParseSink.java` | Выдача частей и обработка дочерних файлов | Только ExtractedPart | 31 | DX, D косвенно | адаптировать | Сигнал прекращения при исчерпании лимитов |
-| `E/TextNormalizer.java` | Переводы строк и пробелы | Только JDK | 19 | D косвенно | как есть | Без изменений алгоритма |
-| `E/parser/AbstractDocumentParser.java` | Общий вызов, нормализация, выдача ошибок | Только extraction; SLF4J | 61 | D: документы и повреждённый файл | адаптировать | Ограничение текста во время чтения, ошибки отдельно от индексируемого текста |
-| `E/parser/BinaryFallbackParser.java` | Последняя часть без текста | FileTypeDetector; Spring | 65 | D косвенно; отдельной проверки вложенного binary нет | адаптировать | Ссылки и примечания под политику файлов |
-| `E/parser/DocxEmbeddedExtractor.java` | Извлекает вложенные объекты DOCX | POI, FileTypeDetector, Spring, SLF4J | 89 | Нет отдельного; включён в помощник D | адаптировать | Глубина/байты/части, уникальные пути, повторное использование файлов |
-| `E/parser/DocxMediaExtractor.java` | Извлекает картинки DOCX | POI, FileTypeDetector, Spring, SLF4J | 87 | D: embedded image | адаптировать | Те же лимиты и пути, не только проверка совпадения размера |
-| `E/parser/DocxPandocParser.java` | DOCX → GFM через внешний процесс | `RedmineMcpProperties`, PandocAvailability, Spring, SLF4J | 131 | DP; DX проверяет пропуск дубля через подставной парсер | адаптировать | Настройки, идентичность кеша `pandoc.md`, размеры результата |
-| `E/parser/DocxTextParser.java` | DOCX-текст и таблицы через POI | AbstractDocumentParser, FileTypeDetector; POI, Spring | 75 | DX, D | адаптировать | Сохранить hasTextPart; ограничивать накопление текста |
-| `E/parser/ImagePassthroughParser.java` | Часть-ссылка на изображение | FileTypeDetector; Spring | 54 | D: картинка DOCX; AT/A: ответ изображения | адаптировать | Политику выдачи локальных ссылок |
-| `E/parser/PdfTextParser.java` | Текстовый слой PDF | AbstractDocumentParser, FileTypeDetector; PDFBox, Spring | 46 | D: PDF и generic Content-Type | адаптировать | Ограничения чтения/результата и явный статус отсутствия текста |
-| `E/parser/PlainTextParser.java` | Текстовый файл UTF-8 | FileTypeDetector, TextNormalizer; Spring, SLF4J | 57 | D: TXT/JSON/XSD | адаптировать | Кодировки и HTML отдельно, ограниченное чтение |
-| `E/parser/PptxTextParser.java` | Текст слайдов и таблиц | AbstractDocumentParser, FileTypeDetector; POI, Spring | 72 | D: PPTX | адаптировать | Ограничение накопления текста |
-| `E/parser/TikaMetadataParser.java` | Метаданные корневого файла | `RedmineMcpProperties`, FileTypeDetector; Tika, Spring, SLF4J | 104 | Нет отдельного; включён в D | адаптировать | Настройки, длина значений, фильтрация метаданных |
-| `E/parser/TikaTextFallbackParser.java` | Резервное извлечение текста | `RedmineMcpProperties`, FileTypeDetector; Tika, Spring, SLF4J | 87 | Нет отдельного на legacy/mail-форматы | адаптировать | Настройки; переполнение BodyContentHandler сейчас попадает в общий catch |
-| `E/parser/XlsxTextParser.java` | Листы и форматированные ячейки | AbstractDocumentParser, FileTypeDetector; POI, Spring | 58 | D: XLSX, несколько листов | адаптировать | Ограничение чтения/накопления текста |
-| `E/parser/ZipParser.java` | Рекурсивная распаковка ZIP; вложенный `ArchiveReadLimitException` | `RedmineMcpProperties`, FileTypeDetector; Spring, SLF4J | 168 | D: поддержанные файлы в ZIP; нет отдельных проверок атак/лимитов | адаптировать | Общие счётчики, прекращение записи, отдельный каталог каждого архива |
+| Class / file | Purpose | Depends on project code | ≈ lines | Tests | Verdict | What to adapt |
+|---|---|---|---:|---|---|---|
+| `E/DocumentParser.java` | Parser contract; nested enum `Phase` | Only ParseInput/ParseSink | 25 | DX, D indirectly | as is | Keep two phases and multiple applicable parsers |
+| `E/ExtractedPart.java` | Result part, text, and links | Nothing outside extraction | 48 | D, A indirectly | adapt | Separate internal paths from exposed sanitized files |
+| `E/ExtractionLimits.java` | Four extraction limits | `RedmineMcpProperties.Limits` | 23 | D indirectly; not all limits checked | adapt | Remove factory from Redmine settings |
+| `E/ExtractionPipeline.java` | Orchestration and recursion; nested `InputSink` | `RedmineMcpProperties`, Spring, SLF4J | 129 | D, DX, DP | adapt | Shared counters, stopping, own configuration |
+| `E/FileTypeDetector.java` | Type by extension and Content-Type | Spring; no Redmine types | 84 | D: PDF/ZIP/XSD with generic Content-Type | adapt | Mail types, MIME parameters, distinguish HTML from text |
+| `E/PandocAvailability.java` | Find/check Pandoc; nested `Detected` | `RedmineMcpProperties`, Spring, SLF4J | 131 | DP; no separate test for all search paths | adapt | Directory, settings, log messages |
+| `E/ParseContext.java` | One extraction context | `RedmineMcpProperties.Extraction` | 15 | D, DX indirectly | adapt | Independent settings and shared mutable limit state |
+| `E/ParseInput.java` | File, logical name, parent, depth | Only ParseContext | 30 | D indirectly | adapt | Do not use name alone as part identity; reconsider nameless root |
+| `E/ParseSink.java` | Emit parts and process child files | Only ExtractedPart | 31 | DX, D indirectly | adapt | Stop signal when limits are exhausted |
+| `E/TextNormalizer.java` | Newlines and whitespace | JDK only | 19 | D indirectly | as is | No algorithm changes |
+| `E/parser/AbstractDocumentParser.java` | Common invocation, normalization, error emission | Extraction only; SLF4J | 61 | D: documents and corrupt file | adapt | Limit text while reading; keep errors out of indexed text |
+| `E/parser/BinaryFallbackParser.java` | Final part without text | FileTypeDetector; Spring | 65 | D indirectly; nested binary not separately checked | adapt | Links and notes under file policy |
+| `E/parser/DocxEmbeddedExtractor.java` | Extract embedded DOCX objects | POI, FileTypeDetector, Spring, SLF4J | 89 | No separate test; included in D helper | adapt | Depth/bytes/parts, unique paths, file reuse |
+| `E/parser/DocxMediaExtractor.java` | Extract DOCX images | POI, FileTypeDetector, Spring, SLF4J | 87 | D: embedded image | adapt | Same limits/paths; do not only check matching sizes |
+| `E/parser/DocxPandocParser.java` | DOCX → GFM via external process | `RedmineMcpProperties`, PandocAvailability, Spring, SLF4J | 131 | DP; DX checks duplicate skip with stub parser | adapt | Settings, `pandoc.md` cache identity, output size |
+| `E/parser/DocxTextParser.java` | DOCX text/tables via POI | AbstractDocumentParser, FileTypeDetector; POI, Spring | 75 | DX, D | adapt | Preserve hasTextPart; limit text accumulation |
+| `E/parser/ImagePassthroughParser.java` | Image reference part | FileTypeDetector; Spring | 54 | D: DOCX image; AT/A: image response | adapt | Policy for exposing local links |
+| `E/parser/PdfTextParser.java` | PDF text layer | AbstractDocumentParser, FileTypeDetector; PDFBox, Spring | 46 | D: PDF and generic Content-Type | adapt | Read/result limits and explicit no-text status |
+| `E/parser/PlainTextParser.java` | UTF-8 text file | FileTypeDetector, TextNormalizer; Spring, SLF4J | 57 | D: TXT/JSON/XSD | adapt | Encodings and separate HTML; bounded reading |
+| `E/parser/PptxTextParser.java` | Slide and table text | AbstractDocumentParser, FileTypeDetector; POI, Spring | 72 | D: PPTX | adapt | Limit text accumulation |
+| `E/parser/TikaMetadataParser.java` | Root-file metadata | `RedmineMcpProperties`, FileTypeDetector; Tika, Spring, SLF4J | 104 | No separate test; included in D | adapt | Settings, value length, metadata filtering |
+| `E/parser/TikaTextFallbackParser.java` | Fallback text extraction | `RedmineMcpProperties`, FileTypeDetector; Tika, Spring, SLF4J | 87 | No separate legacy/mail-format test | adapt | Settings; BodyContentHandler overflow currently caught by general catch |
+| `E/parser/XlsxTextParser.java` | Sheets and formatted cells | AbstractDocumentParser, FileTypeDetector; POI, Spring | 58 | D: XLSX, multiple sheets | adapt | Limit reading/text accumulation |
+| `E/parser/ZipParser.java` | Recursive ZIP unpacking; nested `ArchiveReadLimitException` | `RedmineMcpProperties`, FileTypeDetector; Spring, SLF4J | 168 | D: supported files in ZIP; no separate attack/limit tests | adapt | Shared counters, stop writes, separate directory per archive |
 
-### Ограничение ответов
+### Response compression
 
-Источники: [4], тесты [3]. Включены все 13 файлов, в том числе все семь файлов `steps/`.
+Sources: [4]; tests: [3]. Includes all 13 files, including all seven `steps/` files.
 
-| Класс / файл | Назначение | Зависит от проектного кода | ≈ строк | Тесты | Вердикт | Что адаптировать |
-|---|---|---|---|---|---|---|
-| `C/CompressionResult.java` | Значение, размер, примечания, overBudget | Нет | 11 | RC косвенно | как есть | Потребитель обязан учитывать overBudget |
-| `C/CompressionStep.java` | Шаг сокращения; вложенный `Compressed<T>` | Нет | 29 | RC, IC, AC | как есть | Только пакет |
-| `C/ResponseCompressor.java` | Применяет шаги до лимита | Jackson 3, Spring, SLF4J; нет предметных моделей | 59 | RC | как есть | Сохранить как механизм; окончательную проверку делать снаружи |
-| `C/AttachmentContentCompression.java` | Политика лимитов ответа вложения | `api.AttachmentContent`, `RedmineMcpProperties` | 62 | AC, AT | адаптировать | Почтовая модель, свойства, итоговый размер с notes |
-| `C/HistoryCompression.java` | Сокращает/делит историю | `api.IssueHistory`, `api.Opaque`, свойства, Jackson 3 | 266 | H | не нужно | Не переносить `Draft`, `IndexedDuration`, `TextStep`; взять принцип дочитывания |
-| `C/IssueCompression.java` | Последовательность сокращений задачи | `api.Issue`, `RedmineMcpProperties` | 58 | IC | не нужно | Заменять почтовой политикой, если потребуется |
-| `C/steps/AttachmentContentImagePartsCollapseStep.java` | Оставляет первые картинки | `api.AttachmentContent`, Rewriter | 35 | AC | адаптировать | Модель и доступ к очищенным материалам |
-| `C/steps/AttachmentContentRewriter.java` | Перестраивает части; `CollapseResult`, `TruncateResult` | `api.AttachmentContent.Part` и with-методы | 107 | AC, AT косвенно | адаптировать | Модель, порядок частей, точный способ дочитывания |
-| `C/steps/AttachmentContentTextPartsTruncateStep.java` | Урезает текст частей | `api.AttachmentContent`, Rewriter | 35 | AC | адаптировать | Модель, предел и сообщение о продолжении |
-| `C/steps/ChangesetCommentsFirstLineStep.java` | Первая строка комментария коммита | `api.Issue`, `api.Changeset` | 59 | CF, IC | не нужно | Отсутствует почтовой смысл |
-| `C/steps/JournalDetailsOmitStep.java` | Удаляет изменения полей журнала | `api.Issue`, `api.Journal` | 51 | JD, IC | не нужно | Отсутствует почтовой смысл |
-| `C/steps/JournalNoteContentTruncateStep.java` | Сокращает примечания с исходной длиной | `api.Issue`, `api.Journal` | 80 | IC, в том числе повторное сокращение | не нужно | Взять идею сохранения исходной длины |
-| `C/steps/JournalsTailKeepStep.java` | Оставляет последние записи | `api.Issue` | 39 | JT, IC | не нужно | Не заменять этим постраничное чтение почты |
+| Class / file | Purpose | Depends on project code | ≈ lines | Tests | Verdict | What to adapt |
+|---|---|---|---:|---|---|---|
+| `C/CompressionResult.java` | Value, size, notes, overBudget | None | 11 | RC indirectly | as is | Consumer must handle overBudget |
+| `C/CompressionStep.java` | Compression step; nested `Compressed<T>` | None | 29 | RC, IC, AC | as is | Package only |
+| `C/ResponseCompressor.java` | Applies steps up to limit | Jackson 3, Spring, SLF4J; no domain models | 59 | RC | as is | Keep mechanism; final check belongs outside |
+| `C/AttachmentContentCompression.java` | Attachment-response limit policy | `api.AttachmentContent`, `RedmineMcpProperties` | 62 | AC, AT | adapt | Mail model/settings, final size including notes |
+| `C/HistoryCompression.java` | Shortens/pages history | `api.IssueHistory`, `api.Opaque`, settings, Jackson 3 | 266 | H | unnecessary | Do not transfer `Draft`, `IndexedDuration`, `TextStep`; use continuation principle |
+| `C/IssueCompression.java` | Sequence of issue reductions | `api.Issue`, `RedmineMcpProperties` | 58 | IC | unnecessary | Replace with mail policy if needed |
+| `C/steps/AttachmentContentImagePartsCollapseStep.java` | Keeps first images | `api.AttachmentContent`, Rewriter | 35 | AC | adapt | Model and access to sanitized materials |
+| `C/steps/AttachmentContentRewriter.java` | Rebuilds parts; `CollapseResult`, `TruncateResult` | `api.AttachmentContent.Part` and with-methods | 107 | AC, AT indirectly | adapt | Model, part order, exact continuation method |
+| `C/steps/AttachmentContentTextPartsTruncateStep.java` | Truncates text parts | `api.AttachmentContent`, Rewriter | 35 | AC | adapt | Model, limit, continuation message |
+| `C/steps/ChangesetCommentsFirstLineStep.java` | First line of commit comment | `api.Issue`, `api.Changeset` | 59 | CF, IC | unnecessary | No mail equivalent |
+| `C/steps/JournalDetailsOmitStep.java` | Removes journal field changes | `api.Issue`, `api.Journal` | 51 | JD, IC | unnecessary | No mail equivalent |
+| `C/steps/JournalNoteContentTruncateStep.java` | Truncates notes while retaining original length | `api.Issue`, `api.Journal` | 80 | IC, including repeated truncation | unnecessary | Use idea of preserving original length |
+| `C/steps/JournalsTailKeepStep.java` | Keeps last entries | `api.Issue` | 39 | JT, IC | unnecessary | Do not substitute for paged mail reading |
 
-### Служебная часть сервера
+### Server infrastructure
 
-Источники: Redmine [5][6], JDBC [11][12]; тесты [3][13].
+Sources: Redmine [5][6], JDBC [11][12]; tests [3][13].
 
-| Класс / файл | Назначение | Зависит от проектного кода | ≈ строк | Тесты | Вердикт | Что адаптировать |
-|---|---|---|---|---|---|---|
-| `R/config/McpServerConfig.java` | immediateExecution=true с журналированием | Spring AI customizer, SLF4J | 25 | Нет отдельного в Redmine | как есть | Имя пакета; проверить регистрацию бина |
-| `J/config/McpServerConfig.java` | То же; комментарий об SDK | Spring AI customizer | 23 | `config/McpStdioConcurrencyTest` вручную собирает сервер | как есть | Использовать один вариант и JDBC-тест |
-| `R/config/JsonConfig.java` | Jackson 3 mapper | Jackson, Spring; нет моделей Redmine | 30 | `config/JsonConfigTest` | как есть | Имя бина/пакета |
-| `J/config/JsonConfig.java` | Такой же mapper | Jackson, Spring; нет JDBC-моделей | 30 | `model/OutputSchemaSmokeTest` проверяет отдельный MCP mapper | как есть | Дополнить проверкой фактической сериализации MCP |
-| Redmine `src/main/resources/logback-spring.xml` | stderr + rolling file | `redmine-mcp.data-dir` | 29 | Нет отдельного | адаптировать | Свойство, пути, имя файла, MDC-формат из JDBC |
-| JDBC `src/main/resources/logback-spring.xml` | То же + connection в MDC | `jdbc-mcp.data-dir`, ключ MDC | 31 | Нет отдельного XML-теста | адаптировать | Свойство/имена, убрать logger пакета usage |
-| `R/tools/ToolLogger.java` | Время выполнения и ошибки | Только SLF4J | 18 | Нет отдельного | как есть | Фильтровать передаваемые сообщения ошибок на границе вызова |
-| `J/tools/ToolLogger.java` | Тот же помощник | Только SLF4J | 18 | Нет отдельного | как есть | Не дублировать оба варианта |
-| `J/tools/ToolConnectionMdcBeanPostProcessor.java` | MDC на всё время инструмента | Spring AOP, McpTool, SLF4J; нет JDBC-типов | 90 | Одноимённый тест в `tools/` | как есть | Сохранить параметр connection; для фоновых задач нужен отдельный перенос MDC |
-| Оба `src/main/resources/application.yml` | stdio, banner off, env и группы | Свойства и условия регистрации | 93 / 46 | `tools/ToolGroupConditionTest` в обоих | адаптировать | Имя сервера/префиксы; исключение DataSourceAutoConfiguration специфично JDBC |
+| Class / file | Purpose | Project-code dependency | ≈ lines | Tests | Verdict | What to adapt |
+|---|---|---|---:|---|---|---|
+| `R/config/McpServerConfig.java` | `immediateExecution=true` with logging | Spring AI customizer, SLF4J | 25 | No separate Redmine test | as is | Package name; verify bean registration |
+| `J/config/McpServerConfig.java` | Same; SDK comment | Spring AI customizer | 23 | `config/McpStdioConcurrencyTest` builds server manually | as is | Use one variant and JDBC test |
+| `R/config/JsonConfig.java` | Jackson 3 mapper | Jackson, Spring; no Redmine models | 30 | `config/JsonConfigTest` | as is | Bean/package name |
+| `J/config/JsonConfig.java` | Same mapper | Jackson, Spring; no JDBC models | 30 | `model/OutputSchemaSmokeTest` checks separate MCP mapper | as is | Add check for actual MCP serialization |
+| Redmine `src/main/resources/logback-spring.xml` | stderr + rolling file | `redmine-mcp.data-dir` | 29 | No separate test | adapt | Property, paths, file name, JDBC MDC format |
+| JDBC `src/main/resources/logback-spring.xml` | Same + connection in MDC | `jdbc-mcp.data-dir`, MDC key | 31 | No separate XML test | adapt | Property/names, remove usage-package logger |
+| `R/tools/ToolLogger.java` | Duration and errors | SLF4J only | 18 | No separate test | as is | Filter error messages passed in at call boundary |
+| `J/tools/ToolLogger.java` | Same helper | SLF4J only | 18 | No separate test | as is | Do not duplicate both variants |
+| `J/tools/ToolConnectionMdcBeanPostProcessor.java` | MDC for entire tool call | Spring AOP, McpTool, SLF4J; no JDBC types | 90 | Same-named test in `tools/` | as is | Preserve connection parameter; background jobs need separate MDC transfer |
+| Both `src/main/resources/application.yml` | stdio, banner off, env and groups | Properties and registration conditions | 93 / 46 | `tools/ToolGroupConditionTest` in both | adapt | Server name/prefixes; JDBC-specific DataSourceAutoConfiguration exclusion |
 
-### Соединения
+### Connections
 
-Источники: [10][11][12]; тесты [13]. В колонке тестов имена без пути относятся к `src/test/java/<org>/jdbc/mcp/connection/`, кроме явно указанных `tools/`.
+Sources: [10][11][12]; tests: [13]. Test names without paths refer to `src/test/java/<org>/jdbc/mcp/connection/`, except where `tools/` is specified.
 
-| Класс / файл | Назначение | Зависит от проектного кода | ≈ строк | Тесты | Вердикт | Что адаптировать |
-|---|---|---|---|---|---|---|
-| `J/connection/ConnectionsFile.java` | JSON-контейнер и вложенный `Entry` | Нет импортов JDBC; поля фактически JDBC | 60 | ConnectionsLoaderTest | адаптировать | Сохранить карту имён; заменить JDBC-поля почтовыми |
-| `J/connection/ConnectionsLoader.java` | Читает JSON, подставляет строки, создаёт определения | Все JDBC properties, DatabaseKind, Definition, mapper | 207 | ConnectionsLoaderTest | адаптировать | Обязательные поля/тип, defaults, configError и безопасные сообщения |
-| `J/connection/ConnectionDefinition.java` | Настройки + правила имени | JDBC/driver/catalog properties, DatabaseKind, DataSourceConfig.maskUrl | 113 | ConnectionDefinitionTest, ConnectionsLoaderTest | адаптировать | Оставить проверку имени; убрать SQL URL, snapshot.db и диалекты |
-| `J/connection/EnvironmentPlaceholders.java` | `${VAR}` и списки строк | Только JDK | 69 | ConnectionsLoaderTest: подстановка и отсутствующая переменная | как есть | Заменить проектный пример в Javadoc; добавить проверки краевых случаев |
-| `J/connection/ConnectionRegistry.java` | Ленивые контексты; вложенный `Holder` | Definition, Context, Factory, SLF4J | 154 | ConnectionRegistryTest, включая конкуренцию/изоляцию/close | адаптировать | Новые типы определения/контекста, политика повторов авторизации |
-| `J/connection/ConnectionContext.java` | Доступ к графу служб и close | SQL executor/guard/dialect/plan, metadata/usage, JDBC properties | 178 | ConnectionRegistryTest, SpringConnectionContextFactoryTest | адаптировать | Оставить жизненный цикл; заменить все JDBC-службы и признак poolInitialized |
-| `J/connection/ConnectionContextFactory.java` | Функциональный контракт фабрики | Definition, Context | 12 | ConnectionRegistryTest через подставную фабрику | адаптировать | Новые типы, форма интерфейса остаётся |
-| `J/connection/ConnectionScopeConfig.java` | Создаёт DataSource и закрывает пул | DataSourceConfig, Hikari через него, DatabaseKind, JDBC properties | 34 | SpringConnectionContextFactoryTest | не нужно | JDBC-бин не нужен; будущая почтовая регистрация будет другой |
-| `J/connection/SpringConnectionContextFactory.java` | Ленивый дочерний Spring context | Четыре JDBC-пакета, шесть типов настроек/движка, DataSource | 109 | SpringConnectionContextFactoryTest | адаптировать | Пакеты, primary settings, источники ews/imap, готовность и close |
-| `J/tools/ConnectionTools.java` | listConnections без удалённого запроса | Registry, Definition, ConnectionInfo, ListConnectionsResult | 64 | `tools/ToolConnectionRoutingTest` | адаптировать | Тип ящика и доступность локальных данных вместо schema/каталога SQL |
-| `J/tools/ToolConnections.java` | Выбор контекста и преобразование ошибок | Registry, Context, ToolErrors | 37 | `tools/ToolConnectionRoutingTest` | адаптировать | Описание параметра и принятый почтовый контракт ошибок |
-| `J/tools/ToolConnectionMdcBeanPostProcessor.java` | Устанавливает connection в MDC | Нет JDBC-типов; зависимости см. служебную таблицу | 90 | `tools/ToolConnectionMdcBeanPostProcessorTest` | как есть | Один перенос, не отдельная копия для каждого источника |
-| `J/model/connection/ConnectionInfo.java` | Одна запись списка | Swagger @Schema; JDBC-поля kind/defaultSchema/snapshotAvailable | 22 | `tools/ToolConnectionRoutingTest` | адаптировать | Почтовые поля, явная обязательность/nullable |
-| `J/model/connection/ListConnectionsResult.java` | Обёртка списка | ConnectionInfo, Swagger @Schema | 12 | `tools/ToolConnectionRoutingTest` | адаптировать | Заменить элемент списка |
-| `J/config/ConnectionsConfig.java` | Загружает файл и регистрирует Factory/Registry | JdbcMcpProperties, Loader, Spring Factory, mapper | 36 | Нет отдельного; фабрика и реестр проверяются отдельно | адаптировать | Почтовые свойства и фабрика, destroyMethod=close |
+| Class / file | Purpose | Project-code dependency | ≈ lines | Tests | Verdict | What to adapt |
+|---|---|---|---:|---|---|---|
+| `J/connection/ConnectionsFile.java` | JSON container and nested `Entry` | No JDBC imports; fields are effectively JDBC-specific | 60 | ConnectionsLoaderTest | adapt | Keep name map; replace JDBC fields with mail fields |
+| `J/connection/ConnectionsLoader.java` | Reads JSON, substitutes strings, creates definitions | All JDBC properties, DatabaseKind, Definition, mapper | 207 | ConnectionsLoaderTest | adapt | Required fields/type, defaults, configError, safe messages |
+| `J/connection/ConnectionDefinition.java` | Settings and name rules | JDBC/driver/catalog properties, DatabaseKind, DataSourceConfig.maskUrl | 113 | ConnectionDefinitionTest, ConnectionsLoaderTest | adapt | Keep name validation; remove SQL URL, snapshot.db, dialects |
+| `J/connection/EnvironmentPlaceholders.java` | `${VAR}` and string lists | JDK only | 69 | ConnectionsLoaderTest: substitution and missing variable | as is | Replace project example in Javadoc; add edge-case checks |
+| `J/connection/ConnectionRegistry.java` | Lazy contexts; nested `Holder` | Definition, Context, Factory, SLF4J | 154 | ConnectionRegistryTest, including concurrency/isolation/close | adapt | New definition/context types, auth retry policy |
+| `J/connection/ConnectionContext.java` | Access to service graph and close | SQL executor/guard/dialect/plan, metadata/usage, JDBC properties | 178 | ConnectionRegistryTest, SpringConnectionContextFactoryTest | adapt | Keep lifecycle; replace JDBC services and poolInitialized indicator |
+| `J/connection/ConnectionContextFactory.java` | Functional factory contract | Definition, Context | 12 | ConnectionRegistryTest with stub factory | adapt | New types; interface shape remains |
+| `J/connection/ConnectionScopeConfig.java` | Creates DataSource and closes pool | DataSourceConfig, Hikari through it, DatabaseKind, JDBC properties | 34 | SpringConnectionContextFactoryTest | unnecessary | JDBC bean not needed; mail registration will differ |
+| `J/connection/SpringConnectionContextFactory.java` | Lazy child Spring context | Four JDBC packages, six settings/engine types, DataSource | 109 | SpringConnectionContextFactoryTest | adapt | Packages, primary settings, EWS/IMAP sources, readiness and close |
+| `J/tools/ConnectionTools.java` | listConnections without remote call | Registry, Definition, ConnectionInfo, ListConnectionsResult | 64 | `tools/ToolConnectionRoutingTest` | adapt | Mailbox type and local-data availability instead of SQL schema/catalog |
+| `J/tools/ToolConnections.java` | Selects context and maps errors | Registry, Context, ToolErrors | 37 | `tools/ToolConnectionRoutingTest` | adapt | Parameter description and accepted mail error contract |
+| `J/tools/ToolConnectionMdcBeanPostProcessor.java` | Sets connection in MDC | No JDBC types; see infrastructure table for dependencies | 90 | `tools/ToolConnectionMdcBeanPostProcessorTest` | as is | Transfer once, not separately per source |
+| `J/model/connection/ConnectionInfo.java` | One list entry | Swagger @Schema; JDBC fields kind/defaultSchema/snapshotAvailable | 22 | `tools/ToolConnectionRoutingTest` | adapt | Mail fields, explicit required/nullable behavior |
+| `J/model/connection/ListConnectionsResult.java` | List wrapper | ConnectionInfo, Swagger @Schema | 12 | `tools/ToolConnectionRoutingTest` | adapt | Replace list element type |
+| `J/config/ConnectionsConfig.java` | Loads file and registers Factory/Registry | JdbcMcpProperties, Loader, Spring Factory, mapper | 36 | No separate test; factory and registry checked separately | adapt | Mail settings/factory, destroyMethod=close |
 
-### Версии
+### Versions
 
-Все значения — [код] из каталогов, сборочных файлов и wrapper; это закреплённые объявления, не аудит разрешённого дерева зависимостей. [7][15]
+All values are [code] from catalogs, build files, and wrapper; these are pinned declarations, not an audit of the resolved dependency graph [7][15].
 
-| Библиотека | redmine-mcp-server | jdbc-mcp-server |
+| Library | redmine-mcp-server | jdbc-mcp-server |
 |---|---|---|
 | Spring Boot | `4.2.0-M2` | `4.0.0` |
 | Spring AI MCP server | `2.1.0-M1` | `2.0.1` |
 | Java toolchain | `25` | `21` |
 | Gradle wrapper | `9.3.1` | `9.3.1` |
-| PDFBox | `3.0.5` | Не объявлен в catalog/build |
-| Apache POI (`poi-ooxml`) | `5.4.0` | Не объявлен в catalog/build |
-| Apache Tika (`core`, `parsers-standard-package`) | `3.2.0` | Не объявлен в catalog/build |
-| Jackson | API Jackson 3 `tools.jackson`; версия прямо не закреплена | API Jackson 3 `tools.jackson`; версия прямо не закреплена |
+| PDFBox | `3.0.5` | Not declared in catalog/build |
+| Apache POI (`poi-ooxml`) | `5.4.0` | Not declared in catalog/build |
+| Apache Tika (`core`, `parsers-standard-package`) | `3.2.0` | Not declared in catalog/build |
+| Jackson | Jackson 3 API `tools.jackson`; exact version not directly pinned | Jackson 3 API `tools.jackson`; exact version not directly pinned |
 | Spring dependency-management plugin | `1.1.7` | `1.1.7` |
 
-## Рекомендация
+## Recommendation
 
-[предположение] Переносить выбранный код копированием, сохраняя источник и ревизию в записи о переносе. Не добавлять сейчас инфраструктуру публикации общей библиотеки: существенная часть полезного кода всё равно должна измениться для почтовых настроек, моделей ответа и фильтрации данных.
+[assumption] Transfer selected code by copying, recording its source and revision in the transfer record. Do not add shared-library publishing infrastructure now: much of the useful code still needs changes for mail settings, response models, and data filtering.
 
-1. Сначала взять служебные решения: один `McpServerConfig`, один `JsonConfig`, `ToolLogger`, JDBC MDC и шаблон журналов. Перенести проверки stdio, схем/JSON и обнаружения инструментов через прокси.
-2. Взять контракт и парсеры Redmine как основу извлечения, заменить привязку свойств и усилить ограничения из В1. Служебные ошибки не должны становиться документным текстом для индекса.
-3. Использовать общие три типа компрессора, но писать почтовые шаги и проверять размер конечного ответа. `IssueCompression`, `HistoryCompression` и шаги журналов не переносить.
-4. Перенести модель именованных соединений с адаптацией загрузчика/реестра. Не переносить JDBC-пул, SQL-службы и их настройки; ошибки конфигурации отличать от попыток авторизации.
-5. При переносе тестов заменить Redmine mocks и `TestRedmineMcpProperties`, оставить синтетические документы и временные каталоги. Добавить проверки общего лимита при ZIP → DOCX → вложенный файл и одинаковых имён в разных ветвях.
+1. First reuse infrastructure choices: one `McpServerConfig`, one `JsonConfig`, `ToolLogger`, JDBC MDC, and logging template. Transfer stdio, schema/JSON, and proxy tool-detection checks.
+2. Use Redmine's parser contract and parsers as the extraction basis, replace property binding, and strengthen limits from В1. Operational errors must not become document text indexed by search.
+3. Use the three common compressor types, but write mail-specific steps and check final response size. Do not transfer `IssueCompression`, `HistoryCompression`, or journal steps.
+4. Transfer the named-connection model with an adapted loader/registry. Do not transfer JDBC pool, SQL services, or their settings; distinguish configuration errors from sign-in attempts.
+5. When transferring tests, replace Redmine mocks and `TestRedmineMcpProperties`, keep synthetic documents and temporary directories. Add checks for a shared limit across ZIP → DOCX → nested file and same-named files in different branches.
 
-[предположение] Выделение общей библиотеки станет выгоднее копирования, когда исправленные ограничения и типы извлечения стабилизируются и одинаковые изменения понадобятся нескольким проектам. Тогда выделять небольшое ядро без MCP wire-records и настроек приложений, компилировать под общую минимальную Java и проверять каждый поддерживаемый потребитель. Maven Local/composite удобны для одновременной разработки, опубликованные версии — для независимых выпусков; условия выбора приведены в В7.
+[assumption] A shared library becomes preferable to copying once corrected extraction limits and types stabilize and multiple projects need the same changes. Then extract a small core without MCP wire records or application settings, compile for the common minimum Java, and test every supported consumer. Maven Local/composite is convenient for joint development; published versions suit independent releases. Conditions are in В7.
 
-## Что не удалось проверить
+## What could not be verified
 
-- [код] Сборки и тесты не запускались: задача — чтение двух репозиториев и запись одного отчёта. Указано найденное покрытие по исходникам, а не подтверждение прохождения тестов на этой машине. При реализации выполнить выбранные автономные тесты в соответствующей среде.
-- [код] Отдельных целевых тестов общего прекращения извлечения, глобального счётчика распакованных байтов и коллизий дочерних путей в просмотренном наборе не найдено. Это пробел покрытия, не результат испытания специально подготовленных файлов. [3]
-- [код] Не определены фактически разрешённые версии Jackson, MCP SDK и транзитивных библиотек. Каталоги дают только прямые объявления. Разработчик может проверить их через Gradle `dependencyInsight` в отдельной сессии сборки. [7][15]
-- [код] Комментарий об исправлении SDK и отключённый конкурентный тест не доказывают состояние upstream на 2026-10-24. Веб-проверка исключена областью задания; перед снятием `immediateExecution` нужны проверка зависимостей и воспроизведение конкурентного теста. [11][13]
-- [код] Для `body-limit-bytes` установлено только то, что число передаётся в `BodyContentHandler`, а исключения ловятся целиком. Единица параметра и сохранение частичного результата требуют проверки исходников конкретной Tika или отдельного теста. [2]
-- [предположение] Совместимость выделенного ядра с обеими версиями Boot/AI и Java не проверена: отдельной библиотеки ещё нет. Нужна проверка двух потребителей после удаления проектных зависимостей.
-- [код] Веб-страницы источников не открывались: ниже приведены постоянные GitHub-ссылки на прочитанные локально файлы/каталоги соответствующих чистых ревизий. Даты — даты коммитов, не даты выпусков библиотек.
+- [code] Builds and tests were not run: the task was to read two repositories and write one report. The cited test coverage was found in source, not confirmed as passing on this machine. During implementation, run selected offline tests in the appropriate environment.
+- [code] No targeted tests for global extraction stopping, a global unpacked-byte counter, or child-path collisions were found in the inspected set. This is a coverage gap, not a result from testing specially prepared files [3].
+- [code] Actual resolved versions of Jackson, MCP SDK, and transitive libraries are unknown. Catalogs provide direct declarations only. A developer can inspect them with Gradle `dependencyInsight` in a separate build session [7][15].
+- [code] The SDK-fix comment and disabled concurrency test do not establish upstream status as of 2026-10-24. Web verification was outside this task; before removing `immediateExecution`, check dependencies and reproduce the concurrency test [11][13].
+- [code] For `body-limit-bytes`, only that the value is passed to `BodyContentHandler` and exceptions are caught wholesale was established. Unit of the parameter and retention of partial results require checking that Tika version's source or a separate test [2].
+- [assumption] Compatibility of an extracted core with both Boot/AI and Java versions was not checked: no separate library exists yet. Check both consumers after removing project dependencies.
+- [code] Source web pages were not opened: references below identify locally read files/directories at the respective clean revisions. Dates are commit dates, not library release dates.
 
-## Что ещё стоит изучить
+## What else to study
 
-- [предположение] RT-09: MIME, вложенные `.eml`/`.msg`, TNEF и кодировки; Tika fallback не заменяет модель письма и его частей.
-- [предположение] До выдачи путей определить, какие очищенные файлы доступны модели; существующие подсказки `localPath` в Redmine предполагают доступ к оригиналу. [6]
+- [assumption] RT-09: MIME, nested `.eml`/`.msg`, TNEF, and encodings; Tika fallback does not replace a model of a message and its parts.
+- [assumption] Before exposing paths, decide which sanitized files are available to the model; Redmine's existing `localPath` hints assume access to the original [6].
 
-## Источники
+## Sources
 
-Все источники прочитаны локально 2026-10-24. В каждой ссылке закреплена ревизия; пути в таблицах уточняют конкретный файл внутри каталога. Коммит Redmine датирован 2026-09-30, JDBC — 2026-09-25; отдельные файлы могли изменяться раньше.
+All sources were read locally on 2026-10-24. Each reference pins a revision; table paths identify a particular file within the directory. The Redmine commit is dated 2026-09-30 and JDBC 2026-09-25; individual files may have changed earlier.
 
-1. Redmine, ревизия и дерево — `C:\git\redmine-mcp-server` @ `f62b3e5`,  (прочитано 2026-10-24).
-2. Redmine, все файлы extraction и parser — `C:\git\redmine-mcp-server` @ `f62b3e5`, src/main/java/<org>/redmine/mcp/extraction (прочитано 2026-10-24).
-3. Redmine, тесты extraction, tools, service/compression и config — `C:\git\redmine-mcp-server` @ `f62b3e5`, src/test/java/<org>/redmine/mcp (прочитано 2026-10-24).
-4. Redmine, все файлы compression и steps — `C:\git\redmine-mcp-server` @ `f62b3e5`, src/main/java/<org>/redmine/mcp/compression (прочитано 2026-10-24).
-5. Redmine, config/McpServerConfig, JsonConfig, RedmineMcpProperties, RedmineClientProperties, RedmineConfig; tools/ToolLogger — `C:\git\redmine-mcp-server` @ `f62b3e5`, src/main/java/<org>/redmine/mcp (прочитано 2026-10-24).
-6. Redmine, AttachmentService и ресурсы — `C:\git\redmine-mcp-server` @ `f62b3e5`, src/main/java/<org>/redmine/mcp/service/AttachmentService.java ; `C:\git\redmine-mcp-server` @ `f62b3e5`, src/main/resources (прочитано 2026-10-24).
-7. Redmine, версии и сборка — `C:\git\redmine-mcp-server` @ `f62b3e5`, gradle/libs.versions.toml ; `C:\git\redmine-mcp-server` @ `f62b3e5`, build.gradle.kts ; `C:\git\redmine-mcp-server` @ `f62b3e5`, gradle/wrapper/gradle-wrapper.properties (прочитано 2026-10-24).
-8. Redmine, AGENTS.md и все пять docs/*-agent.md — `C:\git\redmine-mcp-server` @ `f62b3e5`, AGENTS.md ; `C:\git\redmine-mcp-server` @ `f62b3e5`, docs (прочитано 2026-10-24).
-9. JDBC, ревизия и дерево — `C:\git\jdbc-mcp-server` @ `c2c4362`,  (прочитано 2026-10-24).
-10. JDBC, все файлы connection — `C:\git\jdbc-mcp-server` @ `c2c4362`, src/main/java/<org>/jdbc/mcp/connection (прочитано 2026-10-24).
-11. JDBC, config, приложение и ресурсы — `C:\git\jdbc-mcp-server` @ `c2c4362`, src/main/java/<org>/jdbc/mcp ; `C:\git\jdbc-mcp-server` @ `c2c4362`, src/main/resources (прочитано 2026-10-24).
-12. JDBC, ConnectionTools, ToolConnections, ToolConnectionMdcBeanPostProcessor, ToolLogger; записи model/connection — `C:\git\jdbc-mcp-server` @ `c2c4362`, src/main/java/<org>/jdbc/mcp/tools ; `C:\git\jdbc-mcp-server` @ `c2c4362`, src/main/java/<org>/jdbc/mcp/model/connection (прочитано 2026-10-24).
-13. JDBC, тесты connection, config/McpStdioConcurrencyTest, tools и model — `C:\git\jdbc-mcp-server` @ `c2c4362`, src/test/java/<org>/jdbc/mcp (прочитано 2026-10-24).
-14. JDBC, руководство по соединениям и AGENTS.md — `C:\git\jdbc-mcp-server` @ `c2c4362`, docs/connections.md ; `C:\git\jdbc-mcp-server` @ `c2c4362`, AGENTS.md (прочитано 2026-10-24).
-15. JDBC, версии и сборка — `C:\git\jdbc-mcp-server` @ `c2c4362`, gradle/libs.versions.toml ; `C:\git\jdbc-mcp-server` @ `c2c4362`, build.gradle.kts ; `C:\git\jdbc-mcp-server` @ `c2c4362`, gradle/wrapper/gradle-wrapper.properties (прочитано 2026-10-24).
+1. Redmine, revision and tree — `C:\git\redmine-mcp-server` @ `f62b3e5`, (read 2026-10-24).
+2. Redmine, all extraction and parser files — `C:\git\redmine-mcp-server` @ `f62b3e5`, `src/main/java/<org>/redmine/mcp/extraction` (read 2026-10-24).
+3. Redmine, extraction, tools, service/compression, and config tests — `C:\git\redmine-mcp-server` @ `f62b3e5`, `src/test/java/<org>/redmine/mcp` (read 2026-10-24).
+4. Redmine, all compression and steps files — `C:\git\redmine-mcp-server` @ `f62b3e5`, `src/main/java/<org>/redmine/mcp/compression` (read 2026-10-24).
+5. Redmine, config/McpServerConfig, JsonConfig, RedmineMcpProperties, RedmineClientProperties, RedmineConfig; tools/ToolLogger — `C:\git\redmine-mcp-server` @ `f62b3e5`, `src/main/java/<org>/redmine/mcp` (read 2026-10-24).
+6. Redmine, AttachmentService and resources — `C:\git\redmine-mcp-server` @ `f62b3e5`, `src/main/java/<org>/redmine/mcp/service/AttachmentService.java` ; `C:\git\redmine-mcp-server` @ `f62b3e5`, `src/main/resources` (read 2026-10-24).
+7. Redmine, versions and build — `C:\git\redmine-mcp-server` @ `f62b3e5`, gradle/libs.versions.toml ; `C:\git\redmine-mcp-server` @ `f62b3e5`, build.gradle.kts ; `C:\git\redmine-mcp-server` @ `f62b3e5`, gradle/wrapper/gradle-wrapper.properties (read 2026-10-24).
+8. Redmine, AGENTS.md and all five docs/*-agent.md — `C:\git\redmine-mcp-server` @ `f62b3e5`, AGENTS.md ; `C:\git\redmine-mcp-server` @ `f62b3e5`, docs (read 2026-10-24).
+9. JDBC, revision and tree — `C:\git\jdbc-mcp-server` @ `c2c4362`, (read 2026-10-24).
+10. JDBC, all connection files — `C:\git\jdbc-mcp-server` @ `c2c4362`, `src/main/java/<org>/jdbc/mcp/connection` (read 2026-10-24).
+11. JDBC, config, application, and resources — `C:\git\jdbc-mcp-server` @ `c2c4362`, `src/main/java/<org>/jdbc/mcp` ; `C:\git\jdbc-mcp-server` @ `c2c4362`, `src/main/resources` (read 2026-10-24).
+12. JDBC, ConnectionTools, ToolConnections, ToolConnectionMdcBeanPostProcessor, ToolLogger; model/connection records — `C:\git\jdbc-mcp-server` @ `c2c4362`, `src/main/java/<org>/jdbc/mcp/tools` ; `C:\git\jdbc-mcp-server` @ `c2c4362`, `src/main/java/<org>/jdbc/mcp/model/connection` (read 2026-10-24).
+13. JDBC, connection tests, config/McpStdioConcurrencyTest, tools, and model — `C:\git\jdbc-mcp-server` @ `c2c4362`, `src/test/java/<org>/jdbc/mcp` (read 2026-10-24).
+14. JDBC, connections guide and AGENTS.md — `C:\git\jdbc-mcp-server` @ `c2c4362`, docs/connections.md ; `C:\git\jdbc-mcp-server` @ `c2c4362`, AGENTS.md (read 2026-10-24).
+15. JDBC, versions and build — `C:\git\jdbc-mcp-server` @ `c2c4362`, gradle/libs.versions.toml ; `C:\git\jdbc-mcp-server` @ `c2c4362`, build.gradle.kts ; `C:\git\jdbc-mcp-server` @ `c2c4362`, gradle/wrapper/gradle-wrapper.properties (read 2026-10-24).

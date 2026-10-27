@@ -1,414 +1,414 @@
-# RT-02 — Клиент EWS и NTLM в Java
+# RT-02 — EWS and NTLM Client in Java
 
-- Дата: 2026-10-24.
-- Исполнитель: Codex, исследовательская сессия RT-02.
-- Бриф: [RT-02-ews-java-client.md](../research-tasks/RT-02-ews-java-client.md).
-- Метод: документация, исходники и метаданные публичных репозиториев; без сборки и входа в ящики.
+- Date: 2026-10-24.
+- Author: Codex, RT-02 research session.
+- Brief: `docs/research-tasks/RT-02-ews-java-client.md` (historical path).
+- Method: documentation, source code, and metadata from public repositories; no builds or mailbox sign-ins.
 
-## Кратко
+## Summary
 
-1. [код] Оригинальный `OfficeDev/ews-java-api` архивирован 2024-06-18;
-   артефакт 2.0 опубликован 2015-09-09, последний коммит `master` — 2018-07-25. [1–3]
-2. [код] Форки с изменениями в 2025–2026 есть: `eischet`, `jcetech`, `SpanningCloudApps`.
-   Подтверждённой проверки на Java 25 у рассмотренных форков не найдено. [7–9]
-3. [док][код] `HttpURLConnection` умеет NTLM; `java.net.http.HttpClient` в JDK 25
-   автоматически обрабатывает только Basic. Одинаковый `Authenticator` не уравнивает их. [15–19]
-4. [код] На Unix JDK использует Java-реализацию с NTLMv2 по умолчанию;
-   на Windows — системный механизм, версия зависит от политики Windows. [16–18]
-5. [док][код] Apache HttpClient отключил NTLM по умолчанию и объявил устаревшим с 5.3.
-   Удаления нет в проверенных 5.6.5 и 5.7-beta1; схему нужно регистрировать явно. [20–23]
-6. [код][предположение] Рекомендую тонкий SOAP-клиент на StAX + HttpClient 5 classic
-   с явной регистрацией NTLM; резерв — тот же SOAP-слой + буферизованный `HttpsURLConnection`. [19–24]
-7. [код] DavMail 7.1.0 выпущен 2026-10-17: собственный SOAP/StAX поверх HttpClient 4,
-   выбор между JCIFS и собственной схемой с привязкой к TLS. Это образец, а не готовый SDK. [33–38]
-8. [предположение] На примерно 10 операций нужен порядок 15–25 рабочих дней с проверками.
-   Успешный NTLM из .NET пока не доказывает успех Java: различаются домен, NTLMv2 и привязка к TLS.
+1. [code] The original `OfficeDev/ews-java-api` was archived on 2024-06-18;
+   artifact 2.0 was published on 2015-09-09, and the last `master` commit was 2018-07-25. [1–3]
+2. [code] Forks with changes in 2025–2026 exist: `eischet`, `jcetech`, and `SpanningCloudApps`.
+   No confirmed Java 25 check was found for the reviewed forks. [7–9]
+3. [docs][code] `HttpURLConnection` supports NTLM; `java.net.http.HttpClient` in JDK 25
+   automatically handles only Basic. Using the same `Authenticator` does not make them equivalent. [15–19]
+4. [code] On Unix, the JDK uses a Java implementation with NTLMv2 by default;
+   on Windows, it uses the system mechanism, whose version depends on Windows policy. [16–18]
+5. [docs][code] Apache HttpClient disabled NTLM by default and deprecated it starting with 5.3.
+   It is not removed in the reviewed 5.6.5 and 5.7-beta1; the scheme must be registered explicitly. [20–23]
+6. [code][assumption] I recommend a thin SOAP client using StAX + HttpClient 5 classic
+   with explicit NTLM registration; the fallback is the same SOAP layer + buffered `HttpsURLConnection`. [19–24]
+7. [code] DavMail 7.1.0 was released on 2026-10-17: its own SOAP/StAX implementation runs over HttpClient 4,
+   and it chooses between JCIFS and its own TLS-bound scheme. This is an example, not a ready-made SDK. [33–38]
+8. [assumption] About 15–25 working days, including checks, are needed for roughly 10 operations.
+   Successful NTLM from .NET does not yet prove Java will work: domain, NTLMv2, and TLS binding differ.
 
-## Ответы на вопросы
+## Answers to the questions
 
-### В1. Состояние OfficeDev/ews-java-api и Java 17/21/25
+### В1. Status of OfficeDev/ews-java-api and Java 17/21/25
 
-[код] Последняя версия в Maven Central — `com.microsoft.ews-java-api:ews-java-api:2.0`;
-каталог артефакта датирован 2015-09-09. GitHub Releases пуст: это дата публикации Maven,
-а не дата GitHub Release. Последний коммит основной ветки —
-`33235f37d97871f17c496526aad0b8c458f904c3`, 2018-07-25, изменение README. [2, 3]
+[code] The latest version in Maven Central is `com.microsoft.ews-java-api:ews-java-api:2.0`;
+the artifact directory is dated 2015-09-09. GitHub Releases is empty: this is the Maven publication date,
+not a GitHub Release date. The last commit on the main branch is
+`33235f37d97871f17c496526aad0b8c458f904c3`, 2018-07-25, a README change. [2, 3]
 
-[код] README объявляет режим сохранения существующих возможностей и прекращение новых функций
-с 2018-07-19; репозиторий архивирован 2024-06-18. Считать это действующей поддержкой SDK нельзя.
-Ограничения Exchange Online из README сами по себе не запрещают EWS нашего on-premise сервера. [1]
+[code] The README states that the project would maintain existing functionality and stop adding new features
+as of 2018-07-19; the repository was archived on 2024-06-18. This cannot be considered active SDK support.
+The Exchange Online limitations in the README do not by themselves rule out EWS on our on-premises server. [1]
 
-[код] В `pom.xml` основной ветки указаны HttpClient/HttpCore 4.4.1 и старые зависимости;
-это не современная матрица совместимости. В исходниках есть два существенных импорта:
+[code] The main branch `pom.xml` specifies HttpClient/HttpCore 4.4.1 and old dependencies;
+this is not a current compatibility matrix. The source contains two significant imports:
 `ServiceRequestBase` → `javax.xml.ws.http.HTTPException`,
 `TimeChange` → `javax.xml.bind.DatatypeConverter`. [4, 5]
 
-[док] JDK 11 удалил JAX-WS, JAXB и их инструменты из поставки JDK.
-Следовательно, на 17/21/25 эти Java EE API нужно добавлять отдельно либо заменять использование.
-Обычный модуль `java.xml`, включая StAX, не удалён. [6]
+[docs] JDK 11 removed JAX-WS, JAXB, and their tools from the JDK distribution.
+Therefore, on 17/21/25 these Java EE APIs must be added separately or their use replaced.
+The standard `java.xml` module, including StAX, was not removed. [6]
 
-| JDK | Что подтверждено | Вывод для исходного SDK |
+| JDK | What is confirmed | Conclusion for the original SDK |
 |---|---|---|
-| 17 | [код] Старые импорты остаются; `eischet` отдельно перенёс сборку на 17. [5, 7] | [предположение] Запуск возможен после исправления зависимостей; официальной гарантии нет. |
-| 21 | [док][код] Удалённые Java EE API не возвращены; проверенного отчёта проекта о 21 нет. [5, 6] | [предположение] Нужны те же исправления и отдельная проверка поведения. |
-| 25 | [код] Подтверждения CI/релиза SDK для 25 не найдено. [1, 4, 7–9] | [предположение] Не считать совместимым до сборки и проверки нужных операций. |
+| 17 | [code] The old imports remain; `eischet` separately moved its build to 17. [5, 7] | [assumption] It may run after dependency fixes; there is no official guarantee. |
+| 21 | [docs][code] The removed Java EE APIs have not been restored; no verified project report for 21 was found. [5, 6] | [assumption] The same fixes and a separate behavior check are needed. |
+| 25 | [code] No confirmation of SDK CI/release support for 25 was found. [1, 4, 7–9] | [assumption] Do not consider it compatible until it is built and the required operations are checked. |
 
-[код][вторично] Issue [#773](https://github.com/OfficeDev/ews-java-api/issues/773),
-2023-12-20, прямо называет эти два класса и сообщает о локальной миграции автора на Jakarta.
-Это свидетельство проблемы и наличия локального исправления, а не выпущенный Jakarta-релиз. [5]
+[code][secondary] Issue [#773](https://github.com/OfficeDev/ews-java-api/issues/773),
+dated 2023-12-20, names these two classes directly and reports the author's local migration to Jakarta.
+This is evidence of a problem and a local fix, not a released Jakarta version. [5]
 
-[предположение] Формулировка issue о невозможности работы в Jakarta-приложении слишком общая:
-для автономного Boot-приложения старые `javax` API могут сосуществовать с Jakarta в разных пакетах.
-Однако Jakarta XML Binding 3+/XML Web Services 3+ не предоставляют старые классы `javax`;
-одна замена координат зависимости импорты не исправляет. Основание — конкретные импорты [5].
+[assumption] The issue's claim that it cannot work in a Jakarta application is too broad:
+in a standalone Boot application, the old `javax` APIs may coexist with Jakarta in separate packages.
+However, Jakarta XML Binding 3+/XML Web Services 3+ do not provide the old `javax` classes;
+changing dependency coordinates alone does not fix the imports. The basis is the specific imports [5].
 
-[код][вторично] Issue [#692](https://github.com/OfficeDev/ews-java-api/issues/692),
-2019-03-01, обсуждает создание общественного форка. Это не подтверждение, что появился
-единый поддерживаемый преемник. Проверенные кандидаты перечислены в В2. [10]
+[code][secondary] Issue [#692](https://github.com/OfficeDev/ews-java-api/issues/692),
+dated 2019-03-01, discusses creating a community fork. This does not confirm that
+a single supported successor appeared. The reviewed candidates are listed in В2. [10]
 
-### В2. Другие Java-библиотеки и форки с активностью в 2025–2026
+### В2. Other Java libraries and forks active in 2025–2026
 
-[код] `eischet/ews-java-api` — наиболее содержательная из рассмотренных модернизаций:
-отдельные модули API и транспорта Apache 4/5, Jakarta JAXB, Java 17;
-пакеты переименованы в `com.eischet.ews`. README описывает 2.3.2 от 2025-12-29,
-но одновременно говорит об отсутствии готовых пакетов. В POM остаётся HttpClient 5.2.1. [7]
+[code] `eischet/ews-java-api` is the most substantial modernization reviewed:
+separate API and Apache 4/5 transport modules, Jakarta JAXB, Java 17;
+packages were renamed to `com.eischet.ews`. The README describes 2.3.2 dated 2025-12-29,
+but also says that ready-made packages are unavailable. The POM still uses HttpClient 5.2.1. [7]
 
-[предположение] Этот форк полезен при необходимости широкого объектного API EWS.
-Нельзя просто обновить его HttpClient и предположить, что NTLM останется включён:
-между 5.2.1 и современной веткой изменились настройки аутентификации, см. В4.
+[assumption] This fork is useful if a broad object-oriented EWS API is needed.
+Its HttpClient cannot simply be upgraded with the assumption that NTLM will remain enabled:
+authentication settings changed between 5.2.1 and the current line; see В4.
 
-[код] `jcetech/ews-java-api`, ветка `dev`: последний коммит 2025-08-17;
-POM 2.2.0, целевая Java 17 и зависимости Jakarta, но HttpClient/HttpCore всё ещё 4.4.1.
-GitHub Release не найден. Номер в POM не доказывает публикацию артефакта. [8]
+[code] `jcetech/ews-java-api`, `dev` branch: last commit 2025-08-17;
+POM 2.2.0, target Java 17 and Jakarta dependencies, but HttpClient/HttpCore are still 4.4.1.
+No GitHub Release was found. A version in the POM does not prove that an artifact was published. [8]
 
-[код] `SpanningCloudApps/ews-java-api`: последний коммит 2026-06-09,
-добавляет стандартную конфигурацию запросов; POM использует HttpClient 4.5.13.
-GitHub Release не найден; свежий коммит подтверждает точечную работу, не поддержку Java 25. [9]
+[code] `SpanningCloudApps/ews-java-api`: last commit 2026-06-09,
+adds standard request configuration; the POM uses HttpClient 4.5.13.
+No GitHub Release was found; a recent commit confirms targeted work, not Java 25 support. [9]
 
-[док] Коммерческий `Independentsoft JWebServices for Exchange` предлагает версию 2.2.150,
-Exchange 2013, MIME, синхронизацию, поиск, папки и вложения. Страница заявляет Java 5+,
-но не даёт даты выпуска, отдельной гарантии Java 25 или проверяемых деталей NTLMv2. [11]
+[docs] The commercial `Independentsoft JWebServices for Exchange` offers version 2.2.150,
+Exchange 2013, MIME, synchronization, search, folders, and attachments. The page claims Java 5+,
+but gives no release date, separate Java 25 guarantee, or verifiable NTLMv2 details. [11]
 
-[док] TuxCare публикует `2.0-tuxcare.1` от 2026-05-11 как исправление безопасности
-для `ews-java-api` (PF-2697, CVE-2025-48924). Это пример сопровождения старого артефакта
-поставщиком, а не доказательство нового открытого SDK или совместимости с Boot 4. [12]
+[docs] TuxCare publishes `2.0-tuxcare.1`, dated 2026-05-11, as a security fix
+for `ews-java-api` (PF-2697, CVE-2025-48924). This is an example of a vendor maintaining an old artifact,
+not evidence of a new open SDK or compatibility with Boot 4. [12]
 
-[предположение] Итого: ответ «живых Java-вариантов совсем нет» неверен.
-Есть небольшие форки, коммерческий продукт и активно выпускаемый DavMail; общего открытого
-преемника с подтверждёнными Java 25, NTLMv2 и всем нашим набором операций не установлено.
+[assumption] In short, the answer “there are no active Java options at all” is incorrect.
+There are small forks, a commercial product, and actively released DavMail; no common open-source
+successor with confirmed Java 25, NTLMv2, and our full operation set has been identified.
 
-### В3. Собственный тонкий SOAP-клиент, схемы и трудоёмкость
+### В3. A custom thin SOAP client, schemas, and effort
 
-[док][код] EWS допускает прямой SOAP/XML; DavMail показывает этот подход без генерации SDK.
-Для нашей задачи транспорт и XML-обработку можно разделить: NTLM не зависит от способа
-представления XML. Версию запросов задавать явно: `Exchange2013_SP1`. [13, 14, 34]
+[docs][code] EWS supports direct SOAP/XML; DavMail demonstrates this approach without SDK generation.
+For our task, transport and XML handling can be separated: NTLM does not depend on how
+XML is represented. Set the request version explicitly: `Exchange2013_SP1`. [13, 14, 34]
 
-| Способ | Что придётся сделать | Оценка применимости |
+| Approach | What must be done | Applicability assessment |
 |---|---|---|
-| XML-шаблоны + StAX | Запись конверта, пространств имён, параметров; потоковый разбор только нужных полей | [предположение] Основной кандидат: небольшой явный контракт, управляемая память. Пример подхода — [34]. |
-| Jackson XML | Собственные классы для конверта, заголовка, запросов и ответов; отдельная обработка ошибок | [док][предположение] Удобно для простых DTO, но это сопоставление объектов с XML, не готовый SOAP/EWS SDK; есть ограничения XML-модели. [29] |
-| JAXB из XSD, JAX-WS из WSDL | Внешние генераторы, Jakarta API/runtime, исправление imports и при необходимости WSDL service | [док][предположение] Типизация по полной схеме полезна для широкого API; для 10 операций обычно избыточна. [6, 13] |
-| Spring Web Services | `WebServiceTemplate`, SOAP message factory, `Source` либо JAXB, настроенный HTTP sender | [док][предположение] Хорошая оболочка для SOAP, но EWS и NTLM она не реализует; настройка транспорта остаётся нашей. [30] |
+| XML templates + StAX | Write the envelope, namespaces, and parameters; stream-parse only the required fields | [assumption] Primary candidate: a small explicit contract and controlled memory use. Example approach — [34]. |
+| Jackson XML | Custom classes for envelope, header, requests, and responses; separate error handling | [docs][assumption] Convenient for simple DTOs, but it maps objects to XML; it is not a ready-made SOAP/EWS SDK and the XML model has limitations. [29] |
+| JAXB from XSD, JAX-WS from WSDL | External generators, Jakarta API/runtime, import fixes, and possibly adding a WSDL service | [docs][assumption] Full-schema typing is useful for a broad API; usually excessive for 10 operations. [6, 13] |
+| Spring Web Services | `WebServiceTemplate`, SOAP message factory, `Source` or JAXB, configured HTTP sender | [docs][assumption] A good SOAP wrapper, but it does not implement EWS or NTLM; transport configuration remains ours. [30] |
 
-[док] `Services.wsdl` описывает операции, `messages.xsd` — сообщения,
-`types.xsd` — общие типы и заголовки. Microsoft предупреждает: WSDL может не иметь
-`wsdl:service`, поэтому некоторым генераторам требуется добавить его локально. [13]
+[docs] `Services.wsdl` describes operations, `messages.xsd` describes messages,
+and `types.xsd` describes common types and headers. Microsoft warns that a WSDL may lack
+`wsdl:service`, so some generators require it to be added locally. [13]
 
-[код] Получить схемы без входа на наш сервер действительно можно:
+[code] The schemas can indeed be obtained without signing in to our server:
 
-- `php-ews/src/assets/` публично содержит согласованный по расположению комплект
+- `php-ews/src/assets/` publicly contains a co-located set of
   [`services.wsdl`](https://raw.githubusercontent.com/jamesiarmes/php-ews/master/src/assets/services.wsdl),
   [`messages.xsd`](https://raw.githubusercontent.com/jamesiarmes/php-ews/master/src/assets/messages.xsd),
   [`types.xsd`](https://raw.githubusercontent.com/jamesiarmes/php-ews/master/src/assets/types.xsd).
-  В `types.xsd` есть `Exchange2013_SP1`. Это копии в стороннем проекте,
-  а не заверенная точная схема нашего CU23. [31]
-- [док] Microsoft Open Specifications `[MS-OXWSCDATA]`, приложение Full WSDL,
-  даёт общие схемы и ссылки на их определения. Сам этот протокол WSDL не определяет;
-  для операций нужны соответствующие спецификации, например `[MS-OXWSSRCH]`.
-  Это первичный источник контракта, не готовый единый комплект `Services.wsdl`. [32]
-- [код] Genivia публикует все три файла для примера gSOAP, но проверенные XSD имеют
-  версию `Exchange2010_SP2`. Для генерации полного клиента Exchange 2013 их брать нельзя. [40]
-- [код] В дереве `OfficeDev/ews-java-api/master` WSDL/XSD не найдены:
-  библиотека содержит ручную реализацию XML, а не обещанный набор схем для генератора. [3, 4]
+  `types.xsd` includes `Exchange2013_SP1`. These are copies in a third-party project,
+  not an authenticated exact schema for our CU23. [31]
+- [docs] Microsoft Open Specifications `[MS-OXWSCDATA]`, appendix Full WSDL,
+  provides common schemas and links to their definitions. This protocol itself does not define WSDL;
+  the relevant specifications are needed for operations, for example `[MS-OXWSSRCH]`.
+  This is a primary source for the contract, not a ready-made unified `Services.wsdl` set. [32]
+- [code] Genivia publishes all three files for its gSOAP example, but the reviewed XSDs are
+  version `Exchange2010_SP2`. They must not be used to generate a complete Exchange 2013 client. [40]
+- [code] No WSDL/XSD files were found in the `OfficeDev/ews-java-api/master` tree:
+  the library contains a hand-written XML implementation, not the promised schema set for a generator. [3, 4]
 
-[предположение] Перед будущей генерацией закрепить ревизию схем, проверить все относительные
-imports/includes, добавить XML catalog для внешних схем и отдельно сопоставить нужные операции
-с Exchange 2013. Наличие значения версии в XSD само по себе не проверяет весь контракт. [13, 14, 31]
+[assumption] Before future generation, pin the schema revision, check all relative
+imports/includes, add an XML catalog for external schemas, and separately map required operations
+to Exchange 2013. A version value in an XSD alone does not validate the entire contract. [13, 14, 31]
 
-[предположение] Для тонкого клиента предлагается следующий объём, без кода в этой сессии:
+[assumption] The following scope is proposed for a thin client; no code was written in this session:
 
-1. Общий SOAP 1.1 конверт, `SOAPAction`, UTF-8, заголовок версии, безопасная запись параметров.
-2. Разбор `SOAP Fault` независимо от HTTP-статуса и `ResponseClass`/`ResponseCode`
-   отдельно для каждого результата пакетного запроса; ограничение размеров XML и Base64.
-3. Десять операций из соседнего брифа:
+1. A common SOAP 1.1 envelope, `SOAPAction`, UTF-8, version header, and safe parameter writing.
+2. Parse `SOAP Fault` independently of HTTP status and `ResponseClass`/`ResponseCode`
+   separately for each batched request result; limit XML and Base64 sizes.
+3. Ten operations from the companion brief:
    `GetFolder`, `FindFolder`, `SyncFolderHierarchy`, `FindItem`, `SyncFolderItems`,
    `GetItem`, `GetAttachment`, `FindConversation`, `GetConversationItems`, `ConvertId`.
-   Поиск через `Restriction`/`QueryString` — варианты `FindItem`, не новые операции.
-4. Потоковое получение MIME и файлов, обработка изменений и страниц;
-   локальные примеры ответов для ошибок, кириллицы и больших вложений.
+   Search via `Restriction`/`QueryString` are variants of `FindItem`, not new operations.
+4. Stream MIME and file retrieval, handle changes and pages;
+   save local response examples for errors, Cyrillic, and large attachments.
 
-| Работа | Оценка, рабочих дней одного разработчика |
+| Work | Estimate, working days for one developer |
 |---|---|
-| Транспорт NTLM, TLS, тайм-ауты, изоляция ящиков | [предположение] 3–5 |
-| Конверт, безопасный XML, ошибки и повторяемое тело запроса | [предположение] 2–3 |
-| Папки, списки и синхронизация | [предположение] 3–5 |
-| MIME, вложения, разговоры и ConvertId | [предположение] 3–5 |
-| Проверки на сохранённых ответах и проверка пользователем на Exchange | [предположение] 4–7 |
-| Всего для StAX-варианта | [предположение] 15–25; сложная привязка NTLM к TLS может увеличить срок |
+| NTLM transport, TLS, timeouts, mailbox isolation | [assumption] 3–5 |
+| Envelope, safe XML, errors, and repeatable request body | [assumption] 2–3 |
+| Folders, lists, and synchronization | [assumption] 3–5 |
+| MIME, attachments, conversations, and ConvertId | [assumption] 3–5 |
+| Checks against saved responses and user verification on Exchange | [assumption] 4–7 |
+| Total for the StAX option | [assumption] 15–25; complex NTLM-to-TLS binding may increase the estimate |
 
-[предположение] Это оценка реализации источника EWS, не всего MCP-сервера, индекса или MIME-парсера.
-Jackson XML либо Spring-WS могут сократить шаблонную работу при знакомстве с ними,
-но не устранят разбор особенностей EWS; JAXB добавляет риск отдельной отладки генератора.
+[assumption] This estimates implementation of the EWS source, not the entire MCP server, index, or MIME parser.
+Jackson XML or Spring-WS may reduce boilerplate if the team knows them,
+but will not eliminate the need to handle EWS-specific behavior; JAXB adds the risk of separately debugging the generator.
 
-### В4. NTLM и NTLMv2 в HTTP-клиентах
+### В4. NTLM and NTLMv2 in HTTP clients
 
-[док][код] Важно различать NTLMv2 и NTLM2 Session: это разные режимы.
-Наличие слова NTLM в API не доказывает ни NTLMv2, ни поддержку привязки к TLS. [18, 24]
+[docs][code] It is important to distinguish NTLMv2 from NTLM2 Session: they are different modes.
+The presence of “NTLM” in an API does not prove NTLMv2 or support for TLS binding. [18, 24]
 
-**`HttpURLConnection` / `HttpsURLConnection`.** [док] Работает через
-`java.net.Authenticator`; домен может отсутствовать, входить в имя либо задаваться
-`http.auth.ntlm.domain`. Прозрачный вход текущей учётной записью Windows управляется
-`jdk.http.ntlm.transparentAuth`; он нам не нужен, оставляем `disabled`. [15]
+**`HttpURLConnection` / `HttpsURLConnection`.** [docs] It works through
+`java.net.Authenticator`; the domain may be absent, included in the username, or set with
+`http.auth.ntlm.domain`. Transparent sign-in with the current Windows account is controlled by
+`jdk.http.ntlm.transparentAuth`; we do not need it, so leave it `disabled`. [15]
 
-[код] На Unix реализация читает `ntlm.version` и создаёт `com.sun.security.ntlm.Client`;
-его режим по умолчанию — `LMv2/NTLMv2`, можно явно выбрать `NTLMv2`.
-Это проверка HTTP-исходников, а не перенос вывода из документации SASL. [16, 18]
+[code] On Unix, the implementation reads `ntlm.version` and creates `com.sun.security.ntlm.Client`;
+its default mode is `LMv2/NTLMv2`, and `NTLMv2` can be selected explicitly.
+This conclusion comes from checking the HTTP source, not from extrapolating SASL documentation. [16, 18]
 
-[код][предположение] На Windows используется `NTLMAuthSequence`, системная аутентификация;
-свойство `ntlm.version` из Unix-ветки не является переключателем Windows NTLMv2.
-Фактический режим проверяется политикой Windows и согласованием с сервером.
-Windows-код имеет запасной домен `domain`, если свойство не задано: для bare login
-нужно отдельно проверить явно пустой домен, не подставлять `example.com` автоматически. [17]
+[code][assumption] On Windows, `NTLMAuthSequence` and system authentication are used;
+the Unix-branch `ntlm.version` property does not switch Windows to NTLMv2.
+The actual mode is determined by Windows policy and negotiation with the server.
+The Windows code falls back to the domain `domain` if the property is unset: for a bare login,
+an explicitly empty domain must be checked separately; do not automatically substitute `example.com`. [17]
 
-[док] Ограничение для SOAP POST: `setFixedLengthStreamingMode` и
-`setChunkedStreamingMode` запрещают автоматическую обработку аутентификации и перенаправлений;
-вместо неё возможен `HttpRetryException`. Поэтому резервный вариант буферизует небольшой
-XML-запрос внутри URLConnection; потоковое чтение большого ответа этому не мешает. [19]
+[docs] A limitation for SOAP POST: `setFixedLengthStreamingMode` and
+`setChunkedStreamingMode` disable automatic authentication and redirect handling;
+`HttpRetryException` may be thrown instead. Therefore, the fallback buffers the small
+XML request inside URLConnection; this does not prevent streaming a large response. [19]
 
-**`java.net.http.HttpClient`.** [код] В JDK 25 `AuthenticationFilter` выбирает Basic;
-NTLM-handshake не реализован. Простое добавление `Authenticator` не поможет,
-а ручной Type1/Type3 поверх непрозрачного пула соединений не является готовым решением. [39]
+**`java.net.http.HttpClient`.** [code] In JDK 25, `AuthenticationFilter` selects Basic;
+the NTLM handshake is not implemented. Simply adding an `Authenticator` will not help,
+and manually sending Type1/Type3 over an opaque connection pool is not a ready solution. [39]
 
-**Apache HttpClient 5 classic.** [док][код] С 5.3 NTLM deprecated и выключен по умолчанию;
-в 5.6.5 стандартный реестр схем не содержит NTLM. При этом `NTLMScheme`,
-`NTLMSchemeFactory`, `NTCredentials` существуют; `NTLMScheme` есть и в 5.7-beta1.
-Указывать «удалён в 5.4/5.5» неправильно. [20–23]
+**Apache HttpClient 5 classic.** [docs][code] Since 5.3, NTLM is deprecated and disabled by default;
+in 5.6.5, the standard scheme registry does not include NTLM. However, `NTLMScheme`,
+`NTLMSchemeFactory`, and `NTCredentials` still exist; `NTLMScheme` is also present in 5.7-beta1.
+It would be incorrect to say “removed in 5.4/5.5.” [20–23]
 
-[код][предположение] Подключение: собственный `Registry<AuthSchemeFactory>` с
-`NTLMSchemeFactory`, `BasicCredentialsProvider` с `NTCredentials`, область только
-целевого HTTPS-хоста/порта, разрешена только схема NTLM, повторяемое тело XML.
-Для `user` передавать пустой домен отдельно; уточнение формата — проверка пользователем. [21, 22]
+[code][assumption] Configuration: a custom `Registry<AuthSchemeFactory>` with
+`NTLMSchemeFactory`, a `BasicCredentialsProvider` with `NTCredentials`, scope limited to
+the target HTTPS host/port, only the NTLM scheme allowed, and a repeatable XML body.
+Pass an empty domain separately for `user`; the user must verify the exact format. [21, 22]
 
-[код] Движок умеет NTLMv2, но также содержит более старые режимы и переходы между ними.
-Поддержка NTLMv2 не равна политике «только NTLMv2». В исследованных исходниках схема
-вызывает обычный `generateType3Msg` без передачи сертификата TLS, хотя в движке есть
-код channel binding. Поэтому поддержку Extended Protection нельзя обещать по одному движку. [21, 24]
+[code] The engine supports NTLMv2 but also includes older modes and transitions between them.
+Supporting NTLMv2 is not the same as enforcing an “NTLMv2 only” policy. In the reviewed source, the scheme
+calls the ordinary `generateType3Msg` without passing the TLS certificate, although the engine contains
+channel-binding code. Therefore, Extended Protection support cannot be promised based on the engine alone. [21, 24]
 
-**Apache HttpClient 4.5.14.** [док] NTLMv1, NTLMv2 и NTLM2 Session поддерживаются
-из коробки с 4.1; использовать `NTCredentials` и `CredentialsProvider`.
-Ветка 4.x получает только существенные исправления и исправления безопасности;
-официальный сайт не объявляет весь classic HttpClient 4.5 EOL. [25, 26]
+**Apache HttpClient 4.5.14.** [docs] NTLMv1, NTLMv2, and NTLM2 Session have been
+supported out of the box since 4.1; use `NTCredentials` and `CredentialsProvider`.
+The 4.x line receives only significant and security fixes;
+the official site does not declare all of classic HttpClient 4.5 EOL. [25, 26]
 
-**OkHttp.** [код] Есть интерфейс `Authenticator` для ответов 401/407,
-но готового NTLM-движка он не предоставляет. Сторонний пример —
-`netcosports/Android_Ntlm:1.0`, `NTLMAuthenticator` и собственный `NTLMEngineImpl`.
-Движок содержит NTLMv2, но зависит от `android.util.Base64`: это не готовая Java 25 библиотека. [27, 28]
+**OkHttp.** [code] It has an `Authenticator` interface for 401/407 responses,
+but does not provide a ready-made NTLM engine. A third-party example is
+`netcosports/Android_Ntlm:1.0`, `NTLMAuthenticator`, and its own `NTLMEngineImpl`.
+The engine contains NTLMv2 but depends on `android.util.Base64`: it is not a ready-made Java 25 library. [27, 28]
 
-**JCIFS-ng.** [код] Предоставляет `Type1Message`/`Type2Message`/`Type3Message`,
-NTLMv2 и контекст настроек; стандартный `lanManCompatibility` — 3.
-Можно написать адаптер `NTLMEngine` для Apache или `Authenticator` для OkHttp,
-но поддержание соединения, TLS, тайм-ауты и повторы обеспечивает HTTP-клиент. [41]
+**JCIFS-ng.** [code] Provides `Type1Message`/`Type2Message`/`Type3Message`,
+NTLMv2, and a configuration context; the default `lanManCompatibility` is 3.
+An `NTLMEngine` adapter for Apache or an `Authenticator` for OkHttp can be written,
+but the HTTP client handles connection persistence, TLS, timeouts, and retries. [41]
 
-[предположение] Для JCIFS-ng нельзя копировать старые примеры JCIFS 1.x без адаптации:
-API и контекст отличаются. Само наличие генератора Type3 также не доказывает
-правильную привязку HTTPS-аутентификации к каналу.
+[assumption] Old JCIFS 1.x examples cannot be copied for JCIFS-ng without adaptation:
+the API and context differ. The presence of a Type3 generator alone also does not prove
+correct binding of HTTPS authentication to the channel.
 
-**Spring `RestClient`.** [док][код] Поддержка определяется `ClientHttpRequestFactory`:
-Apache factory использует HttpClient 5; JDK factory — новый JDK HttpClient;
-Simple factory — URLConnection. В Spring 7 встроенная интеграция OkHttp3 удалена. [42, 43]
+**Spring `RestClient`.** [docs][code] Support is determined by `ClientHttpRequestFactory`:
+the Apache factory uses HttpClient 5; the JDK factory uses the new JDK HttpClient;
+the Simple factory uses URLConnection. Spring 7 removed built-in OkHttp3 integration. [42, 43]
 
-[код][предположение] Для Simple factory требуется особая осторожность: Spring 7 отправляет
-тело в fixed-length/chunked streaming mode. Поэтому стандартная фабрика не решает NTLM SOAP POST
-даже при настроенном `Authenticator`. Нужен прямой буферизованный URLConnection либо своя фабрика;
-внешняя буферизующая оболочка не гарантирует отключения streaming во внутреннем запросе. [19, 44]
+[code][assumption] The Simple factory requires special care: Spring 7 sends
+the body in fixed-length/chunked streaming mode. Therefore, the standard factory does not solve NTLM SOAP POST,
+even with a configured `Authenticator`. A direct buffered URLConnection or a custom factory is needed;
+an outer buffering wrapper does not guarantee streaming is disabled in the inner request. [19, 44]
 
-[код][предположение] В Apache factory повторяемость зависит от `Body.repeatable()`:
-стандартное значение интерфейса — false. Для RestClient проверять конкретный способ передачи
-XML, а первоначальную реализацию проще делать напрямую через повторяемую Apache entity. [48]
+[code][assumption] With the Apache factory, repeatability depends on `Body.repeatable()`:
+the interface's default is false. For RestClient, verify the specific way XML is sent;
+the initial implementation is simpler if done directly with a repeatable Apache entity. [48]
 
-### В5. Как устроен DavMail и что переиспользовать
+### В5. How DavMail works and what can be reused
 
-[код] Последний описанный релиз — 7.1.0 от 2026-10-17.
-Исходники `master` читались 2026-10-24; это состояние ветки, не идентичность релизному архиву. [33]
+[code] The latest described release is 7.1.0 dated 2026-10-17.
+The `master` source was read on 2026-10-24; this is the branch state, not necessarily the released archive. [33]
 
-| Файл в `src/java/davmail/` | Что изучать |
+| File in `src/java/davmail/` | What to study |
 |---|---|
-| `exchange/ews/EwsExchangeSession.java` | [код] Координация EWS, получение папок, MIME и вложений; заявлена совместимость с Exchange 2013. [35] |
-| `exchange/ews/EWSMethod.java` | [код] SOAP-конверт, HTTP POST, повторяемое тело, StAX, gzip и ошибки EWS. [34] |
-| `http/HttpClientAdapter.java` | [код] HttpClient 4, cookie store, соединения, `NTCredentials`, реестр схем, тайм-ауты. [36] |
-| `http/JCIFSNTLMSchemeFactory.java`, `http/JCIFSEngine.java` | [код] Ветвь JCIFS: адаптация Type1/Type2/Type3 к Apache `NTLMEngine`. [37] |
-| `http/DavMailNTLMSchemeFactory.java`, `http/DavMailNTLMScheme.java` | [код] Альтернативная схема, извлекающая сертификат TLS из текущего соединения. [38] |
-| `http/DavMailNTLMEngineImpl.java` | [код] NTLMv2, добавление данных привязки к каналу и MIC в ответ. [38] |
+| `exchange/ews/EwsExchangeSession.java` | [code] EWS coordination, retrieving folders, MIME, and attachments; claims Exchange 2013 compatibility. [35] |
+| `exchange/ews/EWSMethod.java` | [code] SOAP envelope, HTTP POST, repeatable body, StAX, gzip, and EWS errors. [34] |
+| `http/HttpClientAdapter.java` | [code] HttpClient 4, cookie store, connections, `NTCredentials`, scheme registry, timeouts. [36] |
+| `http/JCIFSNTLMSchemeFactory.java`, `http/JCIFSEngine.java` | [code] JCIFS branch: adapts Type1/Type2/Type3 to Apache `NTLMEngine`. [37] |
+| `http/DavMailNTLMSchemeFactory.java`, `http/DavMailNTLMScheme.java` | [code] Alternative scheme that extracts the TLS certificate from the current connection. [38] |
+| `http/DavMailNTLMEngineImpl.java` | [code] NTLMv2, adding channel-binding data and MIC to the response. [38] |
 
-[код] История важна: 6.3.0 (2025-02-26) удалил JCIFS ради собственной реализации с channel binding;
-6.4.0 (2025-08-31) вернул JCIFS; 6.5.0 (2025-10-23) вернул
-`davmail.enableJcifs=true` по умолчанию. Текущий POM содержит JCIFS **1.3.19**, не JCIFS-ng.
-Следовательно, описание «DavMail больше не использует JCIFS» устарело. [33, 36, 37]
+[code] The history matters: 6.3.0 (2025-02-26) removed JCIFS in favor of its own channel-binding implementation;
+6.4.0 (2025-08-31) restored JCIFS; 6.5.0 (2025-10-23) restored
+`davmail.enableJcifs=true` as the default. The current POM contains JCIFS **1.3.19**, not JCIFS-ng.
+Therefore, the statement “DavMail no longer uses JCIFS” is outdated. [33, 36, 37]
 
-[код][предположение] В текущем коде `enableJcifs=false` выбирает собственную схему с TLS-привязкой.
-Issue #352 показывает, почему это нужно: при включённом Extended Protection прежний
-handshake завершался 401, хотя браузер входил успешно. Это не доказательство такой настройки у нас. [38, 45]
+[code][assumption] In the current code, `enableJcifs=false` selects its own TLS-bound scheme.
+Issue #352 shows why this is needed: with Extended Protection enabled, the previous
+handshake ended in 401 even though browser sign-in worked. This does not prove that our server uses this setting. [38, 45]
 
-[код][предположение] Переиспользуемы архитектурные идеи: ограниченный набор SOAP-операций,
-повторяемый запрос, потоковый ответ, изоляция HTTP-сессии. Файлы имеют заголовки GPL-2.0-or-later;
-при переносе кода нужно учитывать эти условия. Встраивать весь шлюз как SDK не рекомендую:
-он связан с Settings, протоколами, UI и своим журналированием, а также содержит операции записи. [34–38]
+[code][assumption] Reusable architectural ideas include a limited set of SOAP operations,
+a repeatable request, a streamed response, and HTTP-session isolation. The files have GPL-2.0-or-later headers;
+these terms must be considered when porting code. I do not recommend embedding the entire gateway as an SDK:
+it is tied to Settings, protocols, UI, and its own logging, and it also contains write operations. [34–38]
 
-### В6. TLS, соединения, тайм-ауты, сжатие и cookies
+### В6. TLS, connections, timeouts, compression, and cookies
 
-| Область | Проверенный факт и следствие для реализации |
+| Area | Verified fact and implementation implication |
 |---|---|
-| TLS | [предположение] Начать с системного trust store, проверки имени хоста и TLS 1.2/1.3; доступность TLS 1.2 на нашем сервере отдельно не проверялась. Не переносить разрешение TLS 1.0/1.1 из списка протоколов DavMail как рекомендуемую настройку. [36] |
-| Extended Protection | [код][предположение] Проверять передачу сертификата в NTLM-движок, а не только наличие NTLMv2. .NET и чистая Java могут вести себя по-разному. [21, 24, 38, 45] |
-| Соединения | [док] NTLM аутентифицирует соединение; нужен один сокет на протяжении Type1 → Type2 → Type3. Аутентифицированные соединения нельзя передавать другому пользователю. [25] |
-| Несколько ящиков | [предположение] Отдельный HTTP-клиент/пул, credentials и cookies на запись connections; начинать с одного одновременного запроса на ящик. URLConnection — отдельный экземпляр Authenticator на ящик. [19, 25] |
-| Повторяемость POST | [док][код] В ходе NTLM запрос может отправляться повторно. Буферизовать небольшой XML; не передавать одноразовый InputStream как тело. DavMail явно объявляет SOAP entity повторяемой. [19, 34] |
-| Тайм-ауты | [предположение] Задать ожидание свободного соединения, установление TCP/TLS, чтение и общий предел операции; начальная оценка 10–15 с на соединение, 120 с на чтение. У DavMail defaults 10/120 с — ориентир, не лимиты Exchange. [36] |
-| Повторы | [предположение] Разделить ожидаемые 401 внутри handshake и окончательный отказ. Не перебирать логины/методы автоматически; сетевые повторы и задержки EWS ограничить. [21, 34] |
-| gzip | [код][предположение] DavMail посылает `Accept-Encoding: gzip` и читает gzip. При настройке Apache/JDK выбрать один уровень распаковки; ограничивать также распакованный объём и потоково декодировать Base64. [34] |
-| Cookies | [код][предположение] Сохранять `Set-Cookie` по правилам host/path/secure отдельно для ящика. `X-BackEndCookie` считать непрозрачным, не конструировать и не журналировать; cookie не заменяет NTLM-состояние сокета. [36, 46] |
-| Привязка к серверу | [док] Для групп подписок Microsoft описывает `X-AnchorMailbox`, `X-PreferServerAffinity` и **`X-BackEndOverrideCookie`**; это не то же имя, что `X-BackEndCookie`. Для обычного SyncFolderItems не следует объявлять этот механизм подписок обязательным. [46] |
-| Перенаправления | [предположение] URL фиксирован конфигурацией; запретить автоматическую передачу учётных данных другому хосту. Это проще, чем Autodiscover, и соответствует исходным условиям задачи. |
-| XML и память | [док][предположение] Запретить DTD/внешние сущности и сетевое разрешение схем; задать пределы глубины и размера. MIME не собирать через DOM всего ответа. Основание — руководство JAXP и модель больших EWS-ответов. [34, 47] |
+| TLS | [assumption] Start with the system trust store, hostname verification, and TLS 1.2/1.3; TLS 1.2 availability on our server was not checked separately. Do not treat DavMail's TLS 1.0/1.1 protocol list as a recommended setting. [36] |
+| Extended Protection | [code][assumption] Check that the certificate is passed to the NTLM engine, not merely that NTLMv2 is present. .NET and pure Java may behave differently. [21, 24, 38, 45] |
+| Connections | [docs] NTLM authenticates the connection; one socket is needed throughout Type1 → Type2 → Type3. Authenticated connections must not be shared with another user. [25] |
+| Multiple mailboxes | [assumption] Use a separate HTTP client/pool, credentials, and cookies for each connection entry; start with one concurrent request per mailbox. URLConnection needs a separate Authenticator instance per mailbox. [19, 25] |
+| POST repeatability | [docs][code] During NTLM, a request may be sent again. Buffer the small XML; do not use a one-shot InputStream as the body. DavMail explicitly marks the SOAP entity repeatable. [19, 34] |
+| Timeouts | [assumption] Set limits for waiting for a free connection, TCP/TLS setup, reading, and the overall operation; initial estimate: 10–15 s for connecting, 120 s for reading. DavMail's 10/120 s defaults are a reference, not Exchange limits. [36] |
+| Retries | [assumption] Distinguish expected 401 responses within the handshake from final rejection. Do not automatically cycle through logins/methods; limit network retries and EWS delays. [21, 34] |
+| gzip | [code][assumption] DavMail sends `Accept-Encoding: gzip` and reads gzip. When configuring Apache/JDK, choose one decompression layer; also limit the decompressed size and decode Base64 as a stream. [34] |
+| Cookies | [code][assumption] Store `Set-Cookie` per mailbox according to host/path/secure rules. Treat `X-BackEndCookie` as opaque; do not construct or log it. A cookie does not replace NTLM socket state. [36, 46] |
+| Server affinity | [docs] For subscription groups, Microsoft describes `X-AnchorMailbox`, `X-PreferServerAffinity`, and **`X-BackEndOverrideCookie`**; this is not the same name as `X-BackEndCookie`. Do not claim this subscription mechanism is required for ordinary SyncFolderItems. [46] |
+| Redirects | [assumption] The URL is fixed in configuration; prohibit automatically sending credentials to another host. This is simpler than Autodiscover and matches the original task constraints. |
+| XML and memory | [docs][assumption] Prohibit DTD/external entities and network schema resolution; set depth and size limits. Do not build MIME using a DOM of the entire response. Basis: JAXP guidance and the model of large EWS responses. [34, 47] |
 
-## Сравнительные таблицы
+## Comparison tables
 
-В первой таблице трудоёмкость — [предположение], совместимость с Java 25 без запуска — «проверить».
-Транспортные варианты сведены во второй таблице, чтобы не смешивать SOAP SDK и HTTP.
+In the first table, effort is an [assumption], and Java 25 compatibility without running it is “verify.”
+Transport options are summarized in the second table so SOAP SDKs are not mixed with HTTP clients.
 
-| Вариант клиента EWS | Поддерживается (дата последнего релиза) | Java 25 | NTLM | Объём работы | Риски |
+| EWS client option | Supported (last release date) | Java 25 | NTLM | Effort | Risks |
 |---|---|---|---|---|---|
-| OfficeDev 2.0 | [код] Архив; Maven 2015-09-09 [1–3] | Проверить, нужны внешние старые Java EE API | [код] HttpClient 4 [4] | Средний: восстановление зависимостей | Старый SDK, широкий API записи |
-| eischet | [код] Версия в коде 2.3.2, 2025-12-29; опубликованный пакет не подтверждён [7] | Проверить; база 17 | [код] Apache 4/5; JDK-модуль с проблемами [7] | Средний | Переименованные пакеты, HTTP 5.2.1, обновления NTLM |
-| jcetech | [код] Коммит 2025-08-17; релиз не найден [8] | Проверить; target 17 | [код] HTTP 4.4.1 | Средний/высокий | Старая транспортная зависимость |
-| SpanningCloudApps | [код] Коммит 2026-06-09; релиз не найден [9] | Проверить | [код] HTTP 4.5.13 | Средний/высокий | Точечные исправления, нет обещания Java 25 |
-| TuxCare 2.0-tuxcare.1 | [док] Исправление от 2026-05-11 [12] | Не установлено | Не установлено для этой сборки | Зависит от поставщика | Не подтверждены доступность и полный контракт |
-| Independentsoft JWebServices | [док] 2.2.150; дата не опубликована [11] | Проверить у поставщика | NTLMv2 не установлено | Низкий/средний после проверки | Коммерческие условия, закрытая реализация |
-| Свой SOAP: шаблоны + StAX | Поддерживаем сами | [док] StAX остаётся в JDK [6] | По транспорту | 15–25 дней | Свои разбор ошибок, синхронизация и ограничения |
-| Свой SOAP: Jackson XML | [код] Живой XML-модуль [29] | Проверить выбранную версию | По транспорту | Сопоставимо со StAX | Моделирование SOAP и ограничений XML вручную |
-| Свой SOAP: JAXB/JAX-WS | [док] Внешние API и генераторы [6, 13] | Проверить комплект | По транспорту | Средний/высокий | Сложность схем и генерации, объём классов |
-| Spring Web Services | [док] Документация 5.0.2, 2026-06-10 [30] | Проверить комплект с Boot 4 | Через sender/HTTP-клиент | Средний | Не готовый EWS SDK, память SOAP message factory |
-| DavMail как библиотека/образец | [код] 7.1.0, 2026-10-17 [33] | Не установлено для встраивания | [код] JCIFS или собственный движок [36–38] | Высокий при встраивании | Связность шлюза, GPL, операции записи |
+| OfficeDev 2.0 | [code] Archived; Maven 2015-09-09 [1–3] | Verify; old external Java EE APIs are needed | [code] HttpClient 4 [4] | Medium: restore dependencies | Old SDK, broad write API |
+| eischet | [code] Version in source is 2.3.2, 2025-12-29; published package not confirmed [7] | Verify; baseline 17 | [code] Apache 4/5; JDK module has issues [7] | Medium | Renamed packages, HTTP 5.2.1, NTLM upgrades |
+| jcetech | [code] Commit 2025-08-17; no release found [8] | Verify; target 17 | [code] HTTP 4.4.1 | Medium/high | Old transport dependency |
+| SpanningCloudApps | [code] Commit 2026-06-09; no release found [9] | Verify | [code] HTTP 4.5.13 | Medium/high | Targeted fixes, no Java 25 guarantee |
+| TuxCare 2.0-tuxcare.1 | [docs] Fix dated 2026-05-11 [12] | Not established | Not established for this build | Depends on vendor | Availability and full contract unconfirmed |
+| Independentsoft JWebServices | [docs] 2.2.150; release date unpublished [11] | Verify with vendor | NTLMv2 not established | Low/medium after verification | Commercial terms, closed implementation |
+| Custom SOAP: templates + StAX | Maintained by us | [docs] StAX remains in the JDK [6] | Depends on transport | 15–25 days | Custom error handling, synchronization, and limits |
+| Custom SOAP: Jackson XML | [code] Active XML module [29] | Verify selected version | Depends on transport | Comparable to StAX | Manual SOAP modeling and XML limitations |
+| Custom SOAP: JAXB/JAX-WS | [docs] External APIs and generators [6, 13] | Verify toolchain | Depends on transport | Medium/high | Schema and generation complexity, number of classes |
+| Spring Web Services | [docs] Documentation 5.0.2, 2026-06-10 [30] | Verify toolchain with Boot 4 | Through sender/HTTP client | Medium | Not a ready EWS SDK, SOAP message factory memory use |
+| DavMail as library/example | [code] 7.1.0, 2026-10-17 [33] | Embedding not established | [code] JCIFS or its own engine [36–38] | High to embed | Gateway coupling, GPL, write operations |
 
-| HTTP-клиент | NTLM есть? | NTLMv2? | Как подключить | Статус (устарел / удалён / жив) | Источник |
+| HTTP client | NTLM available? | NTLMv2? | Configuration | Status (deprecated / removed / active) | Source |
 |---|---|---|---|---|---|
-| HttpURLConnection, Unix | [код] Да | [код] Да; default LMv2/NTLMv2 | Authenticator; при необходимости ntlm.version=NTLMv2; POST без output streaming | [док] Публичный API JDK 25 | [15, 16, 18, 19] |
-| HttpURLConnection, Windows | [код] Да | [предположение] Через системный механизм; зависит от политики Windows | Authenticator, transparentAuth=disabled, проверить пустой домен | [док] Публичный API JDK 25 | [15, 17, 19] |
-| java.net.http.HttpClient | [код] Нет встроенного | Нет встроенного | Authenticator обрабатывает Basic; NTLM потребовал бы отдельной реализации | [код] Живой клиент без NTLM | [39] |
-| Apache HttpClient 5.6.5 classic | [код] Да, явно включить | [код] Да, не обязательно только v2 | NTLMSchemeFactory + NTCredentials + CredentialsProvider + реестр и предпочтение NTLM | [док][код] Клиент жив; NTLM deprecated с 5.3, не удалён и в 5.7-beta1 | [20–24] |
-| Apache HttpClient 4.5.14 classic | [док] Да | [док] Да с 4.1 | NTCredentials + CredentialsProvider | [док] Только существенные исправления и безопасность | [25, 26] |
-| OkHttp | [код] Только через расширение | [код] Есть в движке Android_Ntlm; для Java адаптировать | Authenticator + движок, например JCIFS-ng; HTTP/1.1, проверить один сокет | [код][предположение] Основной API жив; готовый адаптер Java 25 не подтверждён | [27, 28, 41] |
-| JCIFS-ng как движок | [код] Генератор сообщений, не HTTP-транспорт | [код] Да | CIFSContext + Type1/2/3, свой адаптер HTTP | [код] Последний проверенный коммит 2025-11-18; HTTP-интеграцию поддерживаем сами | [41] |
-| RestClient + JdkClientHttpRequestFactory | [код] Нет | Нет | Фабрика не добавляет NTLM к JDK HttpClient | [док] Живой Spring API | [39, 42] |
-| RestClient + HttpComponentsClientHttpRequestFactory | [док][код] Да при настройке Apache 5 | [код] Как у Apache 5 | Передать заранее настроенный HttpClient 5; проверить повторяемость тела | [док] Живой Spring API, NTLM транспорта устарел | [20–24, 42] |
-| RestClient + SimpleClientHttpRequestFactory | [код] Для SOAP POST стандартная фабрика мешает handshake | У движка JDK есть, у этой связки проверить | Своя фабрика без output streaming либо прямой URLConnection | [код] Живой API с ограничением потокового POST | [19, 44] |
-| RestClient + Apache 4 / OkHttp / JCIFS-ng | Встроенной фабрики Spring 7 нет | Зависит от адаптера | Своя ClientHttpRequestFactory; JCIFS-ng подключать к нижнему HTTP-слою | [док][предположение] Интеграцию сопровождаем сами; OkHttp3 factory удалена в 7.0 | [42, 43] |
+| HttpURLConnection, Unix | [code] Yes | [code] Yes; default LMv2/NTLMv2 | Authenticator; optionally `ntlm.version=NTLMv2`; POST without output streaming | [docs] Public JDK 25 API | [15, 16, 18, 19] |
+| HttpURLConnection, Windows | [code] Yes | [assumption] Through system mechanism; depends on Windows policy | Authenticator, `transparentAuth=disabled`, verify empty domain | [docs] Public JDK 25 API | [15, 17, 19] |
+| java.net.http.HttpClient | [code] No built-in support | No built-in support | Authenticator handles Basic; NTLM would require a separate implementation | [code] Active client without NTLM | [39] |
+| Apache HttpClient 5.6.5 classic | [code] Yes, enable explicitly | [code] Yes, not necessarily v2 only | NTLMSchemeFactory + NTCredentials + CredentialsProvider + registry and NTLM preference | [docs][code] Client active; NTLM deprecated since 5.3, not removed in 5.7-beta1 | [20–24] |
+| Apache HttpClient 4.5.14 classic | [docs] Yes | [docs] Yes since 4.1 | NTCredentials + CredentialsProvider | [docs] Significant and security fixes only | [25, 26] |
+| OkHttp | [code] Only through extension | [code] Present in Android_Ntlm engine; adapt for Java | Authenticator + engine such as JCIFS-ng; HTTP/1.1, verify a single socket | [code][assumption] Main API active; ready Java 25 adapter not confirmed | [27, 28, 41] |
+| JCIFS-ng as an engine | [code] Message generator, not HTTP transport | [code] Yes | CIFSContext + Type1/2/3, custom HTTP adapter | [code] Last reviewed commit 2025-11-18; we maintain HTTP integration ourselves | [41] |
+| RestClient + JdkClientHttpRequestFactory | [code] No | No | Factory does not add NTLM to JDK HttpClient | [docs] Active Spring API | [39, 42] |
+| RestClient + HttpComponentsClientHttpRequestFactory | [docs][code] Yes with Apache 5 configured | [code] Same as Apache 5 | Pass a preconfigured HttpClient 5; verify body repeatability | [docs] Active Spring API; transport NTLM deprecated | [20–24, 42] |
+| RestClient + SimpleClientHttpRequestFactory | [code] Standard factory interferes with SOAP POST handshake | JDK engine has it; verify this combination | Custom factory without output streaming or direct URLConnection | [code] Active API with streaming POST limitation | [19, 44] |
+| RestClient + Apache 4 / OkHttp / JCIFS-ng | No built-in Spring 7 factory | Depends on adapter | Custom ClientHttpRequestFactory; connect JCIFS-ng at lower HTTP layer | [docs][assumption] We maintain integration ourselves; OkHttp3 factory removed in 7.0 | [42, 43] |
 
-## Рекомендация
+## Recommendation
 
-[предположение] **Основной вариант: собственный SOAP/StAX + Apache HttpClient 5 classic**,
-с явно зарегистрированным NTLM и отдельной HTTP-сессией на ящик. Он даёт необходимый контроль
-соединений; интеграция с Spring RestClient возможна после проверки повторяемости тела,
-см. В4. SOAP-контракт ограничен десятью операциями.
-Компромисс существенный: NTLM в Apache больше не поддерживается разработчиками.
-Закреплять проверенную версию и проверять этот участок при каждом обновлении. [20–24, 42, 48]
+[assumption] **Primary option: custom SOAP/StAX + Apache HttpClient 5 classic**,
+with NTLM registered explicitly and a separate HTTP session per mailbox. It provides the required connection
+control; integration with Spring RestClient is possible after verifying body repeatability,
+see В4. The SOAP contract is limited to ten operations.
+The tradeoff is significant: Apache developers no longer support NTLM.
+Pin the verified version and check this area on every upgrade. [20–24, 42, 48]
 
-[предположение] **Резерв: тот же SOAP/StAX + прямой буферизованный HttpsURLConnection**,
-с отдельным `Authenticator` и явными учётными данными. На целевой Windows это независимый
-от Apache путь через системную реализацию NTLM; обязательны проверки bare login/пустого домена,
-NTLMv2, отсутствия потокового POST и повторного использования соединения. Это не обещание,
-что системный механизм решит Extended Protection без дополнительных изменений. [15–19]
+[assumption] **Fallback: the same SOAP/StAX + direct buffered HttpsURLConnection**,
+with a separate `Authenticator` and explicit credentials. On target Windows this is a path
+independent of Apache, using the system NTLM implementation; bare login/empty domain,
+NTLMv2, no streaming POST, and connection reuse must be checked. This does not promise
+that the system mechanism will handle Extended Protection without additional changes. [15–19]
 
-[предположение] Если важнее готовая широкая модель EWS, следующий кандидат — форк `eischet`
-с аудитом зависимостей. Если пользователь отдельно подтвердит Basic по HTTPS, тот же SOAP-слой
-можно перевести на современный поддерживаемый транспорт без NTLM; пока это условный путь.
-Решение остаётся за пользователем; документы плана этой сессией не изменялись.
+[assumption] If a ready-made broad EWS model matters more, the next candidate is the `eischet` fork
+after a dependency audit. If the user separately confirms Basic over HTTPS, the same SOAP layer
+could use a modern supported transport without NTLM; for now, this is conditional.
+The decision remains with the user; the plan documents were not changed in this session.
 
-## Что не удалось проверить
+## What could not be verified
 
-- [предположение] Работа любого выбранного сочетания на Java 25 + Boot 4 и нашем Exchange:
-  код не собирался, запросы не выполнялись. Пользователь проверяет один read-only GetFolder,
-  затем MIME, вложение, синхронизацию и повторное соединение; без перебора логинов.
-- [предположение] Политика NTLMv2, Extended Protection и TLS на сервере неизвестна.
-  Пользователь/администратор проверяет конфигурацию и безопасную диагностику выбранного клиента;
-  доказательство «.NET вошёл» не заменяет этой проверки.
-- [код] Последние релизы форков и официальный CI Java 21/25 не установлены.
-  Метаданные GitHub API и исходники проверены; позднее анонимный API вернул ограничение частоты.
-  Указанные даты коммитов не выданы за даты опубликованных пакетов. [7–9]
-- [док] Для Independentsoft не установлены дата 2.2.150, NTLMv2 и Java 25;
-  запросить эти сведения у поставщика до выбора. Для TuxCare отдельно выяснить условия доступа. [11, 12]
-- [предположение] Генерация полного JAXB/JAX-WS клиента из публичных копий XSD не выполнялась;
-  совместимость imports, полноту операций и память на больших ответах ещё проверить. [13, 31]
-- [код] Схемы Genivia проверены как Exchange2010_SP2; точное совпадение публичных копий
-  php-ews со схемой установленного CU23 не подтверждено. [31, 40]
+- [assumption] No selected combination was run on Java 25 + Boot 4 and our Exchange:
+  the code was not built and no requests were made. The user should check one read-only GetFolder,
+  then MIME, an attachment, synchronization, and reconnection; without cycling through logins.
+- [assumption] The server's NTLMv2, Extended Protection, and TLS policies are unknown.
+  The user/administrator should check the configuration and safe diagnostics for the selected client;
+  evidence that “.NET signed in” does not replace this check.
+- [code] Latest fork releases and official Java 21/25 CI were not established.
+  GitHub API metadata and source were reviewed; later the anonymous API returned a rate limit.
+  The stated commit dates are not presented as package publication dates. [7–9]
+- [docs] The date of Independentsoft 2.2.150, NTLMv2, and Java 25 support were not established;
+  request this information from the vendor before choosing. Check TuxCare access terms separately. [11, 12]
+- [assumption] A complete JAXB/JAX-WS client was not generated from public XSD copies;
+  import compatibility, operation coverage, and memory use for large responses still need checking. [13, 31]
+- [code] Genivia schemas were verified as Exchange2010_SP2; an exact match between public
+  php-ews copies and the installed CU23 schema is unconfirmed. [31, 40]
 
-## Что ещё стоит изучить
+## Further topics to study
 
-- [предположение] Ошибки, ограничения операций и восстановление состояния синхронизации —
-  отдельное исследование [RT-03](../research-tasks/RT-03-ews-operations.md).
-- [предположение] Потоковый разбор MIME и вложенных писем —
-  [RT-09](../research-tasks/RT-09-mime-attachments.md); здесь только граница EWS → MIME.
+- [assumption] Errors, operation limits, and synchronization-state recovery are covered in
+  separate research [RT-03](RT-03-ews-operations.md).
+- [assumption] Streaming parsing of MIME and embedded messages is covered in
+  [RT-09](RT-09-mime-attachments.md); this report covers only the EWS → MIME boundary.
 
-## Источники
+## Sources
 
-Все источники ниже прочитаны **2026-10-24**. Для страниц без даты публикации указано
-«без даты»; даты коммитов и версий не считаются гарантией поддержки.
-Исходники, которые веб-просмотр не выдавал целиком, прочитаны анонимным HTTP GET в память.
+All sources below were read on **2026-10-24**. For pages without a publication date,
+“undated” is stated; commit and version dates are not treated as a support guarantee.
+Source files that the web viewer did not display in full were read into memory with an anonymous HTTP GET.
 
-1. [OfficeDev/ews-java-api: README и статус архива](https://github.com/OfficeDev/ews-java-api) — архив 2024-06-18, заявление 2018-07-19.
-2. [Maven Central, каталог 2.0](https://repo.maven.apache.org/maven2/com/microsoft/ews-java-api/ews-java-api/2.0/) — публикация 2015-09-09; [GitHub Releases](https://github.com/OfficeDev/ews-java-api/releases) — без релизов.
-3. [Последний коммит OfficeDev](https://github.com/OfficeDev/ews-java-api/commit/33235f37d97871f17c496526aad0b8c458f904c3) — 2018-07-25; [API дерева](https://api.github.com/repos/OfficeDev/ews-java-api/git/trees/master?recursive=1) — без даты.
-4. [OfficeDev pom.xml](https://raw.githubusercontent.com/OfficeDev/ews-java-api/master/pom.xml) — основная ветка, без даты.
-5. [Issue #773](https://github.com/OfficeDev/ews-java-api/issues/773) — 2023-12-20; [ServiceRequestBase.java](https://raw.githubusercontent.com/OfficeDev/ews-java-api/master/src/main/java/microsoft/exchange/webservices/data/core/request/ServiceRequestBase.java), [TimeChange.java](https://raw.githubusercontent.com/OfficeDev/ews-java-api/master/src/main/java/microsoft/exchange/webservices/data/property/complex/TimeChange.java) — основная ветка, без даты.
-6. [Oracle JDK 11 Release Notes: JEP 320 и удалённые модули](https://www.oracle.com/java/technologies/javase/11-relnote-issues.html) — изменения JDK 11, 2018; [JAXP JDK 25](https://docs.oracle.com/en/java/javase/25/security/java-api-xml-processing-jaxp-security-guide.html) — издание JDK 25.
-7. [eischet/ews-java-api](https://github.com/eischet/ews-java-api), [readme.md](https://raw.githubusercontent.com/eischet/ews-java-api/main/readme.md), [pom.xml](https://raw.githubusercontent.com/eischet/ews-java-api/main/pom.xml) — 2.3.2 от 2025-12-29; [API коммитов](https://api.github.com/repos/eischet/ews-java-api/commits?per_page=2).
-8. [jcetech/ews-java-api](https://github.com/jcetech/ews-java-api), [pom.xml dev](https://raw.githubusercontent.com/jcetech/ews-java-api/dev/pom.xml), [API коммитов](https://api.github.com/repos/jcetech/ews-java-api/commits?per_page=2) — последний коммит 2025-08-17.
-9. [SpanningCloudApps/ews-java-api](https://github.com/SpanningCloudApps/ews-java-api), [pom.xml](https://raw.githubusercontent.com/SpanningCloudApps/ews-java-api/master/pom.xml), [API коммитов](https://api.github.com/repos/SpanningCloudApps/ews-java-api/commits?per_page=2) — последний коммит 2026-06-09.
+1. [OfficeDev/ews-java-api: README and archive status](https://github.com/OfficeDev/ews-java-api) — archived 2024-06-18, statement dated 2018-07-19.
+2. [Maven Central, 2.0 directory](https://repo.maven.apache.org/maven2/com/microsoft/ews-java-api/ews-java-api/2.0/) — published 2015-09-09; [GitHub Releases](https://github.com/OfficeDev/ews-java-api/releases) — no releases.
+3. [Latest OfficeDev commit](https://github.com/OfficeDev/ews-java-api/commit/33235f37d97871f17c496526aad0b8c458f904c3) — 2018-07-25; [tree API](https://api.github.com/repos/OfficeDev/ews-java-api/git/trees/master?recursive=1) — undated.
+4. [OfficeDev pom.xml](https://raw.githubusercontent.com/OfficeDev/ews-java-api/master/pom.xml) — main branch, undated.
+5. [Issue #773](https://github.com/OfficeDev/ews-java-api/issues/773) — 2023-12-20; [ServiceRequestBase.java](https://raw.githubusercontent.com/OfficeDev/ews-java-api/master/src/main/java/microsoft/exchange/webservices/data/core/request/ServiceRequestBase.java), [TimeChange.java](https://raw.githubusercontent.com/OfficeDev/ews-java-api/master/src/main/java/microsoft/exchange/webservices/data/property/complex/TimeChange.java) — main branch, undated.
+6. [Oracle JDK 11 Release Notes: JEP 320 and removed modules](https://www.oracle.com/java/technologies/javase/11-relnote-issues.html) — JDK 11 changes, 2018; [JAXP JDK 25](https://docs.oracle.com/en/java/javase/25/security/java-api-xml-processing-jaxp-security-guide.html) — JDK 25 edition.
+7. [eischet/ews-java-api](https://github.com/eischet/ews-java-api), [readme.md](https://raw.githubusercontent.com/eischet/ews-java-api/main/readme.md), [pom.xml](https://raw.githubusercontent.com/eischet/ews-java-api/main/pom.xml) — 2.3.2 dated 2025-12-29; [commits API](https://api.github.com/repos/eischet/ews-java-api/commits?per_page=2).
+8. [jcetech/ews-java-api](https://github.com/jcetech/ews-java-api), [pom.xml dev](https://raw.githubusercontent.com/jcetech/ews-java-api/dev/pom.xml), [commits API](https://api.github.com/repos/jcetech/ews-java-api/commits?per_page=2) — last commit 2025-08-17.
+9. [SpanningCloudApps/ews-java-api](https://github.com/SpanningCloudApps/ews-java-api), [pom.xml](https://raw.githubusercontent.com/SpanningCloudApps/ews-java-api/master/pom.xml), [commits API](https://api.github.com/repos/SpanningCloudApps/ews-java-api/commits?per_page=2) — last commit 2026-06-09.
 10. [OfficeDev issue #692: EWS Community Project](https://github.com/OfficeDev/ews-java-api/issues/692) — 2019-03-01.
-11. [Independentsoft JWebServices for Exchange](https://independentsoft.de/jwebservices/index.html) — 2.2.150, дата версии не указана.
+11. [Independentsoft JWebServices for Exchange](https://independentsoft.de/jwebservices/index.html) — 2.2.150, version date not stated.
 12. [TuxCare PF-2697, ews-java-api 2.0-tuxcare.1](https://tuxcare.com/cve-tracker/fixes/details/pf-2697/) — 2026-05-11.
 13. [Microsoft: EWS XML elements](https://learn.microsoft.com/en-us/exchange/client-developer/web-service-reference/ews-xml-elements-in-exchange) — 2023-03-29.
-14. [Microsoft: EWS schema versions](https://learn.microsoft.com/en-us/exchange/client-developer/exchange-web-services/ews-schema-versions-in-exchange) — дата публикации в проверенной выдержке не установлена.
-15. [Oracle Java Networking, JDK 25](https://docs.oracle.com/en/java/javase/25/core/java-networking.html) — издание JDK 25.
-16. [OpenJDK 25 GA: Unix NTLMAuthentication.java](https://raw.githubusercontent.com/openjdk/jdk/jdk-25-ga/src/java.base/unix/classes/sun/net/www/protocol/http/ntlm/NTLMAuthentication.java) — тег jdk-25-ga, 2025.
-17. [OpenJDK 25 GA: Windows NTLMAuthentication.java](https://raw.githubusercontent.com/openjdk/jdk/jdk-25-ga/src/java.base/windows/classes/sun/net/www/protocol/http/ntlm/NTLMAuthentication.java) — тег jdk-25-ga, 2025.
-18. [OpenJDK 25 GA: com.sun.security.ntlm.Client](https://raw.githubusercontent.com/openjdk/jdk/jdk-25-ga/src/java.base/share/classes/com/sun/security/ntlm/Client.java) — тег jdk-25-ga, 2025.
-19. [Oracle HttpURLConnection, JDK 25](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/net/HttpURLConnection.html) — издание JDK 25; setAuthenticator и streaming modes.
-20. [Apache HttpComponents News](https://hc.apache.org/news.html) — объявление 5.2 от 2022-11-10, 5.3 от 2023-12-07; [дистрибутивы](https://downloads.apache.org/httpcomponents/httpclient/binary/) — 5.6.5 от 2026-10-10, 5.7-beta1 от 2026-10-22.
-21. [Apache NTLMScheme 5.6.5](https://raw.githubusercontent.com/apache/httpcomponents-client/rel/v5.6.5/httpclient5/src/main/java/org/apache/hc/client5/http/impl/auth/NTLMScheme.java) — тег 5.6.5.
-22. [Apache HttpClientBuilder 5.6.5](https://raw.githubusercontent.com/apache/httpcomponents-client/rel/v5.6.5/httpclient5/src/main/java/org/apache/hc/client5/http/impl/classic/HttpClientBuilder.java) — тег 5.6.5, реестр схем и методы настройки.
-23. [Apache NTLMScheme 5.7-beta1](https://raw.githubusercontent.com/apache/httpcomponents-client/rel/v5.7-beta1/httpclient5/src/main/java/org/apache/hc/client5/http/impl/auth/NTLMScheme.java) — тег 5.7-beta1.
-24. [Apache NTLMEngineImpl 5.6.5](https://raw.githubusercontent.com/apache/httpcomponents-client/rel/v5.6.5/httpclient5/src/main/java/org/apache/hc/client5/http/impl/auth/NTLMEngineImpl.java) — тег 5.6.5.
-25. [Apache HttpClient 4.5 Tutorial, §4.7](https://hc.apache.org/httpcomponents-client-4.5.x/current/tutorial/pdf/httpclient-tutorial.pdf) — руководство ветки 4.5, версия PDF без отдельно установленной даты.
-26. [Apache Project Status](https://hc.apache.org/status.html) — без даты; различает HttpClient 4.5, HttpCore classic/NIO и HttpAsyncClient.
-27. [OkHttp Authenticator.kt](https://raw.githubusercontent.com/square/okhttp/master/okhttp/src/commonJvmAndroid/kotlin/okhttp3/Authenticator.kt) — основная ветка, без даты.
-28. [Android_Ntlm README](https://github.com/netcosports/Android_Ntlm), [NTLMAuthenticator.java](https://raw.githubusercontent.com/netcosports/Android_Ntlm/master/library/src/main/java/com/netcosports/ntlm/NTLMAuthenticator.java), [NTLMEngineImpl.java](https://raw.githubusercontent.com/netcosports/Android_Ntlm/master/library/src/main/java/com/netcosports/ntlm/NTLMEngineImpl.java) — версия 1.0, дата не установлена.
-29. [FasterXML jackson-dataformat-xml](https://github.com/FasterXML/jackson-dataformat-xml) — ветка 3.x, без даты.
-30. [Spring Web Services Reference](https://docs.spring.io/spring-ws/docs/current/reference/html/) — 5.0.2, 2026-06-10, раздел Client-side API.
-31. [php-ews services.wsdl](https://raw.githubusercontent.com/jamesiarmes/php-ews/master/src/assets/services.wsdl), [messages.xsd](https://raw.githubusercontent.com/jamesiarmes/php-ews/master/src/assets/messages.xsd), [types.xsd](https://raw.githubusercontent.com/jamesiarmes/php-ews/master/src/assets/types.xsd) — master, дата копий не установлена.
-32. [Microsoft MS-OXWSCDATA, Full WSDL](https://learn.microsoft.com/th-th/openspecs/exchange_server_protocols/ms-oxwscdata/9328dc18-72e8-4f7c-bb9d-c6f9d5f0217c) — английский текст спецификации, обновление 2020-10-14; [MS-OXWSSRCH, редакция 2010](https://officeprotocoldoc.z19.web.core.windows.net/files/MS-OXWSSRCH/%5BMS-OXWSSRCH%5D-100210.pdf) — 2010-02-05, пример отдельного WSDL операций.
-33. [DavMail RELEASE-NOTES.md](https://raw.githubusercontent.com/mguessan/davmail/master/RELEASE-NOTES.md) — 7.1.0 от 2026-10-17 и история 6.3–6.5.
-34. [DavMail EWSMethod.java](https://raw.githubusercontent.com/mguessan/davmail/master/src/java/davmail/exchange/ews/EWSMethod.java) — master, без отдельной даты.
-35. [DavMail EwsExchangeSession.java](https://raw.githubusercontent.com/mguessan/davmail/master/src/java/davmail/exchange/ews/EwsExchangeSession.java) — master, без отдельной даты.
-36. [DavMail HttpClientAdapter.java](https://raw.githubusercontent.com/mguessan/davmail/master/src/java/davmail/http/HttpClientAdapter.java), [pom.xml](https://raw.githubusercontent.com/mguessan/davmail/master/pom.xml) — master, без отдельной даты; исходники прочитаны напрямую, поисковая копия отставала.
-37. [DavMail JCIFSNTLMSchemeFactory.java](https://raw.githubusercontent.com/mguessan/davmail/master/src/java/davmail/http/JCIFSNTLMSchemeFactory.java), [JCIFSEngine.java](https://raw.githubusercontent.com/mguessan/davmail/master/src/java/davmail/http/JCIFSEngine.java) — master, без отдельной даты.
-38. [DavMailNTLMScheme.java](https://raw.githubusercontent.com/mguessan/davmail/master/src/java/davmail/http/DavMailNTLMScheme.java), [DavMailNTLMEngineImpl.java](https://raw.githubusercontent.com/mguessan/davmail/master/src/java/davmail/http/DavMailNTLMEngineImpl.java) — master, без отдельной даты.
-39. [OpenJDK 25 GA: AuthenticationFilter.java](https://raw.githubusercontent.com/openjdk/jdk/jdk-25-ga/src/java.net.http/share/classes/jdk/internal/net/http/AuthenticationFilter.java) — тег jdk-25-ga, 2025.
-40. [Genivia gSOAP EWS example](https://www.genivia.com/examples/ews/index.html), [Services.wsdl](https://www.genivia.com/examples/ews/Services.wsdl), [messages.xsd](https://www.genivia.com/examples/ews/messages.xsd), [types.xsd](https://www.genivia.com/examples/ews/types.xsd) — дата не указана, XSD Exchange2010_SP2.
-41. [JCIFS-ng](https://github.com/AgNO3/jcifs-ng), [Type3Message.java](https://raw.githubusercontent.com/AgNO3/jcifs-ng/master/src/main/java/jcifs/ntlmssp/Type3Message.java), [BaseConfiguration.java](https://raw.githubusercontent.com/AgNO3/jcifs-ng/master/src/main/java/jcifs/config/BaseConfiguration.java) — последний коммит master по API 2025-11-18, `8df7abd7fbba839f7654e028853c5903be5e17d0`.
-42. [Spring Framework: REST Clients](https://docs.spring.io/spring-framework/reference/integration/rest-clients.html) — проверена документация 7.0.10, без даты публикации страницы.
-43. [Spring Framework 7.0 Release Notes: Other removals](https://github.com/spring-projects/spring-framework/wiki/Spring-Framework-7.0-Release-Notes/373c55a01235603a2a2ce8e9a5a67f5de6b6a70f) — версия документа с описанием удаления OkHttp3 support.
-44. [Spring 7.0.10 SimpleClientHttpRequest.java](https://raw.githubusercontent.com/spring-projects/spring-framework/v7.0.10/spring-web/src/main/java/org/springframework/http/client/SimpleClientHttpRequest.java) — тег v7.0.10, строки установки streaming mode.
-45. [DavMail issue #352, Extended Protection](https://github.com/mguessan/davmail/issues/352) — 2024-05-10, закрыт; отчёт пользователя, механизм сверялся с кодом [38].
-46. [Microsoft: Maintain affinity between subscriptions and Mailbox server](https://learn.microsoft.com/en-us/exchange/client-developer/exchange-web-services/how-to-maintain-affinity-between-group-of-subscriptions-and-mailbox-server) — дата публикации в проверенной выдержке не установлена.
-47. [Oracle JAXP Security Guide, JDK 25](https://docs.oracle.com/en/java/javase/25/security/java-api-xml-processing-jaxp-security-guide.html) — издание JDK 25.
-48. [Spring 7.0.10 HttpComponentsClientHttpRequest.java](https://raw.githubusercontent.com/spring-projects/spring-framework/v7.0.10/spring-web/src/main/java/org/springframework/http/client/HttpComponentsClientHttpRequest.java), [StreamingHttpOutputMessage.java](https://raw.githubusercontent.com/spring-projects/spring-framework/v7.0.10/spring-web/src/main/java/org/springframework/http/StreamingHttpOutputMessage.java) — тег v7.0.10, контракт повторяемости тела.
+14. [Microsoft: EWS schema versions](https://learn.microsoft.com/en-us/exchange/client-developer/exchange-web-services/ews-schema-versions-in-exchange) — publication date not established in the reviewed excerpt.
+15. [Oracle Java Networking, JDK 25](https://docs.oracle.com/en/java/javase/25/core/java-networking.html) — JDK 25 edition.
+16. [OpenJDK 25 GA: Unix NTLMAuthentication.java](https://raw.githubusercontent.com/openjdk/jdk/jdk-25-ga/src/java.base/unix/classes/sun/net/www/protocol/http/ntlm/NTLMAuthentication.java) — jdk-25-ga tag, 2025.
+17. [OpenJDK 25 GA: Windows NTLMAuthentication.java](https://raw.githubusercontent.com/openjdk/jdk/jdk-25-ga/src/java.base/windows/classes/sun/net/www/protocol/http/ntlm/NTLMAuthentication.java) — jdk-25-ga tag, 2025.
+18. [OpenJDK 25 GA: com.sun.security.ntlm.Client](https://raw.githubusercontent.com/openjdk/jdk/jdk-25-ga/src/java.base/share/classes/com/sun/security/ntlm/Client.java) — jdk-25-ga tag, 2025.
+19. [Oracle HttpURLConnection, JDK 25](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/net/HttpURLConnection.html) — JDK 25 edition; setAuthenticator and streaming modes.
+20. [Apache HttpComponents News](https://hc.apache.org/news.html) — 5.2 announcement dated 2022-11-10, 5.3 dated 2023-12-07; [distributions](https://downloads.apache.org/httpcomponents/httpclient/binary/) — 5.6.5 dated 2026-10-10, 5.7-beta1 dated 2026-10-22.
+21. [Apache NTLMScheme 5.6.5](https://raw.githubusercontent.com/apache/httpcomponents-client/rel/v5.6.5/httpclient5/src/main/java/org/apache/hc/client5/http/impl/auth/NTLMScheme.java) — 5.6.5 tag.
+22. [Apache HttpClientBuilder 5.6.5](https://raw.githubusercontent.com/apache/httpcomponents-client/rel/v5.6.5/httpclient5/src/main/java/org/apache/hc/client5/http/impl/classic/HttpClientBuilder.java) — 5.6.5 tag, scheme registry and configuration methods.
+23. [Apache NTLMScheme 5.7-beta1](https://raw.githubusercontent.com/apache/httpcomponents-client/rel/v5.7-beta1/httpclient5/src/main/java/org/apache/hc/client5/http/impl/auth/NTLMScheme.java) — 5.7-beta1 tag.
+24. [Apache NTLMEngineImpl 5.6.5](https://raw.githubusercontent.com/apache/httpcomponents-client/rel/v5.6.5/httpclient5/src/main/java/org/apache/hc/client5/http/impl/auth/NTLMEngineImpl.java) — 5.6.5 tag.
+25. [Apache HttpClient 4.5 Tutorial, §4.7](https://hc.apache.org/httpcomponents-client-4.5.x/current/tutorial/pdf/httpclient-tutorial.pdf) — 4.5 branch guide, PDF version date not separately established.
+26. [Apache Project Status](https://hc.apache.org/status.html) — undated; distinguishes HttpClient 4.5, HttpCore classic/NIO, and HttpAsyncClient.
+27. [OkHttp Authenticator.kt](https://raw.githubusercontent.com/square/okhttp/master/okhttp/src/commonJvmAndroid/kotlin/okhttp3/Authenticator.kt) — main branch, undated.
+28. [Android_Ntlm README](https://github.com/netcosports/Android_Ntlm), [NTLMAuthenticator.java](https://raw.githubusercontent.com/netcosports/Android_Ntlm/master/library/src/main/java/com/netcosports/ntlm/NTLMAuthenticator.java), [NTLMEngineImpl.java](https://raw.githubusercontent.com/netcosports/Android_Ntlm/master/library/src/main/java/com/netcosports/ntlm/NTLMEngineImpl.java) — version 1.0, date not established.
+29. [FasterXML jackson-dataformat-xml](https://github.com/FasterXML/jackson-dataformat-xml) — 3.x branch, undated.
+30. [Spring Web Services Reference](https://docs.spring.io/spring-ws/docs/current/reference/html/) — 5.0.2, 2026-06-10, Client-side API section.
+31. [php-ews services.wsdl](https://raw.githubusercontent.com/jamesiarmes/php-ews/master/src/assets/services.wsdl), [messages.xsd](https://raw.githubusercontent.com/jamesiarmes/php-ews/master/src/assets/messages.xsd), [types.xsd](https://raw.githubusercontent.com/jamesiarmes/php-ews/master/src/assets/types.xsd) — master, copy dates not established.
+32. [Microsoft MS-OXWSCDATA, Full WSDL](https://learn.microsoft.com/th-th/openspecs/exchange_server_protocols/ms-oxwscdata/9328dc18-72e8-4f7c-bb9d-c6f9d5f0217c) — English specification text, updated 2020-10-14; [MS-OXWSSRCH, 2010 revision](https://officeprotocoldoc.z19.web.core.windows.net/files/MS-OXWSSRCH/%5BMS-OXWSSRCH%5D-100210.pdf) — 2010-02-05, example of a separate operations WSDL.
+33. [DavMail RELEASE-NOTES.md](https://raw.githubusercontent.com/mguessan/davmail/master/RELEASE-NOTES.md) — 7.1.0 dated 2026-10-17 and 6.3–6.5 history.
+34. [DavMail EWSMethod.java](https://raw.githubusercontent.com/mguessan/davmail/master/src/java/davmail/exchange/ews/EWSMethod.java) — master, no separate date.
+35. [DavMail EwsExchangeSession.java](https://raw.githubusercontent.com/mguessan/davmail/master/src/java/davmail/exchange/ews/EwsExchangeSession.java) — master, no separate date.
+36. [DavMail HttpClientAdapter.java](https://raw.githubusercontent.com/mguessan/davmail/master/src/java/davmail/http/HttpClientAdapter.java), [pom.xml](https://raw.githubusercontent.com/mguessan/davmail/master/pom.xml) — master, no separate date; source read directly because the search cache was outdated.
+37. [DavMail JCIFSNTLMSchemeFactory.java](https://raw.githubusercontent.com/mguessan/davmail/master/src/java/davmail/http/JCIFSNTLMSchemeFactory.java), [JCIFSEngine.java](https://raw.githubusercontent.com/mguessan/davmail/master/src/java/davmail/http/JCIFSEngine.java) — master, no separate date.
+38. [DavMailNTLMScheme.java](https://raw.githubusercontent.com/mguessan/davmail/master/src/java/davmail/http/DavMailNTLMScheme.java), [DavMailNTLMEngineImpl.java](https://raw.githubusercontent.com/mguessan/davmail/master/src/java/davmail/http/DavMailNTLMEngineImpl.java) — master, no separate date.
+39. [OpenJDK 25 GA: AuthenticationFilter.java](https://raw.githubusercontent.com/openjdk/jdk/jdk-25-ga/src/java.net.http/share/classes/jdk/internal/net/http/AuthenticationFilter.java) — jdk-25-ga tag, 2025.
+40. [Genivia gSOAP EWS example](https://www.genivia.com/examples/ews/index.html), [Services.wsdl](https://www.genivia.com/examples/ews/Services.wsdl), [messages.xsd](https://www.genivia.com/examples/ews/messages.xsd), [types.xsd](https://www.genivia.com/examples/ews/types.xsd) — date not stated, XSD Exchange2010_SP2.
+41. [JCIFS-ng](https://github.com/AgNO3/jcifs-ng), [Type3Message.java](https://raw.githubusercontent.com/AgNO3/jcifs-ng/master/src/main/java/jcifs/ntlmssp/Type3Message.java), [BaseConfiguration.java](https://raw.githubusercontent.com/AgNO3/jcifs-ng/master/src/main/java/jcifs/config/BaseConfiguration.java) — latest master commit per API, 2025-11-18, `8df7abd7fbba839f7654e028853c5903be5e17d0`.
+42. [Spring Framework: REST Clients](https://docs.spring.io/spring-framework/reference/integration/rest-clients.html) — documentation 7.0.10 reviewed; page publication date not stated.
+43. [Spring Framework 7.0 Release Notes: Other removals](https://github.com/spring-projects/spring-framework/wiki/Spring-Framework-7.0-Release-Notes/373c55a01235603a2a2ce8e9a5a67f5de6b6a70f) — document version describing removal of OkHttp3 support.
+44. [Spring 7.0.10 SimpleClientHttpRequest.java](https://raw.githubusercontent.com/spring-projects/spring-framework/v7.0.10/spring-web/src/main/java/org/springframework/http/client/SimpleClientHttpRequest.java) — v7.0.10 tag, lines setting streaming mode.
+45. [DavMail issue #352, Extended Protection](https://github.com/mguessan/davmail/issues/352) — closed 2024-05-10; user report, mechanism checked against code [38].
+46. [Microsoft: Maintain affinity between subscriptions and Mailbox server](https://learn.microsoft.com/en-us/exchange/client-developer/exchange-web-services/how-to-maintain-affinity-between-group-of-subscriptions-and-mailbox-server) — publication date not established in the reviewed excerpt.
+47. [Oracle JAXP Security Guide, JDK 25](https://docs.oracle.com/en/java/javase/25/security/java-api-xml-processing-jaxp-security-guide.html) — JDK 25 edition.
+48. [Spring 7.0.10 HttpComponentsClientHttpRequest.java](https://raw.githubusercontent.com/spring-projects/spring-framework/v7.0.10/spring-web/src/main/java/org/springframework/http/client/HttpComponentsClientHttpRequest.java), [StreamingHttpOutputMessage.java](https://raw.githubusercontent.com/spring-projects/spring-framework/v7.0.10/spring-web/src/main/java/org/springframework/http/StreamingHttpOutputMessage.java) — v7.0.10 tag, repeatable-body contract.

@@ -117,7 +117,7 @@ MIME SHA-256/time and all saved content; reused moves increase no downloaded, fa
 counter. Both ends of UIDVALIDITY resets are excluded. The runner discovers all folders before
 removal, writes matches first and commits before saving all cursors; reconciliation repairs an
 interrupted metadata/index reassignment or flag update. See `docs/storage-agent.md` for exact matching/recovery
-rules. Availability on the user's servers remains to verify (проверить); only synthetic protocol
+rules. Availability on the user's servers remains to verify; only synthetic protocol
 tests have been run for this metadata path.
 
 Original MIME is kept on disk as downloaded. Under the 2026-10-25 decisions mail content and
@@ -157,7 +157,7 @@ from its identity; a UIDVALIDITY reset uses only fresh observations. Flags are u
 state, independent of Gmail Important. Flag-only changes update metadata/index without writing
 MIME/body/attachments or changing state, error, time or counters. Schema 4 rebuilds offline
 from saved data; old metadata stays unknown until a requested sync. Real-server flag behavior
-remains to verify (проверить).
+remains to verify.
 
 ## Failure diagnostics
 

@@ -109,7 +109,7 @@ EWS ReadFlagChange/Update), without MIME downloads, conversion or a pass over al
 Original files, state/error, SHA-256 and download time remain unchanged. Flags do not participate
 in move matching; destination observations apply after reuse. Flag-only updates and moves count
 as zero downloaded, failed and removed, preserving rescan reports and the background summary.
-Real-server behavior remains to verify (проверить).
+Real-server behavior remains to verify.
 
 ## Threads
 
@@ -275,7 +275,7 @@ final replacement after all planned changes commit. On interruption, reconciliat
 indexed folder/ref/path or flags differing from disk metadata and reruns skip current local refs.
 Final reports for retained folders follow the final cursor save; batch reports still mark
 `done=false`. See `docs/storage-agent.md` for exact eligibility and recovery rules. This path is
-verified offline; availability on the user's servers remains to verify (проверить).
+verified offline; availability on the user's servers remains to verify.
 
 `sync-status.json` is atomically replaced by `SyncRunner`, which runs only while its caller holds
 the connection's Lucene writer lock. Fields: `state` (running/completed/failed), `pid`,

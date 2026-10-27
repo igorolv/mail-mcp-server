@@ -1,83 +1,84 @@
-# RT-10 — MCP-ресурсы и поддержка клиентов
+# RT-10 — MCP resources and client support
 
-- Дата: 2026-10-24
-- Исполнитель: Codex / исследовательская сессия RT-10
-- Бриф: [docs/research-tasks/RT-10-mcp-resources.md](../research-tasks/RT-10-mcp-resources.md)
-- Область: проектирование; клиенты и серверы не запускались, почтовые подключения не выполнялись.
+- Date: 2026-10-24
+- Author: Codex / research session RT-10
+- Brief: `docs/research-tasks/RT-10-mcp-resources.md` (historical path)
+- Scope: design; no clients or servers were run and no mail connections were made.
 
-## Кратко
+## Summary
 
-- [док] Актуальная опубликованная редакция MCP — **2026-07-28**. Она заменила
-  `resources/subscribe` и `resources/unsubscribe` на `subscriptions/listen` [1].
-- [док] Ресурсы, шаблоны, чтение, уведомления и встроенные ресурсы существовали уже в
-  2024-11-05; отдельный блок `resource_link` появился в 2025-06-18 [3–7].
-- [док] Список конкретных URI и список шаблонов — разные операции. Ссылка из инструмента
-  может отсутствовать в `resources/list`; сама ссылка ещё не передаёт содержимое [2, 10].
-- [док][код] Claude Code и VS Code позволяют выбирать ресурсы для контекста; Codex имеет
-  инструменты перечисления, чтения и получения шаблонов. Подробности и пробелы — в матрице [11, 15, 16].
-- [док] Cursor заявляет поддержку ресурсов, но его текущая страница не раскрывает все
-  запрошенные возможности. Нельзя переносить эту отметку на шаблоны и подписки [14].
-- [док] ChatGPT web подключает сервер через HTTPS или Tunnel; настольный ChatGPT отдельно
-  документирует STDIO. Для обычных почтовых ресурсов полнота поддержки не установлена [17–19].
-- [док][код] Spring AI 2.x поддерживает `@McpResource`, `@McpComplete` и программную
-  регистрацию; `ResourceLink` можно вернуть внутри `CallToolResult` [21–26].
-- [предположение] Рекомендация: основной доступ — инструменты поиска и чтения частями;
-  ресурсы и ссылки — дополнение. `localPath` полезен только при доступе клиента к файлам
-  и должен вести на отфильтрованное представление, если файл предназначен модели.
+- [docs] The current published MCP revision is **2026-07-28**. It replaced
+  `resources/subscribe` and `resources/unsubscribe` with `subscriptions/listen` [1].
+- [docs] Resources, templates, reading, notifications and embedded resources already existed
+  in 2024-11-05; the separate `resource_link` block appeared in 2025-06-18 [3–7].
+- [docs] Listing concrete URIs and listing templates are separate operations. A tool's link
+  can be absent from `resources/list`; the link itself does not transmit content [2, 10].
+- [docs][code] Claude Code and VS Code allow selecting resources for context; Codex has tools
+  for listing, reading and retrieving templates. Details and gaps are in the matrix [11, 15, 16].
+- [docs] Cursor claims resource support, but its current page does not describe all requested
+  capabilities. That claim cannot be extended to templates and subscriptions [14].
+- [docs] ChatGPT web connects servers through HTTPS or Tunnel; desktop ChatGPT separately
+  documents STDIO. Full support for ordinary mail resources is unconfirmed [17–19].
+- [docs][code] Spring AI 2.x supports `@McpResource`, `@McpComplete` and programmatic
+  registration; `ResourceLink` can be returned inside `CallToolResult` [21–26].
+- [assumption] Recommendation: search and chunked-read tools as the primary interface, with
+  resources and links as supplements. `localPath` is useful only if the client can access
+  files, and should point to a filtered representation if the file is intended for the model.
 
-## Ответы на вопросы
+## Answers to the questions
 
-### В1. Спецификация: операции, история версий и результаты инструментов
+### В1. Specification: operations, version history and tool results
 
-**Версии.** [док] На дату исследования `/specification` направляет на 2026-07-28.
-Ниже отделены прежние операции от текущих: это важно для совместимости [1, 2].
+**Versions.** [docs] On the research date, `/specification` points to 2026-07-28. The following
+distinguishes previous operations from current ones, which matters for compatibility [1, 2].
 
-| Возможность | Когда появилась / изменилась | Проверенный источник |
+| Capability | Introduced / changed | Verified source |
 |---|---|---|
-| Ресурсы, `resources/list`, `resources/read` | Уже в первой опубликованной редакции 2024-11-05 | [док] [3] |
-| Шаблоны, `resources/templates/list` | Уже в 2024-11-05; URI-шаблоны по RFC 6570 | [док] [3] |
-| `resources/subscribe`, `resources/unsubscribe`, `notifications/resources/updated` | Механизм редакции 2024-11-05; сохранён в 2025-11-25 | [док] [3, 32] |
-| `notifications/resources/list_changed` | Уже в 2024-11-05; отдельная возможность `listChanged` | [док] [3] |
-| `completion/complete` для аргументов ресурсов | Уже в 2024-11-05; возможность `completions` явно добавлена в 2025-03-26 | [док] [4, 6] |
-| Встроенное содержимое: `type: "resource"` | Уже в 2024-11-05, включая результаты инструментов | [док] [5] |
-| Ссылка без содержимого: `type: "resource_link"` | Добавлена в 2025-06-18 | [док] [7] |
-| Значки ресурсов и шаблонов | Добавлены в 2025-11-25 | [док] [8] |
-| `subscriptions/listen` вместо пары subscribe/unsubscribe | Замена в 2026-07-28 | [док] [1] |
-| `ttlMs`, `cacheScope`, `resultType` | Новые обязательные поля соответствующих результатов в 2026-07-28 | [док] [1] |
+| Resources, `resources/list`, `resources/read` | Already in the first published revision, 2024-11-05 | [docs] [3] |
+| Templates, `resources/templates/list` | Already in 2024-11-05; URI templates per RFC 6570 | [docs] [3] |
+| `resources/subscribe`, `resources/unsubscribe`, `notifications/resources/updated` | Mechanism from 2024-11-05; retained in 2025-11-25 | [docs] [3, 32] |
+| `notifications/resources/list_changed` | Already in 2024-11-05; separate `listChanged` capability | [docs] [3] |
+| `completion/complete` for resource arguments | Already in 2024-11-05; explicit `completions` capability added in 2025-03-26 | [docs] [4, 6] |
+| Embedded content: `type: "resource"` | Already in 2024-11-05, including tool results | [docs] [5] |
+| Link without content: `type: "resource_link"` | Added in 2025-06-18 | [docs] [7] |
+| Resource and template icons | Added in 2025-11-25 | [docs] [8] |
+| `subscriptions/listen` replaces subscribe/unsubscribe | Replaced in 2026-07-28 | [docs] [1] |
+| `ttlMs`, `cacheScope`, `resultType` | New required fields in the corresponding results in 2026-07-28 | [docs] [1] |
 
-**Обнаружение и чтение.** [док] `resources/list` возвращает описания конкретных ресурсов,
-а `resources/templates/list` — параметризованные семейства. Обе операции поддерживают
-страницы с `cursor` / `nextCursor`. Содержимое получают через `resources/read` с готовым URI [2, 3].
+**Discovery and reading.** [docs] `resources/list` returns descriptions of concrete resources,
+while `resources/templates/list` returns parameterized families. Both support paging with
+`cursor` / `nextCursor`. Obtain content through `resources/read` with a completed URI [2, 3].
 
-[предположение] Для почты разумно описать семейства
-`mail://{connection}/message/{id}` и `mail://{connection}/attachment/{id}`.
-Список ресурсов нужен для выбора уже сохранённых объектов; шаблон не требует заранее
-перечислять каждое письмо. Идентификатор лучше сделать внутренним и непрозрачным,
-а компоненты URI кодировать по правилам URI; имя соединения не должно содержать секретов.
+[assumption] For mail, sensible families are `mail://{connection}/message/{id}` and
+`mail://{connection}/attachment/{id}`. The resource list supports selecting already saved
+objects; a template does not require listing every message in advance. Prefer an internal,
+opaque identifier and encode URI components under URI rules; connection names must not
+contain secrets.
 
-**Два разных уведомления.** [док] `list_changed` означает изменение каталога,
-а `updated` — изменение конкретного содержимого. Во втором случае уведомление несёт URI,
-и клиент при необходимости читает ресурс повторно. Возможности `listChanged` и `subscribe`
-независимы [2, 32].
+**Two different notifications.** [docs] `list_changed` means the catalog changed; `updated`
+means specific content changed. The latter notification carries a URI, and the client can
+reread the resource as needed. The `listChanged` and `subscribe` capabilities are independent
+[2, 32].
 
-[док] В 2026-07-28 подписка оформляется через `subscriptions/listen`:
-`notifications.resourcesListChanged` выбирает изменения каталога,
-`notifications.resourceSubscriptions` — URI наблюдаемых ресурсов.
-В 2025-11-25 используются прежние `resources/subscribe` / `resources/unsubscribe` [1, 2, 32].
+[docs] In 2026-07-28, subscriptions use `subscriptions/listen`:
+`notifications.resourcesListChanged` selects catalog changes, and
+`notifications.resourceSubscriptions` selects the URIs of watched resources. Revision
+2025-11-25 uses the previous `resources/subscribe` / `resources/unsubscribe` [1, 2, 32].
 
-[док] Новая редакция также убрала начальное рукопожатие `initialize`:
-версия и возможности клиента передаются в `_meta` каждого запроса;
-сервер обязан реализовать `server/discover`. Одной замены названия RPC недостаточно [1].
+[docs] The new revision also removed the initial `initialize` handshake: the client version
+and capabilities are passed in each request's `_meta`; the server must implement
+`server/discover`. Renaming one RPC is insufficient [1].
 
-**Дополнение аргументов.** [док] `completion/complete` принимает ссылку `ref/resource`
-на шаблон и пару `argument.name` / `argument.value`. Для зависимых аргументов есть
-`context.arguments`; ответ содержит `values` (не более 100), необязательные `total`
-и `hasMore`. Сервер объявляет `completions: {}` [9].
+**Argument completion.** [docs] `completion/complete` accepts a `ref/resource` reference to a
+template and an `argument.name` / `argument.value` pair. Dependent arguments use
+`context.arguments`; the response has `values` (at most 100), optional `total` and `hasMore`.
+The server declares `completions: {}` [9].
 
-[предположение] У нас это может быть дополнение `connection` и затем `id` в выбранном
-соединении. Не стоит превращать дополнение в выдачу всего почтового каталога.
+[assumption] We could complete `connection`, then `id` within the chosen connection. Do not
+turn completion into a listing of the entire mail catalog.
 
-**Ссылка и встроенный ресурс.** [док] Это разные элементы `content` результата инструмента [10]:
+**Link and embedded resource.** [docs] These are different `content` elements in a tool result
+[10]:
 
 ```json
 {
@@ -85,12 +86,12 @@
   "uri": "mail://work/attachment/a42",
   "name": "attachment-a42-text",
   "mimeType": "text/plain",
-  "description": "Извлечённый текст вложения после фильтрации"
+  "description": "Extracted attachment text after filtering"
 }
 ```
 
-[док] Такой блок передаёт адрес и описание. Он не гарантирует ни появления в общем списке,
-ни автоматического чтения клиентом. Встроенный вариант уже несёт содержимое [10]:
+[docs] This block transmits an address and description. It guarantees neither inclusion in the
+shared list nor automatic reading by the client. The embedded form already carries content [10]:
 
 ```json
 {
@@ -98,56 +99,55 @@
   "resource": {
     "uri": "mail://work/attachment/a42",
     "mimeType": "text/plain",
-    "text": "Краткое отфильтрованное содержимое вложения."
+    "text": "Short filtered attachment content."
   }
 }
 ```
 
-[док] Это примеры отдельных блоков, а не полных JSON-RPC-ответов.
-Двоичные данные ресурса передаются в `blob` как base64; `type: "blob"` отдельным
-блоком результата инструмента не является [2, 10].
+[docs] These examples are individual blocks, not complete JSON-RPC responses. Binary resource
+data is base64 in `blob`; `type: "blob"` is not a separate tool-result block [2, 10].
 
-[предположение] Вложенный ресурс удобен для небольшого текста. Ссылка откладывает передачу
-данных, но последующее чтение целого большого объекта снова может переполнить контекст.
-Ресурс сам по себе не задаёт постраничного чтения тела: это надо проектировать отдельно.
+[assumption] An embedded resource suits small text. A link defers transmission, but reading a
+whole large object afterward can still overflow context. A resource does not itself define
+body paging: that needs separate design.
 
-### В2. Какие клиенты действительно используют ресурсы
+### В2. Which clients actually use resources
 
-Матрица приведена в разделе «Сравнительные таблицы»: семь обязательных/популярных клиентов
-и отдельная строка для настольного ChatGPT. Это проверка документов и исходников,
-а не результат запуска конкретных установленных версий.
+The matrix under Comparison tables covers seven required/popular clients and a separate row
+for desktop ChatGPT. This checks documentation and source code, not particular installed
+versions in operation.
 
-[док] Наиболее явно пользовательский сценарий описан для Claude Code (`@server:URI`)
-и VS Code (`Add Context → MCP Resource`, `MCP: Browse Resources`) [11, 15].
+[docs] The user workflow is most explicitly described for Claude Code (`@server:URI`) and
+VS Code (`Add Context → MCP Resource`, `MCP: Browse Resources`) [11, 15].
 
-[код] В Codex найдены обработчики `list_mcp_resources`, `list_mcp_resource_templates`
-и `read_mcp_resource`. Это подтверждает доступ модели к операциям, но не наличие
-графического выбора шаблона, дополнения его аргументов или автоматического чтения ссылки [16].
+[code] Codex has handlers for `list_mcp_resources`, `list_mcp_resource_templates` and
+`read_mcp_resource`. This confirms model access to the operations, not a graphical template
+picker, argument completion or automatic link reading [16].
 
-[док] Официальный прежний документ MCP описывает ручной выбор ресурсов в Claude Desktop.
-Он полезен как свидетельство базового сценария, но не доказывает состояние всех функций
-настольного клиента в 2026-10-24 [12, 13].
+[docs] The previous official MCP document describes manual resource selection in Claude
+Desktop. It is evidence for the basic workflow, but does not establish the state of every
+desktop feature on 2026-10-24 [12, 13].
 
-[док] Термин «full MCP support» в материалах ChatGPT не следует читать как обещание всех
-ячеек матрицы: текущая справка описывает подключение и вызовы инструментов [18].
-Импорт файлов навыков через `resources/read` — отдельно документированный сценарий,
-причём импортированные файлы являются снимком, а не живыми почтовыми ресурсами [19].
+[docs] "Full MCP support" in ChatGPT materials should not be read as a promise covering every
+matrix cell: current help describes connecting and calling tools [18]. Importing skill files
+through `resources/read` is a separately documented workflow; imported files are snapshots,
+not live mail resources [19].
 
-[док] В текущей справке OpenAI прежний адрес статьи про developer mode перенаправляется
-на «Connecting custom MCP servers in ChatGPT». Описан интерфейс Plugins без обязательного
-включения Developer Mode; старые инструкции и поисковые выдержки могут отставать [18].
+[docs] In current OpenAI help, the former developer mode article redirects to "Connecting
+custom MCP servers in ChatGPT". It describes a Plugins interface without requiring Developer
+Mode; old instructions and search excerpts may lag [18].
 
-### В3. Регистрация ресурсов в Spring AI MCP server 2.x
+### В3. Resource registration in Spring AI MCP server 2.x
 
-**Проверенная база.** [док] Текущая прочитанная справка помечена Spring AI **2.0.2**.
-Анонс 2.0.0 от 2026-06-12 указывает MCP Java SDK 2.0.0 и соответствие MCP 2025-11-25.
-Это подтверждение исходной базы линии 2.x, а не автоматическое обещание MCP 2026-07-28 [21, 27].
+**Verified baseline.** [docs] The current reference read is labeled Spring AI **2.0.2**.
+The 2.0.0 announcement of 2026-06-12 specifies MCP Java SDK 2.0.0 and MCP 2025-11-25 compliance.
+This confirms the 2.x baseline, not automatic support for MCP 2026-07-28 [21, 27].
 
-**Аннотации.** [док] `@McpResource` принимает конкретный URI или шаблон с `{varName}`;
-поддерживает `name`, `title`, `description`, `mimeType`. Возвращать можно строку
-или `ReadResourceResult`. Spring Boot обнаруживает аннотированные Spring beans [21, 22].
+**Annotations.** [docs] `@McpResource` accepts a concrete URI or template with `{varName}`;
+it supports `name`, `title`, `description`, `mimeType`. Return a string or `ReadResourceResult`.
+Spring Boot discovers annotated Spring beans [21, 22].
 
-[предположение] Эскиз объявления для будущего сервера, без реализации чтения:
+[assumption] Declaration sketch for a future server, without a reading implementation:
 
 ```java
 @McpResource(
@@ -155,31 +155,30 @@
     name = "message-text",
     mimeType = "text/plain")
 public ReadResourceResult message(String connection, String id) {
-    // Содержимое получает общий сервис чтения и фильтрации.
+    // The shared reading and filtering service retrieves the content.
 }
 ```
 
-[док] Для дополнения URI есть `@McpComplete(uri = "...")`; аргументы обработчика могут
-включать `CompleteRequest.CompleteArgument`, а результатом быть список строк
-или `CompleteResult` [21].
+[docs] URI completion uses `@McpComplete(uri = "...")`; handler arguments can include
+`CompleteRequest.CompleteArgument`, returning a string list or `CompleteResult` [21].
 
-**Программная регистрация.** [док][код] Доступны следующие варианты [23–26]:
+**Programmatic registration.** [docs][code] Available options [23–26]:
 
-| Что регистрируется | API | Куда попадает |
+| Registered item | API | Destination |
 |---|---|---|
-| Конкретный URI и обработчик | `McpServerFeatures.SyncResourceSpecification` | `resources/list` и обработка чтения |
-| URI-шаблон и обработчик | `McpServerFeatures.SyncResourceTemplateSpecification` | `resources/templates/list` и обработка чтения |
-| Несколько ресурсов в Spring Boot | Bean `List<SyncResourceSpecification>` | Автоконфигурация сервера |
-| Ресурсы и шаблоны напрямую в SDK | `McpServer.sync(...).resources(...).resourceTemplates(...)` | Программная сборка сервера |
+| Concrete URI and handler | `McpServerFeatures.SyncResourceSpecification` | `resources/list` and read handling |
+| URI template and handler | `McpServerFeatures.SyncResourceTemplateSpecification` | `resources/templates/list` and read handling |
+| Several resources in Spring Boot | Bean `List<SyncResourceSpecification>` | Server autoconfiguration |
+| Resources and templates directly in SDK | `McpServer.sync(...).resources(...).resourceTemplates(...)` | Programmatic server construction |
 
-[док] `SyncResourceTemplateSpecification` содержит `ResourceTemplate` и `readHandler`
-с параметрами `McpSyncServerExchange`, `ReadResourceRequest`; есть асинхронные аналоги [24, 26].
-[предположение] Для первой реализации проще аннотации; программный API пригодится,
-если потребуется управлять отдельными объектами каталога во время работы.
+[docs] `SyncResourceTemplateSpecification` contains `ResourceTemplate` and `readHandler` with
+`McpSyncServerExchange`, `ReadResourceRequest` parameters; asynchronous counterparts exist
+[24, 26]. [assumption] Annotations are simpler for an initial implementation; the programmatic
+API is useful if individual catalog objects need runtime management.
 
-**Ссылки из инструментов.** [код] В Java SDK 2.0.1 `McpSchema.ResourceLink` реализует
-`Content`; `CallToolResult.Builder.addContent(...)` принимает такой блок [25].
-[док] Аннотированный инструмент может возвращать сам `CallToolResult` [21].
+**Links from tools.** [code] In Java SDK 2.0.1, `McpSchema.ResourceLink` implements `Content`;
+`CallToolResult.Builder.addContent(...)` accepts this block [25]. [docs] An annotated tool can
+return `CallToolResult` itself [21].
 
 ```java
 var link = McpSchema.ResourceLink.builder()
@@ -188,168 +187,165 @@ var link = McpSchema.ResourceLink.builder()
     .mimeType("text/plain")
     .build();
 return McpSchema.CallToolResult.builder()
-    .addTextContent("Текст доступен через readAttachmentText(work, a42).")
+    .addTextContent("Text is available through readAttachmentText(work, a42).")
     .addContent(link)
     .build();
 ```
 
-[предположение] Это фрагмент тела будущего обработчика, основанный на API [25],
-а не проверенный сборкой пример приложения. Текстовый блок оставляет понятный путь
-чтения клиенту, который не показывает `resource_link` отдельной ссылкой.
+[assumption] This is a future handler body fragment based on API [25], not a build-verified
+application example. The text block leaves a clear reading path for clients that do not
+show `resource_link` as a separate link.
 
-**Ограничения и границы совместимости.**
+**Limits and compatibility boundaries.**
 
-- [док] Для STDIO используется `spring-ai-starter-mcp-server` и
-  `spring.ai.mcp.server.stdio=true`; включение capability ресурсов управляется
-  `spring.ai.mcp.server.capabilities.resource` [22, 23].
-- [док] В режиме `SYNC` реактивные аннотированные методы игнорируются;
-  в `ASYNC` игнорируются синхронные. Нельзя случайно смешивать эти формы [22].
-- [код] В изученном SDK 2.0.1 ещё есть `initialize`, `resources/subscribe`
-  и `resources/unsubscribe`. Для новой редакции протокола нужно отдельно проверить
-  поддержку в фактически выбранной зависимости, а не ориентироваться на номер 2.x [25].
-- [предположение] Регистрация шаблона не должна означать предварительную регистрацию
-  каждого письма. Динамический каталог и уведомления требуют отдельной реализации,
-  а доступность Java-типа ссылки не доказывает её отображение каждым клиентом.
+- [docs] STDIO uses `spring-ai-starter-mcp-server` and `spring.ai.mcp.server.stdio=true`;
+  resource capability is controlled by `spring.ai.mcp.server.capabilities.resource` [22, 23].
+- [docs] In `SYNC` mode, reactive annotated methods are ignored; in `ASYNC`, synchronous methods
+  are ignored. Do not accidentally mix these forms [22].
+- [code] The inspected SDK 2.0.1 still has `initialize`, `resources/subscribe` and
+  `resources/unsubscribe`. Verify support for the new protocol revision in the actual selected
+  dependency, rather than relying on the 2.x version number [25].
+- [assumption] Registering a template must not mean preregistering every message. A dynamic
+  catalog and notifications need separate implementation; having a Java link type does not
+  prove that every client displays it.
 
-### В4. Как существующие серверы передают документы и большие файлы
+### В4. How existing servers deliver documents and large files
 
-Сопоставлены три сервера из официального репозитория MCP; `Everything` — демонстрационный,
-а не свидетельство промышленной поддержки всех форматов клиентами [28–30].
+Three servers from the official MCP repository were compared; `Everything` is a demonstration,
+not evidence that clients support every format in production [28–30].
 
-| Сервер | Как отдаёт данные | Приём для больших данных | Что взять для почты |
+| Server | Data delivery | Large-data approach | What to borrow for mail |
 |---|---|---|---|
-| Filesystem | [код] `read_text_file` возвращает текст; `read_media_file` — блок изображения/аудио либо встроенный ресурс для иных двоичных файлов [28] | [док] Есть `head` / `tail` по строкам; это не универсальное произвольное продолжение | [предположение] Отдельное чтение текста; путь полезен при общем доступе к файловой системе |
-| Fetch | [док][код] Инструмент `fetch` возвращает извлечённый текст страницы, обычно Markdown [29] | `max_length` по умолчанию 5000 и `start_index`; сообщение об усечении предлагает продолжение | [предположение] Ограниченная порция и явное смещение следующей порции |
-| Everything | [код] `get-resource-links` возвращает вводный текст и `resource_link`; `gzip-file-as-resource` позволяет выбрать ссылку или встроенный ресурс [30] | Ссылка откладывает передачу файла; встроенный вариант сразу несёт base64 | [предположение] Пара «короткое описание + ссылка» поверх обычного инструмента чтения |
+| Filesystem | [code] `read_text_file` returns text; `read_media_file` returns an image/audio block or an embedded resource for other binary files [28] | [docs] Line-based `head` / `tail`; not universal arbitrary continuation | [assumption] Separate text reading; a path is useful with shared filesystem access |
+| Fetch | [docs][code] The `fetch` tool returns extracted page text, usually Markdown [29] | `max_length` defaults to 5000 with `start_index`; truncation message suggests continuation | [assumption] Bounded chunks and an explicit next-chunk offset |
+| Everything | [code] `get-resource-links` returns introductory text and `resource_link`; `gzip-file-as-resource` offers a link or embedded resource [30] | A link defers file transmission; the embedded form immediately carries base64 | [assumption] A short description + link on top of the ordinary read tool |
 
-[предположение] Для большого PDF, DOCX или MIME-письма лучше передавать небольшой результат
-поиска и выбранные фрагменты извлечённого текста. Ссылка экономит первоначальный ответ,
-но не решает извлечение текста, ограничения последующего чтения и поддержку формата моделью.
-Сжатый двоичный ресурс из Everything — пример передачи файла, а не способ читать его моделью.
+[assumption] For a large PDF, DOCX or MIME message, prefer a small search result and selected
+extracted-text chunks. A link reduces the initial response, but does not solve extraction,
+subsequent-read limits or model format support. Everything's compressed binary resource is a
+file-transfer example, not a way for the model to read it.
 
-## Сравнительные таблицы
+## Comparison tables
 
-**Обозначения:** «Да» — подтверждение документом или исходником;
-«Частично» — подтверждён только указанный сценарий; «?» — проверить, доказательства
-для этой функции не найдены. «?» не означает отсутствия поддержки.
-В колонке подписок речь об изменении содержимого, а не только `list_changed`.
+**Legend:** Yes — confirmed by documentation or source; Partial — only the stated scenario
+confirmed; ? — to verify, no evidence for this feature found. ? does not mean unsupported.
+The subscription column concerns content changes, not just `list_changed`.
 
-| Клиент | Список ресурсов | Чтение | Шаблоны | Подписки | Ссылки на ресурсы из инструментов | Прикрепление в контекст | Источник |
+| Client | Resource list | Reading | Templates | Subscriptions | Resource links from tools | Attach to context | Source |
 |---|---|---|---|---|---|---|---|
-| Claude Code | Да [док] | Да [док] | ? | ?; обновление списков подтверждено | ? | Да, `@server:URI` [док] | [11] |
-| Claude Desktop, локальный MCP | Да, ручной выбор [док; прежнее руководство] | Да, выбранного ресурса [док; прежнее руководство] | ? | ? | ? | Да, ручной выбор; текущий интерфейс проверить [док] | [12, 13] |
-| Cursor IDE | ?; способ перечисления отдельно не описан | Да, ресурсы заявлены как читаемые [док] | ? | ? | ? | Частично: «read and referenced»; конкретный выбор проверить [док] | [14] |
-| VS Code, GitHub Copilot agent mode | Да [док] | Да [док] | Да, ввод и дополнение аргументов [док] | Да, наблюдение за ресурсом [код]; редакцию RPC проверить | ? | Да, `Add Context → MCP Resource` [док] | [15, 31] |
-| OpenAI Codex CLI | Да [код] | Да [код] | Да, получение списка [код]; дополнение аргументов ? | ? | ? | Частично: чтение моделью; отдельный выбор пользователем ? | [16, 17] |
-| ChatGPT web, custom MCP / прежний developer mode | ? | Частично: импорт файлов навыков [док]; обычная почта ? | ? | ? | ? | ?; выбор приложения не равен выбору ресурса | [18, 19] |
-| ChatGPT desktop, локальный MCP | ? | ? для обычных ресурсов | ? | ? | ? | ? | [17] подтверждает STDIO, но не эти функции |
-| Gemini CLI | Да [док] | Да [док]; двоичные данные обозначаются заглушкой | ? | ? | ? | Частично: чтение моделью; отдельный ручной выбор ? | [20] |
+| Claude Code | Yes [docs] | Yes [docs] | ? | ?; list refresh confirmed | ? | Yes, `@server:URI` [docs] | [11] |
+| Claude Desktop, local MCP | Yes, manual selection [docs; previous guide] | Yes, selected resource [docs; previous guide] | ? | ? | ? | Yes, manual selection; current UI to verify [docs] | [12, 13] |
+| Cursor IDE | ?; listing method not separately described | Yes, resources described as readable [docs] | ? | ? | ? | Partial: "read and referenced"; specific selection to verify [docs] | [14] |
+| VS Code, GitHub Copilot agent mode | Yes [docs] | Yes [docs] | Yes, argument entry and completion [docs] | Yes, resource watching [code]; RPC revision to verify | ? | Yes, `Add Context → MCP Resource` [docs] | [15, 31] |
+| OpenAI Codex CLI | Yes [code] | Yes [code] | Yes, listing [code]; argument completion ? | ? | ? | Partial: model reading; separate user selection ? | [16, 17] |
+| ChatGPT web, custom MCP / previous developer mode | ? | Partial: skill file import [docs]; ordinary mail ? | ? | ? | ? | ?; selecting an app is not selecting a resource | [18, 19] |
+| ChatGPT desktop, local MCP | ? | ? for ordinary resources | ? | ? | ? | ? | [17] confirms STDIO, not these features |
+| Gemini CLI | Yes [docs] | Yes [docs]; binary data represented by a placeholder | ? | ? | ? | Partial: model reading; separate manual selection ? | [20] |
 
-**Как читать ограничения.**
+**Interpreting the limitations.**
 
-- [док] Claude Code обновляет списки по `list_changed`; в неинтерактивном режиме и
-  Agent SDK описано обновление только списка инструментов. Это не подтверждает подписки
-  на содержимое ресурса [11].
-- [код] VS Code при наблюдении проверяет `ResourcesSubscribe`, вызывает `handler.subscribe`
-  и обрабатывает `onDidUpdateResource`. Это доказательство поведения клиента,
-  но не обещание реализации нового `subscriptions/listen` в любой версии VS Code [31].
-- [предположение] Все «?» требуют отдельной проверки: `resource_link` может дойти
-  до модели как данные, отображаться карточкой или вообще не иметь удобного действия чтения.
-  Наличие `resources/read` не доказывает конкретный вариант интерфейса.
-- [док] ChatGPT web использует HTTPS/Tunnel [18]; актуальная общая инструкция отдельно
-  разрешает STDIO в настольном приложении [17]. Нельзя смешивать эти способы подключения.
+- [docs] Claude Code refreshes lists on `list_changed`; noninteractive mode and Agent SDK
+  describe refreshing only the tool list. This does not confirm resource-content subscriptions
+  [11].
+- [code] When watching, VS Code checks `ResourcesSubscribe`, calls `handler.subscribe` and
+  handles `onDidUpdateResource`. This proves client behavior, not support for the new
+  `subscriptions/listen` in every VS Code version [31].
+- [assumption] Every ? needs separate verification: `resource_link` may reach the model as
+  data, appear as a card, or lack a convenient read action. Having `resources/read` does not
+  establish a particular UI.
+- [docs] ChatGPT web uses HTTPS/Tunnel [18]; current general instructions separately allow
+  STDIO in the desktop app [17]. These connection methods must not be conflated.
 
-## Рекомендация
+## Recommendation
 
-Это предложение для обсуждения [plan.md, 5.5](../plan.md#55-письма-как-mcp-ресурсы),
-а не принятое решение.
+This is a proposal for discussion in [plan.md](../plan.md), former section 5.5
+("Messages as MCP resources"), not an accepted decision.
 
-1. [предположение] **Основной контракт — инструменты.** Поиск возвращает идентификаторы,
-   краткие отфильтрованные выдержки и метаданные; чтение тела и текста вложений принимает
-   ограничение длины и смещение. В ответе нужны `truncated`, `nextOffset`, версия содержимого.
-   Так чтение продолжится без обязательной поддержки шаблонов или ссылок клиентом.
-2. [предположение] **Ресурсы — дополнительный способ выбора контекста.** Сохранить
-   семейства URI из В1, выдавать ограниченный каталог уже доступных объектов и шаблоны.
-   Обработчики ресурсов и инструментов должны обращаться к одному сервису фильтрации.
-3. [предположение] **`resource_link` — дополнение к результату инструмента.** Вместе
-   со ссылкой возвращать короткий обычный текст и способ прочитать объект инструментом.
-   Не делать успешное выполнение задачи зависимым от автоматического открытия ссылки.
-4. [предположение] **`localPath` — вспомогательное поле.** Оно полезно локальному агенту,
-   если тот имеет файловый доступ, но само по себе не передаёт файл в модель и не помогает
-   удалённому клиенту. Для модели выдавать путь только к отфильтрованному тексту;
-   путь к исходному MIME или вложению позволил бы обойти фильтр проекта.
-5. [предположение] **Большое содержимое читать частями.** У ресурса извлечённого текста
-   явно указать MIME и представление; исходное вложение и текст не должны незаметно
-   подменять друг друга. Для слишком большого ресурса выдавать понятную ошибку и указание
-   инструмента чтения частями, а не неотмеченное усечение.
-6. [предположение] **Подписки отложить до потребности.** Для неизменяемых сохранённых
-   представлений они мало полезны. Сначала проверить выбранные версии Spring AI и клиентов;
-   не объявлять capability, для которой нет работающего обработчика.
+1. [assumption] **Tools are the primary contract.** Search returns identifiers, short filtered
+   excerpts and metadata; body/attachment text reading takes a length limit and offset. Responses
+   need `truncated`, `nextOffset` and a content version. Reading can continue without requiring
+   client support for templates or links.
+2. [assumption] **Resources supplement context selection.** Keep the URI families from В1,
+   return a bounded catalog of available objects and templates. Resource and tool handlers
+   should use one filtering service.
+3. [assumption] **`resource_link` supplements tool results.** Return short ordinary text and a
+   way to read the object through a tool alongside the link. Task success must not depend on
+   automatically opening the link.
+4. [assumption] **`localPath` is auxiliary.** It helps a local agent with file access, but does
+   not itself transmit a file to the model or help remote clients. Give the model paths only
+   to filtered text; a path to original MIME/attachments would bypass the project's filter.
+5. [assumption] **Read large content in chunks.** Explicitly state MIME type and representation
+   for extracted-text resources; original attachments and text must not silently replace one
+   another. For an oversized resource, return a clear error and point to the chunked-read tool,
+   rather than silently truncating it.
+6. [assumption] **Defer subscriptions until needed.** They add little for immutable saved
+   representations. First check the selected Spring AI and client versions; do not declare a
+   capability without a working handler.
 
-Обоснование: [док][код] инструменты чтения применяют Filesystem и Fetch [28, 29],
-а полезный пользовательский сценарий ресурсов подтверждён для Claude Code и VS Code [11, 15].
-[предположение] Компромисс — два способа доступа к одному объекту и необходимость сохранять
-единые ограничения. Польза — работа без зависимости от самых слабо документированных ячеек.
+Rationale: [docs][code] Filesystem and Fetch use read tools [28, 29], and useful resource
+workflows are confirmed for Claude Code and VS Code [11, 15]. [assumption] The tradeoff is two
+access paths to one object and the need to maintain shared limits. The benefit is working
+without relying on the least documented matrix cells.
 
-## Что не удалось проверить
+## What could not be verified
 
-- Точные версии установленных клиентов и фактическое отображение `resource_link` во всех
-  восьми строках: запуск клиентов исключён брифом. Проверить позже на искусственных файлах.
-- Все «?» матрицы, включая шаблоны Claude Desktop/Cursor, ручной выбор в CLI,
-  подписки и обычные ресурсы ChatGPT: найденные документы не дают достаточного подтверждения.
-- Поддержку MCP 2026-07-28 конкретным будущим набором Spring AI / Java SDK:
-  документация 2.x и проверенный SDK не являются доказательством такой совместимости.
-- Эскизы Java не компилировались: приложение и сборка в репозитории отсутствуют;
-  добавлять их задача не разрешает. API проверен по указанным документам и исходникам.
-- Поведение двоичных MIME/PDF и пределы размера у каждого клиента: нет единого обещания
-  прочитать любой `blob`. Нужны отдельные проверки на несекретных данных.
+- Exact installed client versions and actual `resource_link` display across all eight rows:
+  the brief excludes running clients. Check later with synthetic files.
+- Every ? in the matrix, including Claude Desktop/Cursor templates, manual CLI selection,
+  subscriptions and ordinary ChatGPT resources: the documents found give insufficient evidence.
+- MCP 2026-07-28 support in the specific future Spring AI / Java SDK combination: 2.x
+  documentation and the inspected SDK do not establish that compatibility.
+- Java sketches were not compiled: no application or build exists in the repository, and the
+  task does not allow adding them. APIs were checked against the cited documents and source.
+- Binary MIME/PDF handling and size limits in each client: there is no universal promise to
+  read any `blob`. Separate checks on nonsecret data are needed.
 
-[предположение] Для будущей проверки достаточно маленького тестового сервера с конкретным
-ресурсом, шаблоном, дополнением и инструментом, возвращающим текст, ссылку и встроенный ресурс.
-Проверить чтение URI вне списка, изменение каталога и содержимого, большой текст и бинарный файл;
-фиксировать версию клиента и согласованную редакцию протокола. В этой сессии сервер не создавался.
+[assumption] A future check needs only a small test server with a concrete resource, template,
+completion and a tool returning text, a link and an embedded resource. Check reading a URI absent
+from the list, catalog/content changes, large text and a binary file; record the client version
+and negotiated protocol revision. No server was created in this session.
 
-## Что ещё стоит изучить
+## Further research
 
-- [предположение] Правила стабильности URI при пересоздании индекса и смене версии фильтра.
-- [предположение] Нужен ли пользователю отдельный экспорт исходных вложений вне контекста модели.
-- [док] Prompts и sampling — отдельные возможности MCP, здесь не исследовались [1].
+- [assumption] URI stability rules when rebuilding indexes or changing filter versions.
+- [assumption] Whether the user needs a separate original-attachment export outside model context.
+- [docs] Prompts and sampling are separate MCP capabilities, not studied here [1].
 
-## Источники
+## Sources
 
-Все ссылки прочитаны **2026-10-24**. Если дата публикации не указана, источник — текущая
-страница без явной даты; `main` означает состояние исходников при чтении, не номер релиза.
-Поисковые выдержки не использованы как доказательство текущего состояния продукта.
+All links were read on **2026-10-24**. Without a stated publication date, a source is the current
+undated page; `main` denotes the source state when read, not a release number. Search excerpts
+were not used as evidence of current product behavior.
 
-1. MCP, Key Changes — [редакция 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/changelog); дата редакции 2026-07-28.
-2. MCP, Resources — [редакция 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/server/resources); дата редакции 2026-07-28.
-3. MCP, Resources — [редакция 2024-11-05](https://modelcontextprotocol.io/specification/2024-11-05/server/resources); дата редакции 2024-11-05.
-4. MCP, Completion — [редакция 2024-11-05](https://modelcontextprotocol.io/specification/2024-11-05/server/utilities/completion); дата редакции 2024-11-05.
-5. MCP, Tools — [редакция 2024-11-05](https://modelcontextprotocol.io/specification/2024-11-05/server/tools); дата редакции 2024-11-05.
-6. MCP, Key Changes — [редакция 2025-03-26](https://modelcontextprotocol.io/specification/2025-03-26/changelog); дата редакции 2025-03-26.
-7. MCP, Key Changes — [редакция 2025-06-18](https://modelcontextprotocol.io/specification/2025-06-18/changelog); дата редакции 2025-06-18.
-8. MCP, Key Changes — [редакция 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/changelog); дата редакции 2025-11-25.
-9. MCP, Completion — [редакция 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/server/utilities/completion); дата редакции 2026-07-28.
-10. MCP, Tools — [редакция 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/server/tools); дата редакции 2026-07-28.
-11. Anthropic, Connect Claude Code to tools via MCP — [официальная справка](https://code.claude.com/docs/en/mcp), разделы Use MCP resources, Dynamic tool updates, Notification streams; без явной даты публикации.
-12. MCP, прежнее руководство Resources — [исходник `docs/concepts/resources.mdx`](https://raw.githubusercontent.com/modelcontextprotocol/docs/main/docs/concepts/resources.mdx), `main`; явная дата публикации отсутствует, руководство описывает прежний протокол.
-13. Anthropic, Getting Started with Local MCP Servers on Claude Desktop — [официальная справка](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop); страница показывает обновление в день чтения, 2026-10-24.
-14. Cursor, Model Context Protocol — [официальная справка](https://cursor.com/docs/mcp), таблица Protocol and extension support; без явной даты публикации.
-15. Microsoft, MCP developer guide — [официальная справка VS Code](https://code.visualstudio.com/api/extension-guides/ai/mcp), разделы Resources и Resource templates; без явной даты публикации.
-16. OpenAI Codex, `codex-rs/core/src/tools/handlers/` — [`mcp_resource.rs`](https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/src/tools/handlers/mcp_resource.rs), [`list_mcp_resource_templates.rs`](https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/src/tools/handlers/mcp_resource/list_mcp_resource_templates.rs), [`read_mcp_resource.rs`](https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/src/tools/handlers/mcp_resource/read_mcp_resource.rs), `main`; без привязки к установленной версии CLI.
-17. OpenAI, Model Context Protocol — [актуальная общая справка](https://learn.chatgpt.com/docs/extend/mcp?surface=chatgpt), разделы Configure in the ChatGPT desktop app и Configure with the CLI; без явной даты публикации.
-18. OpenAI, Connecting custom MCP servers in ChatGPT — [официальная справка](https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt); при чтении дата обновления отображалась относительно времени, абсолютная дата публикации не указана.
-19. OpenAI, Build an MCP server — [официальная справка Plugins](https://developers.openai.com/plugins/build/mcp-server), раздел Return every listed resource; без явной даты публикации.
-20. Google, MCP resource tools — [официальная справка Gemini CLI](https://geminicli.com/docs/tools/mcp-resources/); без явной даты публикации.
-21. Spring AI, MCP Server Annotations — [справка 2.0.2](https://docs.spring.io/spring-ai/reference/api/mcp/mcp-annotations-server.html); версия в заголовке страницы, дата публикации отсутствует.
-22. Spring AI, MCP Server Boot Starter — [справка 2.0.2](https://docs.spring.io/spring-ai/reference/api/mcp/mcp-server-boot-starter-docs.html); без явной даты публикации.
-23. Spring AI, STDIO/SSE Server Boot Starter — [справка](https://docs.spring.io/spring-ai/reference/api/mcp/mcp-stdio-sse-server-boot-starter-docs.html), свойства и раздел Resources; без явной даты публикации.
-24. MCP Java SDK Core 2.0.1 — [Javadoc `SyncResourceTemplateSpecification`](https://javadoc.io/static/io.modelcontextprotocol.sdk/mcp-core/2.0.1/io/modelcontextprotocol/server/McpServerFeatures.SyncResourceTemplateSpecification.html); версия 2.0.1, дата релиза на странице не указана.
-25. MCP Java SDK, `McpSchema.java` — [исходник v2.0.1](https://raw.githubusercontent.com/modelcontextprotocol/java-sdk/v2.0.1/mcp-core/src/main/java/io/modelcontextprotocol/spec/McpSchema.java), `ResourceLink`, `CallToolResult.Builder`, константы методов; дата релиза отдельно не установлена.
-26. MCP Java SDK, `McpServer.java` — [исходник v2.0.1](https://raw.githubusercontent.com/modelcontextprotocol/java-sdk/v2.0.1/mcp-core/src/main/java/io/modelcontextprotocol/server/McpServer.java), регистрация ресурсов и шаблонов; дата релиза отдельно не установлена.
-27. Spring, Spring AI 2.0.0 GA Available Now — [анонс](https://spring.io/blog/2026/06/12/spring-ai-2-0-0-GA-available-now/); опубликован 2026-06-12.
-28. MCP Filesystem — [`README.md`](https://github.com/modelcontextprotocol/servers/blob/main/src/filesystem/README.md) и [`server.ts`](https://raw.githubusercontent.com/modelcontextprotocol/servers/main/src/filesystem/server.ts), `main`; без привязки к опубликованной версии пакета.
-29. MCP Fetch — [`README.md`](https://github.com/modelcontextprotocol/servers/blob/main/src/fetch/README.md) и [`server.py`](https://raw.githubusercontent.com/modelcontextprotocol/servers/main/src/fetch/src/mcp_server_fetch/server.py), `main`; без привязки к опубликованной версии пакета.
-30. MCP Everything — [`get-resource-links.ts`](https://raw.githubusercontent.com/modelcontextprotocol/servers/main/src/everything/tools/get-resource-links.ts) и [`gzip-file-as-resource.ts`](https://raw.githubusercontent.com/modelcontextprotocol/servers/main/src/everything/tools/gzip-file-as-resource.ts), `main`; демонстрационные обработчики, без привязки к релизу.
-31. Microsoft VS Code, `McpResourceFilesystem.watch` — [исходник `mcpResourceFilesystem.ts`](https://raw.githubusercontent.com/microsoft/vscode/main/src/vs/workbench/contrib/mcp/common/mcpResourceFilesystem.ts), `main`; без привязки к установленной версии VS Code.
-32. MCP, Resources — [редакция 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/server/resources); дата редакции 2025-11-25.
+1. MCP, Key Changes — [revision 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/changelog); revision dated 2026-07-28.
+2. MCP, Resources — [revision 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/server/resources); revision dated 2026-07-28.
+3. MCP, Resources — [revision 2024-11-05](https://modelcontextprotocol.io/specification/2024-11-05/server/resources); revision dated 2024-11-05.
+4. MCP, Completion — [revision 2024-11-05](https://modelcontextprotocol.io/specification/2024-11-05/server/utilities/completion); revision dated 2024-11-05.
+5. MCP, Tools — [revision 2024-11-05](https://modelcontextprotocol.io/specification/2024-11-05/server/tools); revision dated 2024-11-05.
+6. MCP, Key Changes — [revision 2025-03-26](https://modelcontextprotocol.io/specification/2025-03-26/changelog); revision dated 2025-03-26.
+7. MCP, Key Changes — [revision 2025-06-18](https://modelcontextprotocol.io/specification/2025-06-18/changelog); revision dated 2025-06-18.
+8. MCP, Key Changes — [revision 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/changelog); revision dated 2025-11-25.
+9. MCP, Completion — [revision 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/server/utilities/completion); revision dated 2026-07-28.
+10. MCP, Tools — [revision 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/server/tools); revision dated 2026-07-28.
+11. Anthropic, Connect Claude Code to tools via MCP — [official reference](https://code.claude.com/docs/en/mcp), Use MCP resources, Dynamic tool updates and Notification streams sections; no explicit publication date.
+12. MCP, previous Resources guide — [source `docs/concepts/resources.mdx`](https://raw.githubusercontent.com/modelcontextprotocol/docs/main/docs/concepts/resources.mdx), `main`; no explicit publication date, describes the previous protocol.
+13. Anthropic, Getting Started with Local MCP Servers on Claude Desktop — [official help](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop); the page shows an update on the reading date, 2026-10-24.
+14. Cursor, Model Context Protocol — [official reference](https://cursor.com/docs/mcp), Protocol and extension support table; no explicit publication date.
+15. Microsoft, MCP developer guide — [official VS Code reference](https://code.visualstudio.com/api/extension-guides/ai/mcp), Resources and Resource templates sections; no explicit publication date.
+16. OpenAI Codex, `codex-rs/core/src/tools/handlers/` — [`mcp_resource.rs`](https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/src/tools/handlers/mcp_resource.rs), [`list_mcp_resource_templates.rs`](https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/src/tools/handlers/mcp_resource/list_mcp_resource_templates.rs), [`read_mcp_resource.rs`](https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/src/tools/handlers/mcp_resource/read_mcp_resource.rs), `main`; not tied to the installed CLI version.
+17. OpenAI, Model Context Protocol — [current general reference](https://learn.chatgpt.com/docs/extend/mcp?surface=chatgpt), Configure in the ChatGPT desktop app and Configure with the CLI sections; no explicit publication date.
+18. OpenAI, Connecting custom MCP servers in ChatGPT — [official help](https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt); the update date was relative when read, with no absolute publication date.
+19. OpenAI, Build an MCP server — [official Plugins reference](https://developers.openai.com/plugins/build/mcp-server), Return every listed resource section; no explicit publication date.
+20. Google, MCP resource tools — [official Gemini CLI reference](https://geminicli.com/docs/tools/mcp-resources/); no explicit publication date.
+21. Spring AI, MCP Server Annotations — [2.0.2 reference](https://docs.spring.io/spring-ai/reference/api/mcp/mcp-annotations-server.html); version in the page heading, no publication date.
+22. Spring AI, MCP Server Boot Starter — [2.0.2 reference](https://docs.spring.io/spring-ai/reference/api/mcp/mcp-server-boot-starter-docs.html); no explicit publication date.
+23. Spring AI, STDIO/SSE Server Boot Starter — [reference](https://docs.spring.io/spring-ai/reference/api/mcp/mcp-stdio-sse-server-boot-starter-docs.html), properties and Resources section; no explicit publication date.
+24. MCP Java SDK Core 2.0.1 — [Javadoc `SyncResourceTemplateSpecification`](https://javadoc.io/static/io.modelcontextprotocol.sdk/mcp-core/2.0.1/io/modelcontextprotocol/server/McpServerFeatures.SyncResourceTemplateSpecification.html); version 2.0.1, release date not stated on the page.
+25. MCP Java SDK, `McpSchema.java` — [v2.0.1 source](https://raw.githubusercontent.com/modelcontextprotocol/java-sdk/v2.0.1/mcp-core/src/main/java/io/modelcontextprotocol/spec/McpSchema.java), `ResourceLink`, `CallToolResult.Builder`, method constants; release date not separately established.
+26. MCP Java SDK, `McpServer.java` — [v2.0.1 source](https://raw.githubusercontent.com/modelcontextprotocol/java-sdk/v2.0.1/mcp-core/src/main/java/io/modelcontextprotocol/server/McpServer.java), resource and template registration; release date not separately established.
+27. Spring, Spring AI 2.0.0 GA Available Now — [announcement](https://spring.io/blog/2026/06/12/spring-ai-2-0-0-GA-available-now/); published 2026-06-12.
+28. MCP Filesystem — [`README.md`](https://github.com/modelcontextprotocol/servers/blob/main/src/filesystem/README.md) and [`server.ts`](https://raw.githubusercontent.com/modelcontextprotocol/servers/main/src/filesystem/server.ts), `main`; not tied to a published package version.
+29. MCP Fetch — [`README.md`](https://github.com/modelcontextprotocol/servers/blob/main/src/fetch/README.md) and [`server.py`](https://raw.githubusercontent.com/modelcontextprotocol/servers/main/src/fetch/src/mcp_server_fetch/server.py), `main`; not tied to a published package version.
+30. MCP Everything — [`get-resource-links.ts`](https://raw.githubusercontent.com/modelcontextprotocol/servers/main/src/everything/tools/get-resource-links.ts) and [`gzip-file-as-resource.ts`](https://raw.githubusercontent.com/modelcontextprotocol/servers/main/src/everything/tools/gzip-file-as-resource.ts), `main`; demonstration handlers, not tied to a release.
+31. Microsoft VS Code, `McpResourceFilesystem.watch` — [source `mcpResourceFilesystem.ts`](https://raw.githubusercontent.com/microsoft/vscode/main/src/vs/workbench/contrib/mcp/common/mcpResourceFilesystem.ts), `main`; not tied to the installed VS Code version.
+32. MCP, Resources — [revision 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/server/resources); revision dated 2025-11-25.

@@ -222,7 +222,7 @@ encrypting it is `docs/backlog.md` Д27.
 
 `testdata/mime/` has 20 MIME cases, `testdata/redaction/` has 256 detector cases and 8 mixed
 documents, and `testdata/search/` has 48 messages with 80 control queries. Each directory has an
-English README, JSON expectations and a complete manifest. Russian reports are in
+English README, JSON expectations and a complete manifest. Research reports are in
 `docs/research/RT-11-synthetic-mime.md`, `RT-12-redaction-samples.md`, `RT-13-search-queries.md`.
 Helper generators/validators stay under ignored `testdata/.work/`; only data is tracked.
 They feed `MimeReaderTest`, `SearchControlSetTest` and `SecretRedactorTest`. The latter checks

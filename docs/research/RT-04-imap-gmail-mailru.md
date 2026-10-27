@@ -1,439 +1,308 @@
-# RT-04 — Доступ к Gmail и Mail.ru по IMAP
+# RT-04 — Access to Gmail and Mail.ru over IMAP
 
-- Дата: 2026-10-24
-- Исполнитель: Codex, исследовательская сессия RT-04
-- Бриф: [RT-04-imap-gmail-mailru.md](../research-tasks/RT-04-imap-gmail-mailru.md)
-- Метод: публичная документация, RFC и исходный код; подключений к почтовым серверам не было.
+- Date: 2026-10-24
+- Author: Codex, RT-04 research session
+- Brief: `docs/research-tasks/RT-04-imap-gmail-mailru.md` (historical path)
+- Method: public documentation, RFCs, and source code; no connections to mail servers were made.
 
-## Кратко
+## Summary
 
-- [док] Gmail принимает пароль приложения при включённой двухэтапной проверке либо OAuth2
-  через XOAUTH2. Пароли приложений не отменены, но доступны не каждому аккаунту [1–3].
-- [док] Для личного Gmail IMAP постоянно включён с января 2025 года. В Workspace доступ
-  контролирует администратор; обычный пароль аккаунта больше не подходит [2, 8, 9].
-- [док] OAuth для IMAP требует широкой области доступа (scope) `https://mail.google.com/`.
-  Для личного приложения есть исключение из проверки Google; режим Testing всё равно
-  ограничивает токен обновления (refresh token) семью днями [3, 5–7, 33].
-- [док] Метки Gmail представлены папками. [предположение] Хранить MIME один раз по
-  `(connection, X-GM-MSGID)`, а принадлежность папкам — отдельно [10, 34].
-- [док] Google публикует для Workspace лимит скачивания IMAP 2500 MB/сутки; для личного
-  Gmail это ориентир, а не подтверждённая квота. Учитывать также предел 15 клиентов [2, 12].
-- [док] Mail.ru: `imap.mail.ru:993`, TLS, пароль внешнего приложения, привязанный телефон.
-  [код] OAuth для IMAP существует в Thunderbird; допуск собственного клиента не проверен [16–19].
-- [вторично] У Mail.ru исторически есть MOVE и UIDPLUS, но нет IDLE; актуальные CONDSTORE,
-  QRESYNC и SPECIAL-USE не подтверждены. Нужен обычный опрос и проверка CAPABILITY [20].
-- [док][код] Angus Mail 2.0.5, выпущенный 2026-02-27, покрывает необходимые операции.
-  Читать через `Folder.READ_ONLY` и `BODY.PEEK`, явно запретить команды изменения [22–27].
-- [предположение] Рекомендация для личного MVP: пароль приложения у обоих провайдеров,
-  если доступен; предусмотреть OAuth2 для Gmail. Синхронизация должна работать без расширений,
-  ускоряясь через CONDSTORE/QRESYNC только после их обнаружения [1, 16, 29, 30].
+- [docs] Gmail accepts an app password when two-step verification is enabled, or OAuth2 via XOAUTH2. App passwords have not been discontinued, but are not available to every account [1–3].
+- [docs] IMAP has been permanently enabled for personal Gmail since January 2025. In Workspace, access is controlled by the administrator; the ordinary account password no longer works [2, 8, 9].
+- [docs] IMAP OAuth requires the broad `https://mail.google.com/` scope. Personal-use apps are exempt from Google verification; Testing mode still limits the refresh token to seven days [3, 5–7, 33].
+- [docs] Gmail labels are represented as folders. [assumption] Store MIME once by `(connection, X-GM-MSGID)` and track folder membership separately [10, 34].
+- [docs] Google publishes an IMAP download limit of 2500 MB/day for Workspace; for personal Gmail this is a reference point, not a confirmed quota. Also account for the 15-client limit [2, 12].
+- [docs] Mail.ru: `imap.mail.ru:993`, TLS, external-app password, and a linked phone. [code] OAuth for IMAP exists in Thunderbird; eligibility for a custom client has not been verified [16–19].
+- [secondary] Mail.ru historically supports MOVE and UIDPLUS, but not IDLE; current CONDSTORE, QRESYNC, and SPECIAL-USE support is unconfirmed. Polling and CAPABILITY checks are needed [20].
+- [docs][code] Angus Mail 2.0.5, released 2026-02-27, covers the required operations. Read with `Folder.READ_ONLY` and `BODY.PEEK`, and explicitly forbid mutating commands [22–27].
+- [assumption] Recommendation for a personal MVP: use an app password with both providers if available; provide OAuth2 for Gmail. Synchronization must work without extensions, using CONDSTORE/QRESYNC only as accelerations after detection [1, 16, 29, 30].
 
-## Ответы на вопросы
+## Answers to the questions
 
-### В1. Gmail: способы входа, OAuth и ограничения
+### В1. Gmail: sign-in methods, OAuth, and restrictions
 
-**Пароль приложения.** [док] Нужна 2-Step Verification. Опция может отсутствовать, если
-используются только аппаратные ключи безопасности, организационный аккаунт или Advanced
-Protection. Google рекомендует Sign in with Google; смена основного пароля отзывает пароли
-приложений. В текущей справке нет объявления об их общей отмене [1].
+**App password.** [docs] 2-Step Verification is required. The option may be unavailable if only hardware security keys are used, for an organizational account, or with Advanced Protection. Google recommends Sign in with Google; changing the main password revokes app passwords. Current help does not announce their general discontinuation [1].
 
-**OAuth2.** [док] Для IMAP нужен `https://mail.google.com/`, механизм `AUTHENTICATE XOAUTH2`.
-Передаётся токен доступа (access token); токен обновления используется отдельно для его
-обновления. `gmail.readonly` предназначен для Gmail API и не заменяет разрешение IMAP [3, 33].
+**OAuth2.** [docs] IMAP requires `https://mail.google.com/` and the `AUTHENTICATE XOAUTH2` mechanism. An access token is passed; the refresh token is used separately to renew it. `gmail.readonly` is for the Gmail API and does not replace the IMAP permission [3, 33].
 
-Порядок подготовки собственного локального приложения:
+Preparation steps for a custom local application:
 
-| Шаг | Что требуется | Основание |
+| Step | Requirement | Basis |
 |---|---|---|
-| Регистрация | Google Cloud project, OAuth client типа Desktop app, настройки согласия и доступа к данным | [док] [4] |
-| Личный аккаунт | Аудитория External; Internal предназначена для организации | [док] [7] |
-| Разработка | Testing, пользователь добавлен в test users; максимум 100 тестировщиков | [док] [7] |
-| Вход | Системный браузер, authorization code, PKCE; локальный loopback callback поддерживается для Desktop app | [док] [4] |
-| Длительная работа | Запросить offline access и сохранить refresh token вне репозитория; предусмотреть повторное согласие | [док] [4, 5] |
-| Выход из Testing | Для длительной личной эксплуатации — Published / In production; проверка Google и публикационный статус являются разными свойствами | [док] [6, 7] |
+| Registration | Google Cloud project, Desktop app OAuth client, consent and data-access settings | [docs] [4] |
+| Personal account | External audience; Internal is for an organization | [docs] [7] |
+| Development | Testing, user added to test users; maximum 100 testers | [docs] [7] |
+| Sign-in | System browser, authorization code, PKCE; local loopback callback supported for Desktop apps | [docs] [4] |
+| Long-running use | Request offline access and store the refresh token outside the repository; allow for renewed consent | [docs] [4, 5] |
+| Leaving Testing | For sustained personal use, use Published / In production; verification and publication status are separate properties | [docs] [6, 7] |
 
-[док] External + Testing выдаёт refresh token на **7 дней**; исключение для доступа только
-к базовым данным профиля к почте не относится. В production refresh token тоже может перестать
-работать: отзыв доступа, шесть месяцев неиспользования, смена пароля при Gmail scopes,
-ограничения администратора или количества токенов [5].
+[docs] External + Testing issues a refresh token valid for **7 days**; the exception for access to basic profile data does not apply to mail. In production, a refresh token can still stop working because access was revoked, it was unused for six months, the password changed with Gmail scopes, an administrator imposed restrictions, or the token limit was reached [5].
 
-[док] `https://mail.google.com/` — ограниченная область доступа (restricted scope). Для приложения только для себя или
-немногих лично знакомых пользователей есть исключение из проверки. Сохраняются
-предупреждение о непроверенном приложении и ограничения числа пользователей [6, 7, 33].
+[docs] `https://mail.google.com/` is a restricted scope. Apps used only by their owner or a few personally known users are exempt from verification. The unverified-app warning and user-count limits still apply [6, 7, 33].
 
-[док] При публичном распространении исключение для личного использования нельзя считать
-общим разрешением. Проверка restricted scopes и, при работе с данными через сторонний
-сервер, оценка безопасности рассматриваются отдельно. Google требует обосновать полный
-почтовый scope и предлагает Gmail API при достаточности более узких разрешений [3, 6].
+[docs] For public distribution, the personal-use exception must not be treated as general permission. Restricted-scope verification and, when data is handled through a third-party server, a security assessment are considered separately. Google requires justification for the full-mail scope and recommends the Gmail API when narrower permissions suffice [3, 6].
 
-[предположение] Для локального сервера одного владельца пароль приложения уменьшает
-объём настройки. Публичный выпуск с OAuth требует отдельной оценки, включая передачу
-содержимого писем через MCP внешнему клиенту или модели; личное исключение не следует
-автоматически переносить на такой выпуск [3, 6].
+[assumption] For a local server owned by one person, an app password reduces setup. A public OAuth release needs a separate assessment, including the transfer of message content through MCP to an external client or model; the personal-use exception should not automatically be carried over to such a release [3, 6].
 
-**Workspace.** [док] Администратор разрешает IMAP и может ограничивать OAuth-клиенты.
-Internal-приложения организации имеют другой режим проверки; для личного Gmail он недоступен.
-Пароль приложения зависит от политики аккаунта и не гарантирован [1, 7, 8].
+**Workspace.** [docs] The administrator permits IMAP and can restrict OAuth clients. Internal apps in an organization have a different verification mode, unavailable to personal Gmail. App passwords depend on account policy and are not guaranteed [1, 7, 8].
 
-[док] Две официальные страницы называют разные даты прекращения обычного парольного
-доступа: 2025-03-14 [9] и 2025-05-01 [8]. Первая прямо сохраняет исключение для app passwords.
-Для проектирования на 2026-10-24 общий вывод одинаков: основной пароль не использовать;
-это не объявление об отмене специальных паролей приложений [8, 9].
+[docs] Two official pages give different dates for ending ordinary password access: 2025-03-14 [9] and 2025-05-01 [8]. The first explicitly retains an exception for app passwords. For design as of 2026-10-24, the conclusion is the same: do not use the main password; this is not an announcement that special app passwords are being discontinued [8, 9].
 
-### В2. Нужно ли включать IMAP в Gmail
+### В2. Whether IMAP must be enabled in Gmail
 
-[док] Для **личных** аккаунтов переключатель Enable/Disable IMAP убран с января 2025 года:
-IMAP всегда включён. Это не отменяет требований к способу входа [2].
+[docs] For **personal** accounts, the Enable/Disable IMAP toggle was removed in January 2025: IMAP is always enabled. This does not remove sign-in requirements [2].
 
-[док] Для Workspace доступ включается в Admin console [8]. Сохранившееся поле `enabled`
-в справочнике Gmail API [14] не доказывает наличие переключателя в личном интерфейсе;
-здесь следует руководствоваться прямой инструкцией для личных аккаунтов [2].
+[docs] In Workspace, access is enabled in the Admin console [8]. The remaining `enabled` field in the Gmail API reference [14] does not prove that personal accounts have a UI toggle; follow the direct personal-account instructions [2].
 
-### В3. Расширения Gmail
+### В3. Gmail extensions
 
-[док] `X-GM-EXT-1` объявляет набор Gmail-расширений [10]:
+[docs] `X-GM-EXT-1` advertises the set of Gmail extensions [10]:
 
-| Элемент | Назначение |
+| Element | Purpose |
 |---|---|
-| `X-GM-MSGID` | Общий идентификатор письма во всех папках; 64-битное беззнаковое число |
-| `X-GM-THRID` | Идентификатор цепочки, также 64-битный; не идентификатор отдельного письма |
-| `X-GM-LABELS` | Метки письма в FETCH; изменение через STORE запрещаем |
-| `X-GM-RAW` | Поиск синтаксисом Gmail через SEARCH / UID SEARCH |
+| `X-GM-MSGID` | Shared message identifier across all folders; unsigned 64-bit number |
+| `X-GM-THRID` | Thread identifier, also 64-bit; not an individual message identifier |
+| `X-GM-LABELS` | Message labels in FETCH; changes via STORE are forbidden |
+| `X-GM-RAW` | Gmail-syntax search through SEARCH / UID SEARCH |
 
-[предположение] Оба Gmail ID безопаснее хранить десятичной строкой: не теряются разряды
-в JSON-клиентах и не возникает зависимости от знакового `long` [10].
+[assumption] Store both Gmail IDs as decimal strings to avoid losing precision in JSON clients and depending on signed `long` [10].
 
-| Расширение | Что подтверждено | Уверенность |
+| Extension | What is confirmed | Confidence |
 |---|---|---|
-| CONDSTORE | Есть в опубликованном ответе CAPABILITY Gmail | [вторично] Первичный протокольный материал разработчика; не измерение 2026 года [11] |
-| QRESYNC | В этом ответе отсутствует; действующая поддержка не установлена | [вторично] Планировать работу без него [11] |
-| IDLE | Показан официальным примером Gmail | [док] [10] |
-| MOVE | Есть в опубликованном ответе сервера | [вторично] [11] |
-| UIDPLUS | Есть в опубликованном ответе сервера | [вторично] [11] |
-| SPECIAL-USE | Роли возвращаются LIST; не полагаться только на отдельный capability | [док] [10] |
+| CONDSTORE | Present in a published Gmail CAPABILITY response | [secondary] Primary protocol material from a developer; not a 2026 measurement [11] |
+| QRESYNC | Absent from that response; current support is not established | [secondary] Plan to work without it [11] |
+| IDLE | Shown in an official Gmail example | [docs] [10] |
+| MOVE | Present in a published server response | [secondary] [11] |
+| UIDPLUS | Present in a published server response | [secondary] [11] |
+| SPECIAL-USE | Roles are returned by LIST; do not rely only on a separate capability | [docs] [10] |
 
-[док] CAPABILITY может меняться после входа; запрашивать актуальный набор в рабочей сессии
-[28]. [предположение] Старый пример из документации не считать исчерпывающей матрицей
-сервера 2026 года. Не отправлять QRESYNC или CONDSTORE только на основании имени хоста [11, 29].
+[docs] CAPABILITY can change after sign-in; request the current set during the working session [28]. [assumption] Do not treat an old documentation example as an exhaustive 2026 server matrix. Do not send QRESYNC or CONDSTORE based only on the host name [11, 29].
 
-### В4. Метки, папки и устранение дублей Gmail
+### В4. Gmail labels, folders, and deduplication
 
-[док] У письма может быть несколько меток [34]. В IMAP они представлены папками; одно
-письмо встречается в нескольких папках с общим `X-GM-MSGID`, но папочные UID различаются [10, 28].
+[docs] A message can have multiple labels [34]. IMAP represents them as folders; a message can occur in multiple folders with the same `X-GM-MSGID`, but folder UIDs differ [10, 28].
 
-Рекомендуемая модель [предположение] на основе этих свойств:
+Recommended model [assumption] based on these properties:
 
-| Сущность | Ключ / содержимое |
+| Entity | Key / contents |
 |---|---|
-| Письмо Gmail | `(connection, X-GM-MSGID)`; одна сохранённая MIME-копия |
-| Принадлежность папке | `(connection, folder, UIDVALIDITY, UID)` → письмо и наблюдаемые флаги |
-| Метки и цепочка | Отдельные изменяемые метаданные: labels, `X-GM-THRID` |
-| Другой IMAP-сервер | Папочный ключ обязателен; совпадение `Message-ID` само по себе не основание для слияния |
+| Gmail message | `(connection, X-GM-MSGID)`; one stored MIME copy |
+| Folder membership | `(connection, folder, UIDVALIDITY, UID)` → message and observed flags |
+| Labels and thread | Separate mutable metadata: labels, `X-GM-THRID` |
+| Other IMAP server | Folder key is required; matching `Message-ID` alone is not grounds for merging |
 
-[док] RFC допускает исключение спама и корзины из `\All` [32]. [предположение] Для
-первоначального сбора использовать эту папку, отдельно проверить `\Drafts`, а `\Junk`
-и `\Trash` включать по выбору пользователя. Покрытие сверить с интерфейсом [10, 32].
+[docs] The RFC permits Spam and Trash to be excluded from `\All` [32]. [assumption] Use this folder for the initial collection, check `\Drafts` separately, and include `\Junk` and `\Trash` at the user's choice. Compare coverage with the UI [10, 32].
 
-[предположение] Для точного отражения папок получать их состав и флаги отдельно, но повторно
-не скачивать MIME известного `X-GM-MSGID`. Один проход по All Mail не заменяет наблюдение
-всех выбранных папок и изменение их состава [10, 30].
+[assumption] To represent folders accurately, retrieve their membership and flags separately, but do not download MIME again for a known `X-GM-MSGID`. A single pass over All Mail does not replace observing all selected folders and changes to their membership [10, 30].
 
-[док] Обнаруживать роли по LIST: `\All`, `\Sent`, `\Drafts`, `\Junk`, `\Trash`,
-`\Flagged`; Gmail дополнительно использует `\Important`. Возможен префикс `[GoogleMail]`.
-Не фиксировать `[Gmail]/All Mail` в коде [10, 32].
+[docs] Detect roles from LIST: `\All`, `\Sent`, `\Drafts`, `\Junk`, `\Trash`, `\Flagged`; Gmail also uses `\Important`. A `[GoogleMail]` prefix is possible. Do not hard-code `[Gmail]/All Mail` [10, 32].
 
-[док] Ограничение размера IMAP-папок допускает 1000/2000/5000/10000 писем; 0 означает
-отсутствие ограничения [14]. Видимость меток и ограничение папок нужно проверить до полного
-импорта; скрытая папка не означает удаления её писем [3, 14].
+[docs] IMAP folder-size limits allow 1000/2000/5000/10000 messages; 0 means no limit [14]. Check label visibility and folder limits before a full import; a hidden folder does not mean its messages were deleted [3, 14].
 
-### В5. Лимиты Gmail
+### В5. Gmail limits
 
-| Ограничение | Подтверждённое значение и область применения |
+| Limit | Confirmed value and scope |
 |---|---|
-| Скачивание IMAP | [док] **2500 MB/сутки**, опубликовано для всех редакций Workspace [12] |
-| Загрузка IMAP | [док] 500 MB/сутки Workspace; MVP ничего не загружает [12] |
-| Одновременный доступ | [док] Справка личного Gmail: до **15 почтовых клиентов**, ошибка Too many simultaneous connections [2] |
-| Продолжительность соединения | [док] Около 24 часов; с OAuth — обычно около срока access token, примерно час [13] |
-| Размер письма при чтении | Проверить: универсальная верхняя граница IMAP FETCH в прочитанных источниках не указана |
-| Последствия превышения трафика | [док] Workspace: временная приостановка, обычно час, возможны 24 часа [12] |
+| IMAP download | [docs] **2500 MB/day**, published for all Workspace editions [12] |
+| IMAP upload | [docs] 500 MB/day for Workspace; the MVP uploads nothing [12] |
+| Simultaneous access | [docs] Personal Gmail help: up to **15 mail clients**, then “Too many simultaneous connections” [2] |
+| Connection duration | [docs] About 24 hours; with OAuth, usually around the access-token lifetime, roughly an hour [13] |
+| Message size when reading | Verify: the sources read do not specify a universal upper bound for IMAP FETCH |
+| Effects of exceeding traffic | [docs] Workspace: temporary suspension, usually one hour, possibly 24 hours [12] |
 
-[предположение] До уточнения личной квоты использовать число Workspace как ориентир,
-учитывать прочие клиенты, ограничить параллельность и сохранять прогресс [12].
+[assumption] Until the personal quota is clarified, use the Workspace number as a guide, account for other clients, limit concurrency, and save progress [12].
 
-[вторично] В протокольном материале встречается `APPENDLIMIT=35651584` [11]. Это ограничение
-**добавления**, а не максимального чтения. [док] RFC определяет отдельный `RFC822.SIZE` для
-размера сообщения [28]. [предположение] До скачивания проверять размер, читать потоком,
-при превышении локального предела возвращать явный статус, а не молча пропускать письмо.
+[secondary] `APPENDLIMIT=35651584` appears in protocol material [11]. This limits **appending**, not maximum read size. [docs] The RFC defines a separate `RFC822.SIZE` for message size [28]. [assumption] Check size before downloading, read as a stream, and return an explicit status if the local limit is exceeded instead of silently skipping the message.
 
-[предположение] При сетевой ошибке или ограничении сервера — повтор с увеличивающейся
-паузой и случайным разбросом; при ошибке входа остановить автоматические попытки.
-Не путать запланированное завершение OAuth-сессии с блокировкой аккаунта [12, 13].
+[assumption] For network errors or server throttling, retry with an increasing delay and jitter; stop automatic attempts on sign-in errors. Do not confuse scheduled OAuth-session expiry with account blocking [12, 13].
 
-### В6. Gmail API как альтернатива
+### В6. Gmail API as an alternative
 
-[док] `history.list` возвращает изменения после `historyId`; есть отдельные методы для
-messages, threads и labels. Устаревшая история требует полной синхронизации [15, 34].
-[док] Можно запросить `gmail.readonly`; для IMAP такой узкий scope не подходит [3, 33].
-[док] Нужны Google Cloud project, включённый Gmail API и OAuth client [4, 33].
-[предположение] Это отдельный источник и дополнительные квоты, зато проще модель меток;
-оставить альтернативой, не подменяя им общий IMAP в рамках этого исследования.
+[docs] `history.list` returns changes after `historyId`; there are separate methods for messages, threads, and labels. An expired history requires full synchronization [15, 34]. [docs] `gmail.readonly` can be requested; this narrow scope is not suitable for IMAP [3, 33]. [docs] A Google Cloud project, enabled Gmail API, and OAuth client are required [4, 33]. [assumption] This is a separate source with additional quotas, but has a simpler label model; keep it as an alternative rather than substituting it for general IMAP in this study.
 
-### В7. Mail.ru: подключение и вход
+### В7. Mail.ru: connection and sign-in
 
-[док] `imap.mail.ru:993`, SSL/TLS. Обычный пароль почты не подходит; нужен специальный
-пароль. Для его создания требуется привязанный телефон [16].
+[docs] `imap.mail.ru:993`, SSL/TLS. The ordinary email password does not work; a special password is required. A linked phone is needed to create one [16].
 
-[док] Путь: Настройки → Все настройки → Безопасность → Пароли для внешних приложений →
-Создать → название → Продолжить → тип доступа → Продолжить. Для IMAP выбрать
-**«Полный доступ к Почте»**, а не «Только отправка». Созданное значение вводится только
-локально; его можно отозвать, повторно посмотреть нельзя [16].
+[docs] Path: Settings → All settings → Security → Passwords for external apps → Create → name → Continue → access type → Continue. For IMAP select **“Full access to Mail”**, not “Sending only”. Enter the generated value locally only; it can be revoked, but cannot be viewed again [16].
 
-[док] В разделе внешних сервисов есть переключатель доступа по IMAP, POP и SMTP; его
-состояние следует проверить [17]. Точное действие переключателя на конкретный способ входа
-и интерфейс аккаунта проверяется пользователем, а не попытками агента.
+[docs] The external-services section has a toggle for IMAP, POP, and SMTP access; check its state [17]. The toggle's exact effect on a particular sign-in method and account UI is for the user to verify, not something to probe with agent attempts.
 
-[код] В Thunderbird `OAuth2Providers.sys.mjs` сопоставляет `imap.mail.ru` с `o2.mail.ru`
-и область доступа `mail.imap`; задаёт адреса `/login` и `/token` [19]. [док] Mail публикует
-раздел OAuth для разработчиков и описывает вход сторонних программ через OAuth [17, 18].
+[code] In Thunderbird, `OAuth2Providers.sys.mjs` maps `imap.mail.ru` to `o2.mail.ru` and the `mail.imap` scope; it sets `/login` and `/token` endpoints [19]. [docs] Mail publishes an OAuth-for-developers section and describes OAuth sign-in for third-party programs [17, 18].
 
-[предположение] Значит, OAuth IMAP существует, но это не доказательство свободной выдачи
-доступа новому локальному клиенту. Документация регистрации на `o2.mail.ru/docs/` не была
-доступна при чтении. Не использовать идентификатор или иные реквизиты Thunderbird [19].
+[assumption] Thus OAuth IMAP exists, but this does not prove that a new local client can freely obtain access. The registration documentation at `o2.mail.ru/docs/` was unavailable when read. Do not use Thunderbird's client ID or other credentials [19].
 
-### В8. Расширения Mail.ru
+### В8. Mail.ru extensions
 
-Официальной актуальной матрицы не найдено. Источник [20] — наблюдение разработчика Aqua Mail
-от **2017-04-28**, без гарантии на 2026 год.
+No current official matrix was found. Source [20] is an observation by the Aqua Mail developer dated **2017-04-28**, with no guarantee for 2026.
 
-| Расширение | Что известно | Следствие для реализации |
+| Extension | What is known | Implementation implication |
 |---|---|---|
-| CONDSTORE | [вторично] Нет в списке [20]; актуальное состояние **?** | Не требовать, включать только по CAPABILITY |
-| QRESYNC | [вторично] Нет в списке [20]; актуальное состояние **?** | Нужен путь сверки UID |
-| IDLE | [вторично] Разработчик прямо сообщил об отсутствии [20]; на 2026 год проверить | Поддержать периодический опрос |
-| MOVE | [вторично] Есть в списке [20]; на 2026 год проверить | Для режима чтения не вызывать |
-| UIDPLUS | [вторично] Есть в списке [20]; на 2026 год проверить | Не требуется для обычного UID FETCH |
-| SPECIAL-USE | [вторично] В списке есть XLIST, но нет SPECIAL-USE [20]; состояние **?** | Проверять атрибуты LIST; предусмотреть настройку ролей |
+| CONDSTORE | [secondary] Not in the list [20]; current state **?** | Do not require it; use only when CAPABILITY advertises it |
+| QRESYNC | [secondary] Not in the list [20]; current state **?** | A UID reconciliation path is needed |
+| IDLE | [secondary] Developer explicitly reported it absent [20]; check for 2026 | Support periodic polling |
+| MOVE | [secondary] Present in the list [20]; check for 2026 | Do not call in read-only mode |
+| UIDPLUS | [secondary] Present in the list [20]; check for 2026 | Not required for ordinary UID FETCH |
+| SPECIAL-USE | [secondary] XLIST is listed, SPECIAL-USE is not [20]; state **?** | Check LIST attributes; allow role configuration |
 
-[предположение] Хранить возможности конкретной сессии. Отсутствие найденной документации
-не означает отсутствия функции; свойства иных сервисов Mail сюда не переносить [20, 28].
+[assumption] Store capabilities per session. Lack of found documentation does not mean lack of a feature; do not transfer properties of other Mail services here [20, 28].
 
-### В9. Mail.ru: папки, лимиты и особенности
+### В9. Mail.ru: folders, limits, and peculiarities
 
-[док] В IMAP специальным стандартным именем является `INBOX`; разделитель и имена остальных
-папок узнаются через LIST. Для IMAP4rev1 нелатинские имена используют modified UTF-7 [28].
-[предположение] Не считать веб-названия «Отправленные», «Корзина» и «Спам» точными именами
-IMAP-папок. Локализацию и атрибуты текущего ящика пользователь должен проверить отдельно.
+[docs] `INBOX` is the standard special name in IMAP; the separator and other folder names are obtained through LIST. IMAP4rev1 uses modified UTF-7 for non-Latin names [28]. [assumption] Do not assume the web UI names “Sent”, “Trash”, and “Spam” are the exact IMAP folder names. The user should separately check localization and attributes for the current mailbox.
 
-[предположение] Сначала читать роли из LIST, при необходимости использовать поддержанный
-сервером XLIST; если роли не определены — явное соответствие в настройках соединения.
-Не создавать папки для исправления неизвестного имени [20, 32].
+[assumption] First read roles from LIST, use XLIST if the server supports it, and if roles remain undefined use an explicit mapping in connection settings. Do not create folders to correct an unknown name [20, 32].
 
-**Лимиты:** не удалось найти подтверждённые числовые ограничения Mail.ru на число IMAP-
-соединений, суточный трафик, частоту запросов и размер FETCH. Это неизвестные значения,
-не отсутствие ограничений. Не применять сюда Gmail 15/2500 MB.
+**Limits:** no confirmed numeric limits were found for Mail.ru IMAP connections, daily traffic, request frequency, or FETCH size. These are unknown values, not evidence of no limits. Do not apply Gmail's 15/2500 MB here.
 
-[код] В `MailKit/Net/Imap/ImapEngine.cs`, метод `ParseNumber`, есть обход неправильной
-записи чисел Mail.ru с десятичной точкой/экспонентой, в частности в BODYSTRUCTURE [21].
-[предположение] Проверить совместимость Angus на таких сообщениях; для общего скачивания
-выбирать MIME-поток, не делать BODYSTRUCTURE обязательной стадией.
+[code] `MailKit/Net/Imap/ImapEngine.cs`, method `ParseNumber`, works around malformed Mail.ru numeric values containing a decimal point/exponent, particularly in BODYSTRUCTURE [21]. [assumption] Check Angus compatibility with such messages; for general downloading, use the MIME stream rather than making BODYSTRUCTURE a required step.
 
-[вторично] Разработчик Aqua Mail также сообщал о неработающем поиске по тексту в 2017 году
-[20]. [предположение] Актуальную работоспособность BODY/TEXT SEARCH считать непроверенной;
-локальный индекс снимает зависимость от качества этого поиска.
+[secondary] The Aqua Mail developer also reported text search not working in 2017 [20]. [assumption] Treat current BODY/TEXT SEARCH operation as unverified; a local index removes dependence on the quality of that search.
 
-### В10. Angus Mail: версия и нужные API
+### В10. Angus Mail: version and required APIs
 
-[док] Последний стабильный релиз на странице проекта — **2.0.5**; дата GitHub release
-**2026-02-27** проверена также по `relative-time datetime` в HTML. Он использует Jakarta
-Mail API 2.1.5. Главная страница содержит старую ленту новостей; ориентир — release [22].
+[docs] The latest stable release on the project page is **2.0.5**; the GitHub release date **2026-02-27** was also checked using `relative-time datetime` in the HTML. It uses Jakarta Mail API 2.1.5. The home page contains an old news feed; use the release page as the reference [22].
 
-| Задача | Поддержка / точка входа | Источник |
+| Task | Support / entry point | Source |
 |---|---|---|
-| XOAUTH2 | `mail.imap.auth.mechanisms=XOAUTH2`; access token передаётся аргументом password при connect; получение токенов отдельно | [док] [23] |
-| CONDSTORE | `open(Folder.READ_ONLY, ResyncData.CONDSTORE)`, `getHighestModSeq()`, `IMAPMessage.getModSeq()` | [док] [23–25] |
-| Изменившиеся письма | `getMessagesByUIDChangedSince(start, end, modseq)`, также предварительно получает флаги | [док] [24] |
-| QRESYNC | `open(int, ResyncData)` возвращает события изменений; ResyncData содержит прежний UIDVALIDITY, MODSEQ и известные UID | [док][код] [23, 26] |
-| IDLE | `IMAPFolder.idle()`; для наблюдения нескольких папок — `IdleManager` | [док] [23, 24] |
-| Исходный MIME | `IMAPMessage.getMimeStream()`, `setPeek(true)`; поток копировать в локальный `.eml` | [док][код] [25, 27] |
-| Роли папок | `IMAPFolder.getAttributes()` | [док] [24] |
-| Недостающая команда | `IMAPFolder.doCommand(ProtocolCommand)`; требует собственного разбора и контроля разрешённых операций | [код] [26] |
+| XOAUTH2 | `mail.imap.auth.mechanisms=XOAUTH2`; pass the access token as the password argument to connect; token acquisition is separate | [docs] [23] |
+| CONDSTORE | `open(Folder.READ_ONLY, ResyncData.CONDSTORE)`, `getHighestModSeq()`, `IMAPMessage.getModSeq()` | [docs] [23–25] |
+| Changed messages | `getMessagesByUIDChangedSince(start, end, modseq)`, also fetches flags first | [docs] [24] |
+| QRESYNC | `open(int, ResyncData)` returns change events; ResyncData contains previous UIDVALIDITY, MODSEQ, and known UIDs | [docs][code] [23, 26] |
+| IDLE | `IMAPFolder.idle()`; use `IdleManager` to observe multiple folders | [docs] [23, 24] |
+| Original MIME | `IMAPMessage.getMimeStream()`, `setPeek(true)`; copy the stream to a local `.eml` | [docs][code] [25, 27] |
+| Folder roles | `IMAPFolder.getAttributes()` | [docs] [24] |
+| Missing command | `IMAPFolder.doCommand(ProtocolCommand)`; requires custom parsing and control of allowed operations | [code] [26] |
 
-[док] Для протокола `imaps` свойства имеют префикс **`mail.imaps.*`**; `mail.imap.peek`
-по умолчанию false. [предположение] В реализации выбрать один вариант: `imap` с TLS
-либо `imaps`, чтобы не настроить свойства другого провайдера [23].
+[docs] For protocol `imaps`, properties use the **`mail.imaps.*`** prefix; `mail.imap.peek` defaults to false. [assumption] Choose one implementation option, `imap` with TLS or `imaps`, to avoid configuring properties for the wrong provider [23].
 
-[код] В версии 2.0.5 режим READ_ONLY вызывает `protocol.examine`, а `getMimeStream()`
-учитывает PEEK, в том числе при частичной загрузке [26, 27].
+[code] In 2.0.5, READ_ONLY mode calls `protocol.examine`, and `getMimeStream()` honors PEEK, including for partial downloads [26, 27].
 
-[предположение] Недостатка базовых функций для этой задачи не обнаружено. Собственный
-обработчик `doCommand` оправдан только для реально отсутствующего расширения; он не решит
-отсутствие расширения у сервера. Альтернатива при серверной особенности — обычные UID-
-операции; для Gmail — отдельный Gmail API. Менять библиотеку заранее оснований нет.
+[assumption] No missing basic functionality for this task was found. A custom `doCommand` handler is justified only for an extension that is actually missing; it cannot solve the server's lack of an extension. For a server peculiarity, use ordinary UID operations; for Gmail, use the separate Gmail API. There is no reason to change libraries in advance.
 
-### В11. Короткий алгоритм инкрементальной синхронизации
+### В11. Short incremental synchronization algorithm
 
-[док] Основа: ключ `(connection, folder, UIDVALIDITY, UID)`; номера позиций сообщений
-непостоянны. UID действителен внутри поколения конкретной папки [28, 30].
+[docs] Base key: `(connection, folder, UIDVALIDITY, UID)`; message sequence numbers are not persistent. A UID is valid within a generation of a particular folder [28, 30].
 
-Алгоритм ниже — рекомендация [предположение] на основе [28–30]:
+The following algorithm is a recommendation [assumption] based on [28–30]:
 
-1. После TLS и входа обновить CAPABILITY, получить папки LIST, открыть выбранную через EXAMINE.
-2. Сохранить UIDVALIDITY, UIDNEXT, известные UID, флаги; при поддержке — HIGHESTMODSEQ.
-3. Первый проход: UID SEARCH ALL, затем порциями UID FETCH метаданных и BODY.PEEK[];
-   Gmail ID использовать для устранения дублей, см. В4.
-4. Если UIDVALIDITY изменился — отменить все старые соответствия UID и MODSEQ этой папки,
-   выполнить полный проход. Старые UID нельзя сопоставлять новым по числу [30].
-5. Если поддержан QRESYNC — включить его и открыть папку с сохранёнными UIDVALIDITY,
-   MODSEQ и UID; применить FETCH изменений и VANISHED, отдельно получить новые письма [29].
-6. Если есть только CONDSTORE — получить FLAGS/MODSEQ через CHANGEDSINCE; удалённые UID
-   выявлять сверкой текущего UID SEARCH ALL с локальным набором [29, 30].
-7. Без этих расширений — сверять UID и флаги порциями; получать MIME только новых UID [30].
-8. IDLE использовать как сигнал начать сверку, а не как журнал изменений. Без IDLE
-   выполнять опрос; после разрыва всегда возобновлять обычную синхронизацию [23, 30].
+1. After TLS and sign-in, refresh CAPABILITY, retrieve folders with LIST, and open the selected folder with EXAMINE.
+2. Save UIDVALIDITY, UIDNEXT, known UIDs, and flags; if supported, save HIGHESTMODSEQ.
+3. First pass: UID SEARCH ALL, then UID FETCH metadata and BODY.PEEK[] in batches; use the Gmail ID for deduplication, see В4.
+4. If UIDVALIDITY changed, discard all old UID and MODSEQ mappings for that folder and do a full pass. Old UIDs cannot be matched to new ones by number [30].
+5. If QRESYNC is supported, enable it and open the folder with saved UIDVALIDITY, MODSEQ, and UIDs; apply changed FETCH and VANISHED, and retrieve new messages separately [29].
+6. If only CONDSTORE is available, retrieve FLAGS/MODSEQ via CHANGEDSINCE; find deleted UIDs by comparing current UID SEARCH ALL with the local set [29, 30].
+7. Without these extensions, reconcile UIDs and flags in batches; retrieve MIME only for new UIDs [30].
+8. Use IDLE as a signal to begin reconciliation, not as a change log. Without IDLE, poll; after a disconnect, always resume ordinary synchronization [23, 30].
 
-[док] При NOMODSEQ нужно отказаться от сохранённого MODSEQ для этой папки [29].
-[предположение] Состояние продвижения фиксировать атомарно после записи соответствующих
-данных; за исходный рубеж брать значение до прохода, а не более позднее значение,
-изменения до которого могли ещё не обработаться. Повторный проход должен быть безопасен.
+[docs] On NOMODSEQ, discard the saved MODSEQ for that folder [29]. [assumption] Commit progress atomically after the corresponding data is written; use the value from before the pass as the starting point, not a later value whose changes may not have been processed yet. A repeated pass must be safe.
 
-[док] Диапазон IMAP `n:*` при n выше последнего UID может включить последний UID,
-поскольку диапазоны допускают обратный порядок [28]. [предположение] Фильтровать
-результат по фактическому UID, не считать его безусловно новым; обрабатывать пустые папки.
+[docs] An IMAP range `n:*`, when n exceeds the last UID, can include the last UID because ranges permit reverse order [28]. [assumption] Filter results by actual UID rather than treating them as unconditionally new; handle empty folders.
 
-### В12. Как гарантировать чтение без изменения писем
+### В12. How to guarantee reading without changing messages
 
-[док] EXAMINE запрещает изменения постоянного состояния выбранной папки, включая состояние
-пользователя; `SELECT` с ответом READ-ONLY имеет более слабую семантику [31].
-[док] `BODY.PEEK[]` не устанавливает `\Seen`, в отличие от обычного BODY[] [28].
+[docs] EXAMINE prohibits changes to the selected folder's persistent state, including user state; `SELECT` with a READ-ONLY response has weaker semantics [31]. [docs] `BODY.PEEK[]` does not set `\Seen`, unlike ordinary BODY[] [28].
 
-Рекомендуемые ограничения [предположение] на основе [23, 26–28, 31]:
+Recommended restrictions [assumption] based on [23, 26–28, 31]:
 
-- Открывать только `Folder.READ_ONLY`; ошибка EXAMINE не должна вести к SELECT READ_WRITE.
-- Задать `mail.imaps.peek=true` для `imaps`, дополнительно `setPeek(true)` для MIME-потока.
-- Закрывать папку через `close(false)`; не вызывать `expunge()` или `close(true)`.
-- Разрешать только конкретные операции чтения; не отдавать произвольный `doCommand` наружу.
-- Не вызывать `setFlags`; не пытаться «восстановить непрочитанность» после обычного FETCH.
+- Open only with `Folder.READ_ONLY`; an EXAMINE error must not fall back to SELECT READ_WRITE.
+- Set `mail.imaps.peek=true` for `imaps`, and also call `setPeek(true)` for the MIME stream.
+- Close the folder with `close(false)`; do not call `expunge()` or `close(true)`.
+- Allow only specific read operations; do not expose arbitrary `doCommand` calls.
+- Do not call `setFlags`; do not try to “restore unread status” after ordinary FETCH.
 
-| Что может менять сервер | Что запрещаем в режиме чтения |
+| What the server can change | What read-only mode forbids |
 |---|---|
-| Флаги и метки | [док] STORE / UID STORE, включая X-GM-LABELS [10, 28] |
-| Письма | [док] APPEND, COPY, MOVE, EXPUNGE, UID EXPUNGE; CLOSE после записи может удалить письма [23, 28, 31] |
-| Папки и подписки | [док] CREATE, DELETE, RENAME, SUBSCRIBE, UNSUBSCRIBE [28] |
-| Права и квоты | [док] SETACL, DELETEACL, SETQUOTA, соответствующие методы Angus [23] |
+| Flags and labels | [docs] STORE / UID STORE, including X-GM-LABELS [10, 28] |
+| Messages | [docs] APPEND, COPY, MOVE, EXPUNGE, UID EXPUNGE; CLOSE after a write can delete messages [23, 28, 31] |
+| Folders and subscriptions | [docs] CREATE, DELETE, RENAME, SUBSCRIBE, UNSUBSCRIBE [28] |
+| Rights and quotas | [docs] SETACL, DELETEACL, SETQUOTA, and corresponding Angus methods [23] |
 
-[предположение] EXAMINE защищает выбранную папку, но не запрещает приложению, например,
-создать другую или выполнить APPEND. Поэтому он дополняет, а не заменяет запрет операций.
-Пароль приложения и IMAP OAuth scope также не дают отдельной гарантии read-only [3, 16, 31].
+[assumption] EXAMINE protects the selected folder, but does not prevent the application from creating another folder or issuing APPEND, for example. It supplements, rather than replaces, the operation ban. App passwords and IMAP OAuth scopes also do not provide a separate read-only guarantee [3, 16, 31].
 
-## Сравнительные таблицы
+## Comparison tables
 
-### Провайдеры
+### Providers
 
-`?` — актуальный ответ не получен; «наблюдалось» не означает гарантию на 2026-10-24.
+`?` means no current answer was obtained; “observed” is not a guarantee as of 2026-10-24.
 
-| Провайдер | Хост:порт | Способы входа | Что нужно включить в аккаунте | CONDSTORE | QRESYNC | IDLE | MOVE | Лимиты | Источник |
+| Provider | Host:port | Sign-in methods | What to enable in account | CONDSTORE | QRESYNC | IDLE | MOVE | Limits | Source |
 |---|---|---|---|---|---|---|---|---|---|
-| Gmail, личный | `imap.gmail.com:993`, TLS | [док] Пароль приложения / OAuth2 XOAUTH2 | [док] 2-Step Verification для пароля; для OAuth — собственный client и согласие; IMAP постоянно включён | [вторично] Наблюдалось; проверить | [вторично] Не объявлен в источнике; проверить | [док] Да | [вторично] Наблюдалось | [док] До 15 клиентов; 2500 MB/сутки — только ориентир из Workspace; размер FETCH ? | [1–4, 10–13] |
-| Mail.ru | `imap.mail.ru:993`, TLS | [док] Пароль внешнего приложения; [код] OAuth в Thunderbird, доступность своего клиента ? | [док] Телефон, пароль с доступом к Почте; проверить переключатель внешнего доступа | ? | ? | [вторично] Отсутствовал в 2017; проверить | [вторично] Наблюдалось в 2017 | Суточный трафик, соединения, размер FETCH и частота запросов ? | [16–20], см. В8–В9 |
+| Gmail, personal | `imap.gmail.com:993`, TLS | [docs] App password / OAuth2 XOAUTH2 | [docs] 2-Step Verification for password; own client and consent for OAuth; IMAP permanently enabled | [secondary] Observed; verify | [secondary] Not advertised in source; verify | [docs] Yes | [secondary] Observed | [docs] Up to 15 clients; 2500 MB/day is only a Workspace reference; FETCH size ? | [1–4, 10–13] |
+| Mail.ru | `imap.mail.ru:993`, TLS | [docs] External-app password; [code] OAuth in Thunderbird, custom-client availability ? | [docs] Phone, password with Mail access; check external-access toggle | ? | ? | [secondary] Absent in 2017; verify | [secondary] Observed in 2017 | Daily traffic, connections, FETCH size, and request frequency ? | [16–20], see В8–В9 |
 
-### Что пользователю проверить в своих аккаунтах
+### What users should check in their accounts
 
-Все действия выполняет пользователь; секретные значения не передаются в чат.
+The user performs all actions; secret values are not sent in chat.
 
-- [ ] Gmail: проверить 2-Step Verification и доступность раздела App passwords [1].
-- [ ] Gmail: если выбран пароль приложения — создать отдельный для локального сервера;
-  сохранить только вне репозитория. Не включать устаревший режим less secure apps [1, 9].
-- [ ] Gmail: проверить видимость нужных меток в IMAP и отсутствие ограничения числа писем
-  при полном импорте [3, 14].
-- [ ] Gmail OAuth, если выбран: подготовить Desktop client, экран согласия, свой аккаунт в test users;
-  проверить статус публикации и семидневное ограничение Testing [4–7].
-- [ ] Workspace, если появится: уточнить разрешение IMAP и OAuth у администратора [7, 8].
-- [ ] Mail.ru: проверить привязанный телефон и внешний доступ IMAP [16, 17].
-- [ ] Mail.ru: создать отдельный пароль внешнего приложения с типом «Полный доступ к Почте»;
-  не выбирать доступ к Облаку/Календарю без необходимости [16].
-- [ ] При последующей пользовательской проверке клиента: сохранить только обезличенные
-  CAPABILITY после входа, атрибуты LIST и значения UIDVALIDITY/HIGHESTMODSEQ; никаких AUTH
-  строк, токенов, адресов или полных протокольных журналов в публичном результате.
-- [ ] На выбранном непрочитанном письме проверить сохранность флагов после получения MIME;
-  выполнять проверку будущим клиентом с EXAMINE и PEEK, см. В12.
+- [ ] Gmail: check 2-Step Verification and whether App passwords is available [1].
+- [ ] Gmail: if using an app password, create a separate one for the local server and store it outside the repository. Do not enable the obsolete less secure apps mode [1, 9].
+- [ ] Gmail: check visibility of required labels in IMAP and ensure there is no message-count limit during full import [3, 14].
+- [ ] Gmail OAuth, if selected: prepare a Desktop client and consent screen, add your account to test users; check publication status and the seven-day Testing limit [4–7].
+- [ ] Workspace, if applicable: ask the administrator about IMAP permission and OAuth [7, 8].
+- [ ] Mail.ru: check the linked phone and external IMAP access [16, 17].
+- [ ] Mail.ru: create a separate external-app password with “Full access to Mail”; do not choose Cloud/Calendar access unnecessarily [16].
+- [ ] During a later user-run client check, retain only anonymized post-login CAPABILITY, LIST attributes, and UIDVALIDITY/HIGHESTMODSEQ values; no AUTH lines, tokens, addresses, or full protocol logs in a public report.
+- [ ] On a selected unread message, verify flags remain unchanged after MIME retrieval; the future client should use EXAMINE and PEEK, see В12.
 
-## Рекомендация
+## Recommendation
 
-[предположение] Для **этого личного MVP** планировать Gmail с паролем приложения при его
-доступности и Mail.ru с паролем внешнего приложения. Это сохраняет единый IMAP-источник
-и не требует регистрации OAuth-клиентов для первого запуска [1, 16].
+[assumption] For **this personal MVP**, plan Gmail with an app password if available and Mail.ru with an external-app password. This keeps one IMAP source and avoids registering OAuth clients for first launch [1, 16].
 
-[предположение] В модели соединения сразу различать пароль и XOAUTH2: для Gmail OAuth —
-запасной путь при недоступности пароля и отдельный вариант дальнейшего развития. Компромисс:
-настройка проекта, согласия, обновления токенов и правил публикации сложнее [3–7].
+[assumption] Distinguish password and XOAUTH2 in the connection model from the outset: Gmail OAuth is a fallback if an app password is unavailable and a separate future option. The trade-off is more complex project setup, consent, token renewal, and publication rules [3–7].
 
-[предположение] Использовать Angus Mail 2.0.5 за внутренним интерфейсом источника; базовая
-синхронизация — UID с полной сверкой состава, расширения — ускорение. Для Mail.ru не
-обещать мгновенные уведомления до проверки IDLE. Для Gmail отделить письмо от его папочных
-представлений. Режим чтения закрепить запретом команд, EXAMINE и PEEK [20, 22–32].
+[assumption] Use Angus Mail 2.0.5 behind the internal source interface; base synchronization uses UIDs with a full membership reconciliation, with extensions as accelerations. Do not promise instant notifications for Mail.ru until IDLE is checked. Separate Gmail messages from their folder representations. Enforce read-only mode through an operation ban, EXAMINE, and PEEK [20, 22–32].
 
-## Что не удалось проверить
+## What could not be verified
 
-- Доступность паролей приложений и настройки конкретных аккаунтов: без входа неизвестны;
-  пользователь проверяет интерфейс по списку выше. Ни одного входа в ходе исследования нет.
-- CAPABILITY обоих аккаунтов на 2026-10-24: опубликованные наблюдения старше. Пользователь
-  проверяет после входа будущим клиентом; агент не выполняет даже анонимное IMAP-подключение.
-- Для Mail.ru: актуальные расширения, локализация имён и специальные роли папок, числовые
-  лимиты. Нужны обезличенный LIST/CAPABILITY и, для квот нагрузки, ответ поддержки Mail.
-- Личный Gmail: точная квота трафика и максимальный размер FETCH. Не переносить числа
-  Workspace, APPEND или ограничения вложений на чтение без подтверждения провайдера.
-- Mail.ru OAuth: текущая процедура допуска собственного Desktop client, доступность
-  `mail.imap`, время жизни и обновление токенов. `o2.mail.ru/docs/` не удалось прочитать;
-  пользователь может проверить документацию или обратиться в поддержку разработчиков [18].
-- Angus на Java 25, реальных Gmail/Mail.ru и нестандартных ответах Mail.ru: проверены API
-  и исходники, запусков и сборки не было. Поведенческая проверка — отдельная инженерная задача.
-- Полнота меток Gmail через MODSEQ: CONDSTORE гарантирует стандартное состояние, но
-  изменение X-GM-LABELS требует отдельной проверки; до неё периодически сверять метки [10, 29].
-- Правила Google для будущего публичного продукта с внешней моделью: зависит от реального
-  потока данных, условий использования и применимости исключений; см. В1.
+- Availability of app passwords and settings in specific accounts: unknown without sign-in; the user checks the UI using the list above. No sign-in was attempted during this research.
+- CAPABILITY for either account as of 2026-10-24: published observations are older. The user checks after sign-in with the future client; the agent does not make even anonymous IMAP connections.
+- Mail.ru: current extensions, folder-name localization and special-use roles, numeric limits. An anonymized LIST/CAPABILITY and, for traffic quotas, a response from Mail support are needed.
+- Personal Gmail: exact traffic quota and maximum FETCH size. Do not transfer Workspace figures, APPEND limits, or attachment limits to reading without provider confirmation.
+- Mail.ru OAuth: current process for allowing a custom Desktop client, availability of `mail.imap`, token lifetime and renewal. `o2.mail.ru/docs/` could not be read; the user can check the documentation or contact developer support [18].
+- Angus on Java 25, real Gmail/Mail.ru accounts, and nonstandard Mail.ru responses: APIs and source were checked, but no execution or build was done. Behavioral verification is a separate engineering task.
+- Completeness of Gmail labels via MODSEQ: CONDSTORE guarantees standard state, but changes to X-GM-LABELS need separate verification; until then, periodically reconcile labels [10, 29].
+- Google's rules for a future public product using an external model: depends on actual data flow, terms of use, and whether exceptions apply; see В1.
 
-## Что ещё стоит изучить
+## What else to study
 
-- [предположение] Отдельная процедура OAuth-настройки и обновления токенов без вывода секретов
-  в MCP, логи или stdout; сохранение вне репозитория, как предусмотрено планом.
-## Источники
+- [assumption] A separate OAuth setup and token-renewal procedure that does not expose secrets in MCP, logs, or stdout; storage outside the repository as provided in the plan.
 
-Все источники прочитаны **2026-10-24**. Если дата публикации не указана ниже, на использованной
-странице она не установлена; дата обхода поисковиком не подменяет дату обновления.
-Метки [вторично] у наблюдений означают отсутствие гарантии провайдера; используются
-первичные записи самих разработчиков, а не пересказы сторонних статей.
+## Sources
 
-1. Google Account Help, Sign in with app passwords — <https://support.google.com/accounts/answer/185833?hl=en> (прочитано 2026-10-24).
-2. Gmail Help, Add Gmail to another email client — <https://support.google.com/mail/answer/7126229?hl=en> (прочитано 2026-10-24; изменение IMAP с января 2025 года).
-3. Google, OAuth 2.0 mechanism — <https://developers.google.com/workspace/gmail/imap/xoauth2-protocol> (прочитано 2026-10-24).
-4. Google, OAuth 2.0 for Desktop Apps — <https://developers.google.com/identity/protocols/oauth2/native-app> (прочитано 2026-10-24).
-5. Google, Using OAuth 2.0 to Access Google APIs, Refresh token expiration — <https://developers.google.com/identity/protocols/oauth2/> (прочитано 2026-10-24).
-6. Google, Restricted scope verification, Exceptions to verification requirements — <https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification> (прочитано 2026-10-24).
-7. Google, OAuth app state overview — <https://developers.google.com/identity/protocols/oauth2/production-readiness/overview> (прочитано 2026-10-24).
-8. Google Workspace, Set up Gmail with a third-party email client — <https://knowledge.workspace.google.com/admin/sync/set-up-gmail-with-a-third-party-email-client> (прочитано 2026-10-24; указана дата перехода 2025-05-01).
-9. Google Workspace, Transition from less secure apps to OAuth — <https://knowledge.workspace.google.com/admin/sync/transition-from-less-secure-apps-to-oauth> (прочитано 2026-10-24; указана дата 2025-03-14 и исключение app passwords).
-10. Google, IMAP Extensions — <https://developers.google.com/workspace/gmail/imap/imap-extensions> (прочитано 2026-10-24).
-11. emersion, Common IMAP servers CAPABILITY responses, раздел Gmail — <https://gist.github.com/emersion/2c769bc1ed60a7b7945910d35b606801> (прочитано 2026-10-24; дополнение в комментарии 2024-08-14).
-12. Google Workspace, Gmail bandwidth limits — <https://knowledge.workspace.google.com/admin/gmail/gmail-bandwidth-limits?hl=en> (прочитано 2026-10-24).
-13. Google, IMAP, POP, and SMTP — <https://developers.google.com/workspace/gmail/imap/imap-smtp> (прочитано 2026-10-24; обновлено 2026-09-15).
-14. Google, ImapSettings — <https://developers.google.com/workspace/gmail/api/reference/rest/v1/ImapSettings> (прочитано 2026-10-24).
-15. Google, Synchronize clients with Gmail — <https://developers.google.com/workspace/gmail/api/guides/sync> (прочитано 2026-10-24).
-16. Mail, Как войти в почту Mail в другой почтовой программе — <https://help.mail.ru/mail/login/mailer/> (прочитано 2026-10-24; обновлено 2026-02-25).
-17. Mail, Настройки безопасности в Почте Mail — <https://help.mail.ru/mail/security/protection/settings/> (прочитано 2026-10-24).
-18. Mail, OAuth-авторизация для разработчиков — <https://help.mail.ru/developers/oauth/> (прочитано 2026-10-24; связанная `o2.mail.ru/docs/` недоступна при исследовании).
-19. Thunderbird, `mailnews/base/src/OAuth2Providers.sys.mjs` — <https://raw.githubusercontent.com/mozilla/releases-comm-central/master/mailnews/base/src/OAuth2Providers.sys.mjs> (прочитано 2026-10-24; ветка master, записи `imap.mail.ru` и `o2.mail.ru`).
-20. Kostya Vasilyev, разработчик Aqua Mail, собственный ответ CAPABILITY Mail.ru — <https://forum.aqua-mail.com/index.php?topic=2084.0> (прочитано 2026-10-24; сообщение № 4 от 2017-04-28).
-21. MailKit, `MailKit/Net/Imap/ImapEngine.cs`, `ParseNumber` — <https://github.com/jstedfast/MailKit/blob/master/MailKit/Net/Imap/ImapEngine.cs> (прочитано 2026-10-24; ветка master, комментарий об ответах Mail.ru).
-22. Eclipse Angus Mail, release 2.0.5 — <https://github.com/eclipse-ee4j/angus-mail/releases/tag/2.0.5> (прочитано 2026-10-24; опубликован 2026-02-27); список актуальных релизов — <https://github.com/eclipse-ee4j/angus-mail/releases>.
-23. Eclipse Angus Mail, пакет `org.eclipse.angus.mail.imap`, свойства провайдера — <https://eclipse-ee4j.github.io/angus-mail/docs/api/org.eclipse.angus.mail/org/eclipse/angus/mail/imap/package-summary.html> (прочитано 2026-10-24; обновляемая документация).
-24. Eclipse Angus Mail, `IMAPFolder` Javadoc — <https://eclipse-ee4j.github.io/angus-mail/docs/api/org.eclipse.angus.mail/org/eclipse/angus/mail/imap/IMAPFolder.html> (прочитано 2026-10-24).
-25. Eclipse Angus Mail, `IMAPMessage` Javadoc — <https://eclipse-ee4j.github.io/angus-mail/docs/api/org.eclipse.angus.mail/org/eclipse/angus/mail/imap/IMAPMessage.html> (прочитано 2026-10-24).
-26. Eclipse Angus Mail 2.0.5, `providers/imap/src/main/java/org/eclipse/angus/mail/imap/IMAPFolder.java` — <https://raw.githubusercontent.com/eclipse-ee4j/angus-mail/2.0.5/providers/imap/src/main/java/org/eclipse/angus/mail/imap/IMAPFolder.java> (прочитано 2026-10-24; тег 2.0.5).
-27. Eclipse Angus Mail 2.0.5, `providers/imap/src/main/java/org/eclipse/angus/mail/imap/IMAPMessage.java` — <https://raw.githubusercontent.com/eclipse-ee4j/angus-mail/2.0.5/providers/imap/src/main/java/org/eclipse/angus/mail/imap/IMAPMessage.java> (прочитано 2026-10-24; `getMimeStream`, `setPeek`).
-28. RFC 3501, IMAP4rev1 — <https://datatracker.ietf.org/doc/html/rfc3501> (прочитано 2026-10-24; опубликован 2003-03; UID — § 2.3.1.1, FETCH/PEEK — § 6.4.5, диапазоны — § 9).
-29. RFC 7162, CONDSTORE/QRESYNC — <https://datatracker.ietf.org/doc/html/rfc7162> (прочитано 2026-10-24; опубликован 2014-05; NOMODSEQ — § 3.1.2.2, VANISHED — § 3.2.10, синхронизация — § 6).
-30. RFC 4549, Synchronization Operations for Disconnected IMAP4 Clients — <https://datatracker.ietf.org/doc/html/rfc4549> (прочитано 2026-10-24; опубликован 2006-06; UIDVALIDITY — § 4.1, получение изменений — § 4.3).
-31. RFC 9051, IMAP4rev2 — <https://datatracker.ietf.org/doc/html/rfc9051> (прочитано 2026-10-24; опубликован 2021-08; SELECT/EXAMINE — § 6.3.2–6.3.3, CLOSE — § 6.4.1).
-32. RFC 6154, IMAP LIST Extension for Special-Use Mailboxes — <https://www.rfc-editor.org/rfc/rfc6154.html> (прочитано 2026-10-24; опубликован 2011-03).
-33. Google, Choose Gmail API scopes — <https://developers.google.com/workspace/gmail/api/auth/scopes> (прочитано 2026-10-24).
-34. Google, Manage labels — <https://developers.google.com/workspace/gmail/api/guides/labels> (прочитано 2026-10-24).
+All sources were read on **2026-10-24**. If no publication date is listed below, it was not established on the page consulted; the search engine's crawl date is not a substitute for an update date. The [secondary] labels mark observations without a provider guarantee; primary records by the developers themselves are used, not summaries from third-party articles.
+
+1. Google Account Help, Sign in with app passwords — <https://support.google.com/accounts/answer/185833?hl=en> (read 2026-10-24).
+2. Gmail Help, Add Gmail to another email client — <https://support.google.com/mail/answer/7126229?hl=en> (read 2026-10-24; IMAP change from January 2025).
+3. Google, OAuth 2.0 mechanism — <https://developers.google.com/workspace/gmail/imap/xoauth2-protocol> (read 2026-10-24).
+4. Google, OAuth 2.0 for Desktop Apps — <https://developers.google.com/identity/protocols/oauth2/native-app> (read 2026-10-24).
+5. Google, Using OAuth 2.0 to Access Google APIs, Refresh token expiration — <https://developers.google.com/identity/protocols/oauth2/> (read 2026-10-24).
+6. Google, Restricted scope verification, Exceptions to verification requirements — <https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification> (read 2026-10-24).
+7. Google, OAuth app state overview — <https://developers.google.com/identity/protocols/oauth2/production-readiness/overview> (read 2026-10-24).
+8. Google Workspace, Set up Gmail with a third-party email client — <https://knowledge.workspace.google.com/admin/sync/set-up-gmail-with-a-third-party-email-client> (read 2026-10-24; transition date listed as 2025-05-01).
+9. Google Workspace, Transition from less secure apps to OAuth — <https://knowledge.workspace.google.com/admin/sync/transition-from-less-secure-apps-to-oauth> (read 2026-10-24; date listed as 2025-03-14 and app-password exception).
+10. Google, IMAP Extensions — <https://developers.google.com/workspace/gmail/imap/imap-extensions> (read 2026-10-24).
+11. emersion, Common IMAP servers CAPABILITY responses, Gmail section — <https://gist.github.com/emersion/2c769bc1ed60a7b7945910d35b606801> (read 2026-10-24; comment addition dated 2024-08-14).
+12. Google Workspace, Gmail bandwidth limits — <https://knowledge.workspace.google.com/admin/gmail/gmail-bandwidth-limits?hl=en> (read 2026-10-24).
+13. Google, IMAP, POP, and SMTP — <https://developers.google.com/workspace/gmail/imap/imap-smtp> (read 2026-10-24; updated 2026-09-15).
+14. Google, ImapSettings — <https://developers.google.com/workspace/gmail/api/reference/rest/v1/ImapSettings> (read 2026-10-24).
+15. Google, Synchronize clients with Gmail — <https://developers.google.com/workspace/gmail/api/guides/sync> (read 2026-10-24).
+16. Mail, How to sign in to Mail in another email program — <https://help.mail.ru/mail/login/mailer/> (read 2026-10-24; updated 2026-02-25).
+17. Mail, Security settings in Mail — <https://help.mail.ru/mail/security/protection/settings/> (read 2026-10-24).
+18. Mail, OAuth authorization for developers — <https://help.mail.ru/developers/oauth/> (read 2026-10-24; related `o2.mail.ru/docs/` unavailable during research).
+19. Thunderbird, `mailnews/base/src/OAuth2Providers.sys.mjs` — <https://raw.githubusercontent.com/mozilla/releases-comm-central/master/mailnews/base/src/OAuth2Providers.sys.mjs> (read 2026-10-24; master branch, `imap.mail.ru` and `o2.mail.ru` entries).
+20. Kostya Vasilyev, Aqua Mail developer, own Mail.ru CAPABILITY response — <https://forum.aqua-mail.com/index.php?topic=2084.0> (read 2026-10-24; post No. 4 from 2017-04-28).
+21. MailKit, `MailKit/Net/Imap/ImapEngine.cs`, `ParseNumber` — <https://github.com/jstedfast/MailKit/blob/master/MailKit/Net/Imap/ImapEngine.cs> (read 2026-10-24; master branch, comment about Mail.ru responses).
+22. Eclipse Angus Mail, release 2.0.5 — <https://github.com/eclipse-ee4j/angus-mail/releases/tag/2.0.5> (read 2026-10-24; published 2026-02-27); current releases — <https://github.com/eclipse-ee4j/angus-mail/releases>.
+23. Eclipse Angus Mail, package `org.eclipse.angus.mail.imap`, provider properties — <https://eclipse-ee4j.github.io/angus-mail/docs/api/org.eclipse.angus.mail/org/eclipse/angus/mail/imap/package-summary.html> (read 2026-10-24; living documentation).
+24. Eclipse Angus Mail, `IMAPFolder` Javadoc — <https://eclipse-ee4j.github.io/angus-mail/docs/api/org.eclipse.angus.mail/org/eclipse/angus/mail/imap/IMAPFolder.html> (read 2026-10-24).
+25. Eclipse Angus Mail, `IMAPMessage` Javadoc — <https://eclipse-ee4j.github.io/angus-mail/docs/api/org.eclipse.angus.mail/org/eclipse/angus/mail/imap/IMAPMessage.html> (read 2026-10-24).
+26. Eclipse Angus Mail 2.0.5, `providers/imap/src/main/java/org/eclipse/angus/mail/imap/IMAPFolder.java` — <https://raw.githubusercontent.com/eclipse-ee4j/angus-mail/2.0.5/providers/imap/src/main/java/org/eclipse/angus/mail/imap/IMAPFolder.java> (read 2026-10-24; tag 2.0.5).
+27. Eclipse Angus Mail 2.0.5, `providers/imap/src/main/java/org/eclipse/angus/mail/imap/IMAPMessage.java` — <https://raw.githubusercontent.com/eclipse-ee4j/angus-mail/2.0.5/providers/imap/src/main/java/org/eclipse/angus/mail/imap/IMAPMessage.java> (read 2026-10-24; `getMimeStream`, `setPeek`).
+28. RFC 3501, IMAP4rev1 — <https://datatracker.ietf.org/doc/html/rfc3501> (read 2026-10-24; published 2003-03; UID — § 2.3.1.1, FETCH/PEEK — § 6.4.5, ranges — § 9).
+29. RFC 7162, CONDSTORE/QRESYNC — <https://datatracker.ietf.org/doc/html/rfc7162> (read 2026-10-24; published 2014-05; NOMODSEQ — § 3.1.2.2, VANISHED — § 3.2.10, synchronization — § 6).
+30. RFC 4549, Synchronization Operations for Disconnected IMAP4 Clients — <https://datatracker.ietf.org/doc/html/rfc4549> (read 2026-10-24; published 2006-06; UIDVALIDITY — § 4.1, fetching changes — § 4.3).
+31. RFC 9051, IMAP4rev2 — <https://datatracker.ietf.org/doc/html/rfc9051> (read 2026-10-24; published 2021-08; SELECT/EXAMINE — § 6.3.2–6.3.3, CLOSE — § 6.4.1).
+32. RFC 6154, IMAP LIST Extension for Special-Use Mailboxes — <https://www.rfc-editor.org/rfc/rfc6154.html> (read 2026-10-24; published 2011-03).
+33. Google, Choose Gmail API scopes — <https://developers.google.com/workspace/gmail/api/auth/scopes> (read 2026-10-24).
+34. Google, Manage labels — <https://developers.google.com/workspace/gmail/api/guides/labels> (read 2026-10-24).

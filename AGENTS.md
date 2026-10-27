@@ -32,12 +32,12 @@ Work now consists of finishing `0.1.0`, then optional improvements:
 | `README.md` | Project overview for users: features, quickstart, tools, commands, troubleshooting |
 | `AGENTS.md` | This file: rules for agents changing the repository |
 | `CLAUDE.md` | One line, `@AGENTS.md`, so Claude Code loads this file. Keep all rules here, not there |
-| `docs/plan.md` | The plan (in Russian): idea and status, checks pending on real mail, principles and data flow, scope of `0.1.0`, how work is done |
-| `docs/results.md` | Environment facts and real-mailbox results (in Russian), numbers only |
-| `docs/decisions.md` | The user's current decisions, including rejected ideas, and what no change may add without one (in Russian) |
-| `docs/backlog.md` | Possible improvements after `0.1.0` (in Russian) |
+| `docs/plan.md` | The plan: idea and status, checks pending on real mail, principles and data flow, scope of `0.1.0`, how work is done |
+| `docs/results.md` | Environment facts and real-mailbox results, numbers only |
+| `docs/decisions.md` | The user's current decisions, including rejected ideas, and what no change may add without one |
+| `docs/backlog.md` | Possible improvements after `0.1.0` |
 | `docs/connections.md`, `docs/clients.md`, `docs/commands.md`, `docs/search.md`, `docs/security.md` | User documents (in English): connections file, client registration, user-run commands, search, security |
-| `docs/research/` | Background research results `RT-NN-*.md` (in Russian), from 2026-10-24, with an index in `README.md`; the decisions taken from them are in `docs/decisions.md` |
+| `docs/research/` | Background research results `RT-NN-*.md`, from 2026-10-24, with an index in `README.md`; the decisions taken from them are in `docs/decisions.md` |
 | `docs/impl-tasks/` | Implementation briefs `IT-NN-*.md` for separate agent sessions, plus `README.md` with shared rules and the report template |
 | `docs/*-agent.md` | Engineering documents (in English), see the routing table below |
 | `src/main/java/mail/mcp/` | Server source; layout in `docs/architecture-agent.md` |
@@ -120,16 +120,16 @@ one in this table.
 
 ## Working with the plan
 
-- `docs/plan.md`, `docs/results.md`, `docs/decisions.md`, `docs/backlog.md` and `docs/research/` are written **in
-  Russian**. Keep Russian when you edit them. `AGENTS.md`, `README.md`, the user documents
-  (`docs/connections.md`, `clients.md`, `commands.md`, `search.md`, `security.md`) and the
-  engineering documents (`docs/*-agent.md`) are written **in English**.
+- All project documentation is written **in English**, including `AGENTS.md`, `README.md`,
+  `docs/`, research reports and test data READMEs. Keep literal non-English examples where they
+  demonstrate language-specific behavior or quote synthetic fixture data. Existing improvement
+  and decision identifiers (`Д…`, `П…`) stay unchanged so references remain stable.
 - User documents describe what a user sees and does: formats, settings, output, exit codes,
   guarantees. They are the single source for those; engineering documents describe the
   implementation and link to them instead of repeating them. A change of user-visible behavior
   updates the user document in the same change. User documents describe the current version for a
   new user; upgrade steps for the user's own data belong in `docs/plan.md` section 2.
-- The Russian documents describe the current state, not the history. Replace outdated statements
+- The project documents describe the current state, not the history. Replace outdated statements
   instead of appending corrections. Git keeps the history.
 - Where to record what:
   - a verified fact or a real-mailbox result goes to `docs/results.md`, anonymized: numbers only,
@@ -147,13 +147,13 @@ one in this table.
     item into the version, move its row to `docs/plan.md` section 4. A rejected idea is deleted
     from the table and recorded with its reason in `docs/decisions.md`;
   - `docs/decisions.md` section 2 gets a row **only for decisions the user made**; mark your own
-    proposals «Предложено». Rows go in date order.
+    proposals "Proposed". Rows go in date order.
 - Delete an implementation brief once it is accepted and recorded, and update the task list in
   `docs/impl-tasks/README.md`.
 - Always use absolute dates in `YYYY-MM-DD` form, never "today" or "yesterday".
-- Mark a fact you have not verified from a primary source "проверить" (to verify); do not
+- Mark a fact you have not verified from a primary source "to verify"; do not
   present recollection as fact.
-- Keep section numbering and internal links (`plan.md 3.1`, `results.md, раздел 1`) consistent
+- Keep section numbering and internal links (`plan.md 3.1`, `results.md, section 1`) consistent
   when you add or move sections. Code comments cite these documents too.
 
 ## Architecture summary

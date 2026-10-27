@@ -34,8 +34,7 @@ Optional tool-output secret replacement is described in `docs/redaction-agent.md
 Not implemented: PII anonymization, MCP resources, embeddings, writing
 mail; see `docs/backlog.md`.
 
-Read/star flags are implemented and verified offline; real-server behavior remains to verify
-(проверить). `RemoteMessageInfo`, `MessageMeta` and `MessageCard` carry nullable `read`/`flagged`.
+Read/star flags are implemented and verified offline; real-server behavior remains to verify. `RemoteMessageInfo`, `MessageMeta` and `MessageCard` carry nullable `read`/`flagged`.
 Unknown is omitted, while false clears an observed value. Known messages get flags with the
 folder changes (`FolderChanges.observed`): IMAP from FLAGS in the UID listing, EWS from
 ReadFlagChange and a short GetItem of Update items (Д29). IMAP uses the actual FETCH responses
@@ -196,7 +195,7 @@ After a run that did not complete, reconciliation compares indexed folder/ref/pa
 disk metadata and restores just mismatched documents without reconversion; after a completed run it
 compares keys only (Д30). Current local refs make reruns after metadata reassignment,
 index commit or interrupted downloads/cursor save idempotent. No journal or second store is
-used. Protocol availability on the user's servers remains to verify (проверить).
+used. Protocol availability on the user's servers remains to verify.
 
 ### Planned packages
 

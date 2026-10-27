@@ -98,7 +98,7 @@ before unmatched removals. All cursors advance only after planned changes commit
 repairs metadata/index folder/ref and flag mismatches on restart. Reused moves contribute no downloaded,
 failed or removed count. See `docs/storage-agent.md` for exact eligibility and recovery rules.
 Synthetic protocol tests cover these requests; availability on the user's EWS server remains
-to verify (проверить), not a real-mail result.
+to verify, not a real-mail result.
 
 Primary references checked 2026-10-27: [ItemShape](https://learn.microsoft.com/en-us/exchange/client-developer/web-service-reference/itemshape)
 and [FieldURI](https://learn.microsoft.com/en-us/exchange/client-developer/web-service-reference/fielduri).
@@ -119,7 +119,7 @@ and writes nothing to the mailbox. Known flag changes leave local content and do
 metadata unchanged, rebuild only the affected document and increase no message counter.
 Flags are excluded from move identity; destination observations apply on reuse. Schema 4 stores
 known values, with offline rebuild from disk; old data stays unknown until sync. Real-server
-availability remains to verify (проверить).
+availability remains to verify.
 
 Primary references: [Flag](https://learn.microsoft.com/en-us/exchange/client-developer/web-service-reference/flag)
 and [FlagStatus](https://learn.microsoft.com/en-us/exchange/client-developer/web-service-reference/flagstatus).

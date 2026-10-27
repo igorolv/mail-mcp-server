@@ -1,434 +1,435 @@
-# RT-09 — MIME и почтовые вложения в Java
+# RT-09 — MIME and mail attachments in Java
 
-- Дата: 2026-10-24
-- Исполнитель: Codex / GPT-6, исследовательская сессия RT-09
-- Бриф: `docs/research-tasks/RT-09-mime-attachments.md`
+- Date: 2026-10-24
+- Author: Codex / GPT-6, research session RT-09
+- Brief: `docs/research-tasks/RT-09-mime-attachments.md`
 
-## Кратко
+## Summary
 
-- [предположение] Рекомендую **Apache James Mime4j 0.8.15, потоковый API** для общего
-  разбора `.eml` из EWS и IMAP: он позволяет сохранять части на диск и явно ограничивать
-  структуру. Новые общие лимиты подтверждены в выпуске 0.8.15 от 2026-09-03. [1–3]
-- [док] Angus/Jakarta Mail удобен объектной моделью и декодированием заголовков;
-  `MimeMessage(InputStream)` не гарантирует постоянную память. Tika `RFC822Parser`
-  использует Mime4j, но внутри буферизует некоторые тела, поэтому тоже не полностью потоковый. [4–7]
-- [предположение] RFC 2047 и RFC 2231 обрабатывать раздельно; для параметров имён
-  использовать Jakarta Mail `ParameterList`, для нестандартного encoded-word в имени —
-  ограниченный совместимый режим. Кодировки определять для каждой текстовой части. [8–12]
-- [предположение] Сохранять полное тело и оригинал; из `multipart/alternative` выбирать
-  одно представление. HTML преобразовывать jsoup с собственным сохранением ссылок и таблиц;
-  удаление цитат/подписей оставлять отключаемым производным представлением. [13–18]
-- [док] MSG читает POI HSMF, TNEF/`winmail.dat` — POI HMEF; нужен `poi-scratchpad`.
-  Оба формата требуют отдельного обхода вложений, а не только получения общего текста. [19–23]
-- [предположение] Новые парсеры MVP: `EmlMessageParser`, `MsgMessageParser`, `TnefParser`,
-  `HtmlBodyParser`, `CalendarInviteParser` и распознающий `SmimeEnvelopeParser`.
-  Для S/MIME MVP ограничить обнаружением; для ICS — чтением приглашения без операций календаря. [24–28]
-- [код] В sibling project фактически выполняются **все** подходящие PRIMARY-парсеры;
-  ранний порядок сам по себе не исключает дубли. `PlainTextParser` захватывает HTML/ICS,
-  Tika может повторно разбирать контейнер, а счётчик байтов ZIP локален одному архиву. [29]
-- [предположение] Нужны общие счётчики для всей цепочки MIME → MSG/TNEF → ZIP → документ,
-  отдельный предел MIME-глубины, безопасные внутренние имена и ограничение работы парсера
-  процессом. Ограничение длины ответа не ограничивает расход памяти при разборе. [3, 29–31]
+- [assumption] Recommend **Apache James Mime4j 0.8.15, streaming API** for shared parsing of
+  `.eml` from EWS and IMAP: it allows saving parts to disk and explicitly limiting structure.
+  New shared limits are confirmed in release 0.8.15 of 2026-09-03. [1–3]
+- [docs] Angus/Jakarta Mail offers a convenient object model and header decoding;
+  `MimeMessage(InputStream)` does not guarantee constant memory. Tika's `RFC822Parser` uses
+  Mime4j but buffers some bodies internally, so it is not fully streaming either. [4–7]
+- [assumption] Handle RFC 2047 and RFC 2231 separately; use Jakarta Mail `ParameterList` for
+  filename parameters and a bounded compatibility mode for nonstandard encoded-word filenames.
+  Determine the charset of each text part separately. [8–12]
+- [assumption] Preserve the complete body and original; choose one `multipart/alternative`
+  representation. Convert HTML with jsoup and custom link/table preservation; quote/signature
+  removal should remain an optional derived representation. [13–18]
+- [docs] POI HSMF reads MSG, POI HMEF reads TNEF/`winmail.dat`; `poi-scratchpad` is required.
+  Both formats need separate attachment traversal, not just aggregate text extraction. [19–23]
+- [assumption] New MVP parsers: `EmlMessageParser`, `MsgMessageParser`, `TnefParser`,
+  `HtmlBodyParser`, `CalendarInviteParser` and a recognizing `SmimeEnvelopeParser`.
+  Limit S/MIME to detection in the MVP; ICS to reading invitations without calendar actions. [24–28]
+- [code] The sibling project actually runs **all** matching PRIMARY parsers; early ordering
+  alone does not prevent duplicates. `PlainTextParser` captures HTML/ICS, Tika can parse
+  containers again, and the ZIP byte counter is local to each archive. [29]
+- [assumption] Shared counters are needed across MIME → MSG/TNEF → ZIP → document, with a
+  separate MIME depth limit, safe internal names and a process limiting parser work.
+  Limiting response length does not bound parsing memory. [3, 29–31]
 
-## Ответы на вопросы
+## Answers to the questions
 
-### В1. MIME-парсеры: Angus Mail, Mime4j, Tika
+### В1. MIME parsers: Angus Mail, Mime4j, Tika
 
-[док] `MimeMessage` относится к Jakarta Mail API, совместимую реализацию которого предоставляет
-Eclipse Angus Mail. Для честного сравнения ниже рассматривается связка API + Angus,
-а не класс из пакета `org.eclipse.angus`. [4, 32]
+[docs] `MimeMessage` belongs to the Jakarta Mail API, for which Eclipse Angus Mail provides a
+compatible implementation. For a fair comparison, the table covers API + Angus, rather than a
+class in the `org.eclipse.angus` package. [4, 32]
 
-| Кандидат | Память и способ чтения | Повреждённые сообщения | Заголовки | Лицензия и сопровождение |
+| Candidate | Memory and reading method | Damaged messages | Headers | License and maintenance |
 |---|---|---|---|---|
-| Angus / `MimeMessage` | [док] Объектная модель; обычный поток сохраняется как байты тела, `SharedInputStream` позволяет разделять поток; multipart разбирается при обращении | [док] Есть режимы для отсутствующей конечной границы, отсутствующего boundary и неверных encoded words | [док] `getSubject`, адреса, `MimeUtility`, `ParameterList`; сырые заголовки доступны отдельно | [док] EPL-2.0 / GPL-2.0 с Classpath Exception, отдельные части EDL-1.0; сайт указывает стабильный 2.0.5 [4, 8, 32, 33] |
-| Mime4j: `MimeStreamParser` / `MimeTokenStream` | [док] [код] События или последовательность токенов; потребитель решает, что сохранять; декодирование тела включается явно | [док] [код] Нестрогий разбор и контроль ошибок; ограничения структуры заданы через `MimeConfig` | [код] `DecoderUtil`, типизированные поля из DOM-модуля можно применять без построения дерева тел | [док] [код] Apache-2.0; выпуск 0.8.15 добавляет лимиты, см. ниже [1–3, 7, 12] |
-| Mime4j DOM | [док] Дерево письма; для больших тел есть хранение во временных файлах через storage-модуль | [док] Та же основа разбора; построение дерева увеличивает число объектов | [док] Удобный доступ к полям и телам | [док] Apache-2.0, тот же проект; выбор хранения нужно настроить [1, 2] |
-| Tika `RFC822Parser` | [код] Потоковый Mime4j → SAX/XHTML; `MailContentHandler` накапливает байты альтернатив и ряда частей первого уровня | [код] Передаётся `MimeConfig` в `ParseContext`; отдельного обещания исправить любое повреждённое письмо нет | [код] Формирует метаданные письма и передаёт вложения `EmbeddedDocumentExtractor` | [код] Apache-2.0; здесь проверены исходники и API 3.2.3, это не утверждение о последнем выпуске Tika [5–7] |
+| Angus / `MimeMessage` | [docs] Object model; an ordinary stream is saved as body bytes, `SharedInputStream` allows sharing a stream; multipart is parsed on access | [docs] Modes for a missing final boundary, absent boundary parameter and invalid encoded words | [docs] `getSubject`, addresses, `MimeUtility`, `ParameterList`; raw headers available separately | [docs] EPL-2.0 / GPL-2.0 with Classpath Exception, some parts EDL-1.0; the site lists stable 2.0.5 [4, 8, 32, 33] |
+| Mime4j: `MimeStreamParser` / `MimeTokenStream` | [docs] [code] Events or a token sequence; the consumer decides what to save; body decoding is explicitly enabled | [docs] [code] Lenient parsing and error handling; structural limits through `MimeConfig` | [code] `DecoderUtil`, typed fields from the DOM module usable without constructing a body tree | [docs] [code] Apache-2.0; release 0.8.15 adds limits, see below [1–3, 7, 12] |
+| Mime4j DOM | [docs] A message tree; the storage module supports temporary files for large bodies | [docs] Same parsing foundation; building the tree increases object counts | [docs] Convenient field and body access | [docs] Apache-2.0, same project; storage must be configured [1, 2] |
+| Tika `RFC822Parser` | [code] Streaming Mime4j → SAX/XHTML; `MailContentHandler` accumulates bytes for alternatives and some top-level parts | [code] `MimeConfig` is passed in `ParseContext`; no separate promise to repair every damaged message | [code] Produces message metadata and passes attachments to `EmbeddedDocumentExtractor` | [code] Apache-2.0; source and API 3.2.3 were checked here, not a claim about the latest Tika release [5–7] |
 
-[док] [код] Страница Mime4j осталась с датой 2017-06-15 и версией `0.8.2-SNAPSHOT`;
-её историческое сравнение терпимости с JavaMail не является современным измерением.
-Актуальность проекта подтверждается отдельным объявлением 0.8.15 и исходником его тега. [1–3]
+[docs] [code] The Mime4j site still shows 2017-06-15 and version `0.8.2-SNAPSHOT`; its historical
+comparison of leniency with JavaMail is not a current measurement. The separate 0.8.15
+announcement and tagged source confirm that the project is current. [1–3]
 
-[код] В `MimeConfig` **тега 0.8.15** присутствуют `maxPartCount`, `maxNestingDepth`,
-`maxTotalHeaderCount`, `maxTotalHeaderLen`, а также ограничения отдельного поля,
-строки, числа заголовков и содержимого сущности. `maxContentLen` не заменяет
-суммарный счётчик декодированных вложений и распакованных архивов приложения. [3]
+[code] `MimeConfig` in **tag 0.8.15** has `maxPartCount`, `maxNestingDepth`,
+`maxTotalHeaderCount`, `maxTotalHeaderLen`, and limits for individual fields, lines, header
+counts and entity content. `maxContentLen` does not replace an application-wide counter of
+decoded attachments and unpacked archives. [3]
 
-[предположение] Для mail-mcp-server потоковый Mime4j предпочтительнее DOM: результатом
-должны стать собственные нормализованные записи и файлы, а изменяемое дерево письма
-не требуется. Angus остаётся пригодным для IMAP; это не обязывает использовать его
-объектную модель как общий парсер EWS и IMAP. [1, 4, 29]
+[assumption] Streaming Mime4j is preferable to DOM for mail-mcp-server: the output should be
+our own normalized records and files; a mutable message tree is unnecessary. Angus remains
+suitable for IMAP; this does not require using its object model as the shared EWS/IMAP parser.
+[1, 4, 29]
 
-[предположение] Tika удобна как источник образцов нормализации и резервный извлекатель
-документов. Использовать один `RFC822Parser` как весь почтовый слой сложнее:
-понадобится собственный обработчик вложений и контроль буферов, альтернатив и CID. [5–7]
+[assumption] Tika is useful as a source of normalization examples and a fallback document
+extractor. Using one `RFC822Parser` as the entire mail layer is harder: it needs a custom
+attachment handler and control over buffers, alternatives and CID. [5–7]
 
-### В2. Заголовки, имена файлов и русские кодировки
+### В2. Headers, filenames and Russian charsets
 
-[док] RFC 2047 задаёт encoded words вида `=?charset?B?...?=` и `=?charset?Q?...?=`
-для допустимых позиций в заголовках; это не способ кодирования MIME-параметров.
-RFC 2231 задаёт `filename*=charset'language'value` и продолжения `filename*0*`,
-`filename*1*`. Процентное декодирование обычного `filename=` применять нельзя. [9, 10]
+[docs] RFC 2047 defines encoded words such as `=?charset?B?...?=` and `=?charset?Q?...?=` in
+allowed header positions; it is not a MIME parameter encoding method. RFC 2231 defines
+`filename*=charset'language'value` and continuations `filename*0*`, `filename*1*`.
+Do not percent-decode ordinary `filename=`. [9, 10]
 
-[предположение] Рекомендуемая последовательность нормализации имени: [8–11, 34]
+[assumption] Recommended filename normalization order: [8–11, 34]
 
-1. Разобрать параметры `Content-Disposition`, собрать и декодировать RFC 2231;
-   взять непустое `filename`. При отсутствии — разобрать `name` из `Content-Type`.
-2. При конфликте сохранить исходные значения и предупреждение; не склеивать разные имена.
-   Такой приоритет двух заголовков соответствует MS-OXCMAIL.
-3. Если имя всё ещё содержит целый encoded-word, один раз применить RFC 2047 как
-   совместимость с отправителями, нарушающими стандарт; отметить это в результате.
-4. Если имени нет, выдать внутреннее `part-<id>` и отдельно определённое расширение;
-   не превращать `Content-ID` или тему письма в доверенный путь.
-5. Хранить `originalFilename`, `decodedFilename`, `storedFilename` отдельно;
-   файл сохранять под внутренним идентификатором, см. В5.
+1. Parse `Content-Disposition` parameters, assemble and decode RFC 2231; take a nonempty
+   `filename`. If absent, parse `name` from `Content-Type`.
+2. On conflict, retain the original values and a warning; do not concatenate different names.
+   This priority between the two headers follows MS-OXCMAIL.
+3. If the name still contains a complete encoded-word, apply RFC 2047 once for compatibility
+   with noncompliant senders; record this in the result.
+4. If there is no name, assign an internal `part-<id>` and a separately determined extension;
+   do not treat `Content-ID` or the message subject as a trusted path.
+5. Store `originalFilename`, `decodedFilename` and `storedFilename` separately; save the file
+   under an internal identifier, see В5.
 
-[док] В Jakarta Mail RFC 2231 включён по умолчанию (`mail.mime.decodeparameters=true`).
-`ParameterList` допускает мягкий режим: при ошибке декодирования может оставить исходное
-значение; строгий режим задаёт `mail.mime.decodeparameters.strict=true`. [11]
+[docs] Jakarta Mail enables RFC 2231 by default (`mail.mime.decodeparameters=true`).
+`ParameterList` supports a lenient mode: it may retain the original value on a decoding error;
+`mail.mime.decodeparameters.strict=true` enables strict mode. [11]
 
-[док] `mail.mime.decodefilename=true` включает `MimeUtility.decodeText` для имени;
-документация прямо относит это к совместимости с нарушающими MIME клиентами.
-`mail.mime.decodetext.strict=false` разрешает encoded words внутри слова.
-Это глобальные System properties; менять их на каждом письме не следует. [8]
+[docs] `mail.mime.decodefilename=true` enables `MimeUtility.decodeText` for filenames; the
+documentation explicitly describes it as compatibility with clients that violate MIME.
+`mail.mime.decodetext.strict=false` allows encoded words inside a word. These are global
+System properties; do not change them for each message. [8]
 
-[код] У просмотренного `ContentTypeFieldLenientImpl` Mime4j параметры поступают в карту
-как пары имя/значение. По этому классу нельзя заключить, что любое имя RFC 2231 уже
-собрано и декодировано. Поэтому рекомендую явный адаптер на `ParameterList` для
-параметрической части заголовка, а не предположение о готовом `filename`. [11, 35]
+[code] In the inspected Mime4j `ContentTypeFieldLenientImpl`, parameters enter a map as
+name/value pairs. That class does not establish that every RFC 2231 name is already assembled
+and decoded. Therefore, recommend an explicit `ParameterList` adapter for the parameter section
+of the header, rather than assuming a ready `filename`. [11, 35]
 
-[док] [предположение] Для Outlook/Exchange подтверждены приоритет `filename` перед `name`
-и необходимость учитывать длинные имена из MAPI/TNEF. Нестандартные encoded words,
-некавыченные пробелы, разрывы продолжений и неизвестные charset включить в набор примеров;
-их частота именно в пользовательском Exchange не проверялась. [8, 11, 20, 23, 34]
+[docs] [assumption] For Outlook/Exchange, `filename` takes priority over `name`, and long names
+from MAPI/TNEF must be considered. Include nonstandard encoded words, unquoted spaces, broken
+continuations and unknown charsets in the examples; their frequency in the user's Exchange
+has not been checked. [8, 11, 20, 23, 34]
 
-[док] [код] Java 25 содержит `KOI8-R` и `windows-1251`; Mime4j `DecoderUtil` умеет
-декодировать RFC 2047, принимать резервную кодировку и таблицу переопределений.
-Это механизм исправления известной ошибки, а не автоматическое распознавание языка. [12, 36]
+[docs] [code] Java 25 includes `KOI8-R` and `windows-1251`; Mime4j `DecoderUtil` can decode
+RFC 2047 and accept a fallback charset and an override table. This repairs a known error;
+it does not automatically recognize a language. [12, 36]
 
-[предположение] Для тела сначала снять `Content-Transfer-Encoding`, затем декодировать
-полученные байты по `charset` **конкретной части**. Заголовки могут иметь другую кодировку.
-Для отсутствующей/неизвестной кодировки сохранить байты и `charsetWarning`, использовать
-контролируемый резервный выбор из UTF-8 / windows-1251 / KOI8-R с указанием метода. [9, 12, 37]
+[assumption] For bodies, first decode `Content-Transfer-Encoding`, then decode the resulting
+bytes using the `charset` of **that particular part**. Headers may use another charset. For a
+missing/unknown charset, preserve bytes and `charsetWarning`; use a controlled fallback choice
+of UTF-8 / windows-1251 / KOI8-R and record the method. [9, 12, 37]
 
-[предположение] Неверная, но существующая метка вроде `iso-8859-1` обычно не вызывает
-ошибки декодера: результат может быть нечитаемым. В просмотренных API нет гарантии
-правильного автоматического исправления такого случая. Автозамену разрешать только по
-проверяемому правилу или настройке соединения; исходный результат оставлять доступным. [8, 12, 36]
+[assumption] An incorrect but existing label such as `iso-8859-1` usually causes no decoder
+error: the result can be unreadable. The inspected APIs do not guarantee correct automatic
+repair. Allow automatic replacement only under a verifiable rule or connection setting;
+keep the original result available. [8, 12, 36]
 
-[предположение] Нормализованный результат должен содержать исходный заголовок и разобранные
-`subject`, `from`, `to`, `cc`, `replyTo`, `messageId`, `inReplyTo`, `references`, дату с зоной.
-Адреса разбирать штатным парсером, дату с ошибкой оставлять неопределённой; повторные поля
-не терять. `Message-ID` не считать гарантией уникальности локального файла. [4, 38]
+[assumption] The normalized result should contain the original header and parsed `subject`,
+`from`, `to`, `cc`, `replyTo`, `messageId`, `inReplyTo`, `references`, and a date with time zone.
+Use the standard address parser; leave an invalid date unknown and preserve repeated fields.
+Do not treat `Message-ID` as a guarantee of local file uniqueness. [4, 38]
 
-### В3. Выбор тела, HTML, цитаты и подписи
+### В3. Body selection, HTML, quotes and signatures
 
-[док] Части `multipart/alternative` представляют альтернативы одного содержимого;
-RFC 2046 рекомендует размещать более богатое представление последним и выбирать
-последнее поддерживаемое. Простое объединение plain и HTML даёт повтор текста. [13]
+[docs] `multipart/alternative` parts are alternative representations of the same content;
+RFC 2046 recommends placing the richer representation last and selecting the last supported
+one. Simply joining plain text and HTML duplicates text. [13]
 
-[предположение] Для текстового ответа MCP предлагаю свою явно описанную политику:
-непустой пригодный `text/plain`, иначе преобразованный HTML. Это осознанное предпочтение
-простого текста, а не буквальное следование правилу выбора наиболее богатого варианта.
-Если plain — только заглушка, разрешать HTML по ограниченной проверяемой эвристике. [13]
+[assumption] For MCP text responses, propose an explicitly documented policy: nonempty usable
+`text/plain`, otherwise converted HTML. This deliberately prefers plain text over literally
+following the richest-supported-alternative rule. If plain text is only a placeholder, allow
+HTML under a bounded, verifiable heuristic. [13]
 
-[предположение] В `multipart/mixed` объединять последовательные части тела с разделителями,
-но не текст вложенных файлов. В `multipart/related` учитывать корневую часть через `start`,
-если она задана, и держать изображения отдельными объектами. Вложенный `message/rfc822`
-всегда получает собственные заголовки и тело, а не продолжает тело родителя. [13, 39]
+[assumption] In `multipart/mixed`, join consecutive body parts with separators, but exclude
+attached file text. In `multipart/related`, honor the root part specified by `start`, if any,
+and keep images as separate objects. An attached `message/rfc822` always gets its own headers
+and body, rather than continuing its parent's body. [13, 39]
 
-[док] [код] Tika по умолчанию `extractAllAlternatives=false`, но обработчик альтернатив
-имеет собственную логику выбора и буферы. Её поведение нельзя считать реализацией
-предложенного предпочтения plain без отдельной проверки. [5–7]
+[docs] [code] Tika defaults to `extractAllAlternatives=false`, but its alternative handler has
+its own selection logic and buffers. Its behavior cannot be treated as implementing the proposed
+plain-text preference without separate verification. [5–7]
 
-[док] jsoup разбирает HTML из строки в DOM. `Element.text()` возвращает текст,
-а `href` извлекается отдельно через `attr`; адрес ссылки сам по себе в тексте не появляется.
-`HtmlToPlainText` — пример простого форматирования, требующий расширения для реальной почты. [14–16]
+[docs] jsoup parses an HTML string into a DOM. `Element.text()` returns text; `href` is obtained
+separately through `attr`, and the link address does not automatically appear in the text.
+`HtmlToPlainText` is a simple formatting example that needs extending for real mail. [14–16]
 
-[предположение] `HtmlBodyParser` должен обходить DOM и выдавать обычный текст:
+[assumption] `HtmlBodyParser` should traverse the DOM and produce plain text:
 
-- Абзацы и `<br>` → переносы, списки → строки с маркерами, `<pre>` → сохранённые пробелы.
-- Ссылки → `подпись (URL)`, если URL отличается от подписи; только текст, без переходов.
-- `<tr>` → строка, `<th>/<td>` → ячейки с разделителем; ограничения строк/столбцов.
-- `script`, `style`, служебные элементы → исключить; скрытие по произвольному CSS
-  полностью не эмулировать, это текстовый извлекатель, а не браузер.
-- Исходный HTML сохранить отдельно; `cid:` представить ссылкой на внутреннюю часть,
-  `img alt` — ограниченным текстом. Внешние URL, CSS, шрифты и картинки не загружать.
+- Paragraphs and `<br>` → line breaks; lists → bulleted lines; `<pre>` → preserved whitespace.
+- Links → `label (URL)` if the URL differs from the label; text only, without following links.
+- `<tr>` → a row; `<th>/<td>` → delimited cells; row/column limits.
+- Exclude `script`, `style` and utility elements; do not fully emulate arbitrary CSS hiding:
+  this is a text extractor, not a browser.
+- Preserve original HTML separately; represent `cid:` as an internal-part link and `img alt`
+  as bounded text. Do not fetch external URLs, CSS, fonts or images.
 
-[предположение] Такая обработка использует механизмы jsoup [14–16], но сохранение таблиц
-и ссылок является нашей политикой; сравнивать результат с резервным Tika `JSoupParser`
-на искусственных примерах. Наличие XHTML на выходе Tika не гарантирует удобный plain text. [40]
+[assumption] This uses jsoup mechanisms [14–16], but preserving tables and links is our policy;
+compare results with fallback Tika `JSoupParser` on synthetic examples. Tika's XHTML output
+does not guarantee usable plain text. [40]
 
-[код] `github/email_reply_parser` (Ruby, MIT) разбивает plain text снизу вверх на фрагменты,
-помечая цитату, подпись и скрываемую часть. README предупреждает об английских разделителях;
-код уже содержит обработку некоторых многострочных заголовков, поэтому README не точнее кода. [17]
+[code] `github/email_reply_parser` (Ruby, MIT) splits plain text into fragments from bottom to
+top, marking quotes, signatures and hidden sections. The README warns about English separators;
+the code already handles some multiline headers, so the README is not more accurate than the
+code. [17]
 
-[код] Mailgun `talon` (Python, Apache-2.0) содержит обработку цитат plain/HTML,
-простое выделение подписи и вариант с машинным обучением. Полезны `quotations.py`,
-`html_quotations.py` и примеры `signature.bruteforce`; полнота русского языка не доказана. [18]
+[code] Mailgun `talon` (Python, Apache-2.0) handles plain/HTML quotes, simple signature extraction
+and a machine learning variant. Useful files include `quotations.py`, `html_quotations.py` and
+`signature.bruteforce` examples; full Russian coverage is unproven. [18]
 
-[предположение] Для MVP не добавлять Python/Ruby-процесс ради очистки. Возможен перенос идей:
-блоки `>` и `blockquote`, подтверждённые разделители ответа, строка подписи `-- `,
-отдельные правила для русских «От:», «Отправлено:», «Кому:», «Тема:».
-Не обрезать письмо по одиночному «С уважением» или любому двоеточию. [17, 18]
+[assumption] Do not add a Python/Ruby process for cleanup in the MVP. Ideas can be ported:
+`>` and `blockquote` blocks, confirmed reply separators, the `-- ` signature line, and separate
+rules for Russian `От:`, `Отправлено:`, `Кому:`, `Тема:`. Do not truncate a message at a lone
+`С уважением` or any colon. [17, 18]
 
-[предположение] Хранить `bodyTextFull` и необязательный `bodyTextReply` с описанием удалённых
-диапазонов и версией правила. По умолчанию отдавать полный текст; ошибочная очистка может
-удалить пересланное поручение или ответ между строками цитаты. [17, 18]
+[assumption] Store `bodyTextFull` and optional `bodyTextReply`, with removed ranges and the rule
+version described. Return full text by default; incorrect cleanup can remove a forwarded task
+or a reply interleaved with quoted lines. [17, 18]
 
-### В4. Почтовые форматы вложений
+### В4. Mail attachment formats
 
-[док] Возможности, библиотеки, лицензии и ограничения по каждому случаю сведены в первую
-таблицу раздела «Сравнительные таблицы». Существенные особенности обработки ниже. [19–28]
+[docs] Capabilities, libraries, licenses and limits for each case are collected in the first table under
+Comparison tables. Important processing details follow. [19–28]
 
-[код] [предположение] MSG не является MIME. HSMF даёт `MAPIMessage` и `AttachmentChunks`,
-включая отдельный доступ к вложенному MAPI-письму и байтам обычного вложения.
-Нужен адаптер в ту же нормализованную модель; перекодирование всего MSG в искусственный EML
-не требуется. Для тела использовать plain, затем HTML, затем RTF через извлекатель. [19, 21, 23]
+[code] [assumption] MSG is not MIME. HSMF provides `MAPIMessage` and `AttachmentChunks`, with
+separate access to an attached MAPI message and ordinary attachment bytes. An adapter to the
+same normalized model is needed; converting the entire MSG into an artificial EML is unnecessary.
+For the body, use plain text, then HTML, then RTF through an extractor. [19, 21, 23]
 
-[док] [код] HMEF предоставляет тему, RTF-тело и вложения, включая длинные имена;
-`getContents()` возвращает массив байтов. Конструктор читает атрибуты и накапливает объекты,
-поэтому ограничивать только запись дочерних файлов слишком поздно. [20, 22]
+[docs] [code] HMEF provides the subject, RTF body and attachments, including long names;
+`getContents()` returns a byte array. The constructor reads attributes and accumulates objects,
+so limiting only child-file writes is too late. [20, 22]
 
-[предположение] Проверять TNEF по MIME-типу и сигнатуре, включая `application/ms-tnef`;
-одно имя `winmail.dat` — подсказка, а не доказательство. Вложения HMEF отправлять в общий
-пайплайн; RTF-тело превращать в текст через имеющийся Tika, не выдавать управляющий RTF. [20, 22, 40]
+[assumption] Check TNEF by MIME type and signature, including `application/ms-tnef`; the name
+`winmail.dat` alone is a hint, not proof. Send HMEF attachments through the shared pipeline;
+convert the RTF body to text with the existing Tika, rather than returning RTF controls. [20, 22, 40]
 
-[док] [предположение] `text/calendar`/ICS читать как вложение с `UID`, `METHOD`,
-`SUMMARY`, `DESCRIPTION`, `LOCATION`, `DTSTART`, `DTEND`, `TZID`, участниками и организатором.
-Сохранять `RRULE`, но не разворачивать повторения; не выполнять `VALARM` и не загружать `ATTACH`.
-Это извлечение текста приглашения, без принятия встречи и доступа к календарю. [24, 25]
+[docs] [assumption] Read `text/calendar`/ICS as an attachment with `UID`, `METHOD`, `SUMMARY`,
+`DESCRIPTION`, `LOCATION`, `DTSTART`, `DTEND`, `TZID`, attendees and organizer. Preserve `RRULE`
+but do not expand recurrence; do not execute `VALARM` or download `ATTACH`. This extracts the
+invitation text without accepting a meeting or accessing the calendar. [24, 25]
 
-[док] S/MIME различает `multipart/signed` с отдельной `application/pkcs7-signature` (`.p7s`),
-непрозрачную подпись `application/pkcs7-mime; smime-type=signed-data` и зашифрованную
-оболочку `smime-type=enveloped-data` (часто `.p7m`). Расширения недостаточно для различения. [26]
+[docs] S/MIME distinguishes `multipart/signed` with a separate `application/pkcs7-signature`
+(`.p7s`), opaque signatures `application/pkcs7-mime; smime-type=signed-data`, and encrypted
+envelopes `smime-type=enveloped-data` (often `.p7m`). The extension alone cannot distinguish
+them. [26]
 
-[предположение] В MVP читать первую часть `multipart/signed` как обычный MIME, но ставить
-`signatureStatus=not_verified`; `.p7s` хранить как подпись, не как тело. Для непрозрачного
-CMS выдавать `opaque_signed` / `encrypted` / `unknown_cms` по доступным признакам,
-оригинал и причину отсутствия текста. Не сообщать «пустое письмо». [26]
+[assumption] In the MVP, read the first `multipart/signed` part as ordinary MIME, but set
+`signatureStatus=not_verified`; store `.p7s` as a signature, not a body. For opaque CMS, return
+`opaque_signed` / `encrypted` / `unknown_cms` based on available evidence, the original, and the
+reason text is unavailable. Do not report an "empty message". [26]
 
-[док] [предположение] При расширении поддержки Bouncy Castle даёт CMS и S/MIME;
-для Jakarta Mail есть отдельный вариант S/MIME-библиотеки. Извлечение signed-data без
-закрытого ключа возможно, расшифрование требует ключа получателя; проверка подписи
-и доверия сертификату — отдельные действия. В MVP их не рекомендую. [26–28]
+[docs] [assumption] For expanded support, Bouncy Castle provides CMS and S/MIME; there is a
+separate S/MIME library variant for Jakarta Mail. Extracting signed-data requires no private
+key; decryption requires the recipient's key. Signature verification and certificate trust
+are separate operations. These are not recommended for the MVP. [26–28]
 
-### В5. Лимиты и опасные входные данные
+### В5. Limits and dangerous input
 
-[предположение] Ниже — **начальные предлагаемые значения**, а не лимиты Exchange или
-библиотек. Подбирать их по обезличенным примерам; превышение отражать в результате,
-не пытаться автоматически повторять разбор с отключёнными ограничениями. Основание: [3, 29–31].
+[assumption] The following are **initial proposed values**, not Exchange or library limits.
+Tune them on anonymized examples; reflect exceeded limits in the result, without automatically
+retrying parsing with limits disabled. Basis: [3, 29–31].
 
-| Ограничение | Предложение | Где проверять |
+| Limit | Proposal | Where to check |
 |---|---|---|
-| Исходный EML / один контейнер | 50 MiB / 25 MiB для MSG и TNEF | При получении и до конструктора парсера; считать реально прочитанное |
-| Декодированная часть | 25 MiB | При Base64/QP-декодировании и записи, до `readAllBytes`/построения строки |
-| Все производные байты | 100 MiB на корневое письмо | Общий изменяемый счётчик для MIME, TNEF, MSG, ZIP и документов |
-| MIME-части / заголовки | 512 частей; 200 полей на сущность; 4096 всего | `MimeConfig` + общий счётчик при повторном входе в парсер |
-| Длина заголовков | 64 KiB на поле/физическую строку; 1 MiB суммарно | До накопления заголовка; соответствующие настройки `MimeConfig` |
-| MIME-глубина | 32, корневая сущность = 1 | Внутри MIME-парсера; не путать с глубиной файловых контейнеров |
-| Глубина EML/MSG/TNEF/ZIP | 5 переходов; корневой файл = 0 | До каждого рекурсивного вызова, общий контекст всех типов |
-| Выходные объекты / записи архива | 256 объектов; 200 записей на ZIP | Считать также пропущенные части и каталоги, не только выданный текст |
-| HTML / ICS | HTML ≤ 2 MiB и 100000 DOM-узлов; ICS ≤ 1 MiB и 1000 компонентов | Байты до DOM/модели; узлы/компоненты дополнительно, после или во время разбора |
-| Текст результата | 200000 символов суммарно, 20000 на часть | При накоплении извлечения; лимит ответа MCP дополнительно |
-| Время / память | 30 s и 512 MiB на изолированный процесс обработки | Процесс с остановкой по сроку; кооперативная проверка между частями |
+| Original EML / one container | 50 MiB / 25 MiB for MSG and TNEF | On receipt and before the parser constructor; count bytes actually read |
+| Decoded part | 25 MiB | During Base64/QP decoding and writing, before `readAllBytes`/string construction |
+| All derived bytes | 100 MiB per root message | Shared mutable counter across MIME, TNEF, MSG, ZIP and documents |
+| MIME parts / headers | 512 parts; 200 fields per entity; 4096 total | `MimeConfig` + a shared counter when reentering the parser |
+| Header length | 64 KiB per field/physical line; 1 MiB total | Before accumulating the header; corresponding `MimeConfig` settings |
+| MIME depth | 32, root entity = 1 | Inside the MIME parser; distinct from file-container depth |
+| EML/MSG/TNEF/ZIP depth | 5 transitions; root file = 0 | Before every recursive call, in a context shared by all types |
+| Output objects / archive entries | 256 objects; 200 entries per ZIP | Count skipped parts and directories too, not just returned text |
+| HTML / ICS | HTML ≤ 2 MiB and 100000 DOM nodes; ICS ≤ 1 MiB and 1000 components | Bytes before DOM/model construction; additionally count nodes/components during or after parsing |
+| Result text | 200000 characters total, 20000 per part | While accumulating extracted text; MCP response limits apply separately |
+| Time / memory | 30 s and 512 MiB per isolated processing process | A process terminated at the deadline; cooperative checks between parts |
 
-[код] [предположение] В Mime4j 0.8.15 часть перечисленного выражается штатными настройками [3];
-декодированные байты, переходы между форматами и результаты считать в приложении.
-Локальные пределы каждого нового экземпляра парсера не образуют общий предел.
+[code] [assumption] Mime4j 0.8.15 exposes native settings for some of these [3]; count decoded
+bytes, transitions between formats and results in the application. Local limits on each new
+parser instance do not constitute a shared limit.
 
-[предположение] ZIP-бомбы останавливать по фактически распакованным байтам и числу записей,
-включая вложенные OOXML/ZIP. Коэффициент сжатия — дополнительный сигнал, не замена общего
-лимита; заявленному `ZipEntry.getSize()` и MIME-параметру `size` не доверять. [29–31]
+[assumption] Stop ZIP bombs based on bytes actually extracted and entry counts, including
+nested OOXML/ZIP. Compression ratio is an additional signal, not a replacement for the shared
+limit; do not trust declared `ZipEntry.getSize()` or the MIME `size` parameter. [29–31]
 
-[предположение] При неправильной/незакрытой границе разрешать только ограниченный мягкий
-разбор с предупреждением; при потере структуры сохранять оригинал и частичный результат.
-Не искать произвольные границы повторными проходами без лимита времени/байтов. [3, 8, 13]
+[assumption] For an incorrect/unclosed boundary, allow only bounded lenient parsing with a
+warning; preserve the original and partial result if structure is lost. Do not search for
+arbitrary boundaries with repeated passes without time/byte limits. [3, 8, 13]
 
-[предположение] Большие inline-картинки учитывать в общем объёме даже без OCR. В MVP не
-декодировать пиксели; CID связывать в пределах письма/related-контекста с внутренним ID,
-а не считать глобальным уникальным путём. Для будущего OCR нужен отдельный предел пикселей. [39]
+[assumption] Count large inline images in total volume even without OCR. Do not decode pixels
+in the MVP; bind CID to an internal ID within the message/related context, rather than treating
+it as a globally unique path. Future OCR needs a separate pixel limit. [39]
 
-[предположение] Не использовать имя вложения как относительный путь: исключить `..`,
-абсолютные и UNC-пути, диски, Windows ADS (`:`), управляющие символы, зарезервированные
-имена и коллизии регистра. Лучше записывать по ID с `CREATE_NEW`, проверяя нахождение
-нормализованного пути внутри собственного каталога; display-name хранить метаданными. [29, 31]
+[assumption] Do not use attachment names as relative paths: exclude `..`, absolute and UNC
+paths, drive letters, Windows ADS (`:`), control characters, reserved names and case collisions.
+Prefer writing by ID with `CREATE_NEW`, verifying that the normalized path stays inside the
+owned directory; retain display names as metadata. [29, 31]
 
-[док] [предположение] POI и Tika предупреждают о работе с недоверенными документами.
-Предел вывода не предотвращает выделение памяти внутри HSMF/HMEF, DOM и PDF/Office-парсеров;
-остановка Java-потока по таймауту не гарантирует остановку такого разбора.
-Для жёсткой границы нужен процесс с ограниченной памятью и отключённой сетью. [30, 31]
+[docs] [assumption] POI and Tika warn about untrusted documents. An output limit does not
+prevent internal allocations in HSMF/HMEF, DOM and PDF/Office parsers; timing out a Java thread
+does not guarantee that parsing stops. A hard boundary needs a process with limited memory
+and networking disabled. [30, 31]
 
-[предположение] Сохранять исходные байты до нормализации, производные файлы писать атомарно.
-Статусы `partial`, `limit_exceeded`, `unsupported`, `encrypted`, `parse_error` должны
-различаться; сообщать ID пропущенной части и причину. Текст исключения не должен содержать
-всё тело или заголовки письма. Это продолжает подход восстанавливаемых ответов sibling project. [29]
+[assumption] Preserve original bytes before normalization; write derived files atomically.
+Distinguish `partial`, `limit_exceeded`, `unsupported`, `encrypted` and `parse_error`; report
+the skipped part ID and reason. Exception text must not contain the entire body or headers.
+This extends the sibling project's recoverable-response approach. [29]
 
-### В6. Соответствие существующему пайплайну
+### В6. Fit with the existing pipeline
 
-[код] Проверен `C:\git\redmine-mcp-server` @
-`f62b3e5d546d04533e4259a573293d949939a48d`; рабочее дерево не изменялось.
-Далее пути Java приведены относительно `src/main/java/<org>/redmine/mcp/`. [29]
+[code] Inspected `C:\git\redmine-mcp-server` @
+`f62b3e5d546d04533e4259a573293d949939a48d`; the working tree was unchanged. Java paths below
+are relative to `src/main/java/<org>/redmine/mcp/`. [29]
 
-[код] `extraction/ExtractionPipeline.java` проходит все подходящие PRIMARY, затем FALLBACK;
-`@Order` задаёт порядок, но не выбор единственного обработчика. Это отличается от описания
-«first canParse wins» в `docs/retrieval-extraction-agent.md`. В коде интерфейс использует
-`applies`, а `ParseSink` не содержит описанного в документации `shouldStop()`. [29]
+[code] `extraction/ExtractionPipeline.java` runs all matching PRIMARY parsers, then FALLBACK;
+`@Order` controls order, not selection of a single handler. This differs from "first canParse
+wins" in `docs/retrieval-extraction-agent.md`. The actual interface uses `applies`, and
+`ParseSink` lacks the documented `shouldStop()`. [29]
 
-[код] `ParseSink.processNow` увеличивает `depth` и передаёт тот же `ParseContext`,
-но контекст сейчас содержит только неизменяемые значения лимитов. Суммарное число
-выданных `ExtractedPart` ограничено общим списком; это не счётчик всех разобранных частей. [29]
+[code] `ParseSink.processNow` increments `depth` and passes the same `ParseContext`, but that
+context currently contains only immutable limit values. The shared list bounds the total
+number of emitted `ExtractedPart` objects; it does not count all parsed parts. [29]
 
-[код] `ZipParser` проверяет глубину, но буферизует запись в `ByteArrayOutputStream`;
-`totalBytes` создаётся заново на каждом архиве. В `FileTypeDetector.isPlainText` любой
-`text/*` и `.html` считаются обычным текстом; `PlainTextParser` читает целый файл как UTF-8. [29]
+[code] `ZipParser` checks depth but buffers entries in `ByteArrayOutputStream`; `totalBytes`
+starts anew for each archive. `FileTypeDetector.isPlainText` treats every `text/*` and `.html`
+as plain text; `PlainTextParser` reads the whole file as UTF-8. [29]
 
-[предположение] Переносить следует контракт рекурсивного обработчика и результаты с
-`producer`/`parent`, дополнив устойчивыми `partId`, `parentPartId`, MIME-путём и CID.
-Общий почтовый нормализатор вызывать и для корневого письма, и из `EmlMessageParser`;
-не пропускать корневое тело через обезличенный общий документный fallback. [29]
+[assumption] Port the recursive handler contract and results with `producer`/`parent`, adding
+stable `partId`, `parentPartId`, MIME path and CID. Call the shared mail normalizer for both
+the root message and `EmlMessageParser`; do not route the root body through a generic document
+fallback that lacks mail context. [29]
 
-| Существующий элемент | Необходимое изменение в будущем mail-mcp-server |
+| Existing element | Required change in the future mail-mcp-server |
 |---|---|
-| `PlainTextParser` / `FileTypeDetector` | [предположение] Исключить HTML, calendar, RFC822 и прочие почтовые контейнеры; MIME-параметры отделять от типа, кодировку переносить в `ParseInput`; читать ограниченно. Основание: [29] |
-| `ExtractionPipeline` / `ParseContext` | [предположение] Добавить общие счётчики и причину остановки; проверку глубины перед рекурсией; взаимоисключающие правила распознавания контейнеров. Основание: [29] |
-| `ZipParser` | [предположение] Писать ограниченный поток в отдельный каталог контейнера; учитывать общий расход и количество просмотренных записей; не сбрасывать лимит в ZIP внутри EML. Основание: [29] |
-| `TikaTextFallbackParser` | [предположение] Исключать распознанные почтовые контейнеры даже при пустом тексте/ошибке; передавать ограниченный `EmbeddedDocumentExtractor`, `MimeConfig` и общий контекст для разрешённых случаев. Основание: [6, 7, 29] |
-| `TikaMetadataParser` | [предположение] Не запускать `AutoDetectParser` повторно для EML/MSG/TNEF/S/MIME; метаданные брать из первого разбора. Сейчас `DefaultHandler` убирает вывод, но не вложенную работу парсеров. Основание: [29] |
-| `ImagePassthroughParser` | [предположение] Добавить `contentId`, `inline`, связь с частью и ограничения размера; выводить краткую запись вместо множества однотипных изображений. Основание: [29, 39] |
-| PDF/Office и `BinaryFallbackParser` | [предположение] Форматную логику сохранить; подключить общий контроль ресурсов. Для неполного/зашифрованного письма выдавать специальный статус вместо общего «нет текста». Основание: [29–31] |
+| `PlainTextParser` / `FileTypeDetector` | [assumption] Exclude HTML, calendar, RFC822 and other mail containers; separate MIME parameters from the type, carry charset in `ParseInput`; read with bounds. Basis: [29] |
+| `ExtractionPipeline` / `ParseContext` | [assumption] Add shared counters and a stop reason, check depth before recursion, and use mutually exclusive container recognition rules. Basis: [29] |
+| `ZipParser` | [assumption] Write a bounded stream into a separate container directory; track shared consumption and inspected entry counts; do not reset the limit for ZIP inside EML. Basis: [29] |
+| `TikaTextFallbackParser` | [assumption] Exclude recognized mail containers even on empty text/error; pass a bounded `EmbeddedDocumentExtractor`, `MimeConfig` and shared context for allowed cases. Basis: [6, 7, 29] |
+| `TikaMetadataParser` | [assumption] Do not run `AutoDetectParser` again for EML/MSG/TNEF/S/MIME; obtain metadata from the first parse. Currently `DefaultHandler` discards output, but does not prevent nested parser work. Basis: [29] |
+| `ImagePassthroughParser` | [assumption] Add `contentId`, `inline`, a part link and size limits; return a short record instead of many identical images. Basis: [29, 39] |
+| PDF/Office and `BinaryFallbackParser` | [assumption] Keep format logic; connect shared resource controls. For incomplete/encrypted messages, return a specific status instead of generic "no text". Basis: [29–31] |
 
-## Сравнительные таблицы
+## Comparison tables
 
-### Форматы и специальные случаи
+### Formats and special cases
 
-| Формат / случай | Библиотека | Что извлекается | Ограничения | Лицензия | Источник |
+| Format / case | Library | Extracted content | Limits | License | Source |
 |---|---|---|---|---|---|
-| EML, вложенный `message/rfc822` | Mime4j core + поля DOM | [док] [код] Заголовки, тела, MIME-части; приложение сохраняет дочерние файлы | [предположение] Рекурсия и нормализованная модель — наши; нужны лимиты В5 | [код] Apache-2.0 | [1–3, 12] |
-| EML как общий текст | Tika `RFC822Parser` | [код] XHTML/метаданные и вложенные объекты через обработчик | [код] Буферы альтернатив; без собственного обработчика не получаем нужный каталог частей | [код] Apache-2.0 | [5–7] |
-| `.msg`, `application/vnd.ms-outlook` | POI HSMF / `MAPIMessage` | [док] [код] Заголовочные свойства, plain/HTML/RTF, вложения и вложенные MSG | [док] `poi-scratchpad`, гарантии совместимости API слабее обычных POI; не гарантирует наличие всех MAPI-полей | [док] Apache-2.0 | [19, 21, 23, 41] |
-| `winmail.dat`, `application/ms-tnef`, также x-tnef | POI HMEF / `HMEFMessage` | [док] [код] Тема, RTF, имена и байты вложений, MAPI/TNEF-атрибуты | [док] [код] `poi-scratchpad`; массивы байтов; поддержка атрибутов неполная, нужен предел до создания модели | [док] Apache-2.0 | [20, 22, 41] |
-| TNEF: другой кандидат | Freeutils JTNEF | [док] Чтение TNEF и извлечение вложений | [предположение] В MVP преимуществ перед уже используемым POI не выявлено; актуальная совместимость не проверялась | [док] GPL; автор предлагает отдельное коммерческое лицензирование | [42] |
-| Inline `cid:` / `multipart/related` | Mime4j + jsoup | [док] [предположение] Байты части, CID и ссылки HTML; связь строит приложение | [предположение] Без OCR и загрузки удалённых картинок; CID привязан к контексту письма | [код] [док] Apache-2.0 + MIT | [1, 14, 39, 43] |
-| HTML-only | jsoup; резервно Tika `JSoupParser` | [док] [предположение] Текст и атрибуты ссылок; читаемые таблицы — собственное правило | [док] [предположение] DOM требует памяти; CSS-вёрстка не воспроизводится | [док] [код] MIT / Apache-2.0 | [14–16, 40, 43] |
-| `text/calendar`, `.ics` | iCal4j `CalendarBuilder` | [док] Модель компонентов/свойств; поля приглашения перечислены в В4 | [предположение] Только чтение; запрет внешнего обновления зон/URI и разворачивания повторений; предел модели | [код] BSD-3-Clause | [24, 25, 44] |
-| S/MIME `.p7m`, `.p7s`, `multipart/signed` | MIME-парсер; Bouncy Castle при расширении | [док] [предположение] В MVP тип оболочки и открытая часть detached-подписи; CMS позднее | [док] [предположение] Шифротекст не читается без ключа; извлечение не означает проверку подписи | [код] Mime4j Apache-2.0; Bouncy Castle MIT | [26–28] |
-| Цитаты / подпись | `email_reply_parser`, `talon` как источники идей | [код] Фрагменты ответа, цитаты, подписи | [предположение] Не готовая Java-зависимость; русская точность не установлена, возможна потеря текста | [код] MIT / Apache-2.0 | [17, 18] |
+| EML, attached `message/rfc822` | Mime4j core + DOM fields | [docs] [code] Headers, bodies, MIME parts; the application saves child files | [assumption] Recursion and normalized model are ours; В5 limits required | [code] Apache-2.0 | [1–3, 12] |
+| EML as aggregate text | Tika `RFC822Parser` | [code] XHTML/metadata and embedded objects through a handler | [code] Alternative buffers; a custom handler is needed for the required parts catalog | [code] Apache-2.0 | [5–7] |
+| `.msg`, `application/vnd.ms-outlook` | POI HSMF / `MAPIMessage` | [docs] [code] Header properties, plain/HTML/RTF, attachments and nested MSG | [docs] `poi-scratchpad`, weaker API compatibility guarantees than ordinary POI; not all MAPI fields are guaranteed | [docs] Apache-2.0 | [19, 21, 23, 41] |
+| `winmail.dat`, `application/ms-tnef`, also x-tnef | POI HMEF / `HMEFMessage` | [docs] [code] Subject, RTF, attachment names and bytes, MAPI/TNEF attributes | [docs] [code] `poi-scratchpad`; byte arrays; incomplete attribute support, requiring a limit before model construction | [docs] Apache-2.0 | [20, 22, 41] |
+| TNEF: another candidate | Freeutils JTNEF | [docs] TNEF reading and attachment extraction | [assumption] No MVP advantage over the already used POI identified; current compatibility unverified | [docs] GPL; the author offers separate commercial licensing | [42] |
+| Inline `cid:` / `multipart/related` | Mime4j + jsoup | [docs] [assumption] Part bytes, CID and HTML links; the application builds associations | [assumption] No OCR or remote image downloads; CID is scoped to the message | [code] [docs] Apache-2.0 + MIT | [1, 14, 39, 43] |
+| HTML-only | jsoup; fallback Tika `JSoupParser` | [docs] [assumption] Text and link attributes; readable tables are a custom rule | [docs] [assumption] DOM needs memory; CSS layout is not reproduced | [docs] [code] MIT / Apache-2.0 | [14–16, 40, 43] |
+| `text/calendar`, `.ics` | iCal4j `CalendarBuilder` | [docs] Component/property model; invitation fields listed in В4 | [assumption] Read-only; no external zone/URI updates or recurrence expansion; model limit | [code] BSD-3-Clause | [24, 25, 44] |
+| S/MIME `.p7m`, `.p7s`, `multipart/signed` | MIME parser; Bouncy Castle for expanded support | [docs] [assumption] MVP: envelope type and clear part of detached signatures; CMS later | [docs] [assumption] Ciphertext needs a key; extraction does not imply signature verification | [code] Mime4j Apache-2.0; Bouncy Castle MIT | [26–28] |
+| Quotes / signature | `email_reply_parser`, `talon` as idea sources | [code] Reply fragments, quotes, signatures | [assumption] Not a ready Java dependency; Russian accuracy unconfirmed, possible text loss | [code] MIT / Apache-2.0 | [17, 18] |
 
-### Новые парсеры и их порядок
+### New parsers and their order
 
-[предположение] Все строки — рекомендуемые **новые компоненты MVP**, числа — предлагаемые
-`@Order`, а не изменение sibling project. Группы лимитов: M — MIME/заголовки, C — контейнеры,
-H — HTML, I — ICS; значения и общие ограничения приведены в В5.
-Каждый почтовый контейнер исключается из старых text/metadata/fallback-обработчиков.
+[assumption] All rows recommend **new MVP components**; numbers are proposed `@Order` values,
+not changes to the sibling project. Limit groups: M — MIME/headers, C — containers, H — HTML,
+I — ICS; values and shared limits are in В5. Exclude each mail container from the old
+text/metadata/fallback handlers.
 
-| Новый парсер | MIME-тип / признак | Библиотека | Место в порядке парсеров | Лимиты |
+| New parser | MIME type / indicator | Library | Parser ordering | Limits |
 |---|---|---|---|---|
-| `SmimeEnvelopeParser` | `application/(x-)pkcs7-mime`, `(x-)pkcs7-signature`, `.p7m/.p7s` как подсказка | MIME-заголовки; CMS позже через BC | PRIMARY 40, до контейнеров и Tika; `multipart/signed` распознаётся также в MIME-обходе | M/C; MVP без расшифрования/распаковки непрозрачного CMS [26–28] |
-| `EmlMessageParser` | `message/rfc822`, `.eml` с подтверждением заголовков | Mime4j core, типизированные поля DOM, `ParameterList` | PRIMARY 50, до plain 100; тот же нормализатор, что у корневого письма | M/C, потоковая запись, общий предел частей/байтов [1–3, 11] |
-| `MsgMessageParser` | `application/vnd.ms-outlook`, `.msg` + структура OLE/MAPI | POI HSMF, `poi-scratchpad` | PRIMARY 60, до plain и Tika; OLE-сигнатура без MAPI недостаточна | C, ≤25 MiB до модели, вложенные MSG учитываются в глубине [19, 23] |
-| `TnefParser` | `application/ms-tnef`, `application/vnd.ms-tnef`, `application/x-tnef`; сигнатура TNEF | POI HMEF, `poi-scratchpad` | PRIMARY 70, до Tika; имя `winmail.dat` только подсказка | C, ≤25 MiB до модели, общий расход производных файлов [20, 22, 40] |
-| `CalendarInviteParser` | `text/calendar`, `.ics` + `BEGIN:VCALENDAR` | iCal4j | PRIMARY 80, до plain; тип исключён из `PlainTextParser` | I/C, без повторений, сигналов и внешних обращений [24, 25, 44] |
-| `HtmlBodyParser` | `text/html`, `application/xhtml+xml`, `.html/.htm` | jsoup | PRIMARY 90, до plain; используется и при выборе тела MIME | H, ограниченный вывод и ссылки без загрузки [14–16] |
+| `SmimeEnvelopeParser` | `application/(x-)pkcs7-mime`, `(x-)pkcs7-signature`, `.p7m/.p7s` as hints | MIME headers; CMS later through BC | PRIMARY 40, before containers and Tika; MIME traversal also recognizes `multipart/signed` | M/C; no opaque CMS decryption/unpacking in MVP [26–28] |
+| `EmlMessageParser` | `message/rfc822`, `.eml` with header confirmation | Mime4j core, typed DOM fields, `ParameterList` | PRIMARY 50, before plain 100; same normalizer as the root message | M/C, streaming writes, shared part/byte limit [1–3, 11] |
+| `MsgMessageParser` | `application/vnd.ms-outlook`, `.msg` + OLE/MAPI structure | POI HSMF, `poi-scratchpad` | PRIMARY 60, before plain and Tika; OLE signature without MAPI is insufficient | C, ≤25 MiB before model construction, nested MSG counts toward depth [19, 23] |
+| `TnefParser` | `application/ms-tnef`, `application/vnd.ms-tnef`, `application/x-tnef`; TNEF signature | POI HMEF, `poi-scratchpad` | PRIMARY 70, before Tika; `winmail.dat` name is only a hint | C, ≤25 MiB before model construction, shared derived-file consumption [20, 22, 40] |
+| `CalendarInviteParser` | `text/calendar`, `.ics` + `BEGIN:VCALENDAR` | iCal4j | PRIMARY 80, before plain; excluded from `PlainTextParser` | I/C, no recurrence, alarms or external access [24, 25, 44] |
+| `HtmlBodyParser` | `text/html`, `application/xhtml+xml`, `.html/.htm` | jsoup | PRIMARY 90, before plain; also used for MIME body selection | H, bounded output and links without fetching [14–16] |
 
-## Рекомендация
+## Recommendation
 
-[предположение] Выбрать **Mime4j 0.8.15 с `MimeStreamParser`** как основу нормализации
-EML. Взять core для потоков, DOM-модуль только для разбора полей; `ParameterList`
-использовать для RFC 2231, не строя второе дерево `MimeMessage`.
-Преимущество — контроль частей и ресурсов; цена — собственные правила выбора тела,
-хранения файлов и диагностики. Это рекомендация, решение остаётся за пользователем. [1–3, 11]
+[assumption] Choose **Mime4j 0.8.15 with `MimeStreamParser`** as the EML normalization foundation.
+Use core for streaming and the DOM module only for field parsing; use `ParameterList` for
+RFC 2231 without building a second `MimeMessage` tree. Benefits: part and resource control;
+cost: custom body selection, file storage and diagnostic rules. This is a recommendation;
+the user decides. [1–3, 11]
 
-[предположение] По образцу Tika включить `setContentDecoding(true)` и `setNoRecurse()`:
-multipart обходится MIME-парсером, а вложенный `message/rfc822` сохраняется отдельным файлом
-и передаётся общему обработчику с увеличением глубины и сохранением общих счётчиков.
-Это даёт одну точку контроля переходов EML → другие контейнеры. [6, 29]
+[assumption] Following Tika, enable `setContentDecoding(true)` and `setNoRecurse()`:
+the MIME parser traverses multipart, while an attached `message/rfc822` is saved as a separate
+file and passed to the shared handler with increased depth and preserved shared counters.
+This provides one control point for EML → other container transitions. [6, 29]
 
-[предположение] Для MVP добавить шесть компонентов из второй таблицы; `SmimeEnvelopeParser`
-делает только распознавание. Использовать POI HSMF/HMEF, jsoup и iCal4j; сохранить
-имеющиеся документные извлекатели. Сначала исправить пересечения типов, общий контекст
-лимитов и повторный разбор через Tika, иначе новые `@Order` не обеспечат нужного поведения. [29]
+[assumption] Add the six components in the second table for the MVP; `SmimeEnvelopeParser`
+only recognizes envelopes. Use POI HSMF/HMEF, jsoup and iCal4j; retain existing document
+extractors. First fix type overlaps, shared limit context and repeated Tika parsing, otherwise
+new `@Order` values will not ensure the required behavior. [29]
 
-[предположение] Перед реализацией закрепить набор искусственных примеров: RFC 2231 с
-продолжениями, encoded-word в имени, KOI8-R/1251 и ошибочная метка, plain+HTML, HTML-only,
-CID, EML→MSG→ZIP, TNEF, ICS с TZID, signed/encrypted S/MIME и повреждённая boundary.
-Критерии: один выбранный текст тела, сохранённые отдельные вложения, отсутствие внешних
-запросов и явная причина остановки на каждом лимите. Примеры в этой сессии не запускались.
+[assumption] Before implementation, establish synthetic examples: RFC 2231 continuations,
+encoded-word filenames, KOI8-R/1251 and wrong charset labels, plain+HTML, HTML-only, CID,
+EML→MSG→ZIP, TNEF, ICS with TZID, signed/encrypted S/MIME and damaged boundaries. Criteria:
+one selected body text, separately saved attachments, no external requests and an explicit
+stop reason for every limit. No examples were run in this session.
 
-## Что не удалось проверить
+## What could not be verified
 
-- Реальные письма Exchange/Gmail/Mail.ru и особенности их имён/кодировок: доступа к ящикам
-  не было. Пользователь может отдельно предоставить обезличенные EML; вход не требуется.
-- Точность исправления charset, разметки таблиц и удаления русских цитат: нет испытаний
-  на корпусе. Проверить на искусственных и обезличенных письмах перед включением эвристик.
-- Полноту RFC 2231 в разных путях Mime4j 0.8.15: просмотр одного lenient-класса её не
-  устанавливает. До проверки рекомендован явный `ParameterList`, см. В2. [11, 35]
-- Поведение HSMF/HMEF на всех вариантах MAPI и неизвестных свойствах: документация и код
-  подтверждают API, но не полноту форматов. Нужны отдельные примеры MSG/TNEF. [19, 20, 23]
-- Совместимость всей выбранной комбинации на Java 25 и согласование транзитивных версий:
-  сборка и выполнение запрещены брифом. Просмотреть зависимости, затем проверить отдельно.
-- Здесь исходники Tika зафиксированы на 3.2.3, sibling project использует Tika 3.2.0 и
-  POI 5.4.0; их не следует принимать за рекомендуемые актуальные версии зависимостей. [29]
-- Предлагаемые 50/100 MiB, глубина и время не измерены; пользователь должен утвердить
-  значения после испытаний. Открытые ключи, закрытые ключи и проверка доверия S/MIME
-  в этой сессии не использовались.
+- Real Exchange/Gmail/Mail.ru messages and their filename/charset quirks: no mailbox access.
+  The user can separately provide anonymized EML; no sign-in required.
+- Charset repair accuracy, table formatting and Russian quote removal: no corpus tests.
+  Check synthetic and anonymized messages before enabling heuristics.
+- Complete RFC 2231 support across Mime4j 0.8.15 paths: inspecting one lenient class does not
+  establish it. Until verified, recommend explicit `ParameterList`, see В2. [11, 35]
+- HSMF/HMEF behavior across all MAPI variants and unknown properties: documentation and code
+  confirm APIs, not format completeness. Separate MSG/TNEF examples are needed. [19, 20, 23]
+- Java 25 compatibility of the complete chosen combination and transitive version alignment:
+  the brief prohibits building and execution. Inspect dependencies, then verify separately.
+- Tika source here is pinned to 3.2.3; the sibling project uses Tika 3.2.0 and POI 5.4.0.
+  These are not recommended current dependency versions. [29]
+- Proposed 50/100 MiB, depth and time values are unmeasured; the user must approve values after
+  testing. Public keys, private keys and S/MIME trust verification were not used in this session.
 
-## Что ещё стоит изучить
+## Further research
 
-- [предположение] Сверить выдачу EWS item attachments с сохранённым MIME: при неполном
-  преобразовании предусмотреть отдельную загрузку вложенного объекта источником.
-- [предположение] Выбор изоляции документных парсеров отдельным локальным процессом
-  и управление его файлами/памятью, сохраняя stdio MCP единственным транспортом. [30]
-- [док] Для будущего S/MIME учитывать RFC 9788 о защите внутренних заголовков;
-  внешние заголовки не всегда совпадают с защищёнными. [45]
+- [assumption] Compare EWS item attachment results with saved MIME: if conversion is incomplete,
+  consider a separate source download of the attached object.
+- [assumption] Choosing a separate local process for document parser isolation and managing
+  its files/memory while retaining stdio MCP as the only transport. [30]
+- [docs] For future S/MIME, consider RFC 9788 on protecting inner headers; external headers
+  do not always match protected ones. [45]
 
-## Источники
+## Sources
 
-Все веб-источники прочитаны 2026-10-24. У недатированных страниц дата публикации
-не установлена; даты RFC ниже — даты спецификаций, а не свежесть реализации.
+All web sources were read on 2026-10-24. Publication dates of undated pages are unknown;
+RFC dates below are specification dates, not evidence of implementation freshness.
 
-1. [Apache James Mime4j: обзор](https://james.apache.org/mime4j/) — публикация сайта 2017-06-15; историческое описание streaming/DOM/storage, не текущий номер выпуска.
-2. [Apache James MIME4J 0.8.15](https://james.apache.org/james/update/2026/09/03/mime4j-0.8.15.html) — объявление 2026-09-03, новые настраиваемые лимиты.
-3. [MimeConfig.java, тег apache-mime4j-project-0.8.15](https://raw.githubusercontent.com/apache/james-mime4j/apache-mime4j-project-0.8.15/core/src/main/java/org/apache/james/mime4j/stream/MimeConfig.java) — проверены поля, Builder и комментарии ограничений.
-4. [Jakarta Mail MimeMessage](https://eclipse-ee4j.github.io/angus-mail/docs/api/jakarta.mail/jakarta/mail/internet/MimeMessage.html) — конструкторы, `content`, `contentStream`, headers и `SharedInputStream`; дата не указана.
-5. [Tika 3.2.3 RFC822Parser API](https://tika.incubator.apache.org/3.2.3/api/org/apache/tika/parser/mail/RFC822Parser) — `ParseContext`, `extractAllAlternatives`; дата выпуска здесь не устанавливалась.
-6. [Tika RFC822Parser.java, тег 3.2.3](https://raw.githubusercontent.com/apache/tika/3.2.3/tika-parsers/tika-parsers-standard/tika-parsers-standard-modules/tika-parser-mail-module/src/main/java/org/apache/tika/parser/mail/RFC822Parser.java) — настройка Mime4j и декодирования, Apache-2.0.
-7. [Tika MailContentHandler.java, тег 3.2.3](https://raw.githubusercontent.com/apache/tika/3.2.3/tika-parsers/tika-parsers-standard/tika-parsers-standard-modules/tika-parser-mail-module/src/main/java/org/apache/tika/parser/mail/MailContentHandler.java) — буферы альтернатив, вложения, типизированные поля.
-8. [Jakarta Mail internet package: MIME properties](https://eclipse-ee4j.github.io/angus-mail/docs/api/jakarta.mail/jakarta/mail/internet/package-summary.html) — декодирование имён, совместимость и границы multipart; дата не указана.
+1. [Apache James Mime4j: overview](https://james.apache.org/mime4j/) — site published 2017-06-15; historical streaming/DOM/storage description, not the current release number.
+2. [Apache James MIME4J 0.8.15](https://james.apache.org/james/update/2026/09/03/mime4j-0.8.15.html) — announcement of 2026-09-03, new configurable limits.
+3. [MimeConfig.java, tag apache-mime4j-project-0.8.15](https://raw.githubusercontent.com/apache/james-mime4j/apache-mime4j-project-0.8.15/core/src/main/java/org/apache/james/mime4j/stream/MimeConfig.java) — limit fields, Builder and comments checked.
+4. [Jakarta Mail MimeMessage](https://eclipse-ee4j.github.io/angus-mail/docs/api/jakarta.mail/jakarta/mail/internet/MimeMessage.html) — constructors, `content`, `contentStream`, headers and `SharedInputStream`; undated.
+5. [Tika 3.2.3 RFC822Parser API](https://tika.incubator.apache.org/3.2.3/api/org/apache/tika/parser/mail/RFC822Parser) — `ParseContext`, `extractAllAlternatives`; release date not established here.
+6. [Tika RFC822Parser.java, tag 3.2.3](https://raw.githubusercontent.com/apache/tika/3.2.3/tika-parsers/tika-parsers-standard/tika-parsers-standard-modules/tika-parser-mail-module/src/main/java/org/apache/tika/parser/mail/RFC822Parser.java) — Mime4j and decoding configuration, Apache-2.0.
+7. [Tika MailContentHandler.java, tag 3.2.3](https://raw.githubusercontent.com/apache/tika/3.2.3/tika-parsers/tika-parsers-standard/tika-parsers-standard-modules/tika-parser-mail-module/src/main/java/org/apache/tika/parser/mail/MailContentHandler.java) — alternative buffers, attachments, typed fields.
+8. [Jakarta Mail internet package: MIME properties](https://eclipse-ee4j.github.io/angus-mail/docs/api/jakarta.mail/jakarta/mail/internet/package-summary.html) — filename decoding, compatibility and multipart boundaries; undated.
 9. [RFC 2047](https://www.rfc-editor.org/rfc/rfc2047) — MIME Header Extensions, 1996-11.
-10. [RFC 2231](https://www.rfc-editor.org/rfc/rfc2231) — параметры, charset и продолжения, 1997-11.
-11. [Jakarta Mail ParameterList](https://eclipse-ee4j.github.io/angus-mail/docs/api/jakarta.mail/jakarta/mail/internet/ParameterList.html) — RFC 2231 и режимы совместимости; дата не указана.
-12. [Mime4j DecoderUtil.java](https://raw.githubusercontent.com/apache/james-mime4j/master/core/src/main/java/org/apache/james/mime4j/codec/DecoderUtil.java) — RFC 2047, fallback charset и overrides; просмотр ветки master, не обещание всех API в старых версиях.
-13. [RFC 2046](https://www.rfc-editor.org/rfc/rfc2046) — multipart, alternatives и message/rfc822, 1996-11.
-14. [jsoup: Parse a document from a String](https://jsoup.org/cookbook/input/parse-document-from-string) — 2010-01-17; локальный разбор HTML.
-15. [jsoup: Extract attributes, text, and HTML](https://jsoup.org/cookbook/extracting-data/attributes-text-html) — 2010-02-09; различие text и href.
-16. [jsoup HtmlToPlainText](https://jsoup.org/apidocs/org/jsoup/examples/HtmlToPlainText) — пример, ограничения форматирования; дата не указана.
-17. [github/email_reply_parser](https://github.com/github/email_reply_parser) и [lib/email_reply_parser.rb](https://raw.githubusercontent.com/github/email_reply_parser/master/lib/email_reply_parser.rb) — README, MIT, алгоритм фрагментов; просмотр master, дата выпуска не устанавливалась.
-18. [Mailgun talon](https://github.com/mailgun/talon) и [talon/quotations.py](https://raw.githubusercontent.com/mailgun/talon/master/talon/quotations.py) — README, Apache-2.0, plain/HTML и эвристики; просмотр master, дата выпуска не устанавливалась.
-19. [Apache POI HSMF](https://poi.apache.org/components/hsmf/index.html) — MSG, scratchpad и ограничения совместимости; дата страницы не указана.
-20. [Apache POI HMEF](https://poi.apache.org/components/hmef/index.html) — TNEF, тело, имена и вложения; дата страницы не указана.
-21. [POI MAPIMessage API 5.0](https://poi.apache.org/apidocs/5.0/org/apache/poi/hsmf/MAPIMessage.html) — API тел plain/HTML/RTF; старый справочник, не рекомендация версии.
-22. [POI HMEFMessage.java](https://raw.githubusercontent.com/apache/poi/trunk/poi-scratchpad/src/main/java/org/apache/poi/hmef/HMEFMessage.java) — сигнатура TNEF, чтение и накопление атрибутов; просмотр trunk.
-23. [POI AttachmentChunks.java](https://raw.githubusercontent.com/apache/poi/trunk/poi-scratchpad/src/main/java/org/apache/poi/hsmf/datatypes/AttachmentChunks.java) — вложенные MSG, данные, имена и Content-ID; просмотр trunk.
-24. [iCal4j Parser](https://www.ical4j.org/parser/) — `CalendarParser`, обработчики, `CalendarBuilder`; дата не указана.
-25. [RFC 5545](https://www.rfc-editor.org/rfc/rfc5545) — iCalendar, свойства и типы, 2009-09.
-26. [RFC 8551](https://www.rfc-editor.org/rfc/rfc8551) — S/MIME 4.0, подпись и шифрование, 2019-04; обновлён RFC 9788.
-27. [Bouncy Castle Java documentation](https://www.bouncycastle.org/documentation/documentation-java/) — CMS/S/MIME и отдельная Jakarta Mail-библиотека; дата страницы не указана.
+10. [RFC 2231](https://www.rfc-editor.org/rfc/rfc2231) — parameters, charsets and continuations, 1997-11.
+11. [Jakarta Mail ParameterList](https://eclipse-ee4j.github.io/angus-mail/docs/api/jakarta.mail/jakarta/mail/internet/ParameterList.html) — RFC 2231 and compatibility modes; undated.
+12. [Mime4j DecoderUtil.java](https://raw.githubusercontent.com/apache/james-mime4j/master/core/src/main/java/org/apache/james/mime4j/codec/DecoderUtil.java) — RFC 2047, fallback charset and overrides; master inspected, not a promise that all APIs exist in older versions.
+13. [RFC 2046](https://www.rfc-editor.org/rfc/rfc2046) — multipart, alternatives and message/rfc822, 1996-11.
+14. [jsoup: Parse a document from a String](https://jsoup.org/cookbook/input/parse-document-from-string) — 2010-01-17; local HTML parsing.
+15. [jsoup: Extract attributes, text, and HTML](https://jsoup.org/cookbook/extracting-data/attributes-text-html) — 2010-02-09; distinction between text and href.
+16. [jsoup HtmlToPlainText](https://jsoup.org/apidocs/org/jsoup/examples/HtmlToPlainText) — example and formatting limits; undated.
+17. [github/email_reply_parser](https://github.com/github/email_reply_parser) and [lib/email_reply_parser.rb](https://raw.githubusercontent.com/github/email_reply_parser/master/lib/email_reply_parser.rb) — README, MIT, fragment algorithm; master inspected, release date not established.
+18. [Mailgun talon](https://github.com/mailgun/talon) and [talon/quotations.py](https://raw.githubusercontent.com/mailgun/talon/master/talon/quotations.py) — README, Apache-2.0, plain/HTML and heuristics; master inspected, release date not established.
+19. [Apache POI HSMF](https://poi.apache.org/components/hsmf/index.html) — MSG, scratchpad and compatibility limits; page undated.
+20. [Apache POI HMEF](https://poi.apache.org/components/hmef/index.html) — TNEF, body, names and attachments; page undated.
+21. [POI MAPIMessage API 5.0](https://poi.apache.org/apidocs/5.0/org/apache/poi/hsmf/MAPIMessage.html) — plain/HTML/RTF body APIs; an old reference, not a version recommendation.
+22. [POI HMEFMessage.java](https://raw.githubusercontent.com/apache/poi/trunk/poi-scratchpad/src/main/java/org/apache/poi/hmef/HMEFMessage.java) — TNEF signature, attribute reading and accumulation; trunk inspected.
+23. [POI AttachmentChunks.java](https://raw.githubusercontent.com/apache/poi/trunk/poi-scratchpad/src/main/java/org/apache/poi/hsmf/datatypes/AttachmentChunks.java) — nested MSG, data, names and Content-ID; trunk inspected.
+24. [iCal4j Parser](https://www.ical4j.org/parser/) — `CalendarParser`, handlers, `CalendarBuilder`; undated.
+25. [RFC 5545](https://www.rfc-editor.org/rfc/rfc5545) — iCalendar, properties and types, 2009-09.
+26. [RFC 8551](https://www.rfc-editor.org/rfc/rfc8551) — S/MIME 4.0, signatures and encryption, 2019-04; updated by RFC 9788.
+27. [Bouncy Castle Java documentation](https://www.bouncycastle.org/documentation/documentation-java/) — CMS/S/MIME and a separate Jakarta Mail library; page undated.
 28. [Bouncy Castle LICENSE.html](https://raw.githubusercontent.com/bcgit/bc-java/main/LICENSE.html) — MIT, copyright 2000–2026.
-29. Локальный первичный источник: `C:\git\redmine-mcp-server` @ `f62b3e5d546d04533e4259a573293d949939a48d`, прочитан 2026-10-24. Проверены `AGENTS.md`, `docs/architecture-agent.md`, `docs/retrieval-extraction-agent.md`, `gradle/libs.versions.toml`; под `src/main/java/<org>/redmine/mcp/extraction/`: `ExtractionPipeline.java`, `ParseSink.java`, `ParseContext.java`, `ExtractionLimits.java`, `FileTypeDetector.java`, `parser/PlainTextParser.java`, `parser/ZipParser.java`, `parser/TikaTextFallbackParser.java`, `parser/TikaMetadataParser.java`, `parser/ImagePassthroughParser.java`, `parser/BinaryFallbackParser.java`; аннотации порядка остальных парсеров. GitHub URL намеренно не приводится.
-30. [Apache Tika Security Model](https://tika.apache.org/security-model.html) — недоверенные документы, границы защиты, процессная изоляция; страница охватывает несколько веток, API из 4.x не переносится автоматически на 3.x.
-31. [Apache POI Security guidance](https://poi.apache.org/security.html) — безопасность обработки недоверенных документов; дата страницы не указана.
-32. [Eclipse Angus Mail](https://eclipse-ee4j.github.io/angus-mail/) — реализация Jakarta Mail, стабильный 2.0.5; блок новостей отстаёт и заканчивается 2.0.3 от 2024-03-04.
-33. [Angus Mail License](https://eclipse-ee4j.github.io/angus-mail/AngusMail-License) — EPL/GPL с Classpath Exception и EDL для отдельных частей; дата не указана.
-34. [Microsoft MS-OXCMAIL 2.2.3.4.1.1 File Name](https://learn.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-oxcmail/55f34e65-1955-4758-8f3a-ab1c64d74360) — приоритет имён Content-Disposition/Content-Type; дата публикации в доступном представлении не установлена.
-35. [Mime4j ContentTypeFieldLenientImpl.java](https://github.com/apache/james-mime4j/blob/master/dom/src/main/java/org/apache/james/mime4j/field/ContentTypeFieldLenientImpl.java) — просмотр master: `parse` и карта параметров; не проверка всех декодеров RFC 2231.
-36. [Java SE 25 Supported Encodings](https://docs.oracle.com/en/java/javase/25/intl/supported-encodings.html) — KOI8-R, windows-1251 и явный выбор кодировки.
-37. [RFC 2045](https://www.rfc-editor.org/rfc/rfc2045) — MIME Content-Type, charset и Content-Transfer-Encoding, 1996-11.
-38. [RFC 5322](https://www.rfc-editor.org/rfc/rfc5322) — Internet Message Format, заголовки и дата, 2008-10.
+29. Local primary source: `C:\git\redmine-mcp-server` @ `f62b3e5d546d04533e4259a573293d949939a48d`, read on 2026-10-24. Inspected `AGENTS.md`, `docs/architecture-agent.md`, `docs/retrieval-extraction-agent.md`, `gradle/libs.versions.toml`; under `src/main/java/<org>/redmine/mcp/extraction/`: `ExtractionPipeline.java`, `ParseSink.java`, `ParseContext.java`, `ExtractionLimits.java`, `FileTypeDetector.java`, `parser/PlainTextParser.java`, `parser/ZipParser.java`, `parser/TikaTextFallbackParser.java`, `parser/TikaMetadataParser.java`, `parser/ImagePassthroughParser.java`, `parser/BinaryFallbackParser.java`; ordering annotations of the other parsers. GitHub URL deliberately omitted.
+30. [Apache Tika Security Model](https://tika.apache.org/security-model.html) — untrusted documents, protection boundaries, process isolation; covers several branches, 4.x APIs do not automatically apply to 3.x.
+31. [Apache POI Security guidance](https://poi.apache.org/security.html) — safe processing of untrusted documents; page undated.
+32. [Eclipse Angus Mail](https://eclipse-ee4j.github.io/angus-mail/) — Jakarta Mail implementation, stable 2.0.5; news section lags, ending at 2.0.3 of 2024-03-04.
+33. [Angus Mail License](https://eclipse-ee4j.github.io/angus-mail/AngusMail-License) — EPL/GPL with Classpath Exception and EDL for some parts; undated.
+34. [Microsoft MS-OXCMAIL 2.2.3.4.1.1 File Name](https://learn.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-oxcmail/55f34e65-1955-4758-8f3a-ab1c64d74360) — Content-Disposition/Content-Type filename priority; publication date unknown in the accessible view.
+35. [Mime4j ContentTypeFieldLenientImpl.java](https://github.com/apache/james-mime4j/blob/master/dom/src/main/java/org/apache/james/mime4j/field/ContentTypeFieldLenientImpl.java) — master inspected: `parse` and parameter map; not a check of every RFC 2231 decoder.
+36. [Java SE 25 Supported Encodings](https://docs.oracle.com/en/java/javase/25/intl/supported-encodings.html) — KOI8-R, windows-1251 and explicit charset selection.
+37. [RFC 2045](https://www.rfc-editor.org/rfc/rfc2045) — MIME Content-Type, charset and Content-Transfer-Encoding, 1996-11.
+38. [RFC 5322](https://www.rfc-editor.org/rfc/rfc5322) — Internet Message Format, headers and dates, 2008-10.
 39. [RFC 2392](https://www.rfc-editor.org/rfc/rfc2392) — Content-ID URLs, 1998-08; [RFC 2387](https://www.rfc-editor.org/rfc/rfc2387) — multipart/related, 1998-08.
-40. [Tika 3.2.3 Supported Formats](https://tika.apache.org/3.2.3/formats.html) — jsoup для HTML, RTF и почтовые форматы; фиксированная версия справочника.
-41. [Apache POI Legal Stuff](https://poi.apache.org/legal.html) — лицензия Apache-2.0.
-42. [Freeutils JTNEF](https://www.freeutils.net/source/jtnef/index.jsp) — возможности и GPL / коммерческое лицензирование; дата страницы не указана.
+40. [Tika 3.2.3 Supported Formats](https://tika.apache.org/3.2.3/formats.html) — jsoup for HTML, RTF and mail formats; pinned reference version.
+41. [Apache POI Legal Stuff](https://poi.apache.org/legal.html) — Apache-2.0 license.
+42. [Freeutils JTNEF](https://www.freeutils.net/source/jtnef/index.jsp) — capabilities and GPL / commercial licensing; page undated.
 43. [jsoup License](https://jsoup.org/license) — MIT, copyright 2009–2026.
-44. [iCal4j repository](https://github.com/ical4j/ical4j) — BSD-3-Clause, конфигурация `net.fortuna.ical4j.timezone.update.enabled`; [Configuration](https://www.ical4j.org/configuring/) — relaxed/outlook hints; дата выпуска не устанавливалась.
-45. [RFC 9788](https://www.rfc-editor.org/rfc/rfc9788) — Header Protection for Cryptographically Protected Email; дата публикации в этой сессии не устанавливалась.
+44. [iCal4j repository](https://github.com/ical4j/ical4j) — BSD-3-Clause, `net.fortuna.ical4j.timezone.update.enabled` configuration; [Configuration](https://www.ical4j.org/configuring/) — relaxed/outlook hints; release date not established.
+45. [RFC 9788](https://www.rfc-editor.org/rfc/rfc9788) — Header Protection for Cryptographically Protected Email; publication date not established in this session.
