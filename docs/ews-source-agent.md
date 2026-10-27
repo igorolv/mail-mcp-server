@@ -113,8 +113,8 @@ Importance:High is unrelated and is not requested or mapped. This implements the
 user flag/star interpretation, not an additional user decision.
 
 Until Д29 every sync read this metadata for all present items: 48.6 s per run for 8085 items on
-the user's server. Now a run without changes sends only SyncFolderItems per folder. Whether
-Exchange 2013 reports a follow-up flag change as Update is to verify (проверить). The request asks no MIME/body, adds no sign-in or retry
+the user's server. Now a run without changes sends only SyncFolderItems per folder. On the user's
+Exchange 2013 a follow-up flag change arrives as Update and a read change as ReadFlagChange (2026-10-28). The request asks no MIME/body, adds no sign-in or retry
 and writes nothing to the mailbox. Known flag changes leave local content and download/state
 metadata unchanged, rebuild only the affected document and increase no message counter.
 Flags are excluded from move identity; destination observations apply on reuse. Schema 4 stores
