@@ -1,5 +1,6 @@
 package mail.mcp.connections;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -31,6 +32,8 @@ public record ConnectionsFile(
      * @param tls                  IMAP implicit TLS, {@code true} by default
      * @param username             login
      * @param password             password or app password; prefer {@code ${VAR}}
+ * @param passwordCommand      program and arguments that print the password, instead of
+ *                             {@code password}; see {@link PasswordCommand}
      * @param domain               EWS NTLM domain; leave out for a bare login
      * @param connectTimeoutSeconds EWS connect timeout, 15 by default
      * @param readTimeoutSeconds   EWS read timeout, 120 by default
@@ -46,6 +49,7 @@ public record ConnectionsFile(
             Boolean tls,
             String username,
             String password,
+            List<String> passwordCommand,
             String domain,
             Integer connectTimeoutSeconds,
             Integer readTimeoutSeconds,

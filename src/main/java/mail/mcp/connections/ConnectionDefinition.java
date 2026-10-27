@@ -89,6 +89,16 @@ public record ConnectionDefinition(
         return type == ConnectionType.EWS || type == ConnectionType.IMAP;
     }
 
+    /** Drops a password-command result kept in memory, so a rejected password is never offered again. */
+    public void forgetPassword() {
+        if (ews != null && ews.password() != null) {
+            ews.password().forget();
+        }
+        if (imap != null && imap.password() != null) {
+            imap.password().forget();
+        }
+    }
+
     /** True when {@code <data-dir>/<name>/} already exists. */
     public boolean hasLocalData() {
         return Files.isDirectory(connectionDir);

@@ -99,7 +99,7 @@ class ConnectionsLoaderTest {
         assertThat(work.description()).isEqualTo("Work mail, Exchange 2013");
         assertThat(work.ews().url().getHost()).isEqualTo("webmail.example.com");
         assertThat(work.ews().username()).isEqualTo("user");
-        assertThat(work.ews().password()).isEqualTo("work-secret");
+        assertThat(work.ews().password().value()).isEqualTo("work-secret");
         assertThat(work.ews().domain()).isNull();
         assertThat(work.ews().connectTimeout()).isEqualTo(Duration.ofSeconds(15));
         assertThat(work.ews().readTimeout()).isEqualTo(Duration.ofSeconds(120));
@@ -110,7 +110,7 @@ class ConnectionsLoaderTest {
         assertThat(gmail.usable()).isTrue();
         assertThat(gmail.imap().host()).isEqualTo("imap.gmail.com");
         assertThat(gmail.imap().port()).isEqualTo(993);
-        assertThat(gmail.imap().password()).isEqualTo("gmail-secret");
+        assertThat(gmail.imap().password().value()).isEqualTo("gmail-secret");
         assertThat(gmail.sourceImplemented()).isTrue();
     }
 
@@ -250,7 +250,7 @@ class ConnectionsLoaderTest {
                 .contains("https://");
         assertThat(loadOne("{\"type\": \"ews\", \"url\": \"https://webmail.example.com/EWS/Exchange.asmx\", "
                 + "\"username\": \"user\"}").configError())
-                .contains("no 'password'");
+                .contains("no 'password' or 'passwordCommand'");
         assertThat(loadOne("{\"type\": \"ews\", " + ews + ", \"connectTimeoutSeconds\": 0}").configError())
                 .contains("timeouts");
         assertThat(loadOne("{\"type\": \"imap\", \"username\": \"u\", \"password\": \"p\"}").configError())
@@ -277,6 +277,47 @@ class ConnectionsLoaderTest {
                 {"type":"imap","auth":"oauth2","host":"imap.mail.ru","username":"user@mail.ru",
                  "oauthClientFile":"~/client.json"}
                 """).configError()).contains("only for imap.gmail.com:993");
+    }
+
+    @Test
+    void passwordCommandIsKeptForSignInAndNeverRunAtStartup() throws IOException {
+        var definition = loadOne("""
+                {"type":"imap","host":"imap.mail.ru","username":"user@mail.ru",
+                 "passwordCommand":["no-such-program-for-mail-mcp-tests","--item","${WORK_PASSWORD}"]}
+                """);
+
+        assertThat(definition.usable()).isTrue();
+        assertThat(definition.imap().password()).isInstanceOf(PasswordCommand.class);
+        assertThat(definition.toString()).doesNotContain("work-secret").doesNotContain("no-such-program");
+    }
+
+    @Test
+    void passwordCommandRules() throws IOException {
+        String ews = "\"type\": \"ews\", \"url\": \"https://webmail.example.com/EWS/Exchange.asmx\", \"username\": \"user\"";
+
+        assertThat(loadOne("{" + ews + ", \"password\": \"p\", \"passwordCommand\": [\"op\"]}").configError())
+                .contains("either 'password' or 'passwordCommand'");
+        assertThat(loadOne("{" + ews + ", \"passwordCommand\": []}").configError()).contains("non-empty array");
+        assertThat(loadOne("{" + ews + ", \"passwordCommand\": [\"op\", \"\"]}").configError()).contains("non-empty array");
+        assertThat(loadOne("{" + ews + ", \"passwordCommand\": [\" \"]}").configError()).contains("non-empty array");
+        assertThat(loadOne("{" + ews + "}").configError()).contains("no 'password' or 'passwordCommand'");
+        assertThatThrownBy(() -> loadOne("{" + ews + ", \"passwordCommand\": \"op read item\"}"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("wrong type");
+        assertThatThrownBy(() -> loadOne("{" + ews + ", \"passwordCommand\": [\"${UNSET_FOR_MAIL_MCP_TESTS}\"]}"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("passwordCommand[0]");
+    }
+
+    @Test
+    void oauthIgnoresAPasswordCommand() throws IOException {
+        var definition = loadOne("""
+                {"type":"imap","auth":"oauth2","host":"imap.gmail.com","username":"user@gmail.com",
+                 "oauthClientFile":"~/client.json","passwordCommand":["op"]}
+                """);
+
+        assertThat(definition.usable()).isTrue();
+        assertThat(definition.imap().password()).isNull();
     }
 
     @Test

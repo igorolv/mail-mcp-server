@@ -13,6 +13,7 @@ import jakarta.mail.internet.InternetAddress;
 import mail.mcp.model.MessageFingerprint;
 import mail.mcp.source.RemoteMessageInfo;
 import mail.mcp.connections.AuthKind;
+import mail.mcp.connections.PasswordCommandException;
 import mail.mcp.source.Downloaded;
 import mail.mcp.source.MessageUnavailableException;
 import mail.mcp.source.oauth.google.GoogleAccessTokenProvider;
@@ -68,7 +69,7 @@ public final class ImapClient implements AutoCloseable {
             throw new IllegalArgumentException("OAuth2 requires Gmail TLS and Google OAuth settings");
         }
         this.credential = testCredential != null ? testCredential : oauth
-                ? new GoogleAccessTokenProvider(settings.oauth2(), settings.username()) : settings::password;
+                ? new GoogleAccessTokenProvider(settings.oauth2(), settings.username()) : () -> settings.password().value();
         Logger.getLogger("org.eclipse.angus.mail").setLevel(Level.OFF);
         Logger.getLogger("jakarta.mail").setLevel(Level.OFF);
         Logger.getLogger(ReadOnlyImapStore.class.getName()).setLevel(Level.OFF);
@@ -106,7 +107,7 @@ public final class ImapClient implements AutoCloseable {
         if (!connected) {
             String secret;
             try { secret = credential.get(); }
-            catch (OAuthException e) { close(); throw e; }
+            catch (OAuthException | PasswordCommandException e) { close(); throw e; }
             store.connect(settings.host(), settings.port(), settings.username(), secret);
             connected = true;
         }

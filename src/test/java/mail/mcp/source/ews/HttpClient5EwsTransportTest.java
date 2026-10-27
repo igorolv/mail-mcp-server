@@ -3,6 +3,8 @@ package mail.mcp.source.ews;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import mail.mcp.connections.AuthKind;
+import mail.mcp.connections.PasswordCommandException;
+import mail.mcp.connections.Secret;
 import org.apache.hc.client5.http.auth.AuthSchemeFactory;
 import org.apache.hc.client5.http.auth.Credentials;
 import org.apache.hc.client5.http.auth.NTCredentials;
@@ -31,6 +33,7 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -150,6 +153,38 @@ class HttpClient5EwsTransportTest {
     }
 
     @Test
+    void passwordIsAskedForAtTheFirstRequestOnly() throws IOException {
+        finalBody = EwsResponseReaderTest.fixtureBytes("getfolder-inbox.xml");
+        AtomicInteger asked = new AtomicInteger();
+        Secret secret = () -> {
+            asked.incrementAndGet();
+            return "not-a-real-password";
+        };
+
+        try (EwsClient client = new EwsClient(new HttpClient5EwsTransport(settingsWith(secret)))) {
+            assertThat(asked).as("opening a session runs no password command").hasValue(0);
+            client.getFolder(DistinguishedFolder.INBOX);
+            client.getFolder(DistinguishedFolder.INBOX);
+        }
+
+        assertThat(asked).hasValue(1);
+    }
+
+    @Test
+    void failedPasswordCommandSendsNoRequest() {
+        Secret secret = () -> {
+            throw new PasswordCommandException("work", "exited with code 1");
+        };
+
+        try (EwsClient client = new EwsClient(new HttpClient5EwsTransport(settingsWith(secret)))) {
+            assertThatThrownBy(() -> client.getFolder(DistinguishedFolder.INBOX))
+                    .isInstanceOf(PasswordCommandException.class);
+        }
+
+        assertThat(requests).isEmpty();
+    }
+
+    @Test
     void rejectedSignInIsReportedOnceAndNotRetried() {
         finalStatus = 401;
 
@@ -235,6 +270,11 @@ class HttpClient5EwsTransportTest {
         URI url = URI.create("http://" + server.getAddress().getHostString() + ":" + server.getAddress().getPort() + PATH);
         return new EwsSettings(url, auth, "user", "not-a-real-password", domain,
                 Duration.ofSeconds(5), Duration.ofSeconds(5));
+    }
+
+    private EwsSettings settingsWith(Secret password) {
+        URI url = URI.create("http://" + server.getAddress().getHostString() + ":" + server.getAddress().getPort() + PATH);
+        return new EwsSettings(url, AuthKind.NTLM, "user", password, null, Duration.ofSeconds(5), Duration.ofSeconds(5));
     }
 
     private void handle(HttpExchange exchange) throws IOException {

@@ -65,10 +65,13 @@ public final class HttpClient5EwsTransport implements EwsTransport {
     private final HttpClientContext context = HttpClientContext.create();
     private final AtomicInteger requests = new AtomicInteger();
     private final AtomicInteger authorizedRequests = new AtomicInteger();
+    // Filled before the first request: a password command runs at sign-in, not when a session opens.
+    private final BasicCredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+    private boolean credentialsSet;
 
     public HttpClient5EwsTransport(EwsSettings settings) {
         this.settings = settings;
-        this.client = buildClient(settings, requests, authorizedRequests);
+        this.client = buildClient(settings, credentialsProvider, requests, authorizedRequests);
     }
 
     /** The scheme registry: only the configured scheme, so the client cannot fall back to another. */
@@ -95,7 +98,7 @@ public final class HttpClient5EwsTransport implements EwsTransport {
      * configured domain is written as {@code DOMAIN\login}.
      */
     static Credentials credentials(EwsSettings settings) {
-        char[] password = settings.password().toCharArray();
+        char[] password = settings.password().value().toCharArray();
         String domain = settings.domain() == null || settings.domain().isBlank() ? null : settings.domain().trim();
         if (settings.auth() == AuthKind.BASIC) {
             String login = domain == null ? settings.username() : domain + "\\" + settings.username();
@@ -104,12 +107,8 @@ public final class HttpClient5EwsTransport implements EwsTransport {
         return new NTCredentials(settings.username(), password, null, domain);
     }
 
-    private static CloseableHttpClient buildClient(EwsSettings settings, AtomicInteger requests,
-                                                   AtomicInteger authorizedRequests) {
-        BasicCredentialsProvider credentialsProvider = new BasicCredentialsProvider();
-        credentialsProvider.setCredentials(
-                new AuthScope(settings.url().getHost(), settings.port()), credentials(settings));
-
+    private static CloseableHttpClient buildClient(EwsSettings settings, BasicCredentialsProvider credentialsProvider,
+                                                   AtomicInteger requests, AtomicInteger authorizedRequests) {
         RequestConfig requestConfig = RequestConfig.custom()
                 .setTargetPreferredAuthSchemes(List.of(schemeName(settings.auth())))
                 .setConnectionRequestTimeout(Timeout.of(settings.connectTimeout()))
@@ -147,6 +146,11 @@ public final class HttpClient5EwsTransport implements EwsTransport {
 
     @Override
     public synchronized <T> T exchange(EwsOperation operation, byte[] envelope, ResponseHandler<T> handler) {
+        if (!credentialsSet) {
+            credentialsProvider.setCredentials(
+                    new AuthScope(settings.url().getHost(), settings.port()), credentials(settings));
+            credentialsSet = true;
+        }
         HttpPost post = new HttpPost(settings.url());
         post.setHeader("SOAPAction", operation.soapAction());
         post.setHeader(HttpHeaders.ACCEPT, "text/xml");

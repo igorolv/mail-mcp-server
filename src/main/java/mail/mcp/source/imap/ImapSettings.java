@@ -1,6 +1,7 @@
 package mail.mcp.source.imap;
 
 import mail.mcp.connections.AuthKind;
+import mail.mcp.connections.Secret;
 import mail.mcp.source.oauth.google.GoogleOAuthSettings;
 
 /**
@@ -11,7 +12,8 @@ import mail.mcp.source.oauth.google.GoogleOAuthSettings;
  * @param tls      implicit TLS; plain IMAP is rejected by the loader
  * @param auth     app-password or Gmail oauth2
  * @param username login, usually the full address
- * @param password app password; never logged, never returned by a tool
+ * @param password app password, asked for only at sign-in; never logged, never returned by a tool;
+ *                 null for oauth2
  * @param oauth2   Google OAuth file locations; no secret contents, null for app-password
  */
 public record ImapSettings(
@@ -20,12 +22,12 @@ public record ImapSettings(
         boolean tls,
         AuthKind auth,
         String username,
-        String password,
+        Secret password,
         GoogleOAuthSettings oauth2
 ) {
 
     public ImapSettings(String host, int port, boolean tls, AuthKind auth, String username, String password) {
-        this(host, port, tls, auth, username, password, null);
+        this(host, port, tls, auth, username, Secret.of(password), null);
     }
 
     public static final int DEFAULT_PORT = 993;

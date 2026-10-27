@@ -6,6 +6,8 @@ import mail.mcp.connections.ConnectionRegistry;
 import mail.mcp.connections.ConnectionType;
 import mail.mcp.connections.AuthKind;
 import mail.mcp.connections.MailConnection;
+import mail.mcp.connections.PasswordCommandException;
+import mail.mcp.connections.Secret;
 import mail.mcp.convert.Pandoc;
 import mail.mcp.convert.PandocException;
 import mail.mcp.index.MailIndex;
@@ -14,6 +16,7 @@ import mail.mcp.source.FolderChanges;
 import mail.mcp.source.MailSource;
 import mail.mcp.source.RemoteFolder;
 import mail.mcp.source.imap.ImapException;
+import mail.mcp.source.imap.ImapSettings;
 import mail.mcp.store.MessageStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -33,13 +36,18 @@ class SyncServiceTest {
     @TempDir Path dir;
     private final AtomicInteger opened = new AtomicInteger();
     private final AtomicInteger located = new AtomicInteger();
+    private final AtomicInteger forgotten = new AtomicInteger();
     private final FakeMailSource fake = new FakeMailSource();
 
     private MessageStore store() { return new MessageStore(dir, new JsonConfig().mailMcpObjectMapper()); }
 
     private SyncService service(Supplier<MailSource> source, Supplier<Pandoc> pandoc) {
+        Secret password = new Secret() {
+            @Override public String value() { return "synthetic-test-value"; }
+            @Override public void forget() { forgotten.incrementAndGet(); }
+        };
         var definition = new ConnectionDefinition("local", null, ConnectionType.IMAP, AuthKind.APP_PASSWORD,
-                null, null, dir, null);
+                null, new ImapSettings("127.0.0.1", 993, true, AuthKind.APP_PASSWORD, "user", password, null), dir, null);
         var registry = new ConnectionRegistry(List.of(definition), d -> new MailConnection(d, () -> {
             opened.incrementAndGet();
             return source.get();
@@ -109,6 +117,7 @@ class SyncServiceTest {
         var status = store().readSyncStatus().orElseThrow();
         assertThat(status.state()).isEqualTo("failed");
         assertThat(status.signInRejected()).isTrue();
+        assertThat(forgotten).as("a rejected password is not offered again").hasValue(1);
         // Even a fresh service cannot retry from MCP.
         var next = service(() -> { throw new AssertionError("source must not open"); }, () -> new Pandoc("unused"));
         assertThat(next.start("local").status()).isEqualTo(SyncStart.Status.REFUSED);
@@ -119,6 +128,28 @@ class SyncServiceTest {
             new SyncRunner(store(), index, fake, new MessageProcessor(store(), new Pandoc("unused"))).run(p -> { });
         }
         assertThat(store().readSyncStatus().orElseThrow().signInRejected()).isFalse();
+    }
+
+    @Test void failedPasswordCommandIsRecordedButIsNotARejectedSignIn() throws Exception {
+        var service = service(() -> new MailSource() {
+            @Override public java.util.Map<String, mail.mcp.source.RemoteMessageInfo> metadata(RemoteFolder f, String c, java.util.Collection<String> r) {
+                throw new AssertionError();
+            }
+            @Override public List<RemoteFolder> folders() { throw new PasswordCommandException("local", "exited with code 1"); }
+            @Override public FolderChanges changes(RemoteFolder f, String c, Set<String> known) { throw new AssertionError(); }
+            @Override public Downloaded download(RemoteFolder f, String r, Path target) { throw new AssertionError(); }
+            @Override public void close() { }
+        }, () -> new Pandoc("unused"));
+        assertThat(service.start("local").status()).isEqualTo(SyncStart.Status.STARTED);
+        awaitDone(service);
+        var status = store().readSyncStatus().orElseThrow();
+        assertThat(status.state()).isEqualTo("failed");
+        assertThat(status.signInRejected()).isFalse();
+        assertThat(status.error()).contains("exited with code 1").contains("no sign-in was attempted");
+        assertThat(forgotten).hasValue(0);
+        var next = service(() -> fake, () -> new Pandoc("unused"));
+        assertThat(next.start("local").status()).isEqualTo(SyncStart.Status.STARTED);
+        awaitDone(next);
     }
 
     @Test void missingPandocFailsBeforeTheIndex() {

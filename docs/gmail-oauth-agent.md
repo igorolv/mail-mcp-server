@@ -94,7 +94,7 @@ packages when implemented.
 - OAuth failures become fixed messages, with no raw provider body or nested exception. A failed token
   provider is terminal for that client; new attempts require an explicit new request. The token HTTP
   client disables retries and redirects, uses connect/request/read timeouts and a 64 KiB response cap.
-- Credential files remain plaintext protected by owner permissions; encryption/DPAPI is future work.
+- Credential files remain plaintext protected by owner permissions; DPAPI encryption of the refresh token is plan.md Д27.
 
 ## Authorization flow
 

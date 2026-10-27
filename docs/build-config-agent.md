@@ -89,6 +89,7 @@ Modeled on jdbc-mcp-server `docs/connections.md` @ `c2c4362`. Read once at start
 | `description` | all | What the mailbox is for; shown by `listConnections` |
 | `auth` | all | EWS: `ntlm` (default) or `basic`. IMAP: `app-password` (default) or Gmail-only `oauth2` |
 | `username`, `password` | all | Username required; password required except for OAuth2 and unused there. Any string value may use `${VAR}` |
+| `passwordCommand` | ews, imap/app-password | Instead of `password`: a JSON array, the program and its arguments, that prints the password; see [Password commands](#password-commands). Each element may use `${VAR}`. Ignored for OAuth2 |
 | `oauthClientFile` | imap/oauth2 | Required path to downloaded Google Desktop client JSON; supports `${VAR}` and leading `~`. Token file is derived as `<data-dir>/<connection>/oauth/google-tokens.json` |
 | `url` | ews | Absolute `https://` EWS endpoint; plain `http` is refused |
 | `domain` | ews | NTLM domain. Leave out for a bare login: the NTLM domain field stays empty |
@@ -100,9 +101,11 @@ the name is also the data directory name.
 
 What stops startup: invalid JSON, an invalid name, an entry that is not an object, a value of the
 wrong JSON type, an unset `${VAR}`. What only makes one entry unusable (`configError` in
-`listConnections`): a missing or unknown `type` or `auth`, a missing URL, host, login or
-password, out-of-range values. Unknown keys and keys of the other type are logged as warnings and
-ignored. A missing file starts the server with no connections.
+`listConnections`): a missing or unknown `type` or `auth`, a missing URL, host or login, neither
+or both of `password` and `passwordCommand`, an empty `passwordCommand` or an empty element,
+out-of-range values. Unknown keys and keys of the other type are logged as warnings and
+ignored. A missing file starts the server with no connections. A `passwordCommand` that is not
+an array of strings is a wrong JSON type and stops startup.
 
 Secrets: the file lives outside the repository; restrict it to the owner
 (PowerShell: `icacls "$HOME\.mail-mcp-server\connections.json" /inheritance:r /grant:r "${env:USERNAME}:F"`).
@@ -114,6 +117,67 @@ Add or edit entries only in your local editor; agents must not modify an existin
 file to append connections. Do not paste it into chat. For IMAP app-password authentication,
 use the provider's app password. Placeholder references are optional; a literal password in this
 owner-only external file is supported by the loader too.
+
+### Password commands
+
+For users who do not want the password in this file or in environment variables (plan.md 3.1,
+Д22). `connections/PasswordCommand` runs the configured program and takes its output as the
+password:
+
+```json
+"work": {
+  "type": "ews",
+  "url": "https://webmail.example.com/EWS/Exchange.asmx",
+  "username": "user",
+  "passwordCommand": ["op", "read", "op://Private/Work mail/password"]
+}
+```
+
+- **When it runs:** right before the first sign-in of a synchronization, never at startup and
+  never for reading tools, which use local data only. Opening a source session does not run it
+  (`HttpClient5EwsTransport` sets credentials before its first request; IMAP asks on connect).
+- **Kept in memory:** the value stays in the process until it exits, so frequent syncs do not unlock
+  the password manager each time. A rejected sign-in drops it (`SyncService`). After changing the
+  password in the manager, restart the MCP server, as with a literal password.
+- **Execution:** no shell; the array goes to the program as is. On Windows a `.exe` on `PATH` is
+  found by name; `.cmd`/`.bat` wrappers need `["cmd", "/c", "name", ...]`. The program inherits the
+  server's environment and working directory.
+- **Output:** UTF-8, one non-empty line. One trailing `\n` or `\r\n` and a leading byte order mark
+  are removed; other whitespace is kept. More than one line, empty output, invalid UTF-8 or more
+  than 64 KiB is a failure. Windows PowerShell 5.1 does not write UTF-8 to a pipe by default;
+  scripts must write bytes (as `scripts/Get-StoredPassword.ps1` does).
+- **In the server:** the program gets no input (end of file at once) and 60 seconds; its error
+  output goes to the log only, shortened. It cannot ask anything in a terminal: unlock the manager
+  beforehand or use one that asks in its own window.
+- **In `mail-sync`:** the program uses the user's terminal for input and error output and gets
+  5 minutes, so a master-password prompt works there.
+- **Failure:** a nonzero exit code, a timeout, a program that cannot start or bad output ends the
+  run with a fixed `PasswordCommandException` message (no program output). No credentials were
+  sent, so it is never a rejected sign-in: `signInRejected` stays false, MCP `sync` may start
+  again, and `mail-sync` exits 2.
+
+This keeps the password out of files and environment variables that agents read routinely. It
+does not stop a process running as the same user from running the command itself.
+
+Recipes (check each tool's own documentation; all of them must print only the password):
+
+| Store | `passwordCommand` |
+|---|---|
+| Windows Credential Manager | `["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "C:\\path\\to\\mail-mcp-server\\scripts\\Get-StoredPassword.ps1", "mail-mcp/work"]` |
+| 1Password CLI | `["op", "read", "op://<vault>/<item>/password"]` |
+| PowerShell SecretManagement | `["powershell", "-NoProfile", "-NonInteractive", "-Command", "$b = [Text.UTF8Encoding]::new($false).GetBytes((Get-Secret -Name mail-work -AsPlainText)); [Console]::OpenStandardOutput().Write($b, 0, $b.Length)"]`; a SecretStore vault must be unlocked or configured without a prompt |
+| macOS Keychain | `["security", "find-generic-password", "-s", "mail-mcp", "-a", "work", "-w"]` |
+| Linux Secret Service | `["secret-tool", "lookup", "service", "mail-mcp", "account", "work"]` |
+| pass / gopass | `["pass", "show", "mail/work"]`; the first line must be the only line |
+
+For Windows Credential Manager, add the credential yourself: Control Panel → Credential Manager →
+Windows Credentials → Add a generic credential, internet or network address `mail-mcp/work`, any
+user name, the password. `cmdkey /generic:mail-mcp/work /user:user /pass` should ask for the
+password instead of taking it on the command line (unverified); never put it on the command line.
+The script reads only generic credentials, prints UTF-8 without a line break and exits 1 with a
+message on standard error when the credential is missing. Managers that need a master password on
+standard input for each call (`keepassxc-cli`, Bitwarden CLI without a session) work only in
+`mail-sync`.
 
 ## Word forms and analysis
 
@@ -227,7 +291,7 @@ it is the exception's simple class name. No EWS failure is retried, including `E
 |---|---|
 | 0 | Success, or `--help` / `-h` |
 | 1 | Unexpected local error; details withheld |
-| 2 | Wrong arguments, invalid configuration/selection, missing pandoc, or OAuth failure |
+| 2 | Wrong arguments, invalid configuration/selection, missing pandoc, OAuth failure, or failed password command (no sign-in) |
 | 3 | IMAP or EWS sign-in rejected; no retry |
 | 4 | IMAP/EWS/network/protocol or local storage error |
 | 5 | Another process holds the connection's Lucene writer lock; no sign-in |
@@ -323,6 +387,13 @@ the mailbox added as a test user when using External/Testing. IMAP requires `htt
 Refresh tokens are saved with owner-only permissions; access tokens stay in memory. Refresh is lazy,
 never retries and does not open a browser. Expired/revoked refresh tokens require the first command again.
 Only the user runs real authorization and sign-in; agents may run `gmail-oauth --help`.
+
+For a personal Gmail mailbox the simpler default is an app password (`auth: app-password`),
+kept in a password manager through `passwordCommand`: no Google Cloud project, no repeated
+consent while the OAuth app is in Testing and no token file. Both grant full IMAP access and both
+can be revoked separately. Use OAuth when app passwords are unavailable, for example when a
+Workspace administrator disallows them. The OAuth refresh token remains a plaintext owner-only
+file; encrypting it is plan.md Д27.
 
 ## Synthetic data sets
 

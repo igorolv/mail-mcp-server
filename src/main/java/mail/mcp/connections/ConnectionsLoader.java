@@ -34,7 +34,9 @@ import java.util.stream.Collectors;
  * <p>What stops startup: a file that is not valid JSON, an invalid connection name, an entry that is
  * not an object, a value of the wrong JSON type, and an unset {@code ${VAR}}. What only marks one
  * entry unusable ({@link ConnectionDefinition#configError()}): a missing or unknown {@code type} or
- * {@code auth}, a missing URL, host, login or password, and values out of range. Unknown keys are
+ * {@code auth}, a missing URL, host or login, neither or both of {@code password} and
+ * {@code passwordCommand}, and values out of range. Password commands only run at sign-in
+ * ({@link PasswordCommand}). Unknown keys are
  * logged as warnings. A missing file, or one that defines no connection, starts the server with an
  * empty list so {@code listConnections} can say that nothing is configured.
  *
@@ -58,6 +60,15 @@ public final class ConnectionsLoader {
     /** @return configured connections, in file order; empty when the file is missing or defines none */
     public static List<ConnectionDefinition> load(MailMcpProperties server, ObjectMapper mapper,
                                                   UnaryOperator<String> env) {
+        return load(server, mapper, env, false);
+    }
+
+    /**
+     * @param terminal true in the user-run {@code mail-sync}: password commands may use the terminal
+     * @return configured connections, in file order; empty when the file is missing or defines none
+     */
+    public static List<ConnectionDefinition> load(MailMcpProperties server, ObjectMapper mapper,
+                                                  UnaryOperator<String> env, boolean terminal) {
         Path file = server.resolvedConnectionsFile();
         if (!Files.exists(file)) {
             log.warn("No mail connections configured: there is no file at {}. Create it (or point "
@@ -89,7 +100,7 @@ public final class ConnectionsLoader {
             }
             warnUnknownKeys(node, Set.copyOf(ENTRY_KEYS), "connection '" + name + "'");
             ConnectionsFile.Entry entry = toEntry(name, node, mapper, file);
-            definitions.put(name, define(name, entry, node, server.connectionDir(name), env));
+            definitions.put(name, define(name, entry, node, server.connectionDir(name), env, terminal));
         }
         if (definitions.isEmpty()) {
             log.warn("No mail connections configured: {} defines none under \"connections\". "
@@ -137,7 +148,7 @@ public final class ConnectionsLoader {
     }
 
     private static ConnectionDefinition define(String name, ConnectionsFile.Entry entry, JsonNode node,
-                                               Path connectionDir, UnaryOperator<String> env) {
+                                               Path connectionDir, UnaryOperator<String> env, boolean terminal) {
         // Resolve every placeholder first: an unset variable stops startup even when the entry has
         // another problem, so the operator sees it at once.
         String field = "connections." + name;
@@ -148,6 +159,14 @@ public final class ConnectionsLoader {
         String host = blankToNull(EnvironmentPlaceholders.resolve(entry.host(), field + ".host", env));
         String username = blankToNull(EnvironmentPlaceholders.resolve(entry.username(), field + ".username", env));
         String password = EnvironmentPlaceholders.resolve(entry.password(), field + ".password", env);
+        List<String> passwordCommand = null;
+        if (entry.passwordCommand() != null) {
+            passwordCommand = new ArrayList<>();
+            for (int i = 0; i < entry.passwordCommand().size(); i++) {
+                passwordCommand.add(EnvironmentPlaceholders.resolve(entry.passwordCommand().get(i),
+                        field + ".passwordCommand[" + i + "]", env));
+            }
+        }
         String domain = blankToNull(EnvironmentPlaceholders.resolve(entry.domain(), field + ".domain", env));
         String oauthClientFile = blankToNull(EnvironmentPlaceholders.resolve(entry.oauthClientFile(), field + ".oauthClientFile", env));
 
@@ -174,19 +193,35 @@ public final class ConnectionsLoader {
         if (username == null) {
             return common.unusable(type, auth, "no 'username'");
         }
-        if (auth != AuthKind.OAUTH2 && (password == null || password.isEmpty())) {
-            return common.unusable(type, auth, "no 'password'");
+        Secret secret = null;
+        if (auth != AuthKind.OAUTH2) {
+            boolean hasPassword = password != null && !password.isEmpty();
+            if (hasPassword && passwordCommand != null) {
+                return common.unusable(type, auth, "set either 'password' or 'passwordCommand', not both");
+            }
+            if (passwordCommand != null) {
+                if (passwordCommand.isEmpty() || passwordCommand.stream().anyMatch(part -> part == null || part.isEmpty())
+                        || passwordCommand.getFirst().isBlank()) {
+                    return common.unusable(type, auth,
+                            "'passwordCommand' must be a non-empty array of non-empty strings: the program, then its arguments");
+                }
+                secret = new PasswordCommand(name, passwordCommand, terminal);
+            } else if (hasPassword) {
+                secret = Secret.of(password);
+            } else {
+                return common.unusable(type, auth, "no 'password' or 'passwordCommand'");
+            }
         }
 
         return switch (type) {
-            case EWS -> defineEws(common, auth, url, username, password, domain,
+            case EWS -> defineEws(common, auth, url, username, secret, domain,
                     entry.connectTimeoutSeconds(), entry.readTimeoutSeconds());
-            case IMAP -> defineImap(common, auth, host, entry.port(), entry.tls(), username, password, oauthClientFile);
+            case IMAP -> defineImap(common, auth, host, entry.port(), entry.tls(), username, secret, oauthClientFile);
         };
     }
 
     private static ConnectionDefinition defineEws(Common common, AuthKind auth, String url, String username,
-                                                  String password, String domain,
+                                                  Secret password, String domain,
                                                   Integer connectTimeoutSeconds, Integer readTimeoutSeconds) {
         if (url == null) {
             return common.unusable(ConnectionType.EWS, auth,
@@ -213,7 +248,7 @@ public final class ConnectionsLoader {
     }
 
     private static ConnectionDefinition defineImap(Common common, AuthKind auth, String host, Integer port,
-                                                   Boolean tls, String username, String password, String oauthClientFile) {
+                                                   Boolean tls, String username, Secret password, String oauthClientFile) {
         if (host == null) {
             return common.unusable(ConnectionType.IMAP, auth, "no 'host' (e.g. imap.gmail.com)");
         }
