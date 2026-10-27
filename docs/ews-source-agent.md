@@ -57,8 +57,11 @@ The folder id identifies a folder across renames; item refs are `ItemId` ids, ig
 
 `changes` reads `SyncFolderItems` until its last page, passing each page's `SyncState` into the
 next request. `Create` entries of any item kind contribute ids in server order; `Delete` removes
-an id created during this call or contributes a deletion. `Update` and `ReadFlagChange` are
-consumed and ignored. The last page's opaque state is returned unchanged. Known refs are skipped
+an id created during this call or contributes a deletion. `ReadFlagChange` gives an item id and
+IsRead (a later change of the same item wins); `Update` gives an item id. For known, still present
+items these become `FolderChanges.observed`: IsRead from ReadFlagChange, and IsRead plus
+Flag/FlagStatus from one IdOnly metadata GetItem per 100 Update items (Д29). Fingerprints from that
+request are dropped. Changes of unknown items are ignored. The last page's opaque state is returned unchanged. Known refs are skipped
 in the added list, and known deletions are returned in natural string order.
 
 A first sync (null state) enumerates all items, so known refs absent from the created set are
@@ -87,8 +90,8 @@ maps successes by returned ItemId rather than by successful-response position. D
 unrequested or missing success IDs and other errors abort without retry. Missing optional
 identity properties disable matching. EWS item size is never replaced by local MIME byte size.
 
-The sync runner uses these snapshots to seed old stores without repeat downloads and to count
-retained copies before matching apparent moves. Unique complete Message-ID/metadata equality
+The sync runner requests these snapshots only for added items; known items keep their stored
+fingerprints, which count as retained copies before matching apparent moves. Unique complete Message-ID/metadata equality
 can still hide different content: this is heuristic evidence, not remote byte identity. Reuse
 preserves UUID, paths, original SHA-256/time and every content file, and changes metadata/index
 before unmatched removals. All cursors advance only after planned changes commit; reconciliation
@@ -102,16 +105,16 @@ and [FieldURI](https://learn.microsoft.com/en-us/exchange/client-developer/web-s
 
 ## Flag snapshots
 
-The same metadata GetItem reads nullable IsRead and Flag/FlagStatus for every present item,
-including unchanged refs. Explicit true/false (also XML boolean 1/0) maps to read.
+The metadata GetItem reads nullable IsRead and Flag/FlagStatus for added items and for known
+items with an Update change; ReadFlagChange supplies IsRead alone. Explicit true/false (also XML boolean 1/0) maps to read.
 Flagged maps to flagged=true; NotFlagged and Complete map to false. Missing/unsupported
 values are unknown; fields update independently and missing data preserves a stored value.
 Importance:High is unrelated and is not requested or mapped. This implements the brief's
 user flag/star interpretation, not an additional user decision.
 
-Update/ReadFlagChange entries still need no separate interpretation: the full metadata pass
-observes final flags even without additions/removals. The tradeoff is batched metadata traffic
-for all present refs on every requested sync. It requests no MIME/body, adds no sign-in or retry
+Until Д29 every sync read this metadata for all present items: 48.6 s per run for 8085 items on
+the user's server. Now a run without changes sends only SyncFolderItems per folder. Whether
+Exchange 2013 reports a follow-up flag change as Update is to verify (проверить). The request asks no MIME/body, adds no sign-in or retry
 and writes nothing to the mailbox. Known flag changes leave local content and download/state
 metadata unchanged, rebuild only the affected document and increase no message counter.
 Flags are excluded from move identity; destination observations apply on reuse. Schema 4 stores

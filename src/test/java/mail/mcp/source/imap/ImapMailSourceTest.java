@@ -66,6 +66,26 @@ class ImapMailSourceTest {
         }
     }
 
+    @Test void changesObserveFlagsOfKnownRefsInTheUidListing() throws Exception {
+        var folder = new FakeImapServer.MailFolder("INBOX",
+                new FakeImapServer.Item(1, MIME, MIME.length, "\\Seen"),
+                new FakeImapServer.Item(5, MIME, MIME.length, "\\Seen \\Flagged"),
+                new FakeImapServer.Item(10, MIME));
+        try (var server = new FakeImapServer(folder); var source = source(server)) {
+            var changes = source.changes(INBOX, "7", Set.of("1", "10"));
+            assertThat(changes.added()).containsExactly("5");
+            assertThat(changes.observed()).containsOnlyKeys("1", "10");
+            assertThat(changes.observed().get("1").read()).isTrue();
+            assertThat(changes.observed().get("1").flagged()).isFalse();
+            assertThat(changes.observed().get("10").read()).isFalse();
+            assertThat(changes.observed().get("10").fingerprint()).isNull();
+            assertThat(server.commands).anyMatch(c -> c.matches("FETCH [0-9:,]+ \\(FLAGS UID\\)"))
+                    .noneMatch(c -> c.contains("ENVELOPE") || c.contains("BODY"));
+            assertThat(source.changes(INBOX, "8", Set.of("1", "10")).observed())
+                    .as("a UIDVALIDITY reset observes nothing").isEmpty();
+        }
+    }
+
     @Test void removedIsKnownMinusPresent() throws Exception {
         try (var server = new FakeImapServer(inbox()); var source = source(server)) {
             var changes = source.changes(INBOX, "7", Set.of("1", "2", "20", "11", "0", "bad", "gone"));

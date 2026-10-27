@@ -99,11 +99,11 @@ MailSource (EWS | IMAP)  ──download .eml──▶  SyncRunner  ──▶  <d
 - One sign-in per run and no retries: a stale password must not lock a domain account.
 - The disk is the full copy; the index is derived and can be rebuilt offline (`mail-reindex`).
 
-Each sync reads identity metadata for all present messages, including known ones, in batches of
-at most 100: EWS `GetItem` identity and flag properties or IMAP `ENVELOPE`, UID, `RFC822.SIZE`
-and `FLAGS`, without bodies. Known mail refreshes on every requested sync.
-The first sync after upgrading seeds old local metadata without downloading known MIME or
-reprocessing it. A message moved before seeding uses the normal download path.
+Identity metadata is read only for new messages, in batches of at most 100: EWS `GetItem`
+identity and flag properties or IMAP `ENVELOPE`, UID, `RFC822.SIZE` and `FLAGS`, without bodies.
+Known messages keep their stored identity, which does not change on the server. A known message
+saved without one (before move detection existed) gets it from its saved `message.eml` headers
+only when it disappears from its folder; a mismatch merely means a normal download.
 
 Reuse requires an explicitly removed, converted local message with MIME, a new ref in another
 folder, and exactly one old and one current occurrence of its complete Message-ID/size/sent
@@ -120,12 +120,12 @@ changes commit; the next run repairs an index whose folder/ref or flags disagree
 current local refs to resume. Content paths stay unchanged. Reused messages count as neither
 downloaded, failed nor removed, so `0 downloaded` can include recognized moves.
 
-The same metadata pass refreshes `read` and `flagged` independently. Missing/unsupported flag
-data keeps the last known value; explicit false clears it. Flag-only updates and reused moves
-increase no download/failure/removal counter and leave MIME, body, attachments, SHA-256, download
-time and processing state unchanged. EWS Update/ReadFlagChange events need no special handling:
-the full pass sees final state even without additions or removals, at the cost of metadata traffic
-for all present messages on every requested sync.
+`read` and `flagged` of known messages come with the folder changes: IMAP reads the FLAGS of all
+UIDs in the same command that lists them, EWS takes `ReadFlagChange` from `SyncFolderItems` and
+reads only items with an `Update` change. Missing/unsupported flag data keeps the last known value;
+explicit false clears it. Flag-only updates and reused moves increase no download/failure/removal
+counter and leave MIME, body, attachments, SHA-256, download time and processing state unchanged.
+A sync without changes therefore costs one change request per folder, as before move detection.
 
 Schema 4 adds stored flag fields. Opening the writer automatically rebuilds older indexes
 offline from disk; `mail-reindex <connection>` also rebuilds without network access. Old metadata

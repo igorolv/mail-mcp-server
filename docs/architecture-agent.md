@@ -35,9 +35,10 @@ mail; see plan.md section 4.
 
 Read/star flags are implemented and verified offline; real-server behavior remains to verify
 (проверить). `RemoteMessageInfo`, `MessageMeta` and `MessageCard` carry nullable `read`/`flagged`.
-Unknown is omitted, while false clears an observed value. The existing metadata pass refreshes
-all present refs on every requested sync. EWS uses IsRead and Flag/FlagStatus; IMAP uses
-Seen/Flagged from the actual batch response after a renewed EXAMINE, never cached flag getters.
+Unknown is omitted, while false clears an observed value. Known messages get flags with the
+folder changes (`FolderChanges.observed`): IMAP from FLAGS in the UID listing, EWS from
+ReadFlagChange and a short GetItem of Update items (Д29). IMAP uses the actual FETCH responses
+after a renewed EXAMINE, never cached flag getters.
 The user flag/star is separate from sender importance and Gmail Important.
 
 Metadata-only flag updates atomically save changed metadata and rebuild its document from saved
@@ -170,12 +171,13 @@ Thread reading uses no bodies, MIME, attachment text, source or pandoc. The writ
 reading. Conversations use schema 4 without persisted threads or additional fields for links.
 Only displayed subjects/senders are filtered; keys, paths, folder keys and dates stay original.
 
-Move reuse is verified offline. Each sync reads metadata for all present refs in batches of at
-most 100, through EWS IdOnly GetItem identity/flag properties or IMAP ENVELOPE/size/UID/FLAGS
-with a renewed EXAMINE and UIDVALIDITY check. This first seeds old stores without repeat MIME
-downloads or reprocessing. `MessageMeta.fingerprint` is nullable for old JSON; processing and
-reindexing preserve it; it is independent of the schema-4 flag fields. A move before seeding falls back to
-normal download. Missing/incomplete refreshed identity clears the fingerprint.
+Move reuse is verified offline. Each sync reads identity metadata only for added refs, in
+batches of at most 100, through EWS IdOnly GetItem identity/flag properties or IMAP
+ENVELOPE/size/UID/FLAGS with a renewed EXAMINE and UIDVALIDITY check. Known refs keep their
+stored fingerprints; `MimeReader.fingerprint` builds one from saved headers for a removed
+candidate without it (IMAP size equals the MIME length; an EWS item size does not, so such a
+candidate never matches). `MessageMeta.fingerprint` is nullable for old JSON; processing and
+reindexing preserve it; it is independent of the schema-4 flag fields.
 
 Matching uses a pre-run snapshot, an explicitly removed converted entry with MIME, and exactly
 one old and one remote occurrence of a complete Message-ID/size/sent date/sender/subject
@@ -189,8 +191,9 @@ downloaded, failed nor removed; zero downloads may include moves.
 Before applying changes, folder identities are saved with old/null cursors, including vanished
 folders. Matches commit before unmatched removals, which check the original folder/ref before
 deleting. Only the final folder-list replacement advances all cursors and drops vanished entries.
-Reconciliation compares indexed folder/ref/path and flags with disk metadata and restores just mismatched
-documents without reconversion. Current local refs make reruns after metadata reassignment,
+After a run that did not complete, reconciliation compares indexed folder/ref/path and flags with
+disk metadata and restores just mismatched documents without reconversion; after a completed run it
+compares keys only (Д30). Current local refs make reruns after metadata reassignment,
 index commit or interrupted downloads/cursor save idempotent. No journal or second store is
 used. Protocol availability on the user's servers remains to verify (проверить).
 

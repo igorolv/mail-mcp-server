@@ -221,14 +221,14 @@ class SyncRunnerTest {
         source.putFolder("c", "C", "7", "3");
         source.fingerprint("c", "3", IDENTITY);
         run();
-        // Refresh the retained copy to incomplete: pre-run ambiguity must still disqualify it.
+        // Known fingerprints are never fetched again: the stored one keeps the copy ambiguous.
         source.fingerprint("c", "3", null);
         moveRemote();
         source.resetCounts();
         run();
         assertThat(source.downloadCalls).isEqualTo(1);
         assertThat(store().messageDir(key)).doesNotExist();
-        assertThat(store().readMeta(refs("f3").get("3")).orElseThrow().fingerprint()).isNull();
+        assertThat(store().readMeta(refs("f3").get("3")).orElseThrow().fingerprint()).isEqualTo(IDENTITY);
         source.removeFolder("c");
     }
 
@@ -251,17 +251,18 @@ class SyncRunnerTest {
         assertThat(content(key)).isEqualTo(bytes);
     }
 
-    @Test void newlySeededRetainedCopyDisablesMoveReuse() throws Exception {
+    @Test void retainedCopyWithoutStoredFingerprintIsNotFetchedAndDoesNotBlockReuse() throws Exception {
         String key = seedMove(false);
         source.putFolder("c", "C", "7", "3");
-        run(); // This retained copy has no saved fingerprint yet.
+        run(); // This retained copy has no saved fingerprint.
         source.fingerprint("c", "3", IDENTITY);
         moveRemote();
         source.resetCounts();
         run();
-        assertThat(source.downloadCalls).isEqualTo(1);
-        assertThat(store().messageDir(key)).doesNotExist();
-        assertThat(store().readMeta(refs("f3").get("3")).orElseThrow().fingerprint()).isEqualTo(IDENTITY);
+        assertThat(source.downloadCalls).isZero();
+        assertThat(source.metadataCalls).as("only the added ref").isEqualTo(1);
+        assertThat(refs("f2")).containsEntry("2", key);
+        assertThat(store().readMeta(refs("f3").get("3")).orElseThrow().fingerprint()).isNull();
     }
 
     @Test void interruptionDuringOtherDownloadsKeepsTheCommittedMove() throws Exception {
@@ -283,25 +284,45 @@ class SyncRunnerTest {
         assertThat(store().readMeta(key).orElseThrow().downloadedAt()).isEqualTo(old.downloadedAt());
     }
 
-    @Test void firstSyncSeedsFingerprintWithoutRedownloadingKnownMime() throws Exception {
-        String key = seedMove(false);
-        var old = store().readMeta(key).orElseThrow();
-        var legacy = new MessageMeta(key, old.folderKey(), old.folder(), old.ref(), old.size(), old.sha256(),
-                old.downloadedAt(), old.state(), old.error());
-        store().writeMeta(legacy);
-        var bytes = content(key);
-        run();
-        assertThat(store().readMeta(key).orElseThrow().fingerprint()).isEqualTo(IDENTITY);
-        assertThat(content(key)).isEqualTo(bytes);
-        assertThat(source.downloadCalls).isZero();
-        assertThat(source.metadataCalls).isEqualTo(2);
-        source.fingerprint("a", "1", new MessageFingerprint(IDENTITY.messageId(), null, IDENTITY.sentAt(), IDENTITY.from(), IDENTITY.subject()));
-        run();
-        assertThat(store().readMeta(key).orElseThrow().fingerprint()).isNull();
-        moveRemote();
-        run();
-        assertThat(source.downloadCalls).isEqualTo(1);
-        assertThat(store().messageDir(key)).doesNotExist();
+    @Test void messageWithoutStoredFingerprintIsNotFetchedAndMovesByItsSavedHeaders() throws Exception {
+        byte[] mime = ("Message-ID: <legacy@example.com>\r\nDate: Sun, 25 Oct 2026 12:00:00 +0000\r\n"
+                + "From: Legacy Sender <legacy@example.com>\r\nSubject: =?UTF-8?B?0KHRgtCw0YDQvtC1?=\r\n"
+                + "MIME-Version: 1.0\r\nContent-Type: text/plain\r\n\r\nSaved before move detection\r\n")
+                .getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        var local = new MessageFingerprint("<legacy@example.com>", (long) mime.length,
+                Instant.parse("2026-10-25T12:00:00Z"), "legacy@example.com", "Старое");
+        Path base = connectionDir;
+        for (boolean sameSize : List.of(true, false)) {
+            connectionDir = base.resolve("sameSize" + sameSize);
+            source = new FakeMailSource();
+            source.putFolder("a", "A", "7", "1");
+            source.putFolder("b", "B", "7");
+            source.putMime("a", "1", mime);
+            run(); // no fingerprint from the server: like mail saved before move detection
+            String key = refs("f1").get("1");
+            assertThat(store().readMeta(key).orElseThrow().fingerprint()).isNull();
+            source.resetCounts();
+            run();
+            assertThat(source.metadataCalls).as("known refs are not fetched again").isZero();
+            assertThat(store().readMeta(key).orElseThrow().fingerprint()).isNull();
+
+            source.putFolder("a", "A", "7");
+            source.putFolder("b", "B", "7", "2");
+            source.putMime("b", "2", mime);
+            // EWS reports item:Size, not the MIME length: such a mismatch must only prevent reuse.
+            source.fingerprint("b", "2", sameSize ? local : new MessageFingerprint(local.messageId(),
+                    local.size() + 100, local.sentAt(), local.from(), local.subject()));
+            source.resetCounts();
+            run();
+            if (sameSize) {
+                assertThat(source.downloadCalls).isZero();
+                assertThat(refs("f2")).containsEntry("2", key);
+                assertThat(store().readMeta(key).orElseThrow().fingerprint()).isEqualTo(local);
+            } else {
+                assertThat(source.downloadCalls).isEqualTo(1);
+                assertThat(store().messageDir(key)).doesNotExist();
+            }
+        }
     }
 
     @Test void uidValidityResetNeverUsesMoveHeuristic() throws Exception {
@@ -328,7 +349,7 @@ class SyncRunnerTest {
             var folders = store().folders();
             moveRemote();
             if (vanish) { source.removeFolder("a"); }
-            source.failMetadataAt = vanish ? 1 : 2;
+            source.failMetadataAt = 1; // only folder B has an added ref
             assertThatThrownBy(this::run).isInstanceOf(ImapException.class);
             assertThat(store().readMeta(key)).contains(old);
             assertThat(content(key)).isEqualTo(bytes);
@@ -758,7 +779,7 @@ class SyncRunnerTest {
         assertThat(updated.error()).isEqualTo(old.error());
         assertThat(content(key)).isEqualTo(before);
         assertThat(source.downloadCalls).isZero();
-        assertThat(source.metadataCalls).isEqualTo(2);
+        assertThat(source.metadataCalls).as("flags come with the changes").isZero();
         try (var reader = mail.mcp.index.MailIndexReader.open(connectionDir).orElseThrow()) {
             assertThat(reader.cards("f1", 0, 10).getFirst().read()).isTrue();
             assertThat(reader.cards("f1", 0, 10).getFirst().flagged()).isFalse();
@@ -794,6 +815,32 @@ class SyncRunnerTest {
             assertThat(reader.cards("f1", 0, 10).getFirst().flagged()).isTrue();
         }
         assertThat(content(key)).isEqualTo(before);
+    }
+
+    @Test void runAfterACompletedRunReadsMetadataOfChangedMessagesOnly() throws Exception {
+        source.putFolder("a", "A", "7", "1", "2", "3");
+        for (String ref : List.of("1", "2", "3")) { source.flags("a", ref, false, false); }
+        source.putFolder("b", "B", "7", "4");
+        run();
+        String untouched = refs("f1").get("2");
+        Path meta = store().messageDir(untouched).resolve(MessageStore.META_FILE);
+        String saved = Files.readString(meta);
+        Files.writeString(meta, "not JSON: a run after a completed run must not open this file");
+
+        source.flags("a", "1", true, false);
+        source.putFolder("b", "B", "7"); // one removal in another folder
+        source.resetCounts();
+        assertThat(run()).contains(new FolderProgress("B", 0, 0, 1, false, true));
+        assertThat(store().readMeta(refs("f1").get("1")).orElseThrow().read()).isTrue();
+        assertThat(source.metadataCalls).isZero();
+
+        // After a run that did not complete, every meta.json is compared with the index again.
+        store().writeSyncStatus(new mail.mcp.model.SyncStatus("failed", 1, Instant.now(), Instant.now(),
+                List.of(), "synthetic", false));
+        assertThatThrownBy(this::run).isInstanceOf(RuntimeException.class);
+        Files.writeString(meta, saved);
+        run();
+        assertThat(store().readSyncStatus().orElseThrow().state()).isEqualTo("completed");
     }
 
     @Test void missingFlagDataDoesNotClearKnownValues() {

@@ -147,10 +147,12 @@ class EwsResponseReaderTest {
     }
 
     @Test
-    void syncFolderItemsReadsCreatesAndDeletesAndSkipsOtherChanges() throws Exception {
+    void syncFolderItemsReadsCreatesDeletesUpdatesAndReadFlags() throws Exception {
         var page = EwsResponseReader.readSyncPage(fixture("sync-changes.xml"));
         assertThat(page.created()).containsExactly("AAMkSYNTH-b", "AAMkSYNTH-a");
         assertThat(page.deleted()).containsExactly("AAMkSYNTH-gone");
+        assertThat(page.updated()).containsExactly("ignored-update");
+        assertThat(page.readFlags()).containsExactly(java.util.Map.entry("ignored-read", true));
         assertThat(page.syncState()).isEqualTo("state-final");
         assertThat(page.includesLastItemInRange()).isTrue();
     }

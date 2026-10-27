@@ -8,7 +8,9 @@ import mail.mcp.source.RemoteFolder;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
+import jakarta.mail.Flags;
 import java.util.List;
 import java.util.Set;
 import java.util.Collection;
@@ -46,7 +48,17 @@ public final class ImapMailSource implements MailSource {
         boolean reset = cursor != null && !cursor.equals(newCursor);
         var added = present.stream().filter(ref -> reset || !known.contains(ref)).toList();
         var removed = known.stream().filter(ref -> reset || !presentSet.contains(ref)).sorted(REF_ORDER).toList();
-        return new FolderChanges(added, removed, newCursor, reset);
+        var observed = new HashMap<String, RemoteMessageInfo>();
+        if (!reset) {
+            for (var entry : uids.flags().entrySet()) {
+                String ref = String.valueOf(entry.getKey());
+                if (known.contains(ref)) {
+                    observed.put(ref, new RemoteMessageInfo(ref, null, entry.getValue().contains(Flags.Flag.SEEN),
+                            entry.getValue().contains(Flags.Flag.FLAGGED)));
+                }
+            }
+        }
+        return new FolderChanges(added, removed, newCursor, reset, false, observed);
     }
 
     @Override public Map<String, RemoteMessageInfo> metadata(RemoteFolder folder, String expectedCursor,

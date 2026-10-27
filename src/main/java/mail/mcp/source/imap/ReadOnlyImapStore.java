@@ -78,6 +78,16 @@ final class ReadOnlyImapStore extends IMAPStore {
             @Override public Response[] fetch(MessageSet[] messages, String items) throws ProtocolException {
                 malformedResponses = 0;
                 Response[] responses = super.fetch(messages, items);
+                if (items.contains("FLAGS") && !items.contains("ENVELOPE")) {
+                    // The UID listing also reads FLAGS (Д29); a skipped response leaves that UID unobserved.
+                    for (var response : responses) {
+                        if (response instanceof FetchResponse fetch) {
+                            var uid = fetch.getItem(UID.class);
+                            var flags = fetch.getItem(FLAGS.class);
+                            if (uid != null && flags != null) { metadataFlags.put(uid.uid, new Flags(flags)); }
+                        }
+                    }
+                }
                 if (items.contains("FLAGS") && items.contains("ENVELOPE")) {
                     metadataUnparsable = malformedResponses;
                     // IMAPFolder.fetch ignores CommandFailedException; surface it as a generic

@@ -45,6 +45,7 @@ final class FakeImapServer implements AutoCloseable {
     volatile boolean omitMetadataFlags;
     volatile boolean malformedMetadataFlags;
     volatile Long malformedMetadataUid;
+    volatile String listingFlags;
     volatile boolean rejectMetadata;
 
     FakeImapServer() throws IOException { this(false, false, "login"); }
@@ -131,6 +132,16 @@ final class FakeImapServer implements AutoCloseable {
                     for (int i = 0; i < current.messages().size(); i++) {
                         if (inSet(i + 1, set)) {
                             send(out, "* " + (i + 1) + " FETCH (UID " + current.messages().get(i).uid() + ")\r\n");
+                        }
+                    }
+                } else if (command.matches("FETCH [0-9:,]+ \\(FLAGS UID\\)")) {
+                    assertThat(current).isNotNull();
+                    String set = command.split(" ")[1];
+                    for (int i = 0; i < current.messages().size(); i++) {
+                        if (inSet(i + 1, set)) {
+                            var item = current.messages().get(i);
+                            send(out, "* " + (i + 1) + " FETCH (FLAGS ("
+                                    + (listingFlags == null ? item.flags() : listingFlags) + ") UID " + item.uid() + ")\r\n");
                         }
                     }
                 } else if (command.matches("FETCH [0-9:,]+ \\(ENVELOPE INTERNALDATE RFC822\\.SIZE FLAGS UID\\)")) {

@@ -96,8 +96,8 @@ user flag/star, not sender importance or Gmail Important. Booleans bypass Secret
 and thread cards read the committed schema-4 index. Existing date bounds, conversation links,
 sorting and pagination are unchanged. Opening the writer rebuilds old schemas offline, or the
 user runs `mail-reindex <connection>`; old metadata remains unknown until a requested sync.
-Every sync refreshes flags on known mail through the existing full metadata pass without MIME
-downloads or conversion. Missing fields preserve known values independently; false clears them.
+Every sync refreshes flags on known mail from the folder changes (IMAP FLAGS in the UID listing,
+EWS ReadFlagChange/Update), without MIME downloads, conversion or a pass over all messages. Missing fields preserve known values independently; false clears them.
 Original files, state/error, SHA-256 and download time remain unchanged. Flags do not participate
 in move matching; destination observations apply after reuse. Flag-only updates and moves count
 as zero downloaded, failed and removed, preserving rescan reports and the background summary.
@@ -248,12 +248,11 @@ English fields keep their original behavior.
 
 ## Status file and writer ownership
 
-Requested syncs now read one source metadata snapshot for every present ref, including known
-messages, in batches of at most 100 without MIME/body fetches. EWS uses IdOnly GetItem identity
-and flag properties; IMAP uses ENVELOPE/size/UID/FLAGS and verifies UIDVALIDITY after reopening with EXAMINE.
-The first ordinary sync seeds old `meta.json` fingerprints without repeat downloads or
-reprocessing. Before seeding, an apparent move uses normal download. No reader tool initiates
-these metadata requests.
+Requested syncs read source metadata only for added refs, in batches of at most 100 without
+MIME/body fetches. EWS uses IdOnly GetItem identity and flag properties; IMAP uses
+ENVELOPE/size/UID/FLAGS and verifies UIDVALIDITY after reopening with EXAMINE. Known messages
+keep saved fingerprints; a removed one without a fingerprint is matched by its saved headers.
+No reader tool initiates these metadata requests.
 
 The runner reuses a removed converted message only for a unique complete Message-ID/metadata
 match in a different included folder of the same connection; retained copies, incomplete

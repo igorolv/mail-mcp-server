@@ -144,25 +144,33 @@ public final class ImapClient implements AutoCloseable {
         return currentFolder;
     }
 
+    /** All UIDs with their FLAGS in one FETCH: cheap read/star observations of the folder (Д29). */
     public synchronized FolderUids folderUids(String folderName) {
         try {
+            // A fresh EXAMINE gives fresh message objects, so cached flags cannot hide a FETCH item.
+            if (currentFolder != null) { currentFolder.close(false); currentFolder = null; }
             var folder = open(folderName);
             long uidValidity = folder.getUIDValidity();
             if (uidValidity <= 0) { throw protocol("folderUids", "non-positive UIDVALIDITY"); }
             var uids = new ArrayList<Long>();
+            var flags = new java.util.HashMap<Long, Flags>();
             if (folder.getMessageCount() > 0) {
                 var messages = folder.getMessages();
                 var profile = new FetchProfile();
                 profile.add(UIDFolder.FetchProfileItem.UID);
+                profile.add(FetchProfile.Item.FLAGS);
+                store.clearMetadataObservations();
                 folder.fetch(messages, profile);
                 for (var message : messages) {
                     long uid = folder.getUID(message);
                     if (uid <= 0) { throw protocol("folderUids", "non-positive UID"); }
                     uids.add(uid);
+                    var observed = store.metadataFlags(uid);
+                    if (observed != null) { flags.put(uid, observed); }
                 }
                 uids.sort(Long::compareTo);
             }
-            return new FolderUids(uidValidity, uids);
+            return new FolderUids(uidValidity, uids, flags);
         } catch (MessagingException e) { throw fail("folderUids", e); }
         catch (ImapException e) { close(); throw e; }
     }

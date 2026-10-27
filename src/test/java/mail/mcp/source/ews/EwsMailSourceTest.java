@@ -290,8 +290,7 @@ class EwsMailSourceTest {
             assertThat(Files.readAllBytes(store.messageDir(key).resolve(MessageStore.MESSAGE_FILE))).isEqualTo(expected);
         }
         var second = new ScriptedEwsTransport().answer(GET_FOLDER, "getfolder-excluded.xml")
-                .answer(FIND_FOLDER, "findfolder-inbox.xml").answer(SYNC_FOLDER_ITEMS, "sync-empty.xml")
-                .answer(GET_ITEM, "getitem-metadata-two.xml");
+                .answer(FIND_FOLDER, "findfolder-inbox.xml").answer(SYNC_FOLDER_ITEMS, "sync-empty.xml");
         progress.clear();
         try (var index = MailIndex.openWriter(temp); var source = new EwsMailSource(new EwsClient(second))) {
             new SyncRunner(store, index, source, new mail.mcp.sync.MessageProcessor(store, new mail.mcp.convert.Pandoc("pandoc"))).run(progress::add);
@@ -300,10 +299,31 @@ class EwsMailSourceTest {
         assertThat(progress).containsExactly(new FolderProgress("Входящие", 0, 0, 0, false, true));
         assertThat(second.requests.get(2)).contains("<m:SyncState>state-final</m:SyncState>");
         assertThat(second.requests).noneMatch(xml -> xml.contains("IncludeMimeContent"));
+        assertThat(second.requests).as("no changes: no GetItem for known items (Д29)").hasSize(3);
         assertThat(store.keys()).isEqualTo(originalKeys);
         first.assertDrained();
         second.assertDrained();
     }
+    @Test void knownItemFlagsComeFromSyncChangesAndUpdatedItemsOnly() {
+        var transport = new ScriptedEwsTransport().answer(SYNC_FOLDER_ITEMS, "sync-flag-changes.xml")
+                .answer(GET_ITEM, "getitem-metadata-flag.xml");
+        try (var source = new EwsMailSource(new EwsClient(transport))) {
+            var changes = source.changes(INBOX, "state", Set.of("AAMkSYNTH-a", "AAMkSYNTH-b"));
+            assertThat(changes.added()).isEmpty();
+            assertThat(changes.removed()).isEmpty();
+            assertThat(changes.observed()).containsOnlyKeys("AAMkSYNTH-a", "AAMkSYNTH-b");
+            var updated = changes.observed().get("AAMkSYNTH-a");
+            assertThat(updated.fingerprint()).isNull();
+            assertThat(updated.read()).isTrue();
+            assertThat(updated.flagged()).isTrue();
+            var readOnly = changes.observed().get("AAMkSYNTH-b");
+            assertThat(readOnly.read()).as("the later ReadFlagChange wins").isFalse();
+            assertThat(readOnly.flagged()).isNull();
+        }
+        transport.assertDrained();
+        assertThat(transport.requests.get(1)).contains("Id=\"AAMkSYNTH-a\"").doesNotContain("AAMkSYNTH-b");
+    }
+
     @Test void invalidSyncStateReportsRescanWithoutResetOrKnownDownloads() {
         var transport = new ScriptedEwsTransport().answer(SYNC_FOLDER_ITEMS, "sync-invalid-state.xml")
                 .answer(SYNC_FOLDER_ITEMS, "sync-changes.xml");

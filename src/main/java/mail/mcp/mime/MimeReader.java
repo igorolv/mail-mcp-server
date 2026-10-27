@@ -12,6 +12,7 @@ import jakarta.mail.util.SharedFileInputStream;
 import mail.mcp.model.Address;
 import mail.mcp.model.AttachmentInfo;
 import mail.mcp.model.MailMessage;
+import mail.mcp.model.MessageFingerprint;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -57,6 +58,29 @@ public final class MimeReader {
                             : List.of(references.trim().split("\\s+")), walk.attachments);
             return new ParsedMessage(message, body,
                     walk.plain == null && walk.html != null);
+        }
+    }
+
+    /**
+     * Identity evidence of a saved original, built like the IMAP ENVELOPE fingerprint: Message-ID,
+     * file size (equal to RFC822.SIZE for an IMAP download), sent date, a single non-group From
+     * address and the decoded subject. Only headers are parsed. Used for move detection of messages
+     * without a stored fingerprint (docs/plan.md 3.6, Д29); a mismatch only prevents reuse.
+     */
+    public static MessageFingerprint fingerprint(Path eml) throws MessagingException, IOException {
+        try (var input = open(eml)) {
+            var mime = new MimeMessage(Session.getInstance(new Properties()), input);
+            String from = null;
+            try {
+                var senders = mime.getFrom();
+                if (senders != null && senders.length == 1 && senders[0] instanceof InternetAddress address
+                        && !address.isGroup()) {
+                    from = address.getAddress();
+                }
+            } catch (MessagingException e) { /* unparsable From: no identity */ }
+            var date = mime.getSentDate();
+            return new MessageFingerprint(mime.getMessageID(), Files.size(eml),
+                    date == null ? null : date.toInstant(), from, mime.getSubject());
         }
     }
 

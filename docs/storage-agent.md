@@ -110,18 +110,20 @@ local messages of that folder, even if the source's removed list is incomplete, 
 the added refs; both ends of a UIDVALIDITY reset are excluded from move matching. EWS rescans
 do not invalidate refs and remain eligible.
 
-Move matching uses the pre-run metadata snapshot before refreshing retained messages. An old
-converted message with existing MIME must be explicitly removed in this run, with a complete
-saved fingerprint equal to a new ref's fingerprint in a different folder of this connection.
-Exactly one old occurrence and one current remote occurrence are required across the entire
-connection, including retained copies and all candidates. Ambiguity, missing evidence, failed
+Move matching uses the pre-run metadata before refreshing retained messages. An old converted
+message with existing MIME must be explicitly removed in this run, with a complete fingerprint
+equal to a new ref's fingerprint in a different folder of this connection. The fingerprint is the
+saved one or, when none is saved, one built from the saved `message.eml` headers
+(`MimeReader.fingerprint`; never persisted). Exactly one old occurrence and one current remote
+occurrence are required across the entire connection: current means the saved fingerprints of
+retained messages plus the fetched ones of added refs. A retained copy without a saved
+fingerprint is not visible to this check. Ambiguity, missing evidence, failed
 or downloaded entries and cross-connection entries cannot supply moves. No candidate is kept
 after a completed run. Duplicate Message-IDs with different metadata remain distinct identities.
 
-All present refs, including known messages, receive one metadata snapshot per folder/run, in
-protocol batches of at most 100 without MIME/body downloads. The first ordinary sync seeds old
-stores without reprocessing or repeat MIME downloads; moves before seeding fall back to download.
-A refreshed incomplete fingerprint clears the saved fingerprint to null. Reuse atomically
+Only added refs receive a metadata snapshot, in protocol batches of at most 100 without
+MIME/body downloads (Д29). Known messages keep their saved fingerprints: a flag-only observation
+carries none and never clears one. Reuse atomically
 rewrites the folder key/path, remote ref, fingerprint and observed destination flags, then rebuilds that index document
 with `MessageProcessor.load`. UUID, physical directory, state/error, MIME size/SHA-256/time,
 body, attachments and sidecars stay unchanged. Equal metadata can conceal different bytes:
@@ -132,7 +134,8 @@ Old JSON and compatibility constructors default both to null; null is omitted, w
 serializes as a boolean false. `flagged` means the user flag/star, not sender importance or
 Gmail Important. Processing, failures, offline reprocessing and reindexing preserve both.
 
-Every metadata pass refreshes each known field independently: missing/unsupported data retains
+Every flag observation (from the folder changes for known refs, from metadata for added refs)
+refreshes each known field independently: missing/unsupported data retains
 the old value, explicit false clears it. Added messages receive observed flags even when download
 fails. Retained entries rewrite metadata atomically only when it changes; changed flags rebuild
 that index document from saved content without download, conversion or content writes.
@@ -259,9 +262,17 @@ Lucene's `write.lock` allows one writer per connection. A second writer fails im
 There is no retry or additional lock. Closing commits the writer and closes the directory.
 Other Lucene I/O failures become `UncheckedIOException`.
 
-`reconcile(store)` deletes incomplete message directories, removes indexed keys absent from
-disk, reads existing metadata to compare the stored folder path, combined folder/ref and flags, and
-returns sorted keys missing from the index or with mismatched identity or flags. It does not index or
+`reconcile(store, checkMetadata)` has two modes (Д30). The full mode (`reconcile(store)`, offline
+commands, and a sync whose previous `sync-status.json` is not `completed`) deletes incomplete
+message directories, removes indexed keys absent from disk, reads every meta.json to compare the
+stored folder path, combined folder/ref and flags, and returns sorted keys missing from the index
+or with mismatched identity or flags. The light mode, used after a completed run, compares only
+directory keys with document keys and opens no meta.json: a completed run leaves both in step.
+A sync run reads meta.json only of messages it removes, moves or changes: flags of retained
+messages are compared with the stored index fields (`folderFlags`), and move uniqueness looks up
+documents by Message-ID (`keysByMessageId`: the parsed header field `messageId` or the unstored
+`fingerprintId` from the saved fingerprint; documents written before Д30 have only the former,
+and no schema change or rebuild is needed). It does not index or
 commit them itself. `SyncRunner` processes downloaded entries, loads converted entries using
 MIME headers, saved `body.md` and attachment Markdown without writes, and indexes failed
 entries with null headers, body and attachment text. Matching index identities and flags are left alone;

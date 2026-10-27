@@ -1,0 +1,10 @@
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+ xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+ xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"><s:Body>
+ <m:GetItemResponse><m:ResponseMessages>
+  <m:GetItemResponseMessage ResponseClass="Success"><m:ResponseCode>NoError</m:ResponseCode>
+   <m:Items><t:Message><t:ItemId Id="AAMkSYNTH-a"/><t:Subject>Synthetic subject</t:Subject>
+    <t:Flag><t:FlagStatus>Flagged</t:FlagStatus></t:Flag><t:IsRead>true</t:IsRead></t:Message></m:Items>
+  </m:GetItemResponseMessage>
+ </m:ResponseMessages></m:GetItemResponse>
+</s:Body></s:Envelope>

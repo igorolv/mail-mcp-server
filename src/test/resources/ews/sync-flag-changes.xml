@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Synthetic SyncFolderItems response with flag changes only; no real mailbox data. -->
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+ xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+ xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+ <s:Body><m:SyncFolderItemsResponse><m:ResponseMessages>
+ <m:SyncFolderItemsResponseMessage ResponseClass="Success">
+ <m:ResponseCode>NoError</m:ResponseCode>
+ <m:SyncState>state-flags</m:SyncState>
+<m:IncludesLastItemInRange>true</m:IncludesLastItemInRange>
+<m:Changes><t:ReadFlagChange><t:ItemId Id="AAMkSYNTH-b" ChangeKey="ignored"/><t:IsRead>true</t:IsRead></t:ReadFlagChange><t:Update><t:Message><t:ItemId Id="AAMkSYNTH-a" ChangeKey="ignored"/></t:Message></t:Update><t:ReadFlagChange><t:ItemId Id="AAMkSYNTH-unknown"/><t:IsRead>true</t:IsRead></t:ReadFlagChange><t:ReadFlagChange><t:ItemId Id="AAMkSYNTH-b" ChangeKey="ignored"/><t:IsRead>false</t:IsRead></t:ReadFlagChange></m:Changes>
+ </m:SyncFolderItemsResponseMessage>
+ </m:ResponseMessages></m:SyncFolderItemsResponse></s:Body>
+</s:Envelope>

@@ -92,7 +92,15 @@ public final class FakeMailSource implements MailSource {
         boolean reset = cursor != null && !cursor.equals(nextCursor);
         var added = present.stream().filter(ref -> reset || !known.contains(ref)).sorted(REF_ORDER).toList();
         var removed = known.stream().filter(ref -> reset || !present.contains(ref)).sorted(REF_ORDER).toList();
-        return new FolderChanges(added, removed, nextCursor, reset);
+        // Like IMAP: read/star of every known present ref with an observation, without fingerprints.
+        var observed = new LinkedHashMap<String, RemoteMessageInfo>();
+        for (String ref : present) {
+            var flag = flags.get(folder.remoteId() + "/" + ref);
+            if (!reset && known.contains(ref) && flag != null && !missingMetadata.contains(folder.remoteId() + "/" + ref)) {
+                observed.put(ref, flag);
+            }
+        }
+        return new FolderChanges(added, removed, nextCursor, reset, false, observed);
     }
 
     @Override public Map<String, RemoteMessageInfo> metadata(RemoteFolder folder, String expectedCursor, Collection<String> refs) {

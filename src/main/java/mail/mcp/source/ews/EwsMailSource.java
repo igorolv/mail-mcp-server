@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -77,6 +78,8 @@ public final class EwsMailSource implements MailSource {
         }
         var created = new LinkedHashSet<String>();
         var deleted = new HashSet<String>();
+        var updated = new LinkedHashSet<String>();
+        var readFlags = new LinkedHashMap<String, Boolean>();
         while (true) {
             created.addAll(page.created());
             for (String id : page.deleted()) {
@@ -84,6 +87,8 @@ public final class EwsMailSource implements MailSource {
                     deleted.add(id);
                 }
             }
+            updated.addAll(page.updated());
+            readFlags.putAll(page.readFlags());
             if (page.includesLastItemInRange()) {
                 break;
             }
@@ -95,7 +100,28 @@ public final class EwsMailSource implements MailSource {
             known.stream().filter(ref -> !created.contains(ref)).forEach(removed::add);
         }
         return new FolderChanges(created.stream().filter(ref -> !known.contains(ref)).toList(),
-                removed.stream().sorted().toList(), page.syncState(), false, rescanned);
+                removed.stream().sorted().toList(), page.syncState(), false, rescanned,
+                observed(known, removed, updated, readFlags));
+    }
+
+    /**
+     * Read/star observations of known items that changed (docs/plan.md 3.6, Д29): ReadFlagChange
+     * carries IsRead; an Update, for example of a follow-up flag, is read with a short metadata
+     * request for those items only. Fingerprints are dropped: known items keep their stored identity.
+     */
+    private Map<String, RemoteMessageInfo> observed(Set<String> known, Set<String> removed,
+                                                    Set<String> updated, Map<String, Boolean> readFlags) {
+        var result = new HashMap<String, RemoteMessageInfo>();
+        readFlags.forEach((ref, read) -> {
+            if (known.contains(ref) && !removed.contains(ref)) { result.put(ref, new RemoteMessageInfo(ref, null, read, null)); }
+        });
+        var changed = updated.stream().filter(known::contains).filter(ref -> !removed.contains(ref)).toList();
+        for (int i = 0; i < changed.size(); i += 100) {
+            for (var info : client.metadata(changed.subList(i, Math.min(i + 100, changed.size()))).values()) {
+                result.put(info.ref(), new RemoteMessageInfo(info.ref(), null, info.read(), info.flagged()));
+            }
+        }
+        return result;
     }
 
     @Override public Map<String, RemoteMessageInfo> metadata(RemoteFolder folder, String expectedCursor,

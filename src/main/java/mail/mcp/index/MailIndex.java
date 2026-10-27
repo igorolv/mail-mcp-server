@@ -108,6 +108,11 @@ public final class MailIndex implements AutoCloseable {
         if (meta.read() != null) { document.add(new StringField("read", meta.read().toString(), Field.Store.YES)); }
         if (meta.flagged() != null) { document.add(new StringField("flagged", meta.flagged().toString(), Field.Store.YES)); }
         if (meta.error() != null) { document.add(new StoredField("error", meta.error())); }
+        // Move matching finds copies by the source-reported Message-ID too (Д30); additive, no schema change:
+        // documents written before it are found by the parsed header only.
+        if (meta.fingerprint() != null && meta.fingerprint().messageId() != null) {
+            document.add(new StringField("fingerprintId", meta.fingerprint().messageId(), Field.Store.NO));
+        }
         if (message != null) {
             if (message.date() != null) {
                 long date = message.date().toEpochMilli();
@@ -202,8 +207,66 @@ public final class MailIndex implements AutoCloseable {
         } catch (IOException e) { throw new UncheckedIOException(e); }
     }
 
+    /**
+     * Read/star values stored in the documents of one folder, by remote ref: {@code [key, read, flagged]},
+     * where read/flagged are "true", "false" or null. Lets a sync compare fresh flags without reading
+     * every meta.json (docs/plan.md 3.6, Д30).
+     */
+    public Map<String, String[]> folderFlags(String folderKey) {
+        String prefix = folderKey + "/";
+        try (var reader = DirectoryReader.open(writer)) {
+            var searcher = new IndexSearcher(reader);
+            Map<String, String[]> flags = new HashMap<>();
+            var query = new PrefixQuery(new Term("ref", prefix));
+            for (var hit : searcher.search(query, Math.max(1, reader.numDocs())).scoreDocs) {
+                Document document = searcher.storedFields().document(hit.doc);
+                flags.put(document.get("ref").substring(prefix.length()),
+                        new String[] {document.get("key"), document.get("read"), document.get("flagged")});
+            }
+            return flags;
+        } catch (IOException e) { throw new UncheckedIOException(e); }
+    }
+
+    /** Keys of documents whose parsed or source-reported Message-ID equals the value exactly. */
+    public Set<String> keysByMessageId(String messageId) {
+        try (var reader = DirectoryReader.open(writer)) {
+            var searcher = new IndexSearcher(reader);
+            Set<String> keys = new HashSet<>();
+            var query = new org.apache.lucene.search.BooleanQuery.Builder()
+                    .add(new org.apache.lucene.search.TermQuery(new Term("messageId", messageId)),
+                            org.apache.lucene.search.BooleanClause.Occur.SHOULD)
+                    .add(new org.apache.lucene.search.TermQuery(new Term("fingerprintId", messageId)),
+                            org.apache.lucene.search.BooleanClause.Occur.SHOULD)
+                    .build();
+            for (var hit : searcher.search(query, Math.max(1, reader.numDocs())).scoreDocs) {
+                keys.add(searcher.storedFields().document(hit.doc).get("key"));
+            }
+            return keys;
+        } catch (IOException e) { throw new UncheckedIOException(e); }
+    }
+
+    /** Full check: what an offline rebuild or an interrupted sync needs. */
     public List<String> reconcile(MessageStore store) {
+        return reconcile(store, true);
+    }
+
+    /**
+     * Brings the index in line with the message directories and returns keys to (re)index.
+     *
+     * @param checkMetadata true after an interrupted or failed run, or offline: also removes directories
+     *                      without meta.json and compares every meta.json with its document (folder, ref,
+     *                      read/star). False after a completed run: only directory and document keys are
+     *                      compared, without opening any meta.json (docs/plan.md 3.6, Д30)
+     */
+    public List<String> reconcile(MessageStore store, boolean checkMetadata) {
         Set<String> diskKeys = new HashSet<>(store.keys());
+        if (!checkMetadata) {
+            Set<String> indexedKeys = keys();
+            for (String key : indexedKeys) {
+                if (!diskKeys.contains(key)) { delete(key); }
+            }
+            return diskKeys.stream().filter(key -> !indexedKeys.contains(key) && store.hasMeta(key)).sorted().toList();
+        }
         for (String key : Set.copyOf(diskKeys)) {
             if (!store.hasMeta(key)) {
                 store.delete(key);

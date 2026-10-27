@@ -12,11 +12,15 @@ import mail.mcp.source.RemoteFolder;
 import mail.mcp.source.RemoteMessageInfo;
 import mail.mcp.source.MailSource;
 import mail.mcp.source.MessageUnavailableException;
+import mail.mcp.mime.MimeReader;
+import jakarta.mail.MessagingException;
 import mail.mcp.store.MessageStore;
 
 import java.math.BigInteger;
 import java.time.Instant;
+import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -62,9 +66,11 @@ public final class SyncRunner {
         Instant startedAt = Instant.now();
         long pid = ProcessHandle.current().pid();
         var folders = new LinkedHashMap<String, FolderProgress>();
+        // Only a run that did not complete can leave meta.json and the index apart (docs/plan.md 3.6, Д30).
+        boolean checkMetadata = !store.readSyncStatus().map(status -> "completed".equals(status.state())).orElse(false);
         try {
             store.writeSyncStatus(new SyncStatus("running", pid, startedAt, null, List.of(), null, false));
-            synchronize(restored, p -> {
+            synchronize(checkMetadata, restored, p -> {
                 folders.put(p.path(), p);
                 store.writeSyncStatus(new SyncStatus("running", pid, startedAt, null,
                         List.copyOf(folders.values()), null, false));
@@ -88,8 +94,14 @@ public final class SyncRunner {
 
     /** The offline command supplies progress; server reconciliation stays silent. */
     public static void restore(MessageStore store, MailIndex index, MessageProcessor processor, IntConsumer progress) {
+        restore(store, index, processor, progress, true);
+    }
+
+    /** @param checkMetadata compare every meta.json with the index; see {@link MailIndex#reconcile(MessageStore, boolean)} */
+    static void restore(MessageStore store, MailIndex index, MessageProcessor processor, IntConsumer progress,
+                        boolean checkMetadata) {
         int count = 0;
-        for (String key : index.reconcile(store)) {
+        for (String key : index.reconcile(store, checkMetadata)) {
             var meta = store.readMeta(key).orElseThrow();
             var processed = switch (meta.state()) {
                 case DOWNLOADED -> processor.process(meta);
@@ -104,8 +116,8 @@ public final class SyncRunner {
         index.commit();
     }
 
-    private void synchronize(IntConsumer restored, Consumer<FolderProgress> progress) {
-        restore(store, index, processor, restored);
+    private void synchronize(boolean checkMetadata, IntConsumer restored, Consumer<FolderProgress> progress) {
+        restore(store, index, processor, restored, checkMetadata);
         var local = store.folders();
         var remote = source.folders();
         BigInteger nextKey = local.stream().map(LocalFolder::key)
@@ -123,15 +135,20 @@ public final class SyncRunner {
                 folders.add(new LocalFolder(previous.key(), folder.remoteId(), folder.path(), previous.cursor()));
             }
         }
-        // Discovery is read-only after restoration. Keep all old evidence until matching finishes.
-        var original = store.keys().stream().map(key -> store.readMeta(key).orElseThrow()).toList();
-        var originalByKey = new HashMap<String, MessageMeta>();
-        original.forEach(meta -> originalByKey.put(meta.key(), meta));
+        // Discovery is read-only after restoration. A run reads meta.json only of messages it removes,
+        // moves or changes, never of every message (docs/plan.md 3.6, Д30).
+        var previousPaths = new HashMap<String, String>();
+        local.forEach(folder -> previousPaths.put(folder.key(), folder.path()));
         var vanished = local.stream().filter(f -> remote.stream().noneMatch(r -> r.remoteId().equals(f.remoteId()))).toList();
         var plans = new ArrayList<FolderPlan>();
         var removedKeys = new HashSet<String>();
         var resetFolders = new HashSet<String>();
-        for (var folder : vanished) { removedKeys.addAll(index.folderRefs(folder.key()).values()); }
+        var vanishedKeys = new HashMap<String, List<String>>();
+        for (var folder : vanished) {
+            var keys = List.copyOf(index.folderRefs(folder.key()).values());
+            vanishedKeys.put(folder.key(), keys);
+            removedKeys.addAll(keys);
+        }
         for (int i = 0; i < folders.size(); i++) {
             var folder = folders.get(i);
             var refs = index.folderRefs(folder.key());
@@ -139,13 +156,21 @@ public final class SyncRunner {
             Set<String> removed = changes.reset() ? Set.copyOf(refs.keySet()) : Set.copyOf(changes.removed());
             removed.stream().map(refs::get).filter(java.util.Objects::nonNull).forEach(removedKeys::add);
             if (changes.reset()) { resetFolders.add(folder.key()); }
-            var present = new LinkedHashSet<>(refs.keySet());
-            present.removeAll(removed);
-            present.addAll(changes.added());
-            var info = source.metadata(remote.get(i), changes.cursor(), present);
-            plans.add(new FolderPlan(folder, remote.get(i), changes, refs, removed, info));
+            // Known refs keep their stored fingerprints; flags come cheaply with the changes. Only
+            // added refs need identity metadata (docs/plan.md 3.6, Д29).
+            var info = new HashMap<String, RemoteMessageInfo>();
+            changes.observed().forEach((ref, observed) -> {
+                if (refs.containsKey(ref) && !removed.contains(ref)) { info.put(ref, observed); }
+            });
+            if (!changes.added().isEmpty()) {
+                info.putAll(source.metadata(remote.get(i), changes.cursor(), changes.added()));
+            }
+            plans.add(new FolderPlan(folder, remote.get(i), changes, refs, removed, Map.copyOf(info)));
         }
-        var matches = matches(original, plans, removedKeys, resetFolders);
+        // Pre-run metadata of removed messages: move candidates and the guard against deleting a reassigned one.
+        var removedMetas = new HashMap<String, MessageMeta>();
+        for (String key : removedKeys) { store.readMeta(key).ifPresent(meta -> removedMetas.put(key, meta)); }
+        var matches = matches(removedMetas, removedKeys, plans, resetFolders);
 
         // Preserve identities and old cursors, including vanished folders, across every crash window.
         var pendingFolders = new ArrayList<>(folders);
@@ -161,9 +186,13 @@ public final class SyncRunner {
                     put(processor.load(meta));
                 }
             }
-            // Retained entries are refreshed only after the pre-run snapshot has been matched.
+            // Retained entries are refreshed only after the pre-run snapshot has been matched. Their flags
+            // are compared with the index; meta.json is read only when something changed (Д30).
+            boolean renamed = !plan.folder().path().equals(previousPaths.getOrDefault(plan.folder().key(), plan.folder().path()));
+            var indexed = renamed ? Map.<String, String[]>of() : index.folderFlags(plan.folder().key());
             for (var entry : plan.refs().entrySet()) {
                 if (plan.removed().contains(entry.getKey())) { continue; }
+                if (!renamed && !changed(plan.info().get(entry.getKey()), indexed.get(entry.getKey()))) { continue; }
                 var old = store.readMeta(entry.getValue()).orElseThrow();
                 var meta = identity(old, plan.folder(), entry.getKey(), plan.info().get(entry.getKey()));
                 if (!meta.equals(old)) {
@@ -181,8 +210,9 @@ public final class SyncRunner {
 
         for (var folder : vanished) {
             int removed = 0;
-            for (var meta : original) {
-                if (meta.folderKey().equals(folder.key()) && deleteOriginal(meta)) { removed++; }
+            for (String key : vanishedKeys.get(folder.key())) {
+                var meta = removedMetas.get(key);
+                if (meta != null && deleteOriginal(meta)) { removed++; }
             }
             index.commit();
             progress.accept(new FolderProgress(folder.path(), 0, 0, removed, false, true));
@@ -194,10 +224,8 @@ public final class SyncRunner {
             int removed = 0;
             for (String ref : plan.removed()) {
                 String key = plan.refs().get(ref);
-                if (key != null) {
-                    var old = originalByKey.get(key);
-                    if (deleteOriginal(old)) { removed++; }
-                }
+                var old = key == null ? null : removedMetas.get(key);
+                if (old != null && deleteOriginal(old)) { removed++; }
             }
             index.commit();
             int downloaded = 0;
@@ -243,34 +271,59 @@ public final class SyncRunner {
         completed.forEach(progress);
     }
 
-    private Map<String, MessageMeta> matches(List<MessageMeta> original, List<FolderPlan> plans,
-                                           Set<String> removed, Set<String> resets) {
+    /**
+     * Unique apparent moves. Candidates are removed converted messages with MIME, identified by their saved
+     * fingerprint or, without one, by their saved headers. Uniqueness counts old and current copies among
+     * the documents with the same Message-ID, so only those few meta.json are read (Д30).
+     */
+    private Map<String, MessageMeta> matches(Map<String, MessageMeta> removedMetas, Set<String> removedKeys,
+                                           List<FolderPlan> plans, Set<String> resets) {
+        var result = new HashMap<String, MessageMeta>();
+        if (plans.stream().allMatch(plan -> plan.changes().added().isEmpty())) { return result; }
+        var candidateFingerprints = new HashMap<String, MessageFingerprint>();
+        for (var meta : removedMetas.values()) {
+            Path eml = store.messageDir(meta.key()).resolve(MessageStore.MESSAGE_FILE);
+            if (resets.contains(meta.folderKey()) || meta.state() != MessageState.CONVERTED || !Files.isRegularFile(eml)) {
+                continue;
+            }
+            var fingerprint = meta.fingerprint();
+            if (fingerprint == null || !fingerprint.complete()) {
+                fingerprint = localFingerprint(eml); // never fetched: messages saved before Д8
+            }
+            if (fingerprint != null && fingerprint.complete()) { candidateFingerprints.put(meta.key(), fingerprint); }
+        }
+        if (candidateFingerprints.isEmpty()) { return result; }
+
+        var candidates = new HashMap<MessageFingerprint, MessageMeta>();
         var oldCounts = new HashMap<MessageFingerprint, Integer>();
         var remoteCounts = new HashMap<MessageFingerprint, Integer>();
-        var candidates = new HashMap<MessageFingerprint, MessageMeta>();
-        for (var meta : original) {
-            var fingerprint = meta.fingerprint();
-            if (fingerprint == null || !fingerprint.complete()) { continue; }
-            oldCounts.merge(fingerprint, 1, Integer::sum);
-            if (removed.contains(meta.key()) && !resets.contains(meta.folderKey())
-                    && meta.state() == MessageState.CONVERTED
-                    && Files.isRegularFile(store.messageDir(meta.key()).resolve(MessageStore.MESSAGE_FILE))) {
-                candidates.put(fingerprint, meta);
+        candidateFingerprints.forEach((key, fingerprint) -> candidates.put(fingerprint, removedMetas.get(key)));
+        for (var fingerprint : Set.copyOf(candidateFingerprints.values())) {
+            // Candidates always count, even when their saved MIME has no Message-ID header to index.
+            var keys = new HashSet<>(index.keysByMessageId(fingerprint.messageId()));
+            candidateFingerprints.forEach((key, candidate) -> { if (candidate.equals(fingerprint)) { keys.add(key); } });
+            for (String key : keys) {
+                var stored = candidateFingerprints.containsKey(key) ? candidateFingerprints.get(key)
+                        : removedMetas.containsKey(key) ? removedMetas.get(key).fingerprint()
+                        : store.readMeta(key).map(MessageMeta::fingerprint).orElse(null);
+                if (!fingerprint.equals(stored)) { continue; }
+                oldCounts.merge(fingerprint, 1, Integer::sum);
+                // Retained messages are current server copies: their identity does not change remotely.
+                if (!removedKeys.contains(key)) { remoteCounts.merge(fingerprint, 1, Integer::sum); }
             }
         }
         for (var plan : plans) {
-            for (var info : plan.info().values()) {
-                var fingerprint = complete(info);
-                if (fingerprint != null) { remoteCounts.merge(fingerprint, 1, Integer::sum); }
+            for (String ref : plan.changes().added()) {
+                var fingerprint = complete(plan.info().get(ref));
+                if (fingerprint != null && candidates.containsKey(fingerprint)) { remoteCounts.merge(fingerprint, 1, Integer::sum); }
             }
         }
-        var result = new HashMap<String, MessageMeta>();
         for (var plan : plans) {
             if (resets.contains(plan.folder().key())) { continue; }
             for (String ref : plan.changes().added()) {
                 if (plan.refs().containsKey(ref)) { continue; }
                 var fingerprint = complete(plan.info().get(ref));
-                var old = candidates.get(fingerprint);
+                var old = fingerprint == null ? null : candidates.get(fingerprint);
                 if (old != null && !old.folderKey().equals(plan.folder().key())
                         && oldCounts.getOrDefault(fingerprint, 0) == 1 && remoteCounts.getOrDefault(fingerprint, 0) == 1) {
                     result.put(plan.folder().key() + "/" + ref, old);
@@ -280,13 +333,28 @@ public final class SyncRunner {
         return result;
     }
 
+    /** True when an observation differs from the read/star values the index holds for the message. */
+    private static boolean changed(RemoteMessageInfo info, String[] indexed) {
+        if (info == null) { return false; }
+        if (info.fingerprint() != null || indexed == null) { return true; }
+        return info.read() != null && !info.read().toString().equals(indexed[1])
+                || info.flagged() != null && !info.flagged().toString().equals(indexed[2]);
+    }
+
+    private static MessageFingerprint localFingerprint(Path eml) {
+        try { return MimeReader.fingerprint(eml); }
+        catch (MessagingException | IOException | RuntimeException e) { return null; }
+    }
+
     private static MessageFingerprint complete(RemoteMessageInfo info) {
         return info != null && info.fingerprint() != null && info.fingerprint().complete() ? info.fingerprint() : null;
     }
 
+    /** Flag-only observations (no fingerprint) keep the stored identity; fresh metadata replaces it. */
     private static MessageMeta identity(MessageMeta old, LocalFolder folder, String ref, RemoteMessageInfo info) {
         return new MessageMeta(old.key(), folder.key(), folder.path(), ref, old.size(), old.sha256(),
-                old.downloadedAt(), old.state(), old.error(), complete(info),
+                old.downloadedAt(), old.state(), old.error(),
+                info == null || info.fingerprint() == null ? old.fingerprint() : complete(info),
                 info == null || info.read() == null ? old.read() : info.read(),
                 info == null || info.flagged() == null ? old.flagged() : info.flagged());
     }

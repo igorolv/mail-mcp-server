@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import mail.mcp.model.MessageFingerprint;
@@ -140,6 +141,8 @@ final class EwsResponseReader {
         boolean[] includesLast = {false};
         List<String> created = new ArrayList<>();
         List<String> deleted = new ArrayList<>();
+        List<String> updated = new ArrayList<>();
+        Map<String, Boolean> readFlags = new LinkedHashMap<>();
         read(EwsOperation.SYNC_FOLDER_ITEMS, in, r -> {
             if (EwsXml.MESSAGES_NS.equals(r.getNamespaceURI())) {
                 switch (r.getLocalName()) {
@@ -157,8 +160,11 @@ final class EwsResponseReader {
                             }
                             String kind = r.getLocalName();
                             if (EwsXml.TYPES_NS.equals(r.getNamespaceURI())
-                                    && ("Create".equals(kind) || "Delete".equals(kind))) {
-                                ("Create".equals(kind) ? created : deleted).add(readChangeId(r));
+                                    && ("Create".equals(kind) || "Delete".equals(kind) || "Update".equals(kind))) {
+                                ("Create".equals(kind) ? created : "Delete".equals(kind) ? deleted : updated)
+                                        .add(readChangeId(r));
+                            } else if (EwsXml.TYPES_NS.equals(r.getNamespaceURI()) && "ReadFlagChange".equals(kind)) {
+                                readReadFlagChange(r, readFlags);
                             } else {
                                 skipElement(r);
                             }
@@ -171,7 +177,35 @@ final class EwsResponseReader {
         if (state[0] == null) {
             throw new EwsProtocolException("SyncFolderItems response has no SyncState");
         }
-        return new EwsSyncPage(state[0], includesLast[0], List.copyOf(created), List.copyOf(deleted));
+        return new EwsSyncPage(state[0], includesLast[0], List.copyOf(created), List.copyOf(deleted),
+                List.copyOf(updated), readFlags);
+    }
+
+    /** {@code ReadFlagChange}: the item id and its new {@code IsRead}; both are required. */
+    private static void readReadFlagChange(XMLStreamReader r, Map<String, Boolean> readFlags) throws XMLStreamException {
+        String id = null;
+        Boolean read = null;
+        int depth = 1;
+        while (depth > 0) {
+            int event = r.next();
+            if (event == START_ELEMENT) {
+                if (EwsXml.TYPES_NS.equals(r.getNamespaceURI()) && "IsRead".equals(r.getLocalName())) {
+                    read = parseBoolean(r.getElementText(), "IsRead"); // also consumes its end element
+                    continue;
+                }
+                if (EwsXml.TYPES_NS.equals(r.getNamespaceURI()) && "ItemId".equals(r.getLocalName())) {
+                    id = r.getAttributeValue(null, "Id");
+                }
+                depth++;
+            } else if (event == END_ELEMENT) {
+                depth--;
+            }
+        }
+        if (id == null || read == null) {
+            throw new EwsProtocolException("SyncFolderItems ReadFlagChange has no ItemId Id or IsRead");
+        }
+        readFlags.remove(id);
+        readFlags.put(id, read);
     }
 
     private static String readChangeId(XMLStreamReader r) throws XMLStreamException {

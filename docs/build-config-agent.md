@@ -261,7 +261,8 @@ java -jar build\libs\mail-mcp-server.jar mail-sync work
 ```
 
 One run uses one lazy source session and one Lucene writer. It takes the writer lock before any
-network request, reconciles disk and index state/identity, and discovers changes and metadata for
+network request, reconciles disk and index (every meta.json only when the previous run did not
+complete; otherwise directory keys only, Д30), and discovers changes and metadata for
 all included folders before removals. Unique apparent moves reuse saved content with the same
 UUID and paths; unmatched vanished folders/messages are removed locally. New messages download
 as `message.eml` and `meta.json`, with index commits after every 100 messages. New/retained folder
@@ -280,9 +281,9 @@ See `docs/tools-agent.md` for status fields and cross-process reading.
 The first run downloads the whole mailbox and may take a while (EWS uses one `GetItem` per
 message). Run the same command again:
 with no new mail it ends with `0 downloaded`; reused moves also increase no downloaded, failed
-or removed count. Each run reads identity and read/star metadata for all present refs in batches
-of at most 100, without MIME/body retrieval; the first run seeds old stores without repeat
-downloads or reprocessing. Flag-only changes also increase no counter and preserve content,
+or removed count. Each run reads identity metadata only for new messages, in batches of at most
+100, without MIME/body retrieval; read/star of known messages comes with the folder changes
+(plan.md 3.6, Д29), so a run without changes costs one change request per folder. Flag-only changes also increase no counter and preserve content,
 state/error and download time. Missing flag fields retain known values; explicit false clears
 them. Matching remains heuristic and can conceal different remote content; see
 `docs/storage-agent.md`. After an interruption, the next run removes

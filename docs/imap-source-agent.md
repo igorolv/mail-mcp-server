@@ -108,9 +108,10 @@ address is required; optional missing fields disable identity matching. No body 
 header fetch, CONDSTORE or Gmail extension is used. The exact attribute guard remains in place;
 adding ENVELOPE permits no RFC822 body retrieval, non-PEEK BODY or write command.
 
-Every present ref, including known messages, is read once per folder/run to seed old local
-fingerprints and detect retained copies. Seeding needs neither reprocessing nor repeat MIME
-downloads; a move before seeding uses normal download. Unique complete metadata equality remains
+Only added UIDs are fetched this way (Д29): a full pass took about 13.5 s per batch of 100 on
+Mail.ru, more than an hour per run. Known messages keep their stored fingerprints; a removed
+message saved without one gets it from its saved headers (`MimeReader.fingerprint`, size =
+file length = RFC822.SIZE). Unique complete metadata equality remains
 a heuristic: different bytes may share it. A matched move preserves UUID, directory, original
 MIME SHA-256/time and all saved content; reused moves increase no downloaded, failed or removed
 counter. Both ends of UIDVALIDITY resets are excluded. The runner discovers all folders before
@@ -148,7 +149,9 @@ the counts only (user decision 2026-10-27, after the first Mail.ru run aborted o
 A tagged NO or BAD for the whole FETCH still aborts with a sanitized protocol error, no retry.
 No STORE, SELECT, body retrieval or additional authentication is enabled.
 
-All present refs refresh on requested sync, including known mail. Null fields preserve stored
+Known mail gets its flags from the UID listing: `folderUids` closes the folder, reopens it with
+EXAMINE and sends one `FETCH 1:n (FLAGS UID)`; ReadOnlyImapStore records UID and FLAGS of each
+parsed response, so a skipped response leaves that UID unobserved. Null fields preserve stored
 values; explicit false clears them. Destination flags apply after move reuse but are excluded
 from its identity; a UIDVALIDITY reset uses only fresh observations. Flags are user read/star
 state, independent of Gmail Important. Flag-only changes update metadata/index without writing
