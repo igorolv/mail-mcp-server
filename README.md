@@ -233,12 +233,13 @@ lists the names.
 | `listMessages` | Message cards of one folder, newest first, in pages; optional `since`/`until` |
 | `getMessage` | Headers, the body in chunks, attachments with the paths of the file and of its text |
 | `getAttachment` | The text of one attachment in chunks, and the file path |
-| `search` | All words required, `"…"` for a phrase, Russian and English word forms. Fields `any`, `subject`, `body`, `from`, `to`, `attachmentName`, `attachmentText`; optional folder and dates. Cards with score and snippet |
+| `search` | All words required, `"…"` for a phrase, Russian and English word forms. Fields `any`, `subject`, `body`, `from`, `to`, `attachmentName`, `attachmentText`, `label`; optional folder and dates. Cards with score and snippet |
 | `getThread` | The conversation of a message across folders, oldest first |
 
 - Lists and text come in pages and chunks with `nextOffset`; every card has an absolute
   `localPath` to the message directory.
-- Cards carry optional `read` and `flagged` — the state seen at the last synchronization.
+- Cards carry optional `read`, `flagged` and `labels` (Gmail labels) — the state seen at the last
+  synchronization.
 - The same message in several folders appears once in `search` and `getThread`, with the other
   copies under `copies`.
 

@@ -80,7 +80,9 @@ public class SearchTools {
                     "make a phrase. No OR/NOT, wildcards, fuzzy matching or field-prefix syntax such as from:. " +
                     "Search alternatives in separate calls. Omit only when since or until is given", required = false) String query,
             @McpToolParam(description = "Choose one: any (default; all fields below), subject, body, from, " +
-                    "to (includes Cc), attachmentName (whole name or parts), attachmentText (extracted contents). " +
+                    "to (includes Cc), attachmentName (whole name or parts), attachmentText (extracted contents), " +
+                    "label (mailbox label words, such as Gmail's Inbox, Sent or user labels; connections " +
+                    "without labels match nothing). " +
                     "from/to search addresses and names. For an exact address match, use an unquoted full " +
                     "address: field=from, query=user@example.com. This ignores case and display names. " +
                     "any also searches content, so an address there need not be a participant. " +
@@ -133,6 +135,7 @@ public class SearchTools {
                             c.hasAttachments(), c.state(), hit.score(), hit.snippet(),
                             store.messageDir(c.key()).toAbsolutePath().toString(), hit.snippetAttachmentFile(),
                             redactor.text(hit.snippetAttachmentName()), c.read(), c.flagged(),
+                            c.labels() == null ? null : redactor.texts(c.labels()),
                             hit.copies().stream().map(copy -> new MessageCopyInfo(copy.key(), copy.folderKey())).toList());
                 }).toList();
                 Integer next = (long) position + hits.size() < results.total() ? position + hits.size() : null;

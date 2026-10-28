@@ -28,8 +28,23 @@ public final class ImapMailSource implements MailSource {
 
     public ImapMailSource(ImapClient client) { this.client = client; }
 
+    /**
+     * Gmail synchronizes its All Mail folder once instead of every label folder: labels of each
+     * message come with the metadata instead (X-GM-LABELS). Without such a folder the current
+     * filtering applies unchanged.
+     */
     @Override public List<RemoteFolder> folders() {
-        return client.listFolders().stream()
+        var listed = client.listFolders();
+        if (client.gmailExtensions()) {
+            var allMail = listed.stream()
+                    .filter(ImapFolderInfo::holdsMessages)
+                    .filter(folder -> folder.attributes().stream().anyMatch(attribute -> attribute.equalsIgnoreCase("\\All")))
+                    .toList();
+            if (allMail.size() == 1) {
+                return List.of(new RemoteFolder(allMail.getFirst().name(), allMail.getFirst().name()));
+            }
+        }
+        return listed.stream()
                 .filter(ImapFolderInfo::holdsMessages)
                 .filter(folder -> folder.attributes().stream()
                         .noneMatch(attribute -> EXCLUDED.stream().anyMatch(attribute::equalsIgnoreCase)))
@@ -50,11 +65,18 @@ public final class ImapMailSource implements MailSource {
         var removed = known.stream().filter(ref -> reset || !presentSet.contains(ref)).sorted(REF_ORDER).toList();
         var observed = new HashMap<String, RemoteMessageInfo>();
         if (!reset) {
-            for (var entry : uids.flags().entrySet()) {
-                String ref = String.valueOf(entry.getKey());
+            // FLAGS and the Gmail items are parsed independently; either one is an observation.
+            var observedUids = new HashSet<>(uids.flags().keySet());
+            observedUids.addAll(uids.gmail().keySet());
+            for (long uid : observedUids) {
+                String ref = String.valueOf(uid);
                 if (known.contains(ref)) {
-                    observed.put(ref, new RemoteMessageInfo(ref, null, entry.getValue().contains(Flags.Flag.SEEN),
-                            entry.getValue().contains(Flags.Flag.FLAGGED)));
+                    var flags = uids.flags().get(uid);
+                    var gmail = uids.gmail().get(uid);
+                    observed.put(ref, new RemoteMessageInfo(ref, null,
+                            flags == null ? null : flags.contains(Flags.Flag.SEEN),
+                            flags == null ? null : flags.contains(Flags.Flag.FLAGGED),
+                            gmail == null ? null : gmail.msgId(), gmail == null ? null : gmail.labels()));
                 }
             }
         }

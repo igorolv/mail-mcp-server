@@ -56,6 +56,16 @@ class MailToolsTest {
         keys = store.keys();
     }
 
+    @Test void getMessageReturnsStoredLabels() {
+        String key = keys.getFirst();
+        var meta = store.readMeta(key).orElseThrow();
+        store.writeMeta(new MessageMeta(meta.key(), meta.folderKey(), meta.folder(), meta.ref(), meta.size(), meta.sha256(),
+                meta.downloadedAt(), meta.state(), meta.error(), meta.fingerprint(), meta.read(), meta.flagged(),
+                "900", List.of("Inbox", "Sent")));
+        assertThat(tools.getMessage("local", key, null, null).labels()).containsExactly("Inbox", "Sent");
+        assertThat(tools.getMessage("local", keys.get(1), null, null).labels()).isNull();
+    }
+
     @Test void getAttachmentChunksTheText() throws Exception {
         String key = keys.getFirst();
         var attachment = tools.getMessage("local", key, null, null).attachments().getFirst();

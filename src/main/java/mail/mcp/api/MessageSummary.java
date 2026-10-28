@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
+import java.util.List;
 
 @Schema(description = "A message card.")
 public record MessageSummary(
@@ -28,5 +29,9 @@ public record MessageSummary(
         @Schema(description = "Flagged or starred in the mailbox as of the last sync (not sender importance); absent when unknown.",
                 nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        Boolean flagged
+        Boolean flagged,
+        @Schema(description = "Mailbox labels of this message as of the last sync, such as Gmail's Inbox, Sent or " +
+                "user labels; empty when it has none. Absent when unknown or when the mailbox has no labels.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        List<String> labels
 ) { }

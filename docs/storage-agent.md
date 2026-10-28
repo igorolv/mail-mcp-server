@@ -1,6 +1,6 @@
 # docs/storage-agent.md — message directories and the derived catalog
 
-Message directories, the derived Lucene index (schema 4), synchronization, MIME/body
+Message directories, the derived Lucene index (schema 5), synchronization, MIME/body
 processing, search and attachment text. Principles and data flow: `docs/plan.md` 3.1–3.2.
 `MessageStore` and `MailIndex` take one connection directory; neither contacts a mailbox.
 
@@ -51,6 +51,14 @@ decoded bytes, except XLSX up to 5 MiB inclusive, can also have UTF-8
 `<file>.md`; absent or failed attachment
 text never changes metadata or the converted message state.
 See `docs/mime-agent.md` for parsing, naming and pandoc rules.
+
+Two provider-neutral fields come from the source when it has them. `stableId` is the provider's
+own message identifier that survives moves and UID changes (currently Gmail `X-GM-MSGID`, kept as
+a decimal string). `labels` are the mailbox labels of the latest observation (currently Gmail
+labels, normalized by the IMAP source: `docs/imap-source-agent.md`). Both are absent in old
+`meta.json` files and for other providers and read as null, which means unknown; an empty label
+list means the message has no labels. Processing, failures, offline reprocessing, reindexing and
+flag updates preserve them; a sync observation replaces either one only when the source returned it.
 The XLSX exception uses the resolved format and actual file size, including inside containers;
 binary XLS retains 20 MiB. Conversion is best effort: compressed XLSX size does not bound
 eager POI memory usage, and smaller spreadsheets can still be expensive. The threshold reduces
@@ -107,7 +115,8 @@ removal or cursor update. Discovery failure retains candidates and old cursors. 
 folders in server order are saved with old/null cursors before applying changes, followed by
 vanished-folder entries. Their identities remain until all changes commit. A reset removes all
 local messages of that folder, even if the source's removed list is incomplete, then downloads
-the added refs; both ends of a UIDVALIDITY reset are excluded from move matching. EWS rescans
+the added refs; both ends of a UIDVALIDITY reset are excluded from heuristic move matching,
+though not from `stableId` matching (below). EWS rescans
 do not invalidate refs and remain eligible.
 
 Move matching uses the pre-run metadata before refreshing retained messages. An old converted
@@ -121,10 +130,21 @@ fingerprint is not visible to this check. Ambiguity, missing evidence, failed
 or downloaded entries and cross-connection entries cannot supply moves. No candidate is kept
 after a completed run. Duplicate Message-IDs with different metadata remain distinct identities.
 
+A candidate with a saved `stableId` uses that identity instead of a fingerprint, in the same pass
+(`SyncRunner.matches`) and under the same uniqueness rule: exactly one stored document with that
+`stableId` (the candidate, found with `keysByStableId`) and exactly one current remote occurrence
+(retained documents with it plus added refs observed with it). Because the identifier survives UID
+changes, this match also applies within one folder and across a UIDVALIDITY reset, including UIDs
+reused for other messages. Such a candidate never matches by fingerprint; candidates without a
+`stableId` (other providers, metadata saved before Д7) keep the heuristic. A message present in two
+included folders at once is two stored messages, as for every provider: one directory per remote
+ref; search and conversations group them as copies.
+
 Only added refs receive a metadata snapshot, in protocol batches of at most 100 without
 MIME/body downloads (Д29). Known messages keep their saved fingerprints: a flag-only observation
 carries none and never clears one. Reuse atomically
-rewrites the folder key/path, remote ref, fingerprint and observed destination flags, then rebuilds that index document
+rewrites the folder key/path, remote ref, fingerprint and observed destination flags, labels and
+`stableId`, then rebuilds that index document
 with `MessageProcessor.load`. UUID, physical directory, state/error, MIME size/SHA-256/time,
 body, attachments and sidecars stay unchanged. Equal metadata can conceal different bytes:
 this heuristic does not verify remote byte identity; SHA-256 describes the saved original only.
@@ -144,10 +164,12 @@ cause no metadata/document rewrites. Flags are excluded from move fingerprints; 
 take observed destination flags. UIDVALIDITY resets use only fresh metadata.
 Flag-only updates and moves add no downloaded/failed/removed count; rescan reporting is unchanged.
 
-Schema 4 adds stored string flag fields and automatically rebuilds older indexes from disk
-through the existing restore path. Old metadata restores unknown flags; an offline reindex
-cannot observe remote state. Reconciliation repairs a flag mismatch after metadata was saved
-before an interrupted index write, just as for folder/ref mismatches.
+Schema 4 added stored string flag fields; schema 5 adds `stableId`, `labels` and `label`. Either
+change automatically rebuilds older indexes from disk through the existing restore path. Old metadata restores unknown flags; an offline reindex
+cannot observe remote state. Reconciliation repairs a flag, label or `stableId` mismatch after
+metadata was saved before an interrupted index write, just as for folder/ref mismatches. Labels
+follow the flag rules: a changed label list rewrites metadata and the document without download,
+conversion or content writes, and counts as no downloaded/failed/removed message.
 
 ## Write order and failures
 
@@ -206,6 +228,9 @@ parsed MIME headers/attachment descriptions and saved Markdown:
 | `folder` | Folder path | `StringField`, stored |
 | `state` | Lowercase state | `StringField`, stored |
 | `read`, `flagged` | Literal `true` or `false`; omitted when unknown | `StringField`, stored |
+| `stableId` | Provider message identifier, absent when null | `StringField`, stored |
+| `labels` | Mailbox labels joined by newline; empty string when known empty, absent when unknown | `StoredField` only |
+| `label` | One label per value, whole words lowercased without stemming or word forms | `TextField`, not stored |
 | `error` | Failure explanation, only when non-null | `StoredField` |
 | `date` | Epoch milliseconds, absent when null | `LongPoint`, `StoredField`, `NumericDocValuesField` |
 | `subject`, `body` | Decoded subject and Markdown body, absent when null | `TextField`, stored |
@@ -238,7 +263,7 @@ filtering, so user rules override stop words such as `человек`; unlisted 
 It preserves offsets and marks replacements as keywords;
 English and exact fields are unchanged. Query parsing and snippets use the reader's analyzer.
 
-Every commit, including closing the writer, carries user data `schema=4` (`MailIndex.SCHEMA`)
+Every commit, including closing the writer, carries user data `schema=5` (`MailIndex.SCHEMA`)
 and `wordForms=<hash>` for nonempty rules only. Without rules, the analyzer and commit data
 are unchanged. Opening an index with another/missing schema or a differing `wordForms` entry
 uses `OpenMode.CREATE`, rebuilding in place (both absent hashes count as equal).
@@ -265,12 +290,13 @@ Other Lucene I/O failures become `UncheckedIOException`.
 `reconcile(store, checkMetadata)` has two modes (Д30). The full mode (`reconcile(store)`, offline
 commands, and a sync whose previous `sync-status.json` is not `completed`) deletes incomplete
 message directories, removes indexed keys absent from disk, reads every meta.json to compare the
-stored folder path, combined folder/ref and flags, and returns sorted keys missing from the index
+stored folder path, combined folder/ref, flags, labels and `stableId`, and returns sorted keys missing from the index
 or with mismatched identity or flags. The light mode, used after a completed run, compares only
 directory keys with document keys and opens no meta.json: a completed run leaves both in step.
 A sync run reads meta.json only of messages it removes, moves or changes: flags of retained
-messages are compared with the stored index fields (`folderFlags`), and move uniqueness looks up
-documents by Message-ID (`keysByMessageId`: the parsed header field `messageId` or the unstored
+messages are compared with the stored index fields (`folderObservations`, returning
+`IndexedObservation` records), and move uniqueness looks up documents by `stableId`
+(`keysByStableId`) or by Message-ID (`keysByMessageId`: the parsed header field `messageId` or the unstored
 `fingerprintId` from the saved fingerprint; documents written before Д30 have only the former,
 and no schema change or rebuild is needed). It does not index or
 commit them itself. `SyncRunner` processes downloaded entries, loads converted entries using

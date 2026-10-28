@@ -347,10 +347,12 @@ Use OAuth2 below if your account permits it. Changing your Google account passwo
 passwords: create a replacement, update Credential Manager and restart the MCP server.
 See [Google: Sign in with app passwords](https://support.google.com/accounts/answer/185833?hl=en).
 
-Gmail labels currently appear as IMAP folders, so the same message may be downloaded in several
-folders. Search and conversations [group matching copies](search.md#copies-of-one-message). Gmail-specific
-All Mail storage with labels and deduplication by `X-GM-MSGID` is still pending (`Д7` in
-[the version plan](plan.md#4-version-010)).
+Gmail is synchronized through its All Mail folder only, so each message is stored once and keeps
+its Gmail labels ([search: labels](search.md#labels)). Keep **Show in IMAP** enabled for All Mail in
+Gmail's settings: without an All Mail folder the server falls back to synchronizing every label
+folder, and a message with several labels is then stored once per folder, as with other providers
+(search and conversations [group matching copies](search.md#copies-of-one-message)). Spam and Trash
+are not part of All Mail and are not synchronized.
 
 ### OAuth2
 

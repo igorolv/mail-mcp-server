@@ -157,4 +157,38 @@ class ImapMailSourceTest {
             assertThat(source.changes(INBOX, "7", Set.of("5")).added()).containsExactly("1", "10");
         }
     }
+
+    @Test void gmailSyncsOnlyTheAllMailFolder() throws Exception {
+        var allMail = new FakeImapServer.MailFolder("[Gmail]/All Mail", 7, List.of("\\All", "\\HasNoChildren"),
+                List.of(new FakeImapServer.Item(1, MIME)));
+        try (var server = new FakeImapServer("gmail", inbox(), allMail,
+                new FakeImapServer.MailFolder("[Gmail]/Sent Mail", 7, List.of("\\Sent"), List.of()),
+                new FakeImapServer.MailFolder("Projects", 7, List.of("\\HasNoChildren"), List.of()));
+             var source = source(server)) {
+            assertThat(source.folders()).containsExactly(new RemoteFolder("[Gmail]/All Mail", "[Gmail]/All Mail"));
+        }
+    }
+
+    @Test void gmailFallsBackToAllFoldersWithoutAnAllMailFolder() throws Exception {
+        try (var server = new FakeImapServer("gmail", inbox(),
+                new FakeImapServer.MailFolder("Sent", 7, List.of("\\Sent"), List.of()));
+             var source = source(server)) {
+            assertThat(source.folders()).containsExactly(INBOX, new RemoteFolder("Sent", "Sent"));
+        }
+    }
+
+    @Test void changesObserveGmailMessageIdAndLabelsOfKnownRefs() throws Exception {
+        var folder = new FakeImapServer.MailFolder("INBOX", 7, List.of(),
+                List.of(new FakeImapServer.Item(1, MIME).gmail("111", "\\Inbox"),
+                        new FakeImapServer.Item(5, MIME).gmail("555", "\\All \\Sent")));
+        try (var server = new FakeImapServer("gmail", folder); var source = source(server)) {
+            var changes = source.changes(INBOX, "7", Set.of("1", "5"));
+            assertThat(changes.observed().get("1").stableId()).isEqualTo("111");
+            assertThat(changes.observed().get("1").labels()).containsExactly("Inbox");
+            assertThat(changes.observed().get("5").labels()).containsExactly("Sent");
+            var metadata = source.metadata(INBOX, "7", List.of("5"));
+            assertThat(metadata.get("5").stableId()).isEqualTo("555");
+            assertThat(metadata.get("5").labels()).containsExactly("Sent");
+        }
+    }
 }

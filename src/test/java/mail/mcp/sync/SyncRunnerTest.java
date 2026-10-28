@@ -914,4 +914,124 @@ class SyncRunnerTest {
         assertThat(source.downloadCalls).isEqualTo(2);
     }
 
+    @Test void labelsAreStoredAndRefreshedWithoutDownload() throws Exception {
+        source.putFolder("all", "All Mail", "7", "1");
+        source.stableIdAndLabels("all", "1", "900", "Inbox", "Starred");
+        run();
+        String key = refs("f1").get("1");
+        var before = content(key);
+        var first = store().readMeta(key).orElseThrow();
+        assertThat(first.stableId()).isEqualTo("900");
+        assertThat(first.labels()).containsExactly("Inbox", "Starred");
+        try (var reader = mail.mcp.index.MailIndexReader.open(connectionDir).orElseThrow()) {
+            assertThat(reader.cards("f1", 0, 10).getFirst().labels()).containsExactly("Inbox", "Starred");
+            assertThat(reader.search("Inbox", mail.mcp.index.SearchField.LABEL, null, 0, 10).total()).isEqualTo(1);
+        }
+
+        source.stableIdAndLabels("all", "1", "900", "Sent");
+        source.resetCounts();
+        assertThat(run()).allSatisfy(progress -> {
+            assertThat(progress.downloaded()).isZero();
+            assertThat(progress.removed()).isZero();
+        });
+        assertThat(source.downloadCalls).isZero();
+        var updated = store().readMeta(key).orElseThrow();
+        assertThat(updated.labels()).containsExactly("Sent");
+        assertThat(updated.sha256()).isEqualTo(first.sha256());
+        assertThat(updated.downloadedAt()).isEqualTo(first.downloadedAt());
+        assertThat(content(key)).isEqualTo(before);
+        try (var reader = mail.mcp.index.MailIndexReader.open(connectionDir).orElseThrow()) {
+            assertThat(reader.cards("f1", 0, 10).getFirst().labels()).containsExactly("Sent");
+            assertThat(reader.search("Sent", mail.mcp.index.SearchField.LABEL, null, 0, 10).total()).isEqualTo(1);
+        }
+    }
+
+    @Test void uidValidityResetReusesMessagesByStableId() throws Exception {
+        source.putFolder("all", "All Mail", "7", "1");
+        source.stableIdAndLabels("all", "1", "900", "Inbox");
+        run();
+        String key = refs("f1").get("1");
+        var old = store().readMeta(key).orElseThrow();
+        var bytes = content(key);
+
+        source.putFolder("all", "All Mail", "8", "2");
+        source.stableIdAndLabels("all", "2", "900", "Inbox", "Pending");
+        source.resetCounts();
+        assertThat(run()).containsExactly(new FolderProgress("All Mail", 0, 0, 0, true, true));
+        assertThat(source.downloadCalls).isZero();
+        assertThat(store().keys()).containsExactly(key);
+        assertThat(refs("f1")).containsExactlyEntriesOf(Map.of("2", key));
+        var reused = store().readMeta(key).orElseThrow();
+        assertThat(reused.stableId()).isEqualTo("900");
+        assertThat(reused.labels()).containsExactly("Inbox", "Pending");
+        assertThat(reused.sha256()).isEqualTo(old.sha256());
+        assertThat(reused.downloadedAt()).isEqualTo(old.downloadedAt());
+        assertThat(content(key)).isEqualTo(bytes);
+        run();
+        assertThat(source.downloadCalls).isZero();
+        assertThat(store().keys()).containsExactly(key);
+    }
+
+    @Test void uidValidityResetReusesMessagesWhoseUidsWereReassigned() throws Exception {
+        source.putFolder("all", "All Mail", "7", "1", "2");
+        source.stableIdAndLabels("all", "1", "900", "Inbox");
+        source.stableIdAndLabels("all", "2", "901", "Sent");
+        run();
+        String first = refs("f1").get("1");
+        String second = refs("f1").get("2");
+        var bytes = content(first);
+
+        // The new UIDVALIDITY reuses both UID numbers for the other message.
+        source.putFolder("all", "All Mail", "8", "1", "2");
+        source.stableIdAndLabels("all", "1", "901", "Sent");
+        source.stableIdAndLabels("all", "2", "900", "Inbox");
+        source.resetCounts();
+        assertThat(run()).containsExactly(new FolderProgress("All Mail", 0, 0, 0, true, true));
+        assertThat(source.downloadCalls).isZero();
+        assertThat(store().keys()).containsExactlyInAnyOrder(first, second);
+        assertThat(refs("f1")).containsExactlyInAnyOrderEntriesOf(Map.of("1", second, "2", first));
+        assertThat(content(first)).isEqualTo(bytes);
+    }
+
+    @Test void stableIdMovesAcrossFoldersButARetainedCopyIsStoredSeparately() throws Exception {
+        source.putFolder("a", "A", "7", "1");
+        source.putFolder("b", "B", "7");
+        source.stableIdAndLabels("a", "1", "900", "Inbox");
+        run();
+        String key = refs("f1").get("1");
+
+        // No fingerprint is observed: the stableId alone identifies the moved message.
+        source.putFolder("a", "A", "7");
+        source.putFolder("b", "B", "7", "5");
+        source.stableIdAndLabels("b", "5", "900", "Work");
+        source.resetCounts();
+        run();
+        assertThat(source.downloadCalls).isZero();
+        assertThat(refs("f1")).isEmpty();
+        assertThat(refs("f2")).containsExactlyEntriesOf(Map.of("5", key));
+        assertThat(store().readMeta(key).orElseThrow().labels()).containsExactly("Work");
+
+        // A second current copy elsewhere is not the same stored message: one directory per remote ref.
+        source.putFolder("a", "A", "7", "2");
+        source.stableIdAndLabels("a", "2", "900", "Inbox");
+        source.resetCounts();
+        run();
+        assertThat(source.downloadCalls).isEqualTo(1);
+        assertThat(store().keys()).hasSize(2).contains(key);
+        assertThat(refs("f2")).containsExactlyEntriesOf(Map.of("5", key));
+    }
+
+    @Test void missingObservationKeepsStoredLabelsAndStableId() {
+        source.putFolder("all", "All Mail", "7", "1");
+        source.stableIdAndLabels("all", "1", "900", "Inbox");
+        run();
+        String key = refs("f1").get("1");
+        source.forgetStableIdAndLabels("all", "1");
+        source.resetCounts();
+        run();
+        assertThat(source.downloadCalls).isZero();
+        assertThat(store().readMeta(key).orElseThrow().labels()).containsExactly("Inbox");
+        assertThat(store().readMeta(key).orElseThrow().stableId()).isEqualTo("900");
+    }
+
 }

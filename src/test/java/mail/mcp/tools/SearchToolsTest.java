@@ -205,6 +205,27 @@ class SearchToolsTest {
         assertThat(bodyJson.has("snippetAttachmentName")).isFalse();
     }
 
+    @Test void searchByLabelFieldReturnsLabelledMessages() {
+        String labelled = store.newKey();
+        var meta = new MessageMeta(labelled, "f1", "INBOX", labelled, 0, null, Instant.now(),
+                MessageState.CONVERTED, null, null, null, null, "900", List.of("Inbox", "My Project"));
+        store.createMessageDir(labelled);
+        store.writeMeta(meta);
+        try (var index = MailIndex.openWriter(dir)) {
+            index.put(meta, new MailMessage("Weekly report", List.of(new Address("Sender", "sender@example.com")),
+                    null, null, Instant.parse("2026-10-26T00:00:00Z"), null, null, null, List.of()), "Body text", null);
+            put(index, "f1");
+            index.commit();
+        }
+        var hits = tools.search("local", "inbox", "label", null, null, null);
+        assertThat(hits.total()).isEqualTo(1);
+        assertThat(hits.hits().getFirst().labels()).containsExactly("Inbox", "My Project");
+        assertThat(tools.search("local", "project", "label", null, null, null).total()).isEqualTo(1);
+        assertThat(tools.search("local", "archive", "label", null, null, null).total()).isZero();
+        assertThat(tools.search("local", "inbox", null, null, null, null).total())
+                .as("labels are part of any").isEqualTo(1);
+    }
+
     private String put(MailIndex index, String folder) {
         String key = store.newKey();
         store.createMessageDir(key);

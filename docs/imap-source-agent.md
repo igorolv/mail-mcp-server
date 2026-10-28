@@ -9,8 +9,8 @@ Angus Mail 2.0.5 with Jakarta Mail API 2.1.5. `ImapMailSource` implements `MailS
 of `ImapClient`: filtered mail folders, changes by UIDVALIDITY and folder UIDs, metadata snapshots and original
 MIME downloads by UID. One source owns one lazy session for any number of queries and downloads
 across folders. `mail-sync` uses the same `SyncRunner`, store and catalog as EWS; MCP tools read
-the local copy (`docs/tools-agent.md`). Gmail labels/deduplication, CONDSTORE/QRESYNC
-and paging are not implemented.
+the local copy (`docs/tools-agent.md`). Gmail runs on its All Mail folder with labels and
+`X-GM-MSGID` identity (see "Gmail" below). CONDSTORE/QRESYNC and paging are not implemented.
 
 `MailConnectionFactory` creates a connection with a supplier; `openSource()` creates a fresh
 `ImapMailSource` without contacting a server. The caller closes the source. EWS connections get
@@ -51,8 +51,10 @@ Allowed control commands: CAPABILITY, NOOP, LOGOUT, LOGIN, AUTHENTICATE (PLAIN/L
 configured provider), LIST, LSUB, NAMESPACE, STATUS, EXAMINE, CLOSE, UNSELECT and ENABLE (UTF8 negotiation).
 OAuth connections use AUTHENTICATE with XOAUTH2 arguments; the wrapper acknowledges OAuth error
 challenges with an empty response instead of resending credentials (see gmail-oauth-agent.md).
-FETCH/UID FETCH is allowed only with UID, FLAGS, INTERNALDATE, ENVELOPE, RFC822.SIZE and BODY.PEEK[]
-(optionally a partial byte range). Command text containing CR/LF is rejected.
+FETCH/UID FETCH is allowed only with UID, FLAGS, INTERNALDATE, ENVELOPE, RFC822.SIZE,
+BODY.PEEK[] (optionally a partial byte range), and the read-only Gmail items X-GM-MSGID and
+X-GM-LABELS (requested only when the server advertises `X-GM-EXT-1`). Command text containing
+CR/LF is rejected.
 
 CLOSE is safe because SELECT is forbidden: RFC 3501 section 6.4.2 specifies that CLOSE cannot
 remove messages from a mailbox opened with EXAMINE. Angus uses it to return the socket to the
@@ -91,8 +93,39 @@ separately for invalid SyncState recovery without invalidating known refs. Old s
    FLAGS comparison.
 
 `folders()` preserves server order, keeps only folders holding messages and excludes attributes
-`\Noselect`, `\NonExistent`, `\Trash`, `\Junk`, `\Drafts` ignoring case. No provider-specific
-Gmail handling is added.
+`\Noselect`, `\NonExistent`, `\Trash`, `\Junk`, `\Drafts` ignoring case. On Gmail it returns only
+the single message-holding folder with the `\All` attribute (see "Gmail"). No provider-specific
+handling is added for other servers.
+
+## Gmail
+
+Gmail is detected by the `X-GM-EXT-1` capability, never by host name, login or folder name.
+`ImapClient.gmailExtensions()` caches that check for the session.
+
+- **One folder.** `ImapMailSource.folders()` returns only the folder whose LIST attributes contain
+  `\All` (case-insensitive) when exactly one message-holding folder has it. Gmail's label folders
+  are therefore not synchronized; without such a folder the ordinary filtering applies. Messages
+  of a vanished label folder are removed by the ordinary vanished-folder path, so a mailbox synced
+  before this change keeps its All Mail copies without downloading MIME again.
+- **Labels.** The UID listing and every metadata fetch add `X-GM-MSGID` and `X-GM-LABELS`.
+  `ReadOnlyImapStore.getFetchItems()` supplies the two parsers; a label list is read as RFC 3501
+  astrings because system labels such as `\Inbox` start with a backslash, which Angus's atom
+  readers treat as a delimiter. Labels are decoded from modified UTF-7 with Angus
+  `BASE64MailboxDecoder`. The package-private `GmailMessageInfo` record normalizes them where it is
+  created: `\All` is dropped (it names the folder itself), other system labels lose one leading
+  backslash (`\Inbox` becomes `Inbox`), and the result is sorted for stable comparisons. An absent
+  item leaves stored labels unknown; an empty list means the message has no labels. FLAGS and the
+  Gmail items are parsed independently, so either one alone is an observation of a known UID.
+  They reach `RemoteMessageInfo` as the provider-neutral `labels`.
+- **Identity.** `X-GM-MSGID` is kept as a decimal string in the provider-neutral `stableId`.
+  `SyncRunner` reuses a saved message with the same `stableId` instead of downloading MIME again,
+  including across a UIDVALIDITY reset; see `docs/storage-agent.md`. Without an All Mail folder,
+  a message present in several label folders is stored once per folder, as on other servers.
+  Labels and flags of known messages are refreshed from the UID listing without downloads.
+- **No writes.** No label change is ever sent: the guard still refuses STORE, and the extensions
+  add no command.
+
+Real-server behavior of the extensions is unverified; only synthetic protocol tests have run.
 
 ## Remote identity metadata
 
@@ -102,13 +135,15 @@ UIDVALIDITY still matches before trusting reused UIDs, then resolves and fetches
 of at most 100. A mismatch closes the client and aborts the run without retry. Missing/expunged
 items are omitted; other protocol/authentication/transport errors abort.
 
-The Angus 2.0.5 profile uses ENVELOPE, FLAGS and UID. Offline fake-server tests verify the exact emitted
-attributes `(ENVELOPE INTERNALDATE RFC822.SIZE FLAGS UID)`; ENVELOPE already supplies the date and size
-fetch attributes, so adding SIZE to the profile would duplicate RFC822.SIZE. Cached envelope
-values provide Message-ID, sent date, decoded subject and From. Exactly one non-group sender
-address is required; optional missing fields disable identity matching. No body or arbitrary
-header fetch, CONDSTORE or Gmail extension is used. The exact attribute guard remains in place;
-adding ENVELOPE permits no RFC822 body retrieval, non-PEEK BODY or write command.
+The Angus 2.0.5 profile uses ENVELOPE, FLAGS and UID, plus the Gmail items on Gmail. Offline
+fake-server tests verify the exact emitted attributes `(ENVELOPE INTERNALDATE RFC822.SIZE FLAGS
+UID)` and, on Gmail, `(ENVELOPE INTERNALDATE RFC822.SIZE FLAGS UID X-GM-MSGID X-GM-LABELS)`;
+ENVELOPE already supplies the date and size fetch attributes, so adding SIZE to the profile would
+duplicate RFC822.SIZE. Cached envelope values provide Message-ID, sent date, decoded subject and
+From. Exactly one non-group sender address is required; optional missing fields disable identity
+matching. No body or arbitrary header fetch, CONDSTORE or Gmail extension beyond the two read-only
+items is used. The exact attribute guard remains in place: adding ENVELOPE permits no RFC822 body
+retrieval, non-PEEK BODY or write command.
 
 Only added UIDs are fetched this way (Д29): a full pass took about 13.5 s per batch of 100 on
 Mail.ru, more than an hour per run. Known messages keep their stored fingerprints; a removed
@@ -133,8 +168,8 @@ MIME download succeeded with EXAMINE and BODY.PEEK. A later check through `MailS
 one session. The downloaded message was already read; unread behavior was not tested.
 See `docs/results.md` section 2. Gmail app-password synchronization with 256 KiB blocks
 completed in the user-run check on 2026-10-28; per-message failure counts are recorded there.
-Real OAuth2 sign-in is unverified; Gmail labels and deduplication remain pending
-(`docs/plan.md` section 4, Д7).
+All Mail synchronization, labels and `X-GM-MSGID` reuse are implemented offline and await the
+user's real-mail check; real OAuth2 sign-in is unverified.
 
 ## Read/star observations
 
@@ -153,13 +188,14 @@ the counts only (user decision 2026-10-27, after the first Mail.ru run aborted o
 A tagged NO or BAD for the whole FETCH still aborts with a sanitized protocol error, no retry.
 No STORE, SELECT, body retrieval or additional authentication is enabled.
 
-Known mail gets its flags from the UID listing: `folderUids` closes the folder, reopens it with
-EXAMINE and sends one `FETCH 1:n (FLAGS UID)`; ReadOnlyImapStore records UID and FLAGS of each
-parsed response, so a skipped response leaves that UID unobserved. Null fields preserve stored
+Known mail gets its flags and Gmail items from the UID listing: `folderUids` closes the folder,
+reopens it with EXAMINE and sends one `FETCH 1:n (FLAGS UID)`; ReadOnlyImapStore records UID and
+FLAGS of each parsed response, so a skipped response leaves that UID unobserved. On Gmail the same
+command adds `X-GM-MSGID X-GM-LABELS` (see "Gmail"). Null fields preserve stored
 values; explicit false clears them. Destination flags apply after move reuse but are excluded
 from its identity; a UIDVALIDITY reset uses only fresh observations. Flags are user read/star
-state, independent of Gmail Important. Flag-only changes update metadata/index without writing
-MIME/body/attachments or changing state, error, time or counters. Schema 4 rebuilds offline
+state, independent of Gmail Important. Flag-only and label-only changes update metadata/index
+without writing MIME/body/attachments or changing state, error, time or counters. Schema 5 rebuilds offline
 from saved data; old metadata stays unknown until a requested sync. Real-server flag behavior
 remains to verify.
 
@@ -186,6 +222,8 @@ no fallback after rejection, EXAMINE/CLOSE folder switching, UID listing, filter
 removed refs, UIDVALIDITY resets, input validation before commands, exact MIME and SHA-256,
 BODY.PEEK only, missing UIDs, declared and streamed size limits, continued use after unavailable
 messages, partial cleanup, existing-target preservation, command rejection and lazy factories.
+Gmail tests cover capability detection, the All Mail folder choice and its fallback, the exact
+X-GM items in both FETCH shapes, a missing extension, and decoded labels.
 All tests are part of `gradlew.bat build`.
 
 Angus 2.0.5 sources inspected on 2026-10-25:

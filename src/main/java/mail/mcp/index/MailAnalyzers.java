@@ -47,6 +47,14 @@ public final class MailAnalyzers {
                         new SnowballFilter(stream, new RussianStemmer()));
             }
         };
+        // Mailbox labels: whole words without stemming or user rules, so both Inbox and a multi-word
+        // label match by its words (docs/search.md).
+        var label = new Analyzer() {
+            @Override protected TokenStreamComponents createComponents(String field) {
+                var tokenizer = new PatternTokenizer(Pattern.compile("[^\\p{L}\\p{N}]+"), -1);
+                return new TokenStreamComponents(tokenizer, new LowerCaseFilter(tokenizer));
+            }
+        };
         var russianStops = new CharArraySet(0, false);
         for (var stop : RussianAnalyzer.getDefaultStopSet()) {
             String word = new String((char[]) stop);
@@ -68,6 +76,6 @@ public final class MailAnalyzers {
         return new PerFieldAnalyzerWrapper(russian, Map.of(
                 "subject_en", english, "body_en", english, "attachmentText_en", english,
                 "fromAddress", exact, "toAddress", exact, "ccAddress", exact,
-                "attachmentFile", exact, "attachmentName", parts));
+                "attachmentFile", exact, "attachmentName", parts, "label", label));
     }
 }

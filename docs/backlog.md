@@ -6,7 +6,7 @@ in [plan.md, section 4](plan.md#4-version-010); rejected ideas and reasons are i
 
 Status: ⬜ not started · 🔨 in progress. Size: S — hours, M — a brief for one session, L — several
 briefs. When the user includes an item in a version, move its row to section 4 of the plan. A new
-idea gets a new row with the next number; numbers are never reused (next available: Д31).
+idea gets a new row with the next number; numbers are never reused (next available: Д34).
 
 | ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|
@@ -17,3 +17,6 @@ idea gets a new row with the next number; numbers are never reused (next availab
 | Д20 | Retry on `ErrorServerBusy` | Wait `BackOffMilliseconds` and retry once. Only if throttling becomes a problem: none occurred with 8345 messages | EWS risk | S | ⬜ |
 | Д23 | Fallback EWS transport | `HttpsURLConnection` with SSPI in case of Extended Protection on another server | П1, RT-02 | M | ⬜ |
 | Д27 | Gmail refresh token encryption | On Windows, store the token value in `google-tokens.json` under DPAPI (CurrentUser), with bindings in plaintext; on other OSes, keep the current owner-only file. Needed only for Gmail over OAuth2; for a personal mailbox, an app password through `windowsCredential` (Д28) or `passwordCommand` (Д22) is simpler | Д22 discussion of 2026-10-27 | M | ⬜ |
+| Д31 | Outlook categories as labels | Fill the provider-neutral `labels` from EWS `item:Categories` (strings the user assigns in Outlook): read it with the existing GetItem metadata for added items and for items with an Update change, like IsRead and Flag. No new EWS operation, no contract or schema change. To verify: that a category change produces an Update change in SyncFolderItems on the user's server | Д7 review of 2026-10-28 | S | ⬜ |
+| Д32 | IMAP keywords as labels | Fill `labels` on non-Gmail IMAP servers from user keywords in FLAGS (`Flags.getUserFlags()`), already returned by the UID listing; exclude system and `$`-prefixed client bookkeeping keywords unless the user wants them. No new command. To verify: whether Mail.ru stores and returns keywords at all | Д7 review of 2026-10-28 | S | ⬜ |
+| Д33 | RFC 8474 `EMAILID` as `stableId` | When a non-Gmail IMAP server advertises `OBJECTID`, fetch `EMAILID` with the UID listing and metadata and store it as `stableId`, so moves and UIDVALIDITY resets reuse messages without the Message-ID heuristic. Extends the FETCH allow-list by one item. To verify: whether Mail.ru advertises `OBJECTID` | Д7 review of 2026-10-28 | S | ⬜ |

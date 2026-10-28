@@ -115,7 +115,7 @@ They describe the latest successful remote observation, not live state. `flagged
 user flag/star, not sender importance or Gmail Important. Booleans bypass SecretRedactor.
 
 `getMessage` reads flags from metadata even without readable MIME; list, text/date-only search
-and thread cards read the committed schema-4 index. Existing date bounds, conversation links,
+and thread cards read the committed schema-5 index. Existing date bounds, conversation links,
 sorting and pagination are unchanged. Opening the writer rebuilds old schemas offline, or the
 user runs `mail-reindex <connection>`; old metadata remains unknown until a requested sync.
 Every sync refreshes flags on known mail from the folder changes (IMAP FLAGS in the UID listing,
@@ -124,6 +124,17 @@ Original files, state/error, SHA-256 and download time remain unchanged. Flags d
 in move matching; destination observations apply after reuse. Flag-only updates and moves count
 as zero downloaded, failed and removed, preserving rescan reports and the background summary.
 Real-server behavior remains to verify.
+
+## Message labels
+
+The same four records append optional `List<String> labels` after `flagged`: mailbox labels of
+the latest observation, omitted when unknown or when the provider has none, empty when known
+empty. Only Gmail provides them now (`docs/imap-source-agent.md`); the contract and the
+`label` search group are provider-neutral, so another source can fill them without changing
+it. Labels are text and pass through `SecretRedactor.texts`, like folder paths. `getMessage`
+reads them from metadata; list, search and thread cards from the stored `labels` index field.
+The `field` description of `search` lists `label`; it is part of `any`. The provider `stableId`
+is used only for synchronization and is never returned.
 
 ## Threads
 

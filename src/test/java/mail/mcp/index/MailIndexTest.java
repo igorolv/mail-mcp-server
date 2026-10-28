@@ -143,6 +143,30 @@ class MailIndexTest {
                 Instant.parse("2026-10-25T12:00:00Z"), MessageState.DOWNLOADED, null);
     }
 
+    @Test void labelSearchMatchesLabelWordsAndCardsCarryLabels() {
+        var labelled = new MessageMeta("a", "f1", "INBOX", "101", 12, "a".repeat(64),
+                Instant.parse("2026-10-25T12:00:00Z"), MessageState.CONVERTED, null, null, null, null,
+                "900", java.util.List.of("Inbox", "My Project"));
+        try (var index = MailIndex.openWriter(connectionDir)) {
+            index.put(labelled, null, "Body text", null);
+            index.put(meta("b", "f1", "102"), null, "Body text", null);
+            index.commit();
+            assertThat(index.keysByStableId("900")).containsExactly("a");
+        }
+        try (var reader = MailIndexReader.open(connectionDir).orElseThrow()) {
+            assertThat(reader.search("Inbox", SearchField.LABEL, null, 0, 20).hits())
+                    .extracting(hit -> hit.card().key()).containsExactly("a");
+            assertThat(reader.search("project", SearchField.LABEL, null, 0, 20).total()).isEqualTo(1);
+            assertThat(reader.search("INBOX", SearchField.ANY, null, 0, 20).total()).isEqualTo(1);
+            assertThat(reader.search("Archive", SearchField.LABEL, null, 0, 20).total()).isZero();
+            var cards = reader.cards("f1", 0, 10);
+            assertThat(cards).filteredOn(card -> card.key().equals("a")).singleElement()
+                    .extracting(card -> card.labels()).isEqualTo(java.util.List.of("Inbox", "My Project"));
+            assertThat(cards).filteredOn(card -> card.key().equals("b")).singleElement()
+                    .extracting(card -> card.labels()).isNull();
+        }
+    }
+
     private static void save(MessageStore store, MessageMeta meta) {
         store.createMessageDir(meta.key());
         store.writeMeta(meta);
@@ -161,7 +185,7 @@ class MailIndexTest {
         try (var reader = MailIndexReader.open(connectionDir).orElseThrow()) { assertThat(reader.current()).isTrue(); }
         try (var directory = FSDirectory.open(connectionDir.resolve("index"));
              var reader = DirectoryReader.open(directory)) {
-            assertThat(reader.getIndexCommit().getUserData().get("schema")).isEqualTo("4");
+            assertThat(reader.getIndexCommit().getUserData().get("schema")).isEqualTo("5");
         }
     }
 

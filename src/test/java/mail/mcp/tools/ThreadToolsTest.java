@@ -78,6 +78,22 @@ class ThreadToolsTest {
                 "Unread body", "Unread attachment text");
     }
 
+    @Test void threadCardsCarryLabels() {
+        var tools = new ThreadTools(registry(), new JsonConfig().mailMcpObjectMapper());
+        String key = UUID.randomUUID().toString();
+        try (var writer = MailIndex.openWriter(dir.resolve("local"))) {
+            writer.put(new MessageMeta(key, "f1", "INBOX", key, 0, null, Instant.now(), MessageState.CONVERTED,
+                            null, null, null, null, "900", List.of("Inbox", "Starred")),
+                    new MailMessage("Subject", null, null, null, null, "<shared@example.com>", null, null, null),
+                    "Body", null);
+            writer.commit();
+        }
+        var card = tools.getThread("local", key, null, null).messages().getFirst();
+        assertThat(card.labels()).containsExactly("Inbox", "Starred");
+        var json = new JsonConfig().mailMcpObjectMapper();
+        assertThat(json.writeValueAsString(card)).contains("\"labels\":[\"Inbox\",\"Starred\"]");
+    }
+
     @Test void threadValidatesArgumentsAnchorAndSchema() throws Exception {
         var tools = new ThreadTools(registry(), new JsonConfig().mailMcpObjectMapper());
         String key = UUID.randomUUID().toString();

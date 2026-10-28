@@ -1,5 +1,6 @@
 package mail.mcp.sync;
 
+import mail.mcp.index.IndexedObservation;
 import mail.mcp.index.MailIndex;
 import mail.mcp.model.LocalFolder;
 import mail.mcp.model.FolderProgress;
@@ -189,7 +190,7 @@ public final class SyncRunner {
             // Retained entries are refreshed only after the pre-run snapshot has been matched. Their flags
             // are compared with the index; meta.json is read only when something changed (Д30).
             boolean renamed = !plan.folder().path().equals(previousPaths.getOrDefault(plan.folder().key(), plan.folder().path()));
-            var indexed = renamed ? Map.<String, String[]>of() : index.folderFlags(plan.folder().key());
+            var indexed = renamed ? Map.<String, IndexedObservation>of() : index.folderObservations(plan.folder().key());
             for (var entry : plan.refs().entrySet()) {
                 if (plan.removed().contains(entry.getKey())) { continue; }
                 if (!renamed && !changed(plan.info().get(entry.getKey()), indexed.get(entry.getKey()))) { continue; }
@@ -199,7 +200,9 @@ public final class SyncRunner {
                     store.writeMeta(meta);
                     checkpoint.accept("metadataRefreshed");
                     if (!old.folder().equals(meta.folder()) || !java.util.Objects.equals(old.read(), meta.read())
-                            || !java.util.Objects.equals(old.flagged(), meta.flagged())) {
+                            || !java.util.Objects.equals(old.flagged(), meta.flagged())
+                            || !java.util.Objects.equals(old.labels(), meta.labels())
+                            || !java.util.Objects.equals(old.stableId(), meta.stableId())) {
                         put(meta.state() == MessageState.CONVERTED ? processor.load(meta) : new Processed(meta, null, null, null));
                     }
                 }
@@ -239,15 +242,11 @@ public final class SyncRunner {
                 MessageMeta meta;
                 try {
                     var mime = source.download(plan.remote(), ref, dir.resolve(MessageStore.MESSAGE_FILE));
-                    meta = new MessageMeta(key, folder.key(), folder.path(), ref, mime.size(), mime.sha256(),
-                            Instant.now(), MessageState.DOWNLOADED, null, complete(plan.info().get(ref)),
-                            plan.info().get(ref) == null ? null : plan.info().get(ref).read(),
-                            plan.info().get(ref) == null ? null : plan.info().get(ref).flagged());
+                    meta = identity(new MessageMeta(key, folder.key(), folder.path(), ref, mime.size(), mime.sha256(),
+                            Instant.now(), MessageState.DOWNLOADED, null), folder, ref, plan.info().get(ref));
                 } catch (MessageUnavailableException e) {
-                    meta = new MessageMeta(key, folder.key(), folder.path(), ref, 0, null,
-                            Instant.now(), MessageState.FAILED, e.getMessage(), complete(plan.info().get(ref)),
-                            plan.info().get(ref) == null ? null : plan.info().get(ref).read(),
-                            plan.info().get(ref) == null ? null : plan.info().get(ref).flagged());
+                    meta = identity(new MessageMeta(key, folder.key(), folder.path(), ref, 0, null,
+                            Instant.now(), MessageState.FAILED, e.getMessage()), folder, ref, plan.info().get(ref));
                 }
                 store.writeMeta(meta);
                 var processed = meta.state() == MessageState.DOWNLOADED
@@ -272,73 +271,103 @@ public final class SyncRunner {
     }
 
     /**
-     * Unique apparent moves. Candidates are removed converted messages with MIME, identified by their saved
-     * fingerprint or, without one, by their saved headers. Uniqueness counts old and current copies among
-     * the documents with the same Message-ID, so only those few meta.json are read (Д30).
+     * Unique apparent moves. Candidates are removed converted messages with MIME. A candidate with a
+     * provider stableId (Gmail X-GM-MSGID) matches only an added message with the same stableId; this
+     * identity survives UID changes, so it also applies within a folder and across a UIDVALIDITY reset.
+     * Other candidates use the Message-ID heuristic: their saved fingerprint or, without one, their saved
+     * headers, only across folders and never with a reset. Either way an identity must have exactly one
+     * stored copy (the candidate) and exactly one current remote copy; retained copies count as current.
+     * Uniqueness reads only the documents found by stableId or Message-ID (Д30).
      */
     private Map<String, MessageMeta> matches(Map<String, MessageMeta> removedMetas, Set<String> removedKeys,
-                                           List<FolderPlan> plans, Set<String> resets) {
+                                             List<FolderPlan> plans, Set<String> resets) {
         var result = new HashMap<String, MessageMeta>();
         if (plans.stream().allMatch(plan -> plan.changes().added().isEmpty())) { return result; }
-        var candidateFingerprints = new HashMap<String, MessageFingerprint>();
+        var candidateIdentities = new HashMap<String, Identity>();
         for (var meta : removedMetas.values()) {
             Path eml = store.messageDir(meta.key()).resolve(MessageStore.MESSAGE_FILE);
-            if (resets.contains(meta.folderKey()) || meta.state() != MessageState.CONVERTED || !Files.isRegularFile(eml)) {
+            if (meta.state() != MessageState.CONVERTED || !Files.isRegularFile(eml)) { continue; }
+            if (meta.stableId() != null) {
+                candidateIdentities.put(meta.key(), new Identity(meta.stableId(), null));
                 continue;
             }
+            if (resets.contains(meta.folderKey())) { continue; }
             var fingerprint = meta.fingerprint();
             if (fingerprint == null || !fingerprint.complete()) {
                 fingerprint = localFingerprint(eml); // never fetched: messages saved before Д8
             }
-            if (fingerprint != null && fingerprint.complete()) { candidateFingerprints.put(meta.key(), fingerprint); }
+            if (fingerprint != null && fingerprint.complete()) { candidateIdentities.put(meta.key(), new Identity(null, fingerprint)); }
         }
-        if (candidateFingerprints.isEmpty()) { return result; }
+        if (candidateIdentities.isEmpty()) { return result; }
 
-        var candidates = new HashMap<MessageFingerprint, MessageMeta>();
-        var oldCounts = new HashMap<MessageFingerprint, Integer>();
-        var remoteCounts = new HashMap<MessageFingerprint, Integer>();
-        candidateFingerprints.forEach((key, fingerprint) -> candidates.put(fingerprint, removedMetas.get(key)));
-        for (var fingerprint : Set.copyOf(candidateFingerprints.values())) {
+        var candidates = new HashMap<Identity, MessageMeta>();
+        var oldCounts = new HashMap<Identity, Integer>();
+        var remoteCounts = new HashMap<Identity, Integer>();
+        candidateIdentities.forEach((key, identity) -> candidates.put(identity, removedMetas.get(key)));
+        for (var identity : Set.copyOf(candidateIdentities.values())) {
             // Candidates always count, even when their saved MIME has no Message-ID header to index.
-            var keys = new HashSet<>(index.keysByMessageId(fingerprint.messageId()));
-            candidateFingerprints.forEach((key, candidate) -> { if (candidate.equals(fingerprint)) { keys.add(key); } });
+            var keys = new HashSet<>(identity.stableId() != null ? index.keysByStableId(identity.stableId())
+                    : index.keysByMessageId(identity.fingerprint().messageId()));
+            candidateIdentities.forEach((key, candidate) -> { if (candidate.equals(identity)) { keys.add(key); } });
             for (String key : keys) {
-                var stored = candidateFingerprints.containsKey(key) ? candidateFingerprints.get(key)
-                        : removedMetas.containsKey(key) ? removedMetas.get(key).fingerprint()
-                        : store.readMeta(key).map(MessageMeta::fingerprint).orElse(null);
-                if (!fingerprint.equals(stored)) { continue; }
-                oldCounts.merge(fingerprint, 1, Integer::sum);
-                // Retained messages are current server copies: their identity does not change remotely.
-                if (!removedKeys.contains(key)) { remoteCounts.merge(fingerprint, 1, Integer::sum); }
-            }
-        }
-        for (var plan : plans) {
-            for (String ref : plan.changes().added()) {
-                var fingerprint = complete(plan.info().get(ref));
-                if (fingerprint != null && candidates.containsKey(fingerprint)) { remoteCounts.merge(fingerprint, 1, Integer::sum); }
-            }
-        }
-        for (var plan : plans) {
-            if (resets.contains(plan.folder().key())) { continue; }
-            for (String ref : plan.changes().added()) {
-                if (plan.refs().containsKey(ref)) { continue; }
-                var fingerprint = complete(plan.info().get(ref));
-                var old = fingerprint == null ? null : candidates.get(fingerprint);
-                if (old != null && !old.folderKey().equals(plan.folder().key())
-                        && oldCounts.getOrDefault(fingerprint, 0) == 1 && remoteCounts.getOrDefault(fingerprint, 0) == 1) {
-                    result.put(plan.folder().key() + "/" + ref, old);
+                if (identity.stableId() == null) {
+                    var stored = candidateIdentities.containsKey(key) ? candidateIdentities.get(key).fingerprint()
+                            : removedMetas.containsKey(key) ? removedMetas.get(key).fingerprint()
+                            : store.readMeta(key).map(MessageMeta::fingerprint).orElse(null);
+                    if (!identity.fingerprint().equals(stored)) { continue; }
                 }
+                oldCounts.merge(identity, 1, Integer::sum);
+                // Retained messages are current server copies: their identity does not change remotely.
+                if (!removedKeys.contains(key)) { remoteCounts.merge(identity, 1, Integer::sum); }
+            }
+        }
+        for (var plan : plans) {
+            for (String ref : plan.changes().added()) {
+                var identity = matchIdentity(plan.info().get(ref), candidates);
+                if (identity != null) { remoteCounts.merge(identity, 1, Integer::sum); }
+            }
+        }
+        for (var plan : plans) {
+            boolean reset = resets.contains(plan.folder().key());
+            for (String ref : plan.changes().added()) {
+                if (!reset && plan.refs().containsKey(ref)) { continue; }
+                var identity = matchIdentity(plan.info().get(ref), candidates);
+                var old = identity == null ? null : candidates.get(identity);
+                if (old == null || oldCounts.getOrDefault(identity, 0) != 1 || remoteCounts.getOrDefault(identity, 0) != 1) {
+                    continue;
+                }
+                if (identity.stableId() == null && (reset || old.folderKey().equals(plan.folder().key()))) { continue; }
+                result.put(plan.folder().key() + "/" + ref, old);
             }
         }
         return result;
     }
 
-    /** True when an observation differs from the read/star values the index holds for the message. */
-    private static boolean changed(RemoteMessageInfo info, String[] indexed) {
+    /**
+     * The candidate identity an added message would match: its stableId when a candidate has that one,
+     * otherwise its complete fingerprint. A candidate with a stableId is never matched by fingerprint.
+     */
+    private static Identity matchIdentity(RemoteMessageInfo info, Map<Identity, MessageMeta> candidates) {
+        if (info == null) { return null; }
+        if (info.stableId() != null) {
+            var stable = new Identity(info.stableId(), null);
+            if (candidates.containsKey(stable)) { return stable; }
+        }
+        var fingerprint = complete(info);
+        return fingerprint == null ? null : new Identity(null, fingerprint);
+    }
+
+    /** A provider stableId, or else a Message-ID fingerprint for the heuristic match. */
+    private record Identity(String stableId, MessageFingerprint fingerprint) { }
+
+    /** True when an observation differs from what the index holds for the message. */
+    private static boolean changed(RemoteMessageInfo info, IndexedObservation indexed) {
         if (info == null) { return false; }
         if (info.fingerprint() != null || indexed == null) { return true; }
-        return info.read() != null && !info.read().toString().equals(indexed[1])
-                || info.flagged() != null && !info.flagged().toString().equals(indexed[2]);
+        return info.read() != null && !info.read().equals(indexed.read())
+                || info.flagged() != null && !info.flagged().equals(indexed.flagged())
+                || info.labels() != null && !info.labels().equals(indexed.labels())
+                || info.stableId() != null && !info.stableId().equals(indexed.stableId());
     }
 
     private static MessageFingerprint localFingerprint(Path eml) {
@@ -350,13 +379,15 @@ public final class SyncRunner {
         return info != null && info.fingerprint() != null && info.fingerprint().complete() ? info.fingerprint() : null;
     }
 
-    /** Flag-only observations (no fingerprint) keep the stored identity; fresh metadata replaces it. */
+    /** Applies an observation: values it lacks keep the stored ones, and only fresh metadata replaces the fingerprint. */
     private static MessageMeta identity(MessageMeta old, LocalFolder folder, String ref, RemoteMessageInfo info) {
         return new MessageMeta(old.key(), folder.key(), folder.path(), ref, old.size(), old.sha256(),
                 old.downloadedAt(), old.state(), old.error(),
                 info == null || info.fingerprint() == null ? old.fingerprint() : complete(info),
                 info == null || info.read() == null ? old.read() : info.read(),
-                info == null || info.flagged() == null ? old.flagged() : info.flagged());
+                info == null || info.flagged() == null ? old.flagged() : info.flagged(),
+                info == null || info.stableId() == null ? old.stableId() : info.stableId(),
+                info == null || info.labels() == null ? old.labels() : info.labels());
     }
 
     private boolean deleteOriginal(MessageMeta old) {

@@ -196,7 +196,7 @@ No sync or other writer may be running for the same connection. The command forc
 in place, then calls `SyncRunner.restore`: converted messages load headers and saved body.md,
 downloaded messages are processed, failed messages get metadata only. Incomplete directories
 are removed. Originals and converted output remain unchanged for converted messages.
-The index commits every 100 entries and at the end, with commit data `schema=4` and
+The index commits every 100 entries and at the end, with commit data `schema=5` and
 `wordForms=<hash>` only when nonempty rules are active. Progress goes to the command's output
 only; server restoration stays silent. The result counts all indexed messages, including failed
 metadata entries.

@@ -49,7 +49,8 @@ public final class MailIndexReader implements AutoCloseable {
     private static final Pattern HEADER_ID = Pattern.compile("<[^<>\\s]+>", Pattern.UNICODE_CHARACTER_CLASS);
     private static final Set<String> COPY_FIELDS = Set.of("key", "ref", "messageId", "date", "from", "subject");
     private static final Set<String> THREAD_FIELDS = Set.of("key", "ref", "messageId", "date", "from", "subject", "inReplyTo", "references");
-    private static final Set<String> CARD_FIELDS = Set.of("key", "ref", "date", "from", "subject", "attachmentNames", "state", "read", "flagged");
+    private static final Set<String> CARD_FIELDS = Set.of("key", "ref", "date", "from", "subject", "attachmentNames", "state",
+            "read", "flagged", "labels");
     private final FSDirectory directory;
     private final DirectoryReader reader;
     private final IndexSearcher searcher;
@@ -350,7 +351,8 @@ public final class MailIndexReader implements AutoCloseable {
                 storedDate == null ? null : Instant.ofEpochMilli(storedDate.numericValue().longValue()),
                 doc.get("from"), doc.get("subject"), names != null && !names.isEmpty(), doc.get("state"),
                 doc.get("read") == null ? null : Boolean.valueOf(doc.get("read")),
-                doc.get("flagged") == null ? null : Boolean.valueOf(doc.get("flagged")));
+                doc.get("flagged") == null ? null : Boolean.valueOf(doc.get("flagged")),
+                MailIndex.splitLabels(doc.get("labels")));
     }
 
     @Override public void close() {

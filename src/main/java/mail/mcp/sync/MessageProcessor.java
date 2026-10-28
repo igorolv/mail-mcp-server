@@ -90,6 +90,7 @@ public final class MessageProcessor {
 
     private static MessageMeta state(MessageMeta meta, MessageState state, String error) {
         return new MessageMeta(meta.key(), meta.folderKey(), meta.folder(), meta.ref(), meta.size(),
-                meta.sha256(), meta.downloadedAt(), state, error, meta.fingerprint(), meta.read(), meta.flagged());
+                meta.sha256(), meta.downloadedAt(), state, error, meta.fingerprint(), meta.read(), meta.flagged(),
+                meta.stableId(), meta.labels());
     }
 }

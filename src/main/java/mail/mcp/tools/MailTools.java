@@ -119,7 +119,8 @@ public class MailTools {
                 var messages = page == null ? List.<MessageSummary>of()
                         : page.cards().stream().map(c -> new MessageSummary(c.key(),
                         c.date(), redactor.text(c.from()), redactor.text(c.subject()), c.hasAttachments(), c.state(),
-                        store.messageDir(c.key()).toAbsolutePath().toString(), c.read(), c.flagged())).toList();
+                        store.messageDir(c.key()).toAbsolutePath().toString(), c.read(), c.flagged(),
+                        c.labels() == null ? null : redactor.texts(c.labels()))).toList();
                 Integer next = (long) position + messages.size() < total ? position + messages.size() : null;
                 ToolLogger.completed(log, "listMessages", start);
                 return new ListMessagesResult(definition.name(), folder, total, position, next, messages, range.since(), range.until());
@@ -180,7 +181,8 @@ public class MailTools {
                     message == null ? null : display(message.to()), message == null ? null : display(message.cc()),
                     message == null ? null : message.date(), message == null ? null : redactor.text(message.messageId()),
                     message == null ? null : redactor.text(message.inReplyTo()), message == null ? null : redactor.texts(message.references()),
-                    chunk, position, next, length, attachments, directory.toString(), meta.read(), meta.flagged());
+                    chunk, position, next, length, attachments, directory.toString(), meta.read(), meta.flagged(),
+                    meta.labels() == null ? null : redactor.texts(meta.labels()));
             ToolLogger.completed(log, "getMessage", start);
             return result;
         } catch (IOException e) {

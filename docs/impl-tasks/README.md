@@ -120,8 +120,12 @@ The reviewer checks; it does not fix. Work through every point and report what y
 IT-01…IT-24 were accepted and deleted (2026-10-25…27). Checks still pending on real mail are in
 `docs/plan.md` section 2. IT-26 was accepted and deleted on 2026-10-28: the shared IMAP MIME
 block is 256 KiB, with offline integrity/limit tests and a user-run Gmail speed check.
-Next unused number: IT-27. No brief is open; a new one gets a row in a table with the columns
-Order, Brief, Plan item, Scope and dependency.
+Next unused number: IT-28. A new brief gets a row in a table with the columns Order, Brief, Plan
+item, Scope and dependency.
+
+| Order | Brief | Plan item | Scope | Dependency |
+|---|---|---|---|---|
+| 1 | [IT-27](IT-27-gmail-all-mail-labels.md) | Д7 | Gmail All Mail once with labels, deduplication by `X-GM-MSGID` | none |
 
 IT-25 (Д26) was not implemented as briefed: on 2026-10-28 the user reduced it to one sentence in
 the `search` description, without `word-forms.txt` or `mail-reindex` advice and without a test of

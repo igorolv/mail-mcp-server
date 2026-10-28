@@ -50,6 +50,8 @@ public final class ImapClient implements AutoCloseable {
     private final Supplier<String> credential;
     private boolean connected;
     private boolean closed;
+    private boolean gmailChecked;
+    private boolean gmail;
     private IMAPFolder currentFolder;
 
     public ImapClient(ImapSettings settings) { this(settings, true); }
@@ -144,21 +146,36 @@ public final class ImapClient implements AutoCloseable {
         return currentFolder;
     }
 
-    /** All UIDs with their FLAGS in one FETCH: cheap read/star observations of the folder (Д29). */
+    /** Gmail extensions of this server; checked once per session and never used to change state. */
+    synchronized boolean gmailExtensions() {
+        if (!gmailChecked) {
+            try {
+                connect();
+                gmail = store.hasCapability("X-GM-EXT-1");
+                gmailChecked = true;
+            } catch (MessagingException e) { throw fail("capability", e); }
+        }
+        return gmail;
+    }
+
+    /** All UIDs with their FLAGS and, on Gmail, the X-GM-MSGID and X-GM-LABELS in one FETCH. */
     public synchronized FolderUids folderUids(String folderName) {
         try {
             // A fresh EXAMINE gives fresh message objects, so cached flags cannot hide a FETCH item.
             if (currentFolder != null) { currentFolder.close(false); currentFolder = null; }
+            boolean gmailServer = gmailExtensions();
             var folder = open(folderName);
             long uidValidity = folder.getUIDValidity();
             if (uidValidity <= 0) { throw protocol("folderUids", "non-positive UIDVALIDITY"); }
             var uids = new ArrayList<Long>();
             var flags = new java.util.HashMap<Long, Flags>();
+            var gmailInfo = new java.util.HashMap<Long, GmailMessageInfo>();
             if (folder.getMessageCount() > 0) {
                 var messages = folder.getMessages();
                 var profile = new FetchProfile();
                 profile.add(UIDFolder.FetchProfileItem.UID);
                 profile.add(FetchProfile.Item.FLAGS);
+                if (gmailServer) { profile.add(ReadOnlyImapStore.GMAIL); }
                 store.clearMetadataObservations();
                 folder.fetch(messages, profile);
                 for (var message : messages) {
@@ -167,10 +184,12 @@ public final class ImapClient implements AutoCloseable {
                     uids.add(uid);
                     var observed = store.metadataFlags(uid);
                     if (observed != null) { flags.put(uid, observed); }
+                    var gmailObserved = store.metadataGmail(uid);
+                    if (gmailObserved != null) { gmailInfo.put(uid, gmailObserved); }
                 }
                 uids.sort(Long::compareTo);
             }
-            return new FolderUids(uidValidity, uids, flags);
+            return new FolderUids(uidValidity, uids, flags, gmailInfo);
         } catch (MessagingException e) { throw fail("folderUids", e); }
         catch (ImapException e) { close(); throw e; }
     }
@@ -186,6 +205,7 @@ public final class ImapClient implements AutoCloseable {
         String operation = "metadata (" + ids.size() + " UIDs)";
         try {
             if (currentFolder != null) { currentFolder.close(false); currentFolder = null; }
+            boolean gmailServer = gmailExtensions();
             var folder = open(folderName);
             if (folder.getUIDValidity() != expectedUidValidity) { throw protocol(operation, "UIDVALIDITY changed"); }
             var result = new LinkedHashMap<String, RemoteMessageInfo>();
@@ -199,6 +219,7 @@ public final class ImapClient implements AutoCloseable {
                 profile.add(FetchProfile.Item.ENVELOPE);
                 profile.add(FetchProfile.Item.FLAGS);
                 profile.add(UIDFolder.FetchProfileItem.UID);
+                if (gmailServer) { profile.add(ReadOnlyImapStore.GMAIL); }
                 store.clearMetadataObservations();
                 folder.fetch(messages, profile);
                 int unknown = 0;
@@ -224,9 +245,12 @@ public final class ImapClient implements AutoCloseable {
                         var fingerprint = new MessageFingerprint(message.getMessageID(), message.getSizeLong(),
                                 date == null ? null : date.toInstant(), from, message.getSubject());
                         var flags = store.metadataFlags(uid);
+                        var gmail = store.metadataGmail(uid);
                         if (result.putIfAbsent(ref, new RemoteMessageInfo(ref, fingerprint,
                                 flags == null ? null : flags.contains(Flags.Flag.SEEN),
-                                flags == null ? null : flags.contains(Flags.Flag.FLAGGED))) != null) {
+                                flags == null ? null : flags.contains(Flags.Flag.FLAGGED),
+                                gmail == null ? null : gmail.msgId(),
+                                gmail == null ? null : gmail.labels())) != null) {
                             throw protocol(operation, "duplicate UID in the response");
                         }
                     } catch (MessageRemovedException e) { /* vanished since UID discovery */ }

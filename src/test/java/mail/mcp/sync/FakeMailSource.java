@@ -40,9 +40,22 @@ public final class FakeMailSource implements MailSource {
     private int failAt;
     private final Map<String, MessageFingerprint> fingerprints = new LinkedHashMap<>();
     private final Map<String, RemoteMessageInfo> flags = new LinkedHashMap<>();
+    private final Map<String, String> stableIds = new LinkedHashMap<>();
+    private final Map<String, List<String>> remoteLabels = new LinkedHashMap<>();
     public final Set<String> missingMetadata = new HashSet<>();
     public void flags(String folder, String ref, Boolean read, Boolean flagged) {
         flags.put(folder + "/" + ref, new RemoteMessageInfo(ref, null, read, flagged));
+    }
+    /** Synthetic provider stableId and labels, as the Gmail IMAP source observes them. */
+    public void stableIdAndLabels(String folder, String ref, String stableId, String... labels) {
+        stableIds.put(folder + "/" + ref, stableId);
+        remoteLabels.put(folder + "/" + ref, List.of(labels));
+    }
+
+    /** The next observations carry no stableId or labels for this message, like an unparsable response. */
+    public void forgetStableIdAndLabels(String folder, String ref) {
+        stableIds.remove(folder + "/" + ref);
+        remoteLabels.remove(folder + "/" + ref);
     }
     public int metadataCalls;
     public int failMetadataAt;
@@ -92,12 +105,17 @@ public final class FakeMailSource implements MailSource {
         boolean reset = cursor != null && !cursor.equals(nextCursor);
         var added = present.stream().filter(ref -> reset || !known.contains(ref)).sorted(REF_ORDER).toList();
         var removed = known.stream().filter(ref -> reset || !present.contains(ref)).sorted(REF_ORDER).toList();
-        // Like IMAP: read/star of every known present ref with an observation, without fingerprints.
+        // Like IMAP: read/star, stableId and labels of every known present ref, without fingerprints.
         var observed = new LinkedHashMap<String, RemoteMessageInfo>();
         for (String ref : present) {
-            var flag = flags.get(folder.remoteId() + "/" + ref);
-            if (!reset && known.contains(ref) && flag != null && !missingMetadata.contains(folder.remoteId() + "/" + ref)) {
-                observed.put(ref, flag);
+            String key = folder.remoteId() + "/" + ref;
+            var flag = flags.get(key);
+            var labels = remoteLabels.get(key);
+            if (!reset && known.contains(ref) && !missingMetadata.contains(key)
+                    && (flag != null || stableIds.containsKey(key) || labels != null)) {
+                observed.put(ref, new RemoteMessageInfo(ref, null,
+                        flag == null ? null : flag.read(), flag == null ? null : flag.flagged(),
+                        stableIds.get(key), labels));
             }
         }
         return new FolderChanges(added, removed, nextCursor, reset, false, observed);
@@ -107,10 +125,12 @@ public final class FakeMailSource implements MailSource {
         if (++metadataCalls == failMetadataAt) { throw new ImapException(ImapException.Kind.PROTOCOL); }
         var result = new LinkedHashMap<String, RemoteMessageInfo>();
         for (String ref : refs) {
-            if (messages.get(folder.remoteId()).containsKey(ref) && !missingMetadata.contains(folder.remoteId() + "/" + ref)) {
-                var observed = flags.get(folder.remoteId() + "/" + ref);
-                result.put(ref, new RemoteMessageInfo(ref, fingerprints.get(folder.remoteId() + "/" + ref),
-                        observed == null ? null : observed.read(), observed == null ? null : observed.flagged()));
+            String key = folder.remoteId() + "/" + ref;
+            if (messages.get(folder.remoteId()).containsKey(ref) && !missingMetadata.contains(key)) {
+                var observed = flags.get(key);
+                result.put(ref, new RemoteMessageInfo(ref, fingerprints.get(key),
+                        observed == null ? null : observed.read(), observed == null ? null : observed.flagged(),
+                        stableIds.get(key), remoteLabels.get(key)));
             }
         }
         return Map.copyOf(result);

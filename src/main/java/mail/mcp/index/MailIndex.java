@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
 
 /** Derived catalog for one connection, owned by the process holding Lucene's write lock. */
 public final class MailIndex implements AutoCloseable {
-    public static final String SCHEMA = "4";
+    public static final String SCHEMA = "5";
     private final FSDirectory directory;
     private final IndexWriter writer;
     private final WordForms forms;
@@ -112,6 +112,14 @@ public final class MailIndex implements AutoCloseable {
         // documents written before it are found by the parsed header only.
         if (meta.fingerprint() != null && meta.fingerprint().messageId() != null) {
             document.add(new StringField("fingerprintId", meta.fingerprint().messageId(), Field.Store.NO));
+        }
+        // Provider identity and mailbox labels (Д7): reuse by stableId, labels shown in cards and searchable.
+        if (meta.stableId() != null) {
+            document.add(new StringField("stableId", meta.stableId(), Field.Store.YES));
+        }
+        if (meta.labels() != null) {
+            document.add(new StoredField("labels", String.join("\n", meta.labels())));
+            meta.labels().forEach(label -> unstoredText(document, "label", label));
         }
         if (message != null) {
             if (message.date() != null) {
@@ -208,23 +216,43 @@ public final class MailIndex implements AutoCloseable {
     }
 
     /**
-     * Read/star values stored in the documents of one folder, by remote ref: {@code [key, read, flagged]},
-     * where read/flagged are "true", "false" or null. Lets a sync compare fresh flags without reading
-     * every meta.json (docs/decisions.md, Д30).
+     * Remote observations stored in the documents of one folder, by remote ref. Lets a sync compare
+     * fresh observations without reading every meta.json (docs/decisions.md, Д30).
      */
-    public Map<String, String[]> folderFlags(String folderKey) {
+    public Map<String, IndexedObservation> folderObservations(String folderKey) {
         String prefix = folderKey + "/";
         try (var reader = DirectoryReader.open(writer)) {
             var searcher = new IndexSearcher(reader);
-            Map<String, String[]> flags = new HashMap<>();
+            Map<String, IndexedObservation> observations = new HashMap<>();
             var query = new PrefixQuery(new Term("ref", prefix));
             for (var hit : searcher.search(query, Math.max(1, reader.numDocs())).scoreDocs) {
                 Document document = searcher.storedFields().document(hit.doc);
-                flags.put(document.get("ref").substring(prefix.length()),
-                        new String[] {document.get("key"), document.get("read"), document.get("flagged")});
+                observations.put(document.get("ref").substring(prefix.length()), new IndexedObservation(
+                        document.get("key"), flag(document.get("read")), flag(document.get("flagged")),
+                        splitLabels(document.get("labels")), document.get("stableId")));
             }
-            return flags;
+            return observations;
         } catch (IOException e) { throw new UncheckedIOException(e); }
+    }
+
+    /** Keys of documents with this provider stableId; a term lookup like {@link #keysByMessageId}. */
+    public Set<String> keysByStableId(String stableId) {
+        try (var reader = DirectoryReader.open(writer)) {
+            var searcher = new IndexSearcher(reader);
+            Set<String> keys = new HashSet<>();
+            var query = new org.apache.lucene.search.TermQuery(new Term("stableId", stableId));
+            for (var hit : searcher.search(query, Math.max(1, reader.numDocs())).scoreDocs) {
+                keys.add(searcher.storedFields().document(hit.doc).get("key"));
+            }
+            return keys;
+        } catch (IOException e) { throw new UncheckedIOException(e); }
+    }
+
+    private static Boolean flag(String stored) { return stored == null ? null : Boolean.valueOf(stored); }
+
+    /** The stored labels value: null when unknown, empty when the message has no labels. */
+    static List<String> splitLabels(String stored) {
+        return stored == null ? null : stored.isEmpty() ? List.of() : List.of(stored.split("\n"));
     }
 
     /** Keys of documents whose parsed or source-reported Message-ID equals the value exactly. */
@@ -255,7 +283,7 @@ public final class MailIndex implements AutoCloseable {
      *
      * @param checkMetadata true after an interrupted or failed run, or offline: also removes directories
      *                      without meta.json and compares every meta.json with its document (folder, ref,
-     *                      read/star). False after a completed run: only directory and document keys are
+     *                      read/star, labels, stableId). False after a completed run: only directory and document keys are
      *                      compared, without opening any meta.json (docs/decisions.md, Д30)
      */
     public List<String> reconcile(MessageStore store, boolean checkMetadata) {
@@ -286,7 +314,9 @@ public final class MailIndex implements AutoCloseable {
                     if (!(meta.folderKey() + "/" + meta.ref()).equals(document.get("ref"))
                             || !meta.folder().equals(document.get("folder"))
                             || !java.util.Objects.equals(meta.read() == null ? null : meta.read().toString(), document.get("read"))
-                            || !java.util.Objects.equals(meta.flagged() == null ? null : meta.flagged().toString(), document.get("flagged"))) { changedKeys.add(key); }
+                            || !java.util.Objects.equals(meta.flagged() == null ? null : meta.flagged().toString(), document.get("flagged"))
+                            || !java.util.Objects.equals(labels(meta), document.get("labels"))
+                            || !java.util.Objects.equals(meta.stableId(), document.get("stableId"))) { changedKeys.add(key); }
                 }
             }
         } catch (IOException e) { throw new UncheckedIOException(e); }
@@ -294,6 +324,11 @@ public final class MailIndex implements AutoCloseable {
             if (!diskKeys.contains(key)) { delete(key); }
         }
         return diskKeys.stream().filter(key -> !indexedKeys.contains(key) || changedKeys.contains(key)).sorted().toList();
+    }
+
+    /** The stored labels field of a message, or null when its labels are unknown. */
+    private static String labels(MessageMeta meta) {
+        return meta.labels() == null ? null : String.join("\n", meta.labels());
     }
 
     @Override public void close() {

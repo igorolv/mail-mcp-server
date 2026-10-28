@@ -8,13 +8,14 @@ import java.util.stream.Stream;
 public enum SearchField {
     ANY("any", "subject", "subject_en", "body", "body_en", "fromAddress", "fromName",
             "toAddress", "toName", "ccAddress", "ccName", "attachmentName", "attachmentFile",
-            "attachmentText", "attachmentText_en"),
+            "attachmentText", "attachmentText_en", "label"),
     SUBJECT("subject", "subject", "subject_en"),
     BODY("body", "body", "body_en"),
     FROM("from", "fromAddress", "fromName"),
     TO("to", "toAddress", "toName", "ccAddress", "ccName"),
     ATTACHMENT_NAME("attachmentName", "attachmentName", "attachmentFile"),
-    ATTACHMENT_TEXT("attachmentText", "attachmentText", "attachmentText_en");
+    ATTACHMENT_TEXT("attachmentText", "attachmentText", "attachmentText_en"),
+    LABEL("label", "label");
 
     private final String id;
     private final List<String> fields;

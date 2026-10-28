@@ -180,6 +180,44 @@ class ImapClientTest {
         }
     }
 
+    @Test void gmailUidListingAndMetadataFetchMessageIdAndLabels() throws Exception {
+        var folder = new FakeImapServer.MailFolder("INBOX",
+                new FakeImapServer.Item(42, MIME, MIME.length, "\\Seen").gmail("1234567890123456789", "\\Inbox \\Sent"));
+        try (var server = new FakeImapServer("gmail", folder); var client = new ImapClient(settings(server.port()), false)) {
+            assertThat(client.gmailExtensions()).isTrue();
+            var uids = client.folderUids("INBOX");
+            var observed = uids.gmail().get(42L);
+            assertThat(observed.msgId()).isEqualTo("1234567890123456789");
+            assertThat(observed.labels()).containsExactly("Inbox", "Sent");
+            var result = client.metadata("INBOX", uids.uidValidity(), uids.uids());
+            assertThat(result.get("42").stableId()).isEqualTo("1234567890123456789");
+            assertThat(result.get("42").labels()).containsExactly("Inbox", "Sent");
+            assertThat(server.commands)
+                    .anyMatch(c -> c.matches("FETCH [0-9:,]+ \\(FLAGS UID X-GM-MSGID X-GM-LABELS\\)"))
+                    .anyMatch(c -> c.matches("FETCH [0-9:,]+ \\(ENVELOPE INTERNALDATE RFC822\\.SIZE FLAGS UID X-GM-MSGID X-GM-LABELS\\)"));
+            assertThat(server.commands).noneMatch(s -> s.matches("(?i).*(SELECT |STORE |EXPUNGE|APPEND ).*"));
+        }
+    }
+
+    @Test void gmailLabelsAreDecodedWithoutAllAndLeadingBackslash() throws Exception {
+        String russian = org.eclipse.angus.mail.imap.protocol.BASE64MailboxEncoder.encode("Важное");
+        var folder = new FakeImapServer.MailFolder("INBOX",
+                new FakeImapServer.Item(42, MIME).gmail("42", "\\All \"my label\" " + russian));
+        try (var server = new FakeImapServer("gmail", folder); var client = new ImapClient(settings(server.port()), false)) {
+            assertThat(client.folderUids("INBOX").gmail().get(42L).labels()).containsExactly("my label", "Важное");
+        }
+    }
+
+    @Test void gmailExtensionIsAbsentForOtherServers() throws Exception {
+        try (var server = new FakeImapServer(); var client = new ImapClient(settings(server.port()), false)) {
+            assertThat(client.gmailExtensions()).isFalse();
+            var uids = client.folderUids("INBOX");
+            client.metadata("INBOX", uids.uidValidity(), uids.uids());
+            assertThat(uids.gmail()).isEmpty();
+            assertThat(server.commands).noneMatch(s -> s.contains("X-GM"));
+        }
+    }
+
     private static ImapSettings oauthSettings(int port) {
         return new ImapSettings("127.0.0.1", port, true, AuthKind.OAUTH2, "user", null);
     }

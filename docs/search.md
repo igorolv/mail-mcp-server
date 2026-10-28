@@ -45,6 +45,7 @@ date-only results when `query` is omitted.
 | `to` | addresses and names in To and Cc |
 | `attachmentName` | attachment file names, whole or by parts (`отчёт` finds `Отчёт_за_май.xlsx`) |
 | `attachmentText` | the text of attachments, including files inside ZIP archives, attached messages and Outlook `.msg` files |
+| `label` | mailbox [labels](#labels), by their words, without regard to case (`inbox`, `My Project`) |
 
 - Use `field: "from"` or `field: "to"` with a complete address (`user@example.com`) to filter by
   sender or recipient. Address fields match complete addresses without regard to case; a query
@@ -124,6 +125,16 @@ Cards and messages carry optional `read` and `flagged` (the user's flag or star;
 importance and not Gmail's Important label). They show the state seen at the last synchronization,
 not the live state of the mailbox. A missing value means unknown. The server never changes these
 flags in the mailbox.
+
+## Labels
+
+Cards and messages carry optional `labels`: the mailbox labels seen at the last synchronization.
+Currently only Gmail provides them. Gmail is synchronized as one folder, its All Mail folder, so a
+message is stored once rather than once per label; its labels (`Inbox`, `Sent`, `Starred`, your
+own labels) replace the folders for finding it. `field: "label"` searches labels by their words;
+Russian word forms are not applied there, so use the label's own words. Gmail's `All` label is not
+listed because it names the folder itself. An empty list means the message has no labels; a
+missing `labels` means unknown or a mailbox without labels. The server never changes labels.
 
 ## Coverage
 

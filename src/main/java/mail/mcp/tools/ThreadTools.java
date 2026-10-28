@@ -70,6 +70,7 @@ public class ThreadTools {
                 var messages = page.cards().stream().map(c -> new ThreadMessageInfo(c.key(), c.folderKey(),
                         c.date(), redactor.text(c.from()), redactor.text(c.subject()), c.hasAttachments(), c.state(),
                         store.messageDir(c.key()).toAbsolutePath().toString(), c.read(), c.flagged(),
+                        c.labels() == null ? null : redactor.texts(c.labels()),
                         page.copies().getOrDefault(c.key(), List.of()).stream()
                                 .map(copy -> new MessageCopyInfo(copy.key(), copy.folderKey())).toList())).toList();
                 Integer next = (long) position + messages.size() < page.total() ? position + messages.size() : null;

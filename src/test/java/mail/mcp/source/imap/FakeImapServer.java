@@ -26,9 +26,20 @@ final class FakeImapServer implements AutoCloseable {
     static final String ENVELOPE = "(\"Sun, 25 Oct 2026 12:00:00 +0000\" \"=?UTF-8?B?0KLQtdC80LA=?=\" "
             + "((NIL NIL \"Sender\" \"example.com\")) NIL NIL NIL NIL NIL NIL \"<Move@example.com>\")";
 
-    record Item(long uid, byte[] bytes, long declaredSize, String flags, String envelope) {
+    record Item(long uid, byte[] bytes, long declaredSize, String flags, String envelope,
+                String msgId, String labels) {
         Item(long uid, byte[] bytes) { this(uid, bytes, bytes.length, ""); }
         Item(long uid, byte[] bytes, long declaredSize, String flags) { this(uid, bytes, declaredSize, flags, ENVELOPE); }
+        Item(long uid, byte[] bytes, long declaredSize, String flags, String envelope) {
+            this(uid, bytes, declaredSize, flags, envelope, null, null);
+        }
+        /** Synthetic Gmail items: msgId as the wire atom, labels already encoded for the wire. */
+        Item gmail(String msgId, String labels) {
+            return new Item(uid, bytes, declaredSize, flags, envelope, msgId, labels);
+        }
+        String gmailItems() {
+            return msgId == null ? "" : " X-GM-MSGID " + msgId + " X-GM-LABELS (" + (labels == null ? "" : labels) + ")";
+        }
     }
 
     record MailFolder(String name, long uidValidity, List<String> attributes, List<Item> messages) {
@@ -58,6 +69,9 @@ final class FakeImapServer implements AutoCloseable {
 
     FakeImapServer(MailFolder... folders) throws IOException { this(false, "login", List.of(folders)); }
 
+    /** Mode selects capabilities without changing the folder set, e.g. {@code "gmail"} or {@code "oauth"}. */
+    FakeImapServer(String mode, MailFolder... folders) throws IOException { this(false, mode, List.of(folders)); }
+
     private FakeImapServer(boolean reject, String mode, List<MailFolder> folders) throws IOException {
         listener = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
         listener.setSoTimeout(5000);
@@ -71,7 +85,9 @@ final class FakeImapServer implements AutoCloseable {
             var in = new BufferedReader(new InputStreamReader(accepted.getInputStream(), StandardCharsets.US_ASCII));
             OutputStream out = accepted.getOutputStream();
             boolean oauth = mode.startsWith("oauth"), initial = mode.equals("oauth-ir");
-            String capabilities = "IMAP4rev1" + (oauth ? " AUTH=XOAUTH2 AUTH=PLAIN AUTH=LOGIN"
+            boolean gmail = mode.contains("gmail");
+            String capabilities = "IMAP4rev1" + (gmail ? " X-GM-EXT-1" : "")
+                    + (oauth ? " AUTH=XOAUTH2 AUTH=PLAIN AUTH=LOGIN"
                     : mode.equals("plain") ? " AUTH=PLAIN AUTH=LOGIN" : "") + (initial ? " SASL-IR" : "");
             send(out, "* OK [CAPABILITY " + capabilities + "] synthetic endpoint\r\n");
             MailFolder current = null;
@@ -134,20 +150,23 @@ final class FakeImapServer implements AutoCloseable {
                             send(out, "* " + (i + 1) + " FETCH (UID " + current.messages().get(i).uid() + ")\r\n");
                         }
                     }
-                } else if (command.matches("FETCH [0-9:,]+ \\(FLAGS UID\\)")) {
+                } else if (command.matches("FETCH [0-9:,]+ \\(FLAGS UID( X-GM-MSGID X-GM-LABELS)?\\)")) {
                     assertThat(current).isNotNull();
                     String set = command.split(" ")[1];
+                    boolean withGmail = command.contains("X-GM-LABELS");
                     for (int i = 0; i < current.messages().size(); i++) {
                         if (inSet(i + 1, set)) {
                             var item = current.messages().get(i);
                             send(out, "* " + (i + 1) + " FETCH (FLAGS ("
-                                    + (listingFlags == null ? item.flags() : listingFlags) + ") UID " + item.uid() + ")\r\n");
+                                    + (listingFlags == null ? item.flags() : listingFlags) + ") UID " + item.uid()
+                                    + (withGmail ? item.gmailItems() : "") + ")\r\n");
                         }
                     }
-                } else if (command.matches("FETCH [0-9:,]+ \\(ENVELOPE INTERNALDATE RFC822\\.SIZE FLAGS UID\\)")) {
+                } else if (command.matches("FETCH [0-9:,]+ \\(ENVELOPE INTERNALDATE RFC822\\.SIZE FLAGS UID( X-GM-MSGID X-GM-LABELS)?\\)")) {
                     assertThat(current).isNotNull();
                     if (rejectMetadata) { send(out, tag + " NO private-server-text\r\n"); continue; }
                     String set = command.split(" ")[1];
+                    boolean withGmail = command.contains("X-GM-LABELS");
                     for (int i = 0; i < current.messages().size(); i++) {
                         if (inSet(i + 1, set)) {
                             var item = current.messages().get(i);
@@ -156,7 +175,7 @@ final class FakeImapServer implements AutoCloseable {
                                     + (omitMetadataFlags ? "" : malformedMetadataFlags
                                     || Long.valueOf(item.uid()).equals(malformedMetadataUid) ? " FLAGS NIL"
                                     : " FLAGS (" + (metadataFlags == null ? item.flags() : metadataFlags) + ")")
-                                    + " UID " + item.uid() + ")\r\n");
+                                    + " UID " + item.uid() + (withGmail ? item.gmailItems() : "") + ")\r\n");
                         }
                     }
                 } else if (command.matches("FETCH [0-9]+ \\(RFC822\\.SIZE\\)")) {

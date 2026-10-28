@@ -1,7 +1,11 @@
 package mail.mcp.source.imap;
 
+import jakarta.mail.FetchProfile;
 import jakarta.mail.Session;
 import jakarta.mail.Flags;
+import org.eclipse.angus.mail.iap.ParsingException;
+import org.eclipse.angus.mail.imap.protocol.BASE64MailboxDecoder;
+import org.eclipse.angus.mail.imap.protocol.FetchItem;
 import org.eclipse.angus.mail.imap.protocol.FetchResponse;
 import org.eclipse.angus.mail.imap.protocol.MessageSet;
 import org.eclipse.angus.mail.imap.protocol.UID;
@@ -18,6 +22,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.Locale;
+import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,20 +34,70 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Checks commands immediately before Angus writes them, including its internal reconnects. */
 final class ReadOnlyImapStore extends IMAPStore {
+    /**
+     * Gmail extensions asked for together with the existing UID listing and metadata fetches
+     * (X-GM-EXT-1). They are read-only FETCH items; no command or state changes with them.
+     */
+    static final FetchProfile.Item GMAIL = new FetchProfile.Item("gmail") { };
+    private static final FetchItem[] GMAIL_ITEMS = {
+            new FetchItem("X-GM-MSGID", GMAIL) {
+                @Override public Object parseItem(FetchResponse response) { return response.readAtom(); }
+            },
+            new FetchItem("X-GM-LABELS", GMAIL) {
+                @Override public Object parseItem(FetchResponse response) throws ParsingException {
+                    return readLabels(response);
+                }
+            }
+    };
+    /**
+     * A parenthesized list of astrings whose atoms may start with a backslash (system labels such as
+     * {@code \Inbox}), which Angus's atom readers treat as a delimiter. Quoted strings and literals
+     * keep their escaping; a NIL entry contributes no label. Null means an unparsable list.
+     */
+    private static List<String> readLabels(FetchResponse response) {
+        response.skipSpaces();
+        if (response.peekByte() != '(') { return null; }
+        response.readByte();
+        var labels = new ArrayList<String>();
+        while (true) {
+            response.skipSpaces();
+            byte next = response.peekByte();
+            if (next == ')') {
+                response.readByte();
+                return List.copyOf(labels);
+            }
+            if (next == '"' || next == '{') {
+                String value = response.readString();
+                if (value == null) { return null; }
+                labels.add(BASE64MailboxDecoder.decode(value));
+                continue;
+            }
+            var atom = new StringBuilder();
+            while (response.peekByte() > ' ' && response.peekByte() != ')') {
+                atom.append((char) response.readByte());
+            }
+            if (atom.isEmpty()) { return null; }
+            if (!atom.toString().equalsIgnoreCase("NIL")) { labels.add(BASE64MailboxDecoder.decode(atom.toString())); }
+        }
+    }
     private final AtomicBoolean authenticationStarted = new AtomicBoolean();
     private final boolean implicitTls;
     private final boolean oauth;
     private final Map<Long, Flags> metadataFlags = new HashMap<>();
     private final Set<Long> metadataParsed = new HashSet<>();
+    private final Map<Long, GmailMessageInfo> metadataGmail = new HashMap<>();
     private int metadataUnparsable;
 
     /** Forgets the previous batch before the next metadata fetch. */
     void clearMetadataObservations() {
         metadataFlags.clear();
         metadataParsed.clear();
+        metadataGmail.clear();
         metadataUnparsable = 0;
     }
     Flags metadataFlags(long uid) { return metadataFlags.get(uid); }
+    /** Gmail items of this batch, or null when the response had neither. */
+    GmailMessageInfo metadataGmail(long uid) { return metadataGmail.get(uid); }
     /** True when this batch returned a parsed FETCH response with ENVELOPE for the UID. */
     boolean metadataParsed(long uid) { return metadataParsed.contains(uid); }
     /** Responses of this batch that Angus could not parse and skipped. */
@@ -62,6 +117,9 @@ final class ReadOnlyImapStore extends IMAPStore {
             private boolean oauthAuthenticated;
             private int malformedResponses;
 
+            // Advertise the Gmail items so Angus parses them instead of rejecting the response.
+            @Override public FetchItem[] getFetchItems() { return GMAIL_ITEMS; }
+
             // Angus skips a response it cannot parse; count it so the batch knows what is missing.
             @Override public Response readResponse() throws IOException, ProtocolException {
                 try { return super.readResponse(); }
@@ -78,6 +136,21 @@ final class ReadOnlyImapStore extends IMAPStore {
             @Override public Response[] fetch(MessageSet[] messages, String items) throws ProtocolException {
                 malformedResponses = 0;
                 Response[] responses = super.fetch(messages, items);
+                if (items.contains("X-GM-MSGID")) {
+                    for (var response : responses) {
+                        if (response instanceof FetchResponse fetch) {
+                            var uid = fetch.getItem(UID.class);
+                            var extension = fetch.getExtensionItems();
+                            if (uid == null || extension == null) { continue; }
+                            var msgId = extension.get("X-GM-MSGID") instanceof String value ? value : null;
+                            var labels = extension.get("X-GM-LABELS") instanceof List<?> values
+                                    ? values.stream().map(String.class::cast).toList() : null;
+                            if (msgId != null || labels != null) {
+                                metadataGmail.put(uid.uid, new GmailMessageInfo(msgId, labels));
+                            }
+                        }
+                    }
+                }
                 if (items.contains("FLAGS") && !items.contains("ENVELOPE")) {
                     // The UID listing also reads FLAGS (Д29); a skipped response leaves that UID unobserved.
                     for (var response : responses) {
@@ -183,8 +256,10 @@ final class ReadOnlyImapStore extends IMAPStore {
                 "UNSELECT", "CLOSE").contains(upper) || upper.equals("ENABLE") || upper.equals("AUTHENTICATE")) {
             return;
         }
-        // Restrict FETCH attributes as well as its verb: BODY/RFC822 can set \\Seen.
-        String item = "(?:UID|FLAGS|INTERNALDATE|ENVELOPE|RFC822\\.SIZE|BODY\\.PEEK\\[\\](?:<\\d+\\.\\d+>)?)";
+        // Restrict FETCH attributes as well as its verb: BODY/RFC822 can set \\Seen. X-GM-MSGID and
+        // X-GM-LABELS are read-only Gmail items requested only when X-GM-EXT-1 is advertised.
+        String item = "(?:UID|FLAGS|INTERNALDATE|ENVELOPE|RFC822\\.SIZE|X-GM-MSGID|X-GM-LABELS"
+                + "|BODY\\.PEEK\\[\\](?:<\\d+\\.\\d+>)?)";
         if (upper.matches("(?:UID )?FETCH [0-9:,]+ \\(" + item + "(?: " + item + ")*\\)")) {
             return;
         }
