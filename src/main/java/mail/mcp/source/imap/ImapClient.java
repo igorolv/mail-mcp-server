@@ -96,7 +96,7 @@ public final class ImapClient implements AutoCloseable {
         p.setProperty("mail.imaps.writetimeout", "15000");
         p.setProperty("mail.imaps.peek", "true");
         p.setProperty("mail.imaps.partialfetch", "true");
-        p.setProperty("mail.imaps.fetchsize", "16384");
+        p.setProperty("mail.imaps.fetchsize", "262144");
         p.setProperty("mail.imaps.connectionpoolsize", "1");
         p.setProperty("mail.imaps.separatestoreconnection", "false");
         p.setProperty("mail.imaps.auth.mechanisms", "PLAIN LOGIN");

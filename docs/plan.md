@@ -15,7 +15,8 @@ Discussion history is in git history.
 
 **Status (2026-10-28): the draft is complete; the first published version, `0.1.0`, is in
 preparation (Д18).** Both user mailboxes work: corporate Exchange (EWS) and Mail.ru (IMAP).
-Implemented:
+Gmail app-password sign-in and downloads are also verified; full synchronization verification
+is pending (Д7). Implemented:
 
 - full and incremental synchronization;
 - messages and attachments on disk, with bodies and attachment text in Markdown;
@@ -71,6 +72,7 @@ before publishing `0.1.0` (decision of 2026-10-28); the remaining checks happen 
 | read/flagged snapshots (`docs/storage-agent.md`, `docs/tools-agent.md`) | The user changes read status and flag/star in their client, runs `sync` or `mail-sync` for EWS and IMAP, and compares `getMessage`, `listMessages`, text search, date search and `getThread`; repeat after clearing flags. Check that known messages are not downloaded again and content is preserved. Real flag requests: to verify | 2026-10-27; 655 tests, 1 expected skip, 0 failures |
 | Message copy grouping (`docs/search.md`) | Restart the MCP server and find a saved message present in several folders, such as a message sent to yourself: `search` and `getThread` show one card, with other keys and folders in `copies`; totals and paging count the group once. No index rebuild or sync is needed for current schema 4 | 2026-10-27; 665 tests, 1 expected skip, 0 failures |
 | User word forms (`docs/search.md`) | Optionally create `word-forms.txt`, check rules with `mail-analyze`, run `mail-reindex` for each connection and search for irregular forms on saved data. After editing, check that text search refuses until a rebuild; lists, conversations and date-only search should work. No rebuild is needed if the file is absent | 2026-10-27; 681 tests, 1 expected skip, 0 failures; control set with rules: 7/7 irregular forms, 86/86 overall, 7 false positives |
+| 256 KiB IMAP MIME blocks on Mail.ru (`docs/imap-source-agent.md`) | On the next user-requested Mail.ru sync that downloads new messages, confirm successful downloads and conversion. Gmail already passed the user-run check ([results.md, section 2](results.md#2-mailru-and-gmail)); no reprocessing is needed | 2026-10-28; 709 tests, 1 expected skip, 0 failures |
 | Passwords from Windows Credential Manager and password managers (`docs/connections.md`) | `windowsCredential`: replace `passwordCommand` with `"windowsCredential": "mail-mcp/<name>"`, run `mail-sync` for `work` and `mailru`, then restart the MCP server and run `sync` and `syncStatus`. `passwordCommand` in `mail-sync` for EWS is already verified ([results.md, section 1](results.md#1-corporate-exchange)); server use, specific password managers and `cmdkey /pass` without a value: to verify | 2026-10-27; 702 tests, 1 expected skip, 0 failures |
 
 ## 3. Design
@@ -153,9 +155,12 @@ Remove accepted items from the table: completed behavior is described in enginee
 documents, pending real-mail checks in section 2, history in git. Numbers are never reused;
 completed: Д1–Д6, Д8, Д9, Д10, Д11, Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30.
 
+Д7: Gmail app-password sign-in, downloads and 256 KiB IMAP blocks are accepted on 2026-10-28
+([results.md, section 2](results.md#2-mailru-and-gmail)). The row below describes the remaining work.
+
 | ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|
-| Д7 | Gmail | Connect the personal mailbox and check it on real mail: app password through `windowsCredential` or `passwordCommand`; OAuth2 if app passwords are unavailable (then verify sign-in; token encryption is in [backlog.md](backlog.md), Д27); All Mail once with labels, deduplication by `X-GM-MSGID` | П3; included in 0.1.0 by the decision of 2026-10-28 | M | ⬜ |
+| Д7 | Gmail | Finish and check the personal mailbox's initial synchronization; All Mail once with labels, deduplication by `X-GM-MSGID`. Verify OAuth2 sign-in only if needed instead of the checked app-password path; token encryption is in [backlog.md](backlog.md), Д27 | П3; included in 0.1.0 by the decision of 2026-10-28 | M | 🔨 |
 | Д18 | Publish `0.1.0` | Done: documents separated, user documentation extracted, README rewritten following jdbc-mcp-server. Remaining: `LICENSE` and `THIRD_PARTY_NOTICES.md` (then link `LICENSE` from README), build version, CI and jar releases through GitHub Actions on tags (then add release jar download and CI, Release, License badges to README) | polish | M | 🔨 |
 
 Before publication, in addition to these items, only the first check in section 2 is required

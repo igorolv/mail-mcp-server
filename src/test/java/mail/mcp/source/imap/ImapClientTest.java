@@ -200,16 +200,38 @@ class ImapClientTest {
         try (var files = Files.list(temp)) { assertThat(files.toList()).containsExactly(target); }
     }
 
+    @Test void multiBlockDownloadPreservesOriginalAndUsesFewReadOnlyFetches() throws Exception {
+        byte[] large = new byte[1024 * 1024 + 17];
+        new java.util.Random(42).nextBytes(large);
+        var folder = new FakeImapServer.MailFolder("INBOX", new FakeImapServer.Item(42, large));
+        try (var server = new FakeImapServer(folder); var client = new ImapClient(settings(server.port()), false)) {
+            Path target = temp.resolve("multi-block.eml");
+            var result = client.download("INBOX", 42, target, ImapClient.DEFAULT_MAX_MIME_BYTES);
+            assertThat(Files.readAllBytes(target)).isEqualTo(large);
+            assertThat(result.size()).isEqualTo(large.length);
+            assertThat(result.sha256()).isEqualTo(HexFormat.of().formatHex(
+                    MessageDigest.getInstance("SHA-256").digest(large)));
+            assertThat(server.commands.stream().filter(s -> s.contains("BODY.PEEK[]"))).containsExactly(
+                    "FETCH 1 (BODY.PEEK[]<0.262144>)",
+                    "FETCH 1 (BODY.PEEK[]<262144.262144>)",
+                    "FETCH 1 (BODY.PEEK[]<524288.262144>)",
+                    "FETCH 1 (BODY.PEEK[]<786432.262144>)",
+                    "FETCH 1 (BODY.PEEK[]<1048576.262144>)");
+            assertThat(server.commands.stream().filter(s -> s.startsWith("FETCH ") || s.startsWith("UID FETCH ")))
+                    .hasSizeLessThanOrEqualTo(7);
+        }
+    }
+
     @Test void streamOverLimitIsTooLargeRemovesPartialAndKeepsSession() throws Exception {
-        byte[] large = "x".repeat(40000).getBytes(StandardCharsets.US_ASCII);
+        byte[] large = "x".repeat(600000).getBytes(StandardCharsets.US_ASCII);
         var folder = new FakeImapServer.MailFolder("INBOX",
                 new FakeImapServer.Item(42, large, 1, ""), new FakeImapServer.Item(43, MIME));
         try (var server = new FakeImapServer(folder); var client = new ImapClient(settings(server.port()), false)) {
-            assertThatThrownBy(() -> client.download("INBOX", 42, temp.resolve("large.eml"), 17000))
+            assertThatThrownBy(() -> client.download("INBOX", 42, temp.resolve("large.eml"), 270000))
                     .isInstanceOfSatisfying(MessageUnavailableException.class,
                             e -> assertThat(e.reason()).isEqualTo(MessageUnavailableException.Reason.TOO_LARGE));
             try (var files = Files.list(temp)) { assertThat(files.toList()).isEmpty(); }
-            assertThat(server.commands).anyMatch(s -> s.contains("BODY.PEEK[]<16384.16384>"));
+            assertThat(server.commands).anyMatch(s -> s.contains("BODY.PEEK[]<262144.262144>"));
             client.download("INBOX", 43, temp.resolve("next.eml"), 1024);
             assertThat(Files.readAllBytes(temp.resolve("next.eml"))).isEqualTo(MIME);
             assertThat(server.commands.stream().filter(s -> s.startsWith("LOGIN "))).hasSize(1);

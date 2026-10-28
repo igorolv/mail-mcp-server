@@ -24,7 +24,9 @@ lifecycle are in `docs/gmail-oauth-agent.md`. Angus objects stay private.
   `mail.imaps.ssl.checkserveridentity=true`. No trust-all setting, plain connection or StartTLS
   fallback is available in production. The package-local plain transport is only for fake-server tests.
 - Properties consistently use the `mail.imaps.*` prefix: connect/write timeouts 15 s, read timeout
-  120 s, partial fetch blocks 16 KiB, PEEK true, one pooled connection, no separate store socket.
+  120 s, partial fetch blocks 256 KiB, PEEK true, one pooled connection, no separate store socket.
+  The larger fixed block reduces sequential round trips on high-latency connections; partial
+  streaming and the existing declared-size and actual-byte checks remain in place.
 - Angus chooses the first supported mechanism from PLAIN/LOGIN; otherwise it uses the IMAP LOGIN
   command if allowed by the server. All run inside TLS; a failed exchange does not fall back to
   another mechanism. SASL plugins are disabled. OAuth connections select XOAUTH2 only; LOGIN and
@@ -129,8 +131,9 @@ Verified by user-run Mail.ru checks on 2026-10-25: LIST returned 41 folders and 
 MIME download succeeded with EXAMINE and BODY.PEEK. A later check through `MailSource` listed
 39 sync folders, enumerated about 13 thousand inbox UIDs and downloaded the highest UID in
 one session. The downloaded message was already read; unread behavior was not tested.
-See `docs/results.md` section 2. Gmail has no successful user-run result yet; connecting and
-checking it is part of `0.1.0` (`docs/plan.md` section 4, Д7).
+See `docs/results.md` section 2. Gmail app-password sign-in, downloads and the 256 KiB block
+passed the user-run check on 2026-10-28. Full Gmail synchronization verification and real
+OAuth2 sign-in remain pending (`docs/plan.md` section 4, Д7).
 
 ## Read/star observations
 
