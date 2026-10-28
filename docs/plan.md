@@ -14,9 +14,8 @@ version `0.1.0`. Related documents:
 Discussion history is in git history.
 
 **Status (2026-10-28): the draft is complete; the first published version, `0.1.0`, is in
-preparation (Д18).** Both user mailboxes work: corporate Exchange (EWS) and Mail.ru (IMAP).
-Gmail app-password synchronization has also completed; Gmail label handling and deduplication
-remain in Д7. Implemented:
+preparation (Д18).** All three user mailboxes work: corporate Exchange (EWS), Mail.ru and Gmail
+(IMAP). Implemented:
 
 - full and incremental synchronization;
 - messages and attachments on disk, with bodies and attachment text in Markdown;
@@ -27,6 +26,7 @@ remain in Д7. Implemented:
 - message copies counted once in search and conversations, with other copies listed in `copies`;
 - detection of unambiguous moves between folders without downloading MIME again;
 - snapshots of read status and user flags/stars, without writing to the mailbox;
+- Gmail synchronized once through All Mail, with its labels on messages and a `label` search field;
 - expansion of attached messages and archives (EML, ZIP, MSG, TNEF), and DOC/XLS/PPT text;
 - an optional secret filter in responses;
 - nine MCP tools.
@@ -65,14 +65,16 @@ before publishing `0.1.0` (decision of 2026-10-28); the remaining checks happen 
 | **Before publication.** EML/ZIP/MSG/TNEF expansion and DOC/XLS/PPT text (`docs/mime-agent.md`) | Run `mail-reprocess` for each connection, then search text in files from archives and older Office formats | 2026-10-27; 582 tests, 1 expected skip, 0 failures |
 | Search by full address without display names (`docs/search.md`) | Restart the MCP server and search `from`/`to` by a full address | 2026-10-26 |
 | Background sync summary and a separate EWS rescan indicator (`docs/tools-agent.md`) | On the next user-requested `sync`, check for one summary line in the log; observe `rescanned` only during natural EWS recovery, without deliberately resetting the cursor | 2026-10-27; 592 tests, 1 expected skip, 0 failures |
-| Date filters and date-only search (`docs/search.md`) | After rebuilding the index to schema 4, restart the MCP server; check a known period with `search` without words and `listMessages` with `since`/`until` on saved data; no separate sync is needed to check dates | 2026-10-27; 603 tests, 1 expected skip, 0 failures |
-| Local conversations (`docs/search.md`) | After rebuilding the index to schema 4, restart the MCP server; call `getThread` with the key of a known conversation and check its membership, order and pages on saved data; no separate sync is needed to check conversations | 2026-10-27; 612 tests, 1 expected skip, 0 failures |
+| Date filters and date-only search (`docs/search.md`) | After rebuilding the index to schema 5, restart the MCP server; check a known period with `search` without words and `listMessages` with `since`/`until` on saved data; no separate sync is needed to check dates | 2026-10-27; 603 tests, 1 expected skip, 0 failures |
+| Local conversations (`docs/search.md`) | After rebuilding the index to schema 5, restart the MCP server; call `getThread` with the key of a known conversation and check its membership, order and pages on saved data; no separate sync is needed to check conversations | 2026-10-27; 612 tests, 1 expected skip, 0 failures |
 | Moves without downloading again (`docs/storage-agent.md`) | The user runs sync to populate fingerprints, manually moves a test message between included folders in a mail client and syncs again; check that UUID, path and content are preserved and MIME is not downloaded again. Availability of EWS/IMAP metadata requests on real servers: to verify | 2026-10-27; 635 tests, 1 expected skip, 0 failures |
 | 5 MiB XLSX text conversion threshold (`docs/mime-agent.md`) | An optional user-run `mail-reprocess` applies the threshold to saved messages: for XLSX files over 5 MiB, old text disappears from `.md` files and search, while originals remain. Until reprocessing, old text is available; reads and `mail-reindex` retain it for `converted` messages | 2026-10-27; 640 tests, 1 expected skip, 0 failures |
 | read/flagged snapshots (`docs/storage-agent.md`, `docs/tools-agent.md`) | The user changes read status and flag/star in their client, runs `sync` or `mail-sync` for EWS and IMAP, and compares `getMessage`, `listMessages`, text search, date search and `getThread`; repeat after clearing flags. Check that known messages are not downloaded again and content is preserved. Real flag requests: to verify | 2026-10-27; 655 tests, 1 expected skip, 0 failures |
-| Message copy grouping (`docs/search.md`) | Restart the MCP server and find a saved message present in several folders, such as a message sent to yourself: `search` and `getThread` show one card, with other keys and folders in `copies`; totals and paging count the group once. No index rebuild or sync is needed for current schema 4 | 2026-10-27; 665 tests, 1 expected skip, 0 failures |
+| Message copy grouping (`docs/search.md`) | Restart the MCP server and find a saved message present in several folders, such as a message sent to yourself: `search` and `getThread` show one card, with other keys and folders in `copies`; totals and paging count the group once. No index rebuild or sync is needed for current schema 5 | 2026-10-27; 665 tests, 1 expected skip, 0 failures |
 | User word forms (`docs/search.md`) | Optionally create `word-forms.txt`, check rules with `mail-analyze`, run `mail-reindex` for each connection and search for irregular forms on saved data. After editing, check that text search refuses until a rebuild; lists, conversations and date-only search should work. No rebuild is needed if the file is absent | 2026-10-27; 681 tests, 1 expected skip, 0 failures; control set with rules: 7/7 irregular forms, 86/86 overall, 7 false positives |
 | 256 KiB IMAP MIME blocks on Mail.ru (`docs/imap-source-agent.md`) | On the next user-requested Mail.ru sync that downloads new messages, confirm successful downloads and conversion. Gmail already passed the user-run check ([results.md, section 2](results.md#2-mailru-and-gmail)); no reprocessing is needed | 2026-10-28; 709 tests, 1 expected skip, 0 failures |
+| Gmail reuse by `stableId` across a UIDVALIDITY reset (`docs/storage-agent.md`) | Cannot be triggered deliberately; if a Gmail `mail-sync` reports a reset of All Mail, check that it downloaded no messages and that message keys and paths are unchanged. All Mail sync, labels and label search already passed ([results.md, section 2](results.md#2-mailru-and-gmail)) | 2026-10-28; offline tests |
+| Gmail OAuth2 sign-in (`docs/gmail-oauth-agent.md`) | Only if needed instead of the verified app password: run `gmail-oauth gmail`, then `mail-sync gmail`. Token encryption is in [backlog.md](backlog.md), Д27 | 2026-10-25 |
 | Passwords from Windows Credential Manager and password managers (`docs/connections.md`) | `windowsCredential`: replace `passwordCommand` with `"windowsCredential": "mail-mcp/<name>"`, run `mail-sync` for `work` and `mailru`, then restart the MCP server and run `sync` and `syncStatus`. `passwordCommand` in `mail-sync` for EWS is already verified ([results.md, section 1](results.md#1-corporate-exchange)); server use, specific password managers and `cmdkey /pass` without a value: to verify | 2026-10-27; 702 tests, 1 expected skip, 0 failures |
 
 ## 3. Design
@@ -153,14 +155,10 @@ Status: ⬜ not started · 🔨 in progress. Size: S — hours, M — a brief fo
 briefs. When work starts, mark the item 🔨 and write a brief in `docs/impl-tasks/`.
 Remove accepted items from the table: completed behavior is described in engineering and user
 documents, pending real-mail checks in section 2, history in git. Numbers are never reused;
-completed: Д1–Д6, Д8, Д9, Д10, Д11, Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30.
-
-Д7: Gmail app-password synchronization and 256 KiB IMAP blocks are verified on 2026-10-28
-([results.md, section 2](results.md#2-mailru-and-gmail)). The row below describes the remaining work.
+completed: Д1–Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30.
 
 | ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|
-| Д7 | Gmail | All Mail once with labels, deduplication by `X-GM-MSGID`. Verify OAuth2 sign-in only if needed instead of the checked app-password path; token encryption is in [backlog.md](backlog.md), Д27 | П3; included in 0.1.0 by the decision of 2026-10-28 | M | 🔨 |
 | Д18 | Publish `0.1.0` | Done: documents separated, user documentation extracted, README rewritten following jdbc-mcp-server. Remaining: `LICENSE` and `THIRD_PARTY_NOTICES.md` (then link `LICENSE` from README), build version, CI and jar releases through GitHub Actions on tags (then add release jar download and CI, Release, License badges to README) | polish | M | 🔨 |
 
 Before publication, in addition to these items, only the first check in section 2 is required

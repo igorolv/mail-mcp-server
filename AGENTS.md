@@ -6,13 +6,13 @@ metadata, body and attachments with Markdown text), indexes it with Lucene and a
 local data only. User-facing overview: `README.md`.
 
 **Current status (2026-10-28): the draft version is complete and checked on the user's real
-mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/results.md`). The first published version
-`0.1.0` (Apache 2.0) is in preparation: `docs/plan.md` section 4 lists its scope, Д18
-(publication) and Д7 (Gmail).
+mailboxes** (`work` over EWS, `mailru` and `gmail` over IMAP; `docs/results.md`). The first
+published version `0.1.0` (Apache 2.0) is in preparation: `docs/plan.md` section 4 lists its
+remaining scope, Д18 (publication).
 - Nine MCP tools, background sync, offline reprocessing and reindexing work.
-- Gmail app-password synchronization is verified, including 256 KiB IMAP blocks
-  (`docs/results.md`, including per-message failures). Gmail label handling and deduplication
-  remain part of `0.1.0` (Д7); real OAuth2 sign-in is unverified. The user runs every real-mail check.
+- Gmail with an app password is verified (`docs/results.md`): 256 KiB IMAP blocks, and All Mail
+  synchronized once with labels (Д7). Real OAuth2 sign-in and reuse across a UIDVALIDITY reset are
+  unverified. The user runs every real-mail check.
 - Features accepted offline but not yet checked by the user on real mail are listed in
   `docs/plan.md` section 2, each with how to check it. Only the first, a user-run
   `mail-reprocess` of both mailboxes, blocks `0.1.0`; the rest are checked as the user works.
@@ -217,7 +217,7 @@ code is listed in `docs/architecture-agent.md`.
 - **Local conversations:** `getThread` follows case-sensitive Message-ID, In-Reply-To and
   References across folders of one connection in one committed index snapshot. Cards sort
   oldest first, undated last, then key; copies group before paging. No bodies, MIME,
-  source or pandoc are read; conversations use the schema-4 catalog without persisted threads.
+  source or pandoc are read; conversations use the schema-5 catalog without persisted threads.
 - **Message copies:** search and threads group equal valid stripped single Message-ID,
   known stored date and nonblank stored sender/subject strings, within one connection.
   Search groups only matching documents after filters; the first in score/date order then key
@@ -238,8 +238,13 @@ code is listed in `docs/architecture-agent.md`.
   messages get them from their metadata. Sender importance and Gmail Important are unrelated. Changed flags
   update only metadata and the derived document, preserving content, state/error, download time
   and counters. Flags are excluded from move identity; destination observations apply on reuse,
-  while UIDVALIDITY resets use fresh values. Schema 4 rebuilds old indexes offline from disk;
+  while UIDVALIDITY resets use fresh values. Schema 5 rebuilds old indexes offline from disk;
   old metadata stays unknown until requested sync. Reconciliation repairs flag mismatches too.
+- **Gmail, labels and stable ids:** a server with `X-GM-EXT-1` and one `\All` folder syncs only
+  All Mail; `X-GM-MSGID` and `X-GM-LABELS` come with the existing fetches. Outside `source/imap/`
+  they are provider-neutral: nullable `stableId` (never returned by tools) and `labels`
+  (normalized, in cards, `getMessage` and the `label` search group, part of `any`). Label changes
+  update metadata like flags. Outlook categories, IMAP keywords and `EMAILID` are backlog Д31–Д33.
 - **Synchronization:**
   - runs only on request: the `sync` tool in the background, or `mail-sync`;
   - always syncs everything, then incrementally;
@@ -248,7 +253,9 @@ code is listed in `docs/architecture-agent.md`.
     over all messages. A unique complete Message-ID/metadata match can reuse an explicitly
     removed converted message in another included folder of the same connection, preserving UUID,
     directory and all content. Equality is heuristic; SHA-256 describes the saved original only.
-    Ambiguity, missing evidence and UIDVALIDITY resets use normal deletion/download;
+    Ambiguity, missing evidence and UIDVALIDITY resets use normal deletion/download. A saved
+    `stableId` replaces that heuristic in the same pass and uniqueness rule, also within a folder
+    and across a reset;
   - discovers all folders before removal, commits reused moves before unmatched deletions,
     and saves all cursors only after all changes commit. After a run that did not complete,
     reconciliation repairs index folder/ref/flag mismatches from metadata without reconversion;
