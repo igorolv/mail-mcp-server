@@ -10,9 +10,9 @@ mailboxes** (`work` over EWS, `mailru` over IMAP; `docs/results.md`). The first 
 `0.1.0` (Apache 2.0) is in preparation: `docs/plan.md` section 4 lists its scope, Д18
 (publication) and Д7 (Gmail).
 - Nine MCP tools, background sync, offline reprocessing and reindexing work.
-- Gmail app-password sign-in and downloads are verified, including 256 KiB IMAP blocks.
-  Full synchronization verification and Gmail label handling remain part of `0.1.0` (Д7);
-  real OAuth2 sign-in is unverified. The user runs every real-mail check.
+- Gmail app-password synchronization is verified, including 256 KiB IMAP blocks
+  (`docs/results.md`, including per-message failures). Gmail label handling and deduplication
+  remain part of `0.1.0` (Д7); real OAuth2 sign-in is unverified. The user runs every real-mail check.
 - Features accepted offline but not yet checked by the user on real mail are listed in
   `docs/plan.md` section 2, each with how to check it. Only the first, a user-run
   `mail-reprocess` of both mailboxes, blocks `0.1.0`; the rest are checked as the user works.

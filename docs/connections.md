@@ -296,8 +296,8 @@ the mailbox's security settings and use it instead of the account password.
 
 ## Gmail
 
-Gmail app-password sign-in and downloads are verified; **full synchronization and OAuth2
-verification are pending**. Both authentication methods use
+Gmail app-password synchronization is verified; **real OAuth2 sign-in is unverified**.
+Both authentication methods use
 `imap.gmail.com:993` with TLS. For personal Gmail, IMAP is always enabled; there is no Enable IMAP
 switch to turn on ([Google: Add Gmail to another email client](https://support.google.com/mail/answer/7126229?hl=en)).
 

@@ -131,9 +131,10 @@ Verified by user-run Mail.ru checks on 2026-10-25: LIST returned 41 folders and 
 MIME download succeeded with EXAMINE and BODY.PEEK. A later check through `MailSource` listed
 39 sync folders, enumerated about 13 thousand inbox UIDs and downloaded the highest UID in
 one session. The downloaded message was already read; unread behavior was not tested.
-See `docs/results.md` section 2. Gmail app-password sign-in, downloads and the 256 KiB block
-passed the user-run check on 2026-10-28. Full Gmail synchronization verification and real
-OAuth2 sign-in remain pending (`docs/plan.md` section 4, Д7).
+See `docs/results.md` section 2. Gmail app-password synchronization with 256 KiB blocks
+completed in the user-run check on 2026-10-28; per-message failure counts are recorded there.
+Real OAuth2 sign-in is unverified; Gmail labels and deduplication remain pending
+(`docs/plan.md` section 4, Д7).
 
 ## Read/star observations
 

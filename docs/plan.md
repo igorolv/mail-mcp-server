@@ -15,8 +15,8 @@ Discussion history is in git history.
 
 **Status (2026-10-28): the draft is complete; the first published version, `0.1.0`, is in
 preparation (Д18).** Both user mailboxes work: corporate Exchange (EWS) and Mail.ru (IMAP).
-Gmail app-password sign-in and downloads are also verified; full synchronization verification
-is pending (Д7). Implemented:
+Gmail app-password synchronization has also completed; Gmail label handling and deduplication
+remain in Д7. Implemented:
 
 - full and incremental synchronization;
 - messages and attachments on disk, with bodies and attachment text in Markdown;
@@ -155,12 +155,12 @@ Remove accepted items from the table: completed behavior is described in enginee
 documents, pending real-mail checks in section 2, history in git. Numbers are never reused;
 completed: Д1–Д6, Д8, Д9, Д10, Д11, Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30.
 
-Д7: Gmail app-password sign-in, downloads and 256 KiB IMAP blocks are accepted on 2026-10-28
+Д7: Gmail app-password synchronization and 256 KiB IMAP blocks are verified on 2026-10-28
 ([results.md, section 2](results.md#2-mailru-and-gmail)). The row below describes the remaining work.
 
 | ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|
-| Д7 | Gmail | Finish and check the personal mailbox's initial synchronization; All Mail once with labels, deduplication by `X-GM-MSGID`. Verify OAuth2 sign-in only if needed instead of the checked app-password path; token encryption is in [backlog.md](backlog.md), Д27 | П3; included in 0.1.0 by the decision of 2026-10-28 | M | 🔨 |
+| Д7 | Gmail | All Mail once with labels, deduplication by `X-GM-MSGID`. Verify OAuth2 sign-in only if needed instead of the checked app-password path; token encryption is in [backlog.md](backlog.md), Д27 | П3; included in 0.1.0 by the decision of 2026-10-28 | M | 🔨 |
 | Д18 | Publish `0.1.0` | Done: documents separated, user documentation extracted, README rewritten following jdbc-mcp-server. Remaining: `LICENSE` and `THIRD_PARTY_NOTICES.md` (then link `LICENSE` from README), build version, CI and jar releases through GitHub Actions on tags (then add release jar download and CI, Release, License badges to README) | polish | M | 🔨 |
 
 Before publication, in addition to these items, only the first check in section 2 is required

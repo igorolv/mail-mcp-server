@@ -10,9 +10,8 @@ attached messages) to Markdown and builds a local Lucene index with Russian and 
 forms. Tools answer from the local copy only; the mailbox is never modified.
 
 **Status:** version `0.1.0` is in preparation. Checked end to end on Exchange 2013 with NTLM
-(about 8 thousand messages) and Mail.ru (about 34 thousand). Gmail app-password sign-in and
-downloads are verified; full synchronization and OAuth2 verification are pending. Developed
-and tested on Windows.
+(about 8 thousand messages) and Mail.ru (about 34 thousand). Gmail app-password synchronization
+has also completed; real OAuth2 sign-in is unverified. Developed and tested on Windows.
 
 **Contents:** [Features](#features) ·
 [Typical Scenarios](#typical-scenarios) ·
