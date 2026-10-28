@@ -43,6 +43,11 @@ Common rules:
 java -jar mail-mcp-server.jar mail-sync work
 ```
 
+Replace `work` with `mailru` or `gmail` for those connections. For Gmail with an app password,
+configure the [Google app password and its local storage](connections.md#app-passwords), then run
+`mail-sync gmail` directly. Only the [OAuth2 alternative](connections.md#oauth2) needs
+`gmail-oauth gmail` before the first sync.
+
 Synchronizes one mailbox: downloads new messages, converts them, removes messages deleted on the
 server, recognizes moves between folders and refreshes read/flag snapshots. It is the same work
 as the MCP `sync` tool, but in the foreground with progress output. The server signs in **once**
@@ -149,8 +154,9 @@ java -jar mail-mcp-server.jar gmail-oauth gmail
 ```
 
 Only for a Gmail connection with `auth: oauth2`; see [Gmail](connections.md#gmail) for the Google
-Cloud setup. The command opens the system browser, waits up to five minutes for your consent on a
-local callback address, and saves the refresh token. It reads no mail. Run `mail-sync` afterwards.
+Cloud setup. Skip this command when using `auth: app-password`. The command opens the system
+browser, waits up to five minutes for your consent on a local callback address, and saves the
+refresh token. It reads no mail. Run `mail-sync` afterwards.
 Run it again whenever Google revokes or expires the token.
 
 ## Exit codes

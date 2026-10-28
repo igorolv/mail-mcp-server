@@ -47,7 +47,9 @@ Stale passwords lock domain accounts, so the server is careful with sign-ins:
 - Passwords are never logged, never printed by commands and never returned by a tool.
   `listConnections` returns names, types, sign-in methods and descriptions, not hosts or logins.
 - Passwords from Credential Manager or a password command stay in the server's memory until it
-  exits, so frequent syncs do not unlock the store each time.
+  exits or a sign-in is rejected, so frequent syncs do not unlock the store each time. Restart the
+  server after replacing a stored password. [Credential Manager setup and password changes](connections.md#windows-credential-manager)
+  explain which Windows user and credential category to use.
 - Keep `connections.json`, the Gmail OAuth client file and the data directory readable only by you.
   The Gmail refresh token file is created that way.
 - None of this protects against another program running as your user: it can read the same

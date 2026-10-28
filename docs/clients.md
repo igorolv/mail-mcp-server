@@ -115,7 +115,14 @@ Cursor (`.cursor/mcp.json` or `~/.cursor/mcp.json`), Claude Desktop
 
 ## Environment variables
 
-The server needs none. These change its defaults:
+The server has no mandatory environment variables. A password placeholder such as
+`${MAIL_WORK_PASSWORD}` in `connections.json` requires that variable in the server's environment
+before startup. A variable set in a terminal is inherited only by clients started from that
+terminal; an already running client or one opened from the desktop will not receive it.
+See [password environment variables](connections.md#environment-variables), or choose Credential
+Manager or a password command to avoid supplying a password through the client environment.
+
+These settings change the server's defaults:
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -150,6 +157,9 @@ them there too if you change the data directory or the connections file.
 - **Pandoc** must be on the `PATH` the client passes to the server, or `sync` refuses to start.
   After installing pandoc, restart the client so that it sees the new `PATH`.
 - **Restart after editing `connections.json`**: the server reads it once at startup.
+- **Windows Credential Manager:** add the generic credentials under the same Windows user that
+  runs the client. After changing a stored password, restart the server to clear its cached value.
+  [Setup and password changes](connections.md#windows-credential-manager).
 - **Several clients at once** may run their own server processes over the same data directory.
   All of them read; only one synchronizes a connection at a time, and the others answer `sync`
   with `lockedByOtherProcess`.

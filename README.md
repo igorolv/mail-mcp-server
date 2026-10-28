@@ -10,9 +10,8 @@ attached messages) to Markdown and builds a local Lucene index with Russian and 
 forms. Tools answer from the local copy only; the mailbox is never modified.
 
 **Status:** version `0.1.0` is in preparation. Checked end to end on Exchange 2013 with NTLM
-(about 8 thousand messages) and Mail.ru (about 34 thousand). Gmail, with an app password or
-OAuth2, is implemented but has not been tried against a real account. Developed and tested on
-Windows.
+(about 8 thousand messages) and Mail.ru (about 34 thousand). Gmail supports app passwords and
+OAuth2; real-mail verification is pending. Developed and tested on Windows.
 
 **Contents:** [Features](#features) ·
 [Typical Scenarios](#typical-scenarios) ·
@@ -77,7 +76,17 @@ The agent picks the tools itself; these are the chains it usually follows.
 
 **3. Describe your mailboxes** in `%USERPROFILE%\.mail-mcp-server\connections.json`
 (`~/.mail-mcp-server/connections.json` elsewhere) — one entry per mailbox, keyed by the
-connection name:
+connection name. This example shows three password sources:
+
+| Connection | Password source | JSON key |
+|---|---|---|
+| Exchange (`work`) | Environment variable | `password` with `${MAIL_WORK_PASSWORD}` |
+| Mail.ru (`mailru`) | Password manager CLI (1Password in this example) | `passwordCommand` |
+| Gmail (`gmail`) | Windows Credential Manager | `windowsCredential` |
+
+These choices are independent of the mail provider: any password-based connection can use any
+of these sources. Keep only the mailboxes you need, replace the example usernames and choose
+**one password source per entry**.
 
 ```json
 {
@@ -87,7 +96,7 @@ connection name:
       "url": "https://webmail.example.com/EWS/Exchange.asmx",
       "auth": "ntlm",
       "username": "user",
-      "windowsCredential": "mail-mcp/work",
+      "password": "${MAIL_WORK_PASSWORD}",
       "description": "Work mail, Exchange 2013"
     },
     "mailru": {
@@ -97,28 +106,68 @@ connection name:
       "tls": true,
       "auth": "app-password",
       "username": "user@mail.ru",
-      "password": "${MAILRU_APP_PASSWORD}",
+      "passwordCommand": ["op", "read", "op://Private/Mailru/password"],
       "description": "Personal Mail.ru"
+    },
+    "gmail": {
+      "type": "imap",
+      "host": "imap.gmail.com",
+      "port": 993,
+      "tls": true,
+      "auth": "app-password",
+      "username": "user@gmail.com",
+      "windowsCredential": "mail-mcp/gmail",
+      "description": "Personal Gmail"
     }
   }
 }
 ```
 
-- `windowsCredential` names a generic credential you add in Windows Credential Manager; `password`
-  may be a literal or `${VAR}`; `passwordCommand` runs a password manager's CLI.
-- For Exchange, NTLM with a bare login (no domain) is the combination known to work. Mail.ru
-  needs an app password; Gmail an app password or OAuth2.
-- Keep the file readable only by you. Every field, provider setup and Gmail OAuth2:
-  [docs/connections.md](docs/connections.md).
+Keep the file readable only by you. Every field and provider setup:
+[docs/connections.md](docs/connections.md).
 
-**4. Run the first synchronization** in a terminal. It downloads the whole mailbox, which takes
+**4. Prepare the passwords** for the sources you chose:
+
+- **Exchange — environment variable.** In PowerShell, enter the mailbox password at a hidden
+  prompt; the following stores it in the current process environment:
+
+  ```powershell
+  $workPassword = Read-Host 'Exchange password' -AsSecureString
+  $env:MAIL_WORK_PASSWORD = [System.Net.NetworkCredential]::new('', $workPassword).Password
+  ```
+
+  Run `mail-sync` and start your MCP client from this terminal so they inherit the variable.
+  A client opened elsewhere needs the variable in its own environment, or a different password
+  source. An unset `${VAR}` prevents server startup. For Exchange, NTLM with a bare login
+  (no domain) is the combination known to work. [Environment variables](docs/connections.md#environment-variables).
+- **Mail.ru — password command.** Create a Mail.ru app password and save it in your password
+  manager. The example uses [1Password CLI](https://developer.1password.com/docs/cli/reference/commands/read/):
+  install `op` on the client's `PATH`, sign in/unlock the manager, and replace
+  `op://Private/Mailru/password` with your vault/item/field reference. The server runs the array
+  without a shell and reads its single output line as the password. For another manager, replace
+  the array with its command, or use either of the other sources.
+  [Password manager recipes and prompts](docs/connections.md#password-commands).
+- **Gmail — Windows Credential Manager (64-bit Windows).** In Gmail, click your profile picture
+  → **Manage your Google Account**
+  → **Security & sign-in** → **2-Step Verification** → **App passwords**. Create one for
+  `mail-mcp-server`; this requires 2-Step Verification. In Windows, search Start for
+  **Credential Manager** → **Windows Credentials** → **Add a generic credential**. Set the address
+  to `mail-mcp/gmail`, the user name to `gmail` and the password to the generated app password.
+  The actual Gmail address stays in `connections.json`.
+  [Credential Manager setup and password changes](docs/connections.md#windows-credential-manager).
+  [Detailed Gmail setup, direct link and OAuth2 alternative](docs/connections.md#gmail).
+
+**5. Run the first synchronization** in a terminal. It downloads the whole mailbox, which takes
 a while on a large one; a second run should end with `0 downloaded`:
 
 ```powershell
 java -jar build\libs\mail-mcp-server.jar mail-sync work
 ```
 
-**5. Register the server** with your MCP client, with an absolute path to the jar. Claude Code:
+Use `mailru` or `gmail` instead of `work` to synchronize those connections. With a Gmail app
+password, run `mail-sync gmail` directly; `gmail-oauth` is only for the OAuth2 alternative.
+
+**6. Register the server** with your MCP client, with an absolute path to the jar. Claude Code:
 
 ```powershell
 claude mcp add --scope user mail -- java -jar C:/path/to/mail-mcp-server.jar
@@ -127,7 +176,7 @@ claude mcp add --scope user mail -- java -jar C:/path/to/mail-mcp-server.jar
 Codex CLI, OpenCode, VS Code, Cursor, Claude Desktop and environment variables:
 [docs/clients.md](docs/clients.md).
 
-**6. Try it.** Ask the agent in plain words:
+**7. Try it.** Ask the agent in plain words:
 
 - *"Which mailboxes can you read?"* — it calls `listConnections`.
 - *"Find the letters about the supply contract in `work` from last week."* — it calls `search`
@@ -283,7 +332,7 @@ skipped when it is not installed.
 | [docs/search.md](docs/search.md) | Search syntax, dates, copies, conversations, word forms |
 | [docs/security.md](docs/security.md) | Read-only protection, sign-in policy, credentials, local data, secret filter |
 | [AGENTS.md](AGENTS.md) | Rules for AI agents changing this repository, and the map of engineering documents (`docs/*-agent.md`) |
-| [docs/plan.md](docs/plan.md), [docs/decisions.md](docs/decisions.md), [docs/results.md](docs/results.md) | Plan, decisions and real-mailbox results (Russian) |
+| [docs/plan.md](docs/plan.md), [docs/decisions.md](docs/decisions.md), [docs/results.md](docs/results.md) | Plan, decisions and real-mailbox results |
 
 ## Troubleshooting
 
@@ -299,9 +348,14 @@ skipped when it is not installed.
   password first. For Exchange, a bare login with `auth: ntlm` is the combination known to work.
 - **`Password of connection '...' is unavailable: ...; no sign-in was attempted`.** Nothing was
   sent to the mail server. For `windowsCredential`, check that a *generic* credential with exactly
-  that target name exists. For `passwordCommand`, run the program in a terminal and check that it
+  that target name exists under the Windows user running the server; see
+  [Credential Manager setup](docs/connections.md#windows-credential-manager).
+  For `passwordCommand`, run the program in a terminal and check that it
   prints only the password; unlock the password manager, or run `mail-sync` in a terminal where it
   can ask.
+- **Gmail does not show App passwords.** Open **2-Step Verification** first, then **App passwords**,
+  or use the direct link in [Gmail setup](docs/connections.md#app-passwords). That section also
+  explains account restrictions and the OAuth2 alternative.
 - **`pandoc not found; install pandoc and put it on PATH`.** Install pandoc and restart the
   terminal or the MCP client, so that it sees the new `PATH`.
 - **`Connection is being synchronized by another process`, exit code 5.** A sync of the same
