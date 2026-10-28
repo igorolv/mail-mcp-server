@@ -213,12 +213,21 @@ fields and existing saved Markdown without reprocessing.
 A query consisting of one full address excludes `fromName`, `toName` and `ccName`; all other
 fields in the chosen group still apply, including body text for `any`.
 
-Every word is required, quoted text is a phrase, and stop-word-only queries return nothing.
+Query words are combined with MUST after analysis; quoted text is a phrase. Text analyzers
+remove common stop words, so stop-word-only queries may return nothing. Address and filename
+analysis differ as described in `docs/storage-agent.md`.
 `SimpleQueryParser` enables phrase and whitespace operators; fuzzy/wildcard syntax is disabled.
 Russian and English word forms match; full addresses must be complete. Filenames match whole
 or by component. Search has no source or pandoc access; `listFolders.synced` shows coverage.
-The tool description warns the caller that irregular forms and synonyms do not match and tells
+The tool description warns the caller that irregular forms and synonyms may be missed and tells
 it to retry with other forms, synonyms or the other language before concluding mail is absent.
+The tool description separates search modes, retry guidance and reading results into paragraphs.
+Parameter descriptions own query syntax, field selection, folder keys, pagination and dates.
+They explicitly rule out query prefixes such as `from:`, illustrate an exact address lookup,
+distinguish it from `any` content matches, and identify dates as MIME-header dates. The result
+guidance maps the connection, hit key and `snippetAttachmentFile` to `getMessage`/`getAttachment`,
+notes that snippets can show partial matches or body context, and explains that matching copies
+are grouped before counting and paging.
 An old schema raises `IllegalStateException` with:
 `The index was built by an older version; run 'mail-reindex <connection>' in a terminal or start a sync to rebuild it`.
 Use offline `mail-reindex` or a requested sync to rebuild from disk.

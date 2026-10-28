@@ -22,14 +22,19 @@ Search runs on the local Lucene index of one connection; it never contacts the m
 - **Quotes make a phrase:** `"акт сверки"`.
 - **Word forms match** in Russian and English: `договоры` finds `договора`, `contracts` finds
   `contract`. Russian uses the Snowball stemmer, English its own field.
-- **Stop words** (`и`, `the`, …) are ignored; a query of stop words only finds nothing.
+- Text analyzers ignore common **stop words** (`и`, `the`, …), so a query containing only stop
+  words may find nothing. Exact address fields and filename analysis have different rules.
 - **No wildcards and no fuzzy matching.** `догов*` is not a prefix search.
+- **No OR or NOT operators.** Search alternatives separately.
+- **No field prefixes in the query.** Pass `field: "from"` and `query: "user@example.com"`,
+  rather than a query such as `from:user@example.com`.
 - **Case** does not matter, and `ё` matches `е`.
 - A query has at most 1,000 characters.
 
 ## Fields
 
-The `field` argument narrows the search; the default is `any`.
+The `field` argument selects one search field group; the default is `any`. It has no effect on
+date-only results when `query` is omitted.
 
 | Field | Searches |
 |---|---|
@@ -41,9 +46,12 @@ The `field` argument narrows the search; the default is `any`.
 | `attachmentName` | attachment file names, whole or by parts (`отчёт` finds `Отчёт_за_май.xlsx`) |
 | `attachmentText` | the text of attachments, including files inside ZIP archives, attached messages and Outlook `.msg` files |
 
-- A query that is one complete address (`user@example.com`) matches the address fields only, not
-  display names. Addresses match only when complete.
-- `folder` restricts the search to one local folder (keys from `listFolders`).
+- Use `field: "from"` or `field: "to"` with a complete address (`user@example.com`) to filter by
+  sender or recipient. Address fields match complete addresses without regard to case; a query
+  of one complete address ignores display names. With `any`, the query can also match body or
+  attachment text, so it does not restrict matches to message participants.
+- `folder` restricts the search to one local folder (a key from `listFolders`, not its display
+  name). Omit it to search all folders in the connection.
 
 Attachment text exists for PDF, DOCX, DOC, XLSX, XLS, PPTX, PPT, ODT, RTF, EPUB, HTML, CSV,
 plain text, attached `.eml` and `.msg` messages and `winmail.dat` (TNEF), up to 20 MiB per file
@@ -56,21 +64,26 @@ plain text, attached `.eml` and `.msg` messages and `winmail.dat` (TNEF), up to 
 - `since` is inclusive, `until` exclusive. Messages of October 26–27 (UTC):
   `since: "2026-10-26"`, `until: "2026-10-28"`.
 - A value is a date `YYYY-MM-DD` (midnight UTC) or an ISO-8601 date and time with `Z` or an offset,
-  e.g. `2026-10-26T09:00:00+03:00`.
+  e.g. `2026-10-26T09:00:00+03:00`, with at most three fractional second digits. When both bounds
+  are given, `since` must be earlier than `until`.
 - The date is the message's `Date` header, not the time it was received or downloaded. Messages
   without a date are left out whenever a bound is given.
 - `search` without `query` but with a date bound lists all messages of the period across all
-  folders (or one `folder`), newest first. It has no scores or snippets.
+  folders (or one `folder`), newest first. Scores are zero and snippets are absent.
 
 ## Results and snippets
 
 `search` returns pages of message cards: key, folder, date, sender, subject, attachment flag,
 score and a snippet with the matches in `**bold**`. Pages default to 20 cards, at most 100;
-`total` is exact and `nextOffset` gives the next page.
+`total` is exact and `nextOffset` gives the next page. Repeat the same search arguments with
+`offset` set to `nextOffset`; a null `nextOffset` means there are no more pages.
 
-The snippet comes from the body when the body matches. Otherwise, for `any` and
-`attachmentText`, it comes from the first matching attachment, and the card names that attachment
-in `snippetAttachmentFile` (pass it to `getAttachment`) and `snippetAttachmentName`.
+For `any`, the snippet comes from the body when the body matches, otherwise from the first
+matching attachment. `attachmentText` tries attachments first, even when the body matches.
+An attachment snippet identifies its source in `snippetAttachmentFile` (pass it to
+`getAttachment`) and `snippetAttachmentName`.
+The snippet may show only part of a multiword match, or fall back to body context without
+highlights when no matching passage is available.
 
 `getMessage` returns headers, the body in chunks and the list of attachments;
 `getAttachment` returns an attachment's text in chunks. Every card and message has a `localPath`
@@ -81,8 +94,8 @@ to the message directory, so an agent with file access can open the original fil
 The same message is often stored in several folders, for example a message you sent to yourself.
 `search` and `getThread` show it once: the card represents the group and lists the other copies as
 `{key, folder}` under `copies`. Copies are recognized by the same `Message-ID`, date, sender and
-subject. `total` and pages count groups. `listMessages` and the folder counts of `listFolders`
-still show every copy.
+subject. Search groups only copies that match its query and filters. `total` and pages count
+groups. `listMessages` and the folder counts of `listFolders` still show every copy.
 
 ## Conversations
 

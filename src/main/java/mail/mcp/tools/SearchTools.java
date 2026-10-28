@@ -58,30 +58,45 @@ public class SearchTools {
         return search(connection, query, field, folder, offset, limit, null, null);
     }
 
-    @McpTool(description = "Search the synced messages of a connection by words, dates or both, in all folders " +
-            "or one. Text results come by relevance, with a snippet marking matches as **word**; without a " +
-            "query, since/until list messages newest first. Query syntax: every word is required; " +
-            "\"double quotes\" make a phrase; there is no OR, NOT or wildcard, so search alternatives " +
-            "separately. Regular Russian and English word forms match; irregular forms in either language " +
-            "(child/children, buy/bought) and synonyms do not, so after few or no results retry with other " +
-            "forms, synonyms or the other language before concluding the mail is absent. " +
-            "An email address matches only when complete, " +
-            "and a query of one address ignores display names. File names match whole or by parts. " +
-            "When the snippet comes from an attachment, snippetAttachmentFile is the file for getAttachment. " +
-            "A message stored in several folders is returned once, with the other copies under copies.",
+    @McpTool(description = "Search locally synced messages in one connection. Choose query and field for text " +
+            "search; optionally restrict by folder and dates. Text results are most relevant first. " +
+            "To list messages by date alone, omit query and supply since or until; results are newest " +
+            "first, without snippets.\n\n" +
+            "Subject, body and attachment text support Russian and English word forms; irregular forms " +
+            "and synonyms may be missed. If results are sparse, try fewer words, other forms, synonyms " +
+            "or the other language in separate calls. An empty result does not prove the mail is absent: " +
+            "only synced, indexed content is searched.\n\n" +
+            "Read a hit with getMessage using the same connection and the hit's key. Snippets mark " +
+            "matches as **word**, but may show only part of a match or body context. If a hit has " +
+            "snippetAttachmentFile, read that attachment with getAttachment using the same connection, " +
+            "the hit's key and file=snippetAttachmentFile. Recognized copies are returned once; copies " +
+            "lists other matching keys and folders. total and paging count these groups.",
             generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public SearchResult search(
             @McpToolParam(description = "Connection name from listConnections") String connection,
-            @McpToolParam(description = "Words to find, at most 1000 characters; may be omitted when since or until is given", required = false) String query,
-            @McpToolParam(description = "Where to look: any (default; all of the following), subject, body, from, " +
-                    "to (also cc), attachmentName, attachmentText", required = false) String field,
-            @McpToolParam(description = "Folder key from listFolders; default all folders", required = false) String folder,
-            @McpToolParam(description = "Start position: nextOffset of the previous page; default 0", required = false) Integer offset,
-            @McpToolParam(description = "Page size; default 20, at most 100", required = false) Integer limit,
-            @McpToolParam(description = "Only messages dated at or after this: YYYY-MM-DD (UTC midnight) or " +
-                    "ISO-8601 datetime with offset, e.g. 2026-10-01T09:00:00+03:00", required = false) String since,
-            @McpToolParam(description = "Only messages dated before this (exclusive); same format as since",
+            @McpToolParam(description = "Search terms, a quoted phrase or a full email address; at most 1000 " +
+                    "characters. Words combine with AND (common stop words may be ignored); double quotes " +
+                    "make a phrase. No OR/NOT, wildcards, fuzzy matching or field-prefix syntax such as from:. " +
+                    "Search alternatives in separate calls. Omit only when since or until is given", required = false) String query,
+            @McpToolParam(description = "Choose one: any (default; all fields below), subject, body, from, " +
+                    "to (includes Cc), attachmentName (whole name or parts), attachmentText (extracted contents). " +
+                    "from/to search addresses and names. For an exact address match, use an unquoted full " +
+                    "address: field=from, query=user@example.com. This ignores case and display names. " +
+                    "any also searches content, so an address there need not be a participant. " +
+                    "Without query, field has no effect", required = false) String field,
+            @McpToolParam(description = "One folder key from listFolders, not its display name. Omit to search " +
+                    "all folders in the connection", required = false) String folder,
+            @McpToolParam(description = "Default 0. For the next page, repeat the same search arguments and use " +
+                    "the previous nextOffset. Stop when there is no nextOffset", required = false) Integer offset,
+            @McpToolParam(description = "Results per page: 1 to 100, default 20; larger values are capped at 100", required = false) Integer limit,
+            @McpToolParam(description = "Include messages at or after this date/time, using the message Date " +
+                    "header, not receipt or download time. Format: YYYY-MM-DD (UTC midnight), or ISO-8601 " +
+                    "with Z or an offset, e.g. 2026-10-01T09:00:00+03:00; at most 3 fractional second digits. " +
+                    "Messages without a date are excluded", required = false) String since,
+            @McpToolParam(description = "Include messages strictly before this date/time; same header and format " +
+                    "as since. To include a whole day, use the following day's midnight. Must be later than " +
+                    "since when both are given. Messages without a date are excluded",
                     required = false) String until) {
         long start = System.nanoTime();
         try {
