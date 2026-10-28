@@ -15,6 +15,12 @@ sync, grouped copies, missing attachment text). Keep converters, size-limit rati
 `mail-reprocess`/`mail-reindex`, secret filtering, tie-break order and wording that repeats the
 output schema in this document instead.
 
+Descriptions map returned local message keys and attachment `file` identifiers to the next
+tool call with the same connection. Listing offsets count cards; body and attachment offsets
+continue only their own text, using the issuing tool's `nextOffset`. Date parameter descriptions
+are consistent between `search` and `listMessages`. User-facing reading and coverage details are
+in `docs/search.md`; background sync outcomes and cross-process locking are in `docs/clients.md`.
+
 ## Tools
 
 | Tool | Arguments | Result and errors |
@@ -28,6 +34,14 @@ output schema in this document instead.
 | `getThread` | Required `connection`, `key`; optional `offset`, `limit` | Local conversation cards across folders, ascending date (undated last), then key; exact total, offset and optional nextOffset. Offset defaults to 0; limit to 50, capped at 200. Invalid UUID or unknown connection is an error before opening the index. Missing index/anchor is an error. |
 | `getAttachment` | Required `connection`, `key`, `file`; optional `offset`, `maxChars` | Original file path and saved Markdown chunk, textPath, textLength and optional nextOffset. `file` must exactly match a stored filename in that message's expanded attachment list, including files inside EML, ZIP, MSG and TNEF containers. Unknown file (including traversal or another message's filename) is an error. Offset defaults to 0; maxChars to 20,000, capped at 100,000. |
 | `search` | Required `connection`; optional `query`, `field`, `folder`, `offset`, `limit`, `since`, `until` | Local cards with BM25 score and body or saved attachment snippet, sorted by score descending then key. Exact total, offset and optional nextOffset. Query is at most 1,000 characters and may be omitted or blank only with a date bound. Offset defaults to 0; limit to 20, capped at 100. Unknown field/folder is an error. No index means zero hits. |
+
+`ConnectionInfo.localDataAvailable` is `Files.isDirectory(connectionDir)`, not evidence of
+indexed messages or a completed sync. `FolderInfo.synced` is the presence of a cursor, not a
+freshness check. `SyncService.start` maps any Lucene writer lock conflict to
+`lockedByOtherProcess`, including a lock held by an offline command. That status starts no new
+run and cannot imply that `syncStatus` describes the lock holder. `SyncRunner` records
+`completed` after the folder pass even when individual messages increment the `failed` counter.
+These distinctions are reflected in tool descriptions and response schemas.
 
 `since` and `until` select the MIME header date, as strict `YYYY-MM-DD` at UTC midnight or
 ISO-8601 datetime with explicit offset and no sub-millisecond precision. Bounds are normalized

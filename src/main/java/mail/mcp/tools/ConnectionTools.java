@@ -44,7 +44,9 @@ public class ConnectionTools {
     @McpTool(
             description = "List the configured mailboxes. Call first when the mailbox to use is not known yet: " +
                     "name is the value for the 'connection' argument of every other tool, description says " +
-                    "what the mailbox is for, configError explains why an entry cannot be used.",
+                    "what the mailbox is for, configError explains why an entry cannot be used. This reads " +
+                    "local configuration without signing in. localDataAvailable indicates a local data " +
+                    "directory, not complete or up-to-date mail; use listFolders and syncStatus to inspect coverage.",
             generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true)
     )

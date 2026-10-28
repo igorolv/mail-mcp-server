@@ -36,17 +36,21 @@ public class ThreadTools {
         this.redactor = redactor;
     }
 
-    @McpTool(description = "List the conversation a message belongs to, across all folders, oldest first, as " +
-            "cards without bodies; read a body with getMessage. Messages are linked by their reply headers " +
-            "(Message-ID, In-Reply-To, References), not by subject. A message stored in several folders is " +
-            "returned once, with the other copies under copies.",
+    @McpTool(description = "List the locally indexed conversation containing a message, across all folders " +
+            "of one connection. Returns cards without bodies, oldest first, with undated messages last. " +
+            "Only locally indexed messages can appear. Messages are linked by reply headers " +
+            "(Message-ID, In-Reply-To, References), not by subject or participants.\n\n" +
+            "Read each message with getMessage using the same connection and that card's key. Recognized " +
+            "copies are returned once, with other keys and folders under copies; total and paging count groups.",
             generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public GetThreadResult getThread(
             @McpToolParam(description = "Connection name from listConnections") String connection,
-            @McpToolParam(description = "Key of any message in the conversation, from listMessages or search") String key,
-            @McpToolParam(description = "Start position: nextOffset of the previous page; default 0", required = false) Integer offset,
-            @McpToolParam(description = "Page size; default 50, at most 200", required = false) Integer limit) {
+            @McpToolParam(description = "Local message key from listMessages or search in this connection. " +
+                    "Any member of the conversation works; use key, not the Message-ID header") String key,
+            @McpToolParam(description = "Default 0. For the next page, keep the same connection and original " +
+                    "key and use the previous nextOffset. Stop when there is no nextOffset", required = false) Integer offset,
+            @McpToolParam(description = "Results per page: 1 to 200, default 50; larger values are capped at 200", required = false) Integer limit) {
         long start = System.nanoTime();
         try {
             if (offset != null && offset < 0) { throw new IllegalArgumentException("offset must be nonnegative"); }

@@ -18,7 +18,9 @@ public record GetAttachmentResult(
         String path,
         @Schema(description = "Absolute path of the extracted Markdown text; absent when there is no text.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String textPath,
-        @Schema(description = "Chunk of the extracted text as Markdown; [redacted:<kind>] marks a hidden secret. Absent when there is no text.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Chunk of the saved extracted text as Markdown; [redacted:<kind>] marks a hidden " +
+                "secret. Absent when extracted text is unavailable; the original attachment may still " +
+                "have content and be available at path.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String text,
         @Schema(description = "Character position of this chunk.", requiredMode = Schema.RequiredMode.REQUIRED)
         int offset,

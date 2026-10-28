@@ -50,9 +50,11 @@ public class MailTools {
         this.redactor = redactor;
     }
 
-    @McpTool(description = "List the folders of a connection's local copy: key (the folder argument of " +
-            "listMessages and search), path, local message count, and synced (false until the folder's " +
-            "first sync finished, so its messages may be missing).", generateOutputSchema = true,
+    @McpTool(description = "List locally known folders in one connection, with folder keys, paths and " +
+            "local indexed message counts. Pass a folder's key as folder to listMessages or search; " +
+            "keep the same connection. synced=false means a completed folder sync has not been recorded " +
+            "and messages may be missing. synced=true does not guarantee current mail; use syncStatus " +
+            "for the latest sync's time and outcome. This tool does not discover folders on the server.", generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public ListFoldersResult listFolders(@McpToolParam(description = "Connection name from listConnections") String connection) {
         long start = System.nanoTime();
@@ -75,19 +77,27 @@ public class MailTools {
         return listMessages(connection, folder, offset, limit, null, null);
     }
 
-    @McpTool(description = "Page through the messages of one folder, newest first, optionally within a date " +
-            "range. Each card has key, date, sender, subject, read/flagged state and attachment presence; " +
-            "pass key to getMessage or getThread.",
+    @McpTool(description = "Browse locally indexed messages in one folder, newest first, optionally within " +
+            "a date range. Undated messages come last without date bounds and are excluded with bounds. " +
+            "For keyword search use search; for a date range across all folders use search without query.\n\n" +
+            "Returns cards without bodies. Pass a card's key and the same connection to getMessage to " +
+            "read it, or to getThread for its conversation. Every stored copy counts separately here; " +
+            "search and getThread group recognized copies. read/flagged describe the last sync observation.",
             generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public ListMessagesResult listMessages(
             @McpToolParam(description = "Connection name from listConnections") String connection,
-            @McpToolParam(description = "Folder key from listFolders") String folder,
-            @McpToolParam(description = "Start position: nextOffset of the previous page; default 0", required = false) Integer offset,
-            @McpToolParam(description = "Page size; default 50, at most 200", required = false) Integer limit,
-            @McpToolParam(description = "Only messages dated at or after this: YYYY-MM-DD (UTC midnight) or " +
-                    "ISO-8601 datetime with offset, e.g. 2026-10-01T09:00:00+03:00", required = false) String since,
-            @McpToolParam(description = "Only messages dated before this (exclusive); same format as since",
+            @McpToolParam(description = "One folder key from listFolders in this connection, not its display name") String folder,
+            @McpToolParam(description = "Default 0. For the next page, repeat the same arguments and use the " +
+                    "previous nextOffset. Stop when there is no nextOffset", required = false) Integer offset,
+            @McpToolParam(description = "Results per page: 1 to 200, default 50; larger values are capped at 200", required = false) Integer limit,
+            @McpToolParam(description = "Include messages at or after this date/time, using the message Date " +
+                    "header, not receipt or download time. Format: YYYY-MM-DD (UTC midnight), or ISO-8601 " +
+                    "with Z or an offset, e.g. 2026-10-01T09:00:00+03:00; at most 3 fractional second digits. " +
+                    "Messages without a date are excluded", required = false) String since,
+            @McpToolParam(description = "Include messages strictly before this date/time; same header and format " +
+                    "as since. To include a whole day, use the following day's midnight. Must be later than " +
+                    "since when both are given. Messages without a date are excluded",
                     required = false) String until) {
         long start = System.nanoTime();
         try {
@@ -120,16 +130,23 @@ public class MailTools {
         }
     }
 
-    @McpTool(description = "Read one message: headers, the body as Markdown in chunks, and its attachments. " +
-            "attachments also lists files unpacked from attached EML, ZIP, MSG and TNEF files; parent names " +
-            "the containing attachment. Read attachment text with getAttachment. A long body continues at " +
-            "nextOffset.", generateOutputSchema = true,
+    @McpTool(description = "Read one locally stored message: headers, a body chunk as Markdown, and an " +
+            "attachment list. nextOffset continues only the body; headers and the attachment list are " +
+            "returned on each call. If body is absent, saved body text is unavailable; inspect state " +
+            "and error rather than assuming the original message was empty.\n\n" +
+            "To read an attachment, call getAttachment with the same connection and key, and " +
+            "file=attachments[].file. Use file, not name or path. The list includes files extracted " +
+            "from attached archives and messages; parent is the containing attachment's file. " +
+            "For the conversation, call getThread with the same connection and key.", generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public GetMessageResult getMessage(
             @McpToolParam(description = "Connection name from listConnections") String connection,
-            @McpToolParam(description = "Message key from listMessages, search or getThread") String key,
-            @McpToolParam(description = "Body character position: nextOffset of the previous chunk; default 0", required = false) Integer offset,
-            @McpToolParam(description = "Chunk size in characters; default 20000, at most 100000", required = false) Integer maxChars) {
+            @McpToolParam(description = "Local message key from listMessages, search or getThread in this " +
+                    "connection; use key, not the Message-ID header") String key,
+            @McpToolParam(description = "Body character offset, default 0. To continue, keep the same " +
+                    "connection and key and use nextOffset from this tool. Stop when there is no nextOffset", required = false) Integer offset,
+            @McpToolParam(description = "Body characters per chunk: 1 to 100000, default 20000; larger values " +
+                    "are capped at 100000", required = false) Integer maxChars) {
         long start = System.nanoTime();
         try {
             int position = offset(offset);
@@ -175,17 +192,24 @@ public class MailTools {
         }
     }
 
-    @McpTool(description = "Read the text of an attachment as Markdown, in chunks. Text exists for PDF, Word, " +
-            "Excel, PowerPoint, OpenDocument, RTF, HTML, CSV, EPUB, plain text and attached messages up to " +
-            "20 MiB (XLSX up to 5 MiB) when conversion succeeded; otherwise text is absent and only path, " +
-            "the original file, is returned. Long text continues at nextOffset.", generateOutputSchema = true,
+    @McpTool(description = "Read an attachment's saved extracted text as Markdown, in chunks, with its " +
+            "metadata and local file paths. This reads existing text; it does not convert the file on demand. " +
+            "If text is absent, extracted text is unavailable, not proof that the original attachment is " +
+            "empty. The original may still be available at path; path is absent if the file is missing.\n\n" +
+            "Get file from getMessage's attachments[].file or a search hit's snippetAttachmentFile, " +
+            "keeping that message's connection and key. To continue a long text, call this tool again " +
+            "with the same connection, key and file and offset=nextOffset. Stop when there is no nextOffset.", generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public GetAttachmentResult getAttachment(
             @McpToolParam(description = "Connection name from listConnections") String connection,
-            @McpToolParam(description = "Message key") String key,
-            @McpToolParam(description = "Exact attachments[].file from getMessage, or snippetAttachmentFile from search") String file,
-            @McpToolParam(description = "Text character position: nextOffset of the previous chunk; default 0", required = false) Integer offset,
-            @McpToolParam(description = "Chunk size in characters; default 20000, at most 100000", required = false) Integer maxChars) {
+            @McpToolParam(description = "Local key of the message containing this attachment, from getMessage " +
+                    "or the search hit; use the same connection") String key,
+            @McpToolParam(description = "Exact attachments[].file from getMessage or snippetAttachmentFile " +
+                    "from search for this message. Use this value unchanged, not name, path or textPath") String file,
+            @McpToolParam(description = "Text character offset, default 0. Use nextOffset from this tool to " +
+                    "continue this attachment, not an offset from message-body or search results", required = false) Integer offset,
+            @McpToolParam(description = "Text characters per chunk: 1 to 100000, default 20000; larger values " +
+                    "are capped at 100000", required = false) Integer maxChars) {
         long start = System.nanoTime();
         try {
             int position = offset(offset);

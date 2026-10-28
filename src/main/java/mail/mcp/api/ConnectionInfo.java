@@ -14,7 +14,8 @@ public record ConnectionInfo(
         String auth,
         @Schema(description = "True when sync supports this mailbox type.", requiredMode = Schema.RequiredMode.REQUIRED)
         boolean sourceAvailable,
-        @Schema(description = "True when a local copy exists; when false, run sync before reading.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "True when the local data directory exists; does not guarantee that messages " +
+                "are present, complete or current. Inspect listFolders and syncStatus for coverage.", requiredMode = Schema.RequiredMode.REQUIRED)
         boolean localDataAvailable,
         @Schema(description = "True when this server process has already used the connection; not a sign-in result.", requiredMode = Schema.RequiredMode.REQUIRED)
         boolean initialized,

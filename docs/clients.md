@@ -161,11 +161,16 @@ them there too if you change the data directory or the connections file.
   runs the client. After changing a stored password, restart the server to clear its cached value.
   [Setup and password changes](connections.md#windows-credential-manager).
 - **Several clients at once** may run their own server processes over the same data directory.
-  All of them read; only one synchronizes a connection at a time, and the others answer `sync`
-  with `lockedByOtherProcess`.
+  All of them read; only one process writes a connection at a time. `sync` returns
+  `lockedByOtherProcess` when another process holds the write lock, including an offline command
+  such as `mail-reindex`. That call starts no sync; `syncStatus` reports sync runs only and may
+  still describe an older run while an offline command holds the lock.
 - **Synchronization runs in the background.** `sync` returns at once; the agent follows it with
-  `syncStatus`, so no long tool timeout is needed. Run the first, full synchronization of a large
-  mailbox with [`mail-sync`](commands.md#mail-sync) in a terminal.
+  `syncStatus`, so no long tool timeout is needed. `started` means launched, and `alreadyRunning`
+  means an existing run is in progress; use `syncStatus` rather than repeating `sync` to monitor
+  either. A `completed` state can still have a nonzero `failed` count for individual messages.
+  Run the first, full synchronization of a large mailbox with
+  [`mail-sync`](commands.md#mail-sync) in a terminal.
 - **Replacing the jar** fails on Windows while a client keeps the server running. Stop the server
   in the client first, then reconnect.
 

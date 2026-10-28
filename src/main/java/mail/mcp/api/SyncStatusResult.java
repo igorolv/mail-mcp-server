@@ -10,7 +10,9 @@ import java.util.List;
 public record SyncStatusResult(
         @Schema(description = "Connection name.", requiredMode = Schema.RequiredMode.REQUIRED)
         String connection,
-        @Schema(description = "running, completed, failed, interrupted (the syncing process stopped before finishing) or never (no sync yet).", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "running (still working), completed (run finished, possibly with individual " +
+                "message failures), failed (run stopped with an error), interrupted (syncing process ended " +
+                "before finishing), or never (no recorded sync).", requiredMode = Schema.RequiredMode.REQUIRED)
         String state,
         @Schema(description = "When the sync started.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         Instant startedAt,
@@ -18,7 +20,8 @@ public record SyncStatusResult(
         Instant finishedAt,
         @Schema(description = "New messages saved, all folders.", requiredMode = Schema.RequiredMode.REQUIRED)
         int downloaded,
-        @Schema(description = "New messages that failed to download or convert, all folders.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Count of new messages that failed to download or convert, all folders. " +
+                "May be nonzero even when state is completed.", requiredMode = Schema.RequiredMode.REQUIRED)
         int failed,
         @Schema(description = "Local messages removed because they are gone from the mailbox, all folders.", requiredMode = Schema.RequiredMode.REQUIRED)
         int removed,

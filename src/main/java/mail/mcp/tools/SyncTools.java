@@ -38,12 +38,16 @@ public class SyncTools {
         this.redactor = redactor;
     }
 
-    @McpTool(description = "Download new and changed mail into the local copy that all other tools read; " +
-            "nothing in the mailbox is changed. Call when the user needs mail newer than the local copy. " +
-            "Returns at once and runs in the background; poll syncStatus until it finishes. The first run " +
-            "of a mailbox can take long. When status is refused, relay message to the user: after a " +
-            "rejected sign-in only the user can recover, by fixing the credentials and running mail-sync " +
-            "in a terminal.", generateOutputSchema = true,
+    @McpTool(description = "Refresh one connection's local mail copy from the mail server, including new " +
+            "messages, removals, moves and read/flag states. The remote mailbox is not changed. Call when " +
+            "the user needs newer mail than the local copy. Runs in the background; the first sync can " +
+            "take a long time.\n\n" +
+            "status=started means launched, not finished. For started or alreadyRunning, check syncStatus " +
+            "with the same connection while state is running; do not call sync again to check progress. " +
+            "lockedByOtherProcess means another process holds the local write lock and this call started " +
+            "no sync. That process may be an offline command; syncStatus reports sync runs only.\n\n" +
+            "For refused, relay message to the user and do not retry: after a rejected sign-in, the user " +
+            "must fix the credentials and run mail-sync in a terminal.", generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = false))
     public SyncStartResult sync(@McpToolParam(description = "Connection name from listConnections") String connection) {
         long start = System.nanoTime();
@@ -64,9 +68,15 @@ public class SyncTools {
         }
     }
 
-    @McpTool(description = "Progress or result of the current or last sync of a connection, with counts " +
-            "per folder. state: running, completed, failed, interrupted (the syncing process stopped " +
-            "before finishing) or never (no sync yet). While running, other tools see partial data.",
+    @McpTool(description = "Read local progress or the result of the current or last sync; this does not " +
+            "start a sync or contact the mail server. state=running means still working; completed means " +
+            "the run finished; failed means the run stopped with an error; interrupted means the syncing " +
+            "process ended before finishing; never means no sync is recorded.\n\n" +
+            "While running, other tools may see incomplete results. Check state to decide whether to " +
+            "keep waiting. The failed count is a count of messages: completed can still have failed>0. " +
+            "Inspect error and signInRejected for a failed run. If signInRejected is true, tell the user " +
+            "to fix credentials and run mail-sync in a terminal; repeated sync calls cannot recover it. " +
+            "Timestamps describe this run, not a guarantee that the local mail is current now.",
             generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public SyncStatusResult syncStatus(@McpToolParam(description = "Connection name from listConnections") String connection) {

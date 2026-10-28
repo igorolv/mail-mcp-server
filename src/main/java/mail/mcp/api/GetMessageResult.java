@@ -11,7 +11,7 @@ import java.util.List;
 public record GetMessageResult(
         @Schema(description = "Message key.", requiredMode = Schema.RequiredMode.REQUIRED)
         String key,
-        @Schema(description = "Folder path in the mailbox.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Folder path in the mailbox; not the folder key used by listMessages/search.", requiredMode = Schema.RequiredMode.REQUIRED)
         String folder,
         @Schema(description = "converted (complete), downloaded (saved, text not processed yet) or failed (see error).", requiredMode = Schema.RequiredMode.REQUIRED)
         String state,
@@ -33,7 +33,8 @@ public record GetMessageResult(
         String inReplyTo,
         @Schema(description = "References header message IDs.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         List<String> references,
-        @Schema(description = "Chunk of the body as Markdown; [redacted:<kind>] marks a hidden secret. Absent when there is no body.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "Chunk of the saved body as Markdown; [redacted:<kind>] marks a hidden secret. " +
+                "Absent when saved body text is unavailable; this does not prove the original body was empty.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String body,
         @Schema(description = "Character position of this chunk.", requiredMode = Schema.RequiredMode.REQUIRED)
         int offset,
@@ -41,7 +42,9 @@ public record GetMessageResult(
         Integer nextOffset,
         @Schema(description = "Length of the whole body in characters; 0 without a body.", requiredMode = Schema.RequiredMode.REQUIRED)
         int bodyLength,
-        @Schema(description = "Attachments, including files unpacked from attached archives and messages; empty when none.", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Attachments, including files unpacked from attached archives and messages. " +
+                "Empty when none are found or the saved MIME cannot be read. Pass an entry's file " +
+                "to getAttachment with this message's key and connection.", requiredMode = Schema.RequiredMode.REQUIRED)
         List<AttachmentRef> attachments,
         @Schema(description = "Absolute message directory, readable directly: message.eml (original), body.md, attachments/.", requiredMode = Schema.RequiredMode.REQUIRED)
         String localPath,

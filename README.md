@@ -360,7 +360,8 @@ skipped when it is not installed.
 - **`pandoc not found; install pandoc and put it on PATH`.** Install pandoc and restart the
   terminal or the MCP client, so that it sees the new `PATH`.
 - **`Connection is being synchronized by another process`, exit code 5.** A sync of the same
-  mailbox runs in another server process or terminal. Wait for it, or check `syncStatus`.
+  mailbox or an offline data command holds the local write lock. Wait for that operation to
+  finish. `syncStatus` reports sync runs only, not progress of offline commands.
 - **Search says the index was built by an older version, or that the word forms changed.** Run
   `mail-reindex <connection>` (offline) or start a sync.
 - **Search misses a message.** Check `listFolders` (`synced`) and `syncStatus`: results are

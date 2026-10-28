@@ -85,9 +85,19 @@ An attachment snippet identifies its source in `snippetAttachmentFile` (pass it 
 The snippet may show only part of a multiword match, or fall back to body context without
 highlights when no matching passage is available.
 
-`getMessage` returns headers, the body in chunks and the list of attachments;
-`getAttachment` returns an attachment's text in chunks. Every card and message has a `localPath`
-to the message directory, so an agent with file access can open the original files directly.
+`getMessage` returns headers, the body in chunks and the list of attachments. Its `nextOffset`
+continues only the body; headers and attachments are repeated. To read an attachment, use
+`getAttachment` with the same connection and message key and the entry's `file`, not its `name`
+or `path`. Continue attachment text using that tool's own `nextOffset`, keeping the connection,
+key and file. Message keys are local keys, not the `Message-ID` header.
+
+These tools read saved text without converting files on demand. Missing body or attachment text
+does not mean the original was empty; a message's `state` and `error` may explain missing content.
+An unreadable saved MIME can also leave the attachment list empty. An attachment's original
+may be available at `path` even without text; the path is absent if the original file is missing.
+Existing saved text remains readable even if current conversion limits would reject the file.
+Every card and message has a `localPath` to the message directory, so an agent with file access
+can open the original files directly.
 
 ## Copies of one message
 
@@ -99,11 +109,14 @@ groups. `listMessages` and the folder counts of `listFolders` still show every c
 
 ## Conversations
 
-`getThread` takes the key of any message and returns the whole conversation it belongs to, across
-all folders of the connection, oldest first. Messages are linked only by their
+`getThread` takes the local key of any indexed message and returns the locally indexed part of
+its conversation across all folders of the connection, oldest first, with undated messages last.
+Messages are linked only by their
 `Message-ID`, `In-Reply-To` and `References` headers, as mail clients do; the subject and the
 participants do not link messages. Replies to a message that is not stored locally still join
 the conversation. Pages default to 50 cards, at most 200.
+Keep the original message key and connection when continuing with `nextOffset`. To read a
+returned card, pass that card's key and the same connection to `getMessage`.
 
 ## Read and flag snapshots
 
@@ -115,8 +128,11 @@ flags in the mailbox.
 ## Coverage
 
 Search sees only what has been synchronized and indexed. During a synchronization results can be
-incomplete: `listFolders` shows which folders were synchronized completely (`synced`), and
-`syncStatus` shows the progress of a running sync.
+incomplete. `listConnections.localDataAvailable` indicates only that a local data directory exists.
+`listFolders.synced` indicates a recorded completed folder sync, not current mail; its message
+count comes from the committed local index and is zero if there is no index. `syncStatus` shows
+the current or last run, including timestamps and outcome. None of these flags alone guarantees
+that all current remote mail is available locally.
 
 ## Word forms
 
