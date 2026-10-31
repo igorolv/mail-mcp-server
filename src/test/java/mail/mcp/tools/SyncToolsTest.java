@@ -33,6 +33,7 @@ class SyncToolsTest {
     @Test void syncStatusIsNeverWithoutAFile() {
         var result = tools().syncStatus("local");
         assertThat(result.state()).isEqualTo("never");
+        assertThat(result.phase()).isNull();
         assertThat(result.folders()).isEmpty();
         assertThat(result.downloaded()).isZero();
         assertThat(result.signInRejected()).isFalse();
@@ -44,9 +45,10 @@ class SyncToolsTest {
         child.waitFor();
         var store = new MessageStore(dir, new JsonConfig().mailMcpObjectMapper());
         store.writeSyncStatus(new SyncStatus("running", child.pid(), Instant.now(), null,
-                List.of(new FolderProgress("INBOX", 2, 1, 3, false, true)), null, false));
+                List.of(new FolderProgress("INBOX", 2, 1, 3, false, true)), null, false, "downloading"));
         var result = tools().syncStatus("local");
         assertThat(result.state()).isEqualTo("interrupted");
+        assertThat(result.phase()).isEqualTo("downloading");
         assertThat(result.downloaded()).isEqualTo(2);
         assertThat(result.failed()).isEqualTo(1);
         assertThat(result.removed()).isEqualTo(3);
@@ -56,7 +58,7 @@ class SyncToolsTest {
         var store = new MessageStore(dir, new JsonConfig().mailMcpObjectMapper());
         store.writeSyncStatus(new SyncStatus("completed", 1, Instant.now(), Instant.now(), List.of(
                 new FolderProgress("ews", 1, 0, 0, false, true, true),
-                new FolderProgress("imap", 2, 0, 1, true, true, false)), null, false));
+                new FolderProgress("imap", 2, 0, 1, true, true, false)), null, false, "downloading"));
         var folders = tools().syncStatus("local").folders();
         assertThat(folders.get(0).rescanned()).isTrue();
         assertThat(folders.get(0).reset()).isFalse();

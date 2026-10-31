@@ -71,7 +71,8 @@ public class SyncTools {
     @McpTool(description = "Read local progress or the result of the current or last sync; this does not " +
             "start a sync or contact the mail server. state=running means still working; completed means " +
             "the run finished; failed means the run stopped with an error; interrupted means the syncing " +
-            "process ended before finishing; never means no sync is recorded.\n\n" +
+            "process ended before finishing; never means no sync is recorded. phase is the stage reached; " +
+            "checkingLocal and checkingFolders can take minutes with no folder progress yet.\n\n" +
             "While running, other tools may see incomplete results. Check state to decide whether to " +
             "keep waiting. The failed count is a count of messages: completed can still have failed>0. " +
             "Inspect error and signInRejected for a failed run. If signInRejected is true, tell the user " +
@@ -86,7 +87,7 @@ public class SyncTools {
             var status = new MessageStore(definition.connectionDir(), mapper).readSyncStatus().orElse(null);
             SyncStatusResult result;
             if (status == null) {
-                result = new SyncStatusResult(definition.name(), "never", null, null, 0, 0, 0, List.of(), null, false);
+                result = new SyncStatusResult(definition.name(), "never", null, null, null, 0, 0, 0, List.of(), null, false);
             } else {
                 String state = status.state();
                 if (state.equals("running") && !syncService.runningHere(definition.name())
@@ -95,7 +96,7 @@ public class SyncTools {
                 }
                 var folders = status.folders().stream().map(p -> new FolderSyncInfo(redactor.text(p.path()), p.downloaded(),
                         p.failed(), p.removed(), p.reset(), p.done(), p.rescanned())).toList();
-                result = new SyncStatusResult(definition.name(), state, status.startedAt(), status.finishedAt(),
+                result = new SyncStatusResult(definition.name(), state, status.phase(), status.startedAt(), status.finishedAt(),
                         folders.stream().mapToInt(FolderSyncInfo::downloaded).sum(),
                         folders.stream().mapToInt(FolderSyncInfo::failed).sum(),
                         folders.stream().mapToInt(FolderSyncInfo::removed).sum(), folders,

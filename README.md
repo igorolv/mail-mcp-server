@@ -244,7 +244,7 @@ lists the names.
 |---|---|
 | `listConnections` | Configured mailboxes with type, sign-in method, description and configuration errors; never contacts a server |
 | `sync` | Starts a background synchronization and returns at once: `started`, `alreadyRunning`, `lockedByOtherProcess` or `refused` (after a rejected sign-in) |
-| `syncStatus` | Progress and result of the current or last run, per folder |
+| `syncStatus` | Progress and result of the current or last run: its stage and each folder |
 | `listFolders` | Local folders with message counts and whether each was synchronized completely |
 | `listMessages` | Message cards of one folder, newest first, in pages; optional `since`/`until` |
 | `getMessage` | Headers, the body in chunks, attachments with the paths of the file and of its text |

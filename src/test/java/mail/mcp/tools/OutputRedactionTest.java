@@ -86,7 +86,7 @@ class OutputRedactionTest {
             index.commit();
         }
         store.writeSyncStatus(new SyncStatus("failed", 0, Instant.now(), Instant.now(),
-                List.of(new FolderProgress("password: " + SECRET, 1, 0, 0, false, true)), "token: " + SECRET, true));
+                List.of(new FolderProgress("password: " + SECRET, 1, 0, 0, false, true)), "token: " + SECRET, true, "downloading"));
     }
 
     @Test void chunksUseFilteredOffsetsAndLeaveFilesUntouched() throws Exception {

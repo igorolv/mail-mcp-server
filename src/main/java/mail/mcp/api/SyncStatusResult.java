@@ -14,6 +14,13 @@ public record SyncStatusResult(
                 "message failures), failed (run stopped with an error), interrupted (syncing process ended " +
                 "before finishing), or never (no recorded sync).", requiredMode = Schema.RequiredMode.REQUIRED)
         String state,
+        @Schema(description = "Stage reached, in order: checkingLocal (comparing saved messages with the index, " +
+                "offline; long after a run that did not complete), signingIn, checkingFolders (collecting changes " +
+                "from every folder), applyingChanges (moves and flag changes), downloading (removing and " +
+                "downloading folder by folder). For failed or interrupted, the stage where the run stopped. " +
+                "Absent for never and for runs recorded by an older version.",
+                nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        String phase,
         @Schema(description = "When the sync started.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         Instant startedAt,
         @Schema(description = "When the sync ended; absent while running.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)

@@ -56,10 +56,26 @@ and never retries.
 ```text
 Mail sync (read-only; one sign-in attempt)
 Connection: mailru (imap, app-password; address and credentials hidden)
+  Checking saved messages against the index
+  Signing in and listing folders
+  Checking changes: 1 folders
+  INBOX: 120 new, 2 gone
+  Applying moves and flag changes
   INBOX: 100 downloaded, 0 failed, 0 removed (in progress)
   INBOX: 120 downloaded, 1 failed, 2 removed
 RESULT: OK (1 folders, 120 downloaded, 1 failed, 2 removed)
 ```
+
+The run goes through these stages; the same stages appear as `phase` in the MCP `syncStatus`
+tool:
+
+| Output line | `phase` | What happens |
+|---|---|---|
+| `Checking saved messages against the index` | `checkingLocal` | Offline comparison of saved messages with the search index. After a run that did not complete, the line reads `Checking every saved message against the index (last run not recorded as completed)`: every saved message is read, which takes minutes for tens of thousands of messages, with `<N> saved messages checked` every 10,000 |
+| `Signing in and listing folders` | `signingIn` | The single sign-in and the folder list |
+| `Checking changes: <N> folders` | `checkingFolders` | New, removed and changed messages of every included folder, and metadata of new messages; `<folder>: <N> new, <M> gone` for each folder with new or removed messages |
+| `Applying moves and flag changes` | `applyingChanges` | Recognized moves and read/flag changes are written locally |
+| folder progress lines | `downloading` | Removals and downloads, folder by folder |
 
 - The first run downloads the included folders and may take long: Exchange needs one request per
   message. Run the command again: with no new mail it ends with `0 downloaded`, and its time
@@ -70,7 +86,9 @@ RESULT: OK (1 folders, 120 downloaded, 1 failed, 2 removed)
   unique matching provider identifier, preserving their keys and files.
 - `downloaded` counts new messages, `failed` messages that could not be downloaded or converted
   (they are not retried), `removed` local messages deleted because they are gone from the server.
-  A recognized move counts as none of them.
+  A recognized move counts as none of them. In the `<N> new, <M> gone` lines, a message moved
+  between included folders still counts as new in one folder and gone in the other: moves are
+  recognized only afterwards.
 - When the search index has to be rebuilt (a new index version or changed word forms), the run
   first restores it from disk without network access and prints `<N> messages indexed` every
   1,000 messages.

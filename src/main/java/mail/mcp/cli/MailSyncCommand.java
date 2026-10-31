@@ -21,6 +21,7 @@ import mail.mcp.source.imap.ImapException;
 import mail.mcp.source.oauth.OAuthException;
 import mail.mcp.store.MessageStore;
 import mail.mcp.model.FolderProgress;
+import mail.mcp.sync.SyncListener;
 import mail.mcp.sync.SyncRunner;
 import mail.mcp.sync.SyncErrors;
 
@@ -94,14 +95,32 @@ public final class MailSyncCommand {
             MailSource source = connection.openSource();
             try (MailIndex index = MailIndex.openWriter(selected.connectionDir(), false, forms); source) {
                 var store = new MessageStore(selected.connectionDir(), new JsonConfig().mailMcpObjectMapper());
-                new SyncRunner(store, index, source, new MessageProcessor(store, pandoc)).run(progress -> {
-                    out.println("  " + progress.path() + ": " + progress.downloaded() + " downloaded, "
-                            + progress.failed() + " failed, " + progress.removed() + " removed"
-                            + (progress.reset() ? ", folder reset" : "")
-                            + (progress.done() ? "" : " (in progress)"));
-                    if (progress.done()) { done.add(progress); }
-                }, restored -> {
-                    if (restored % 1_000 == 0) { out.println("  " + restored + " messages indexed"); }
+                new SyncRunner(store, index, source, new MessageProcessor(store, pandoc)).run(new SyncListener() {
+                    @Override public void checkingLocal(boolean full) {
+                        out.println(full ? "  Checking every saved message against the index (last run not recorded as completed)"
+                                : "  Checking saved messages against the index");
+                    }
+                    @Override public void checked(int count) {
+                        if (count % 10_000 == 0) { out.println("  " + count + " saved messages checked"); }
+                    }
+                    @Override public void restored(int count) {
+                        if (count % 1_000 == 0) { out.println("  " + count + " messages indexed"); }
+                    }
+                    @Override public void signingIn() { out.println("  Signing in and listing folders"); }
+                    @Override public void checkingFolders(int folders) {
+                        out.println("  Checking changes: " + folders + " folders");
+                    }
+                    @Override public void changes(String path, int added, int removed) {
+                        out.println("  " + path + ": " + added + " new, " + removed + " gone");
+                    }
+                    @Override public void applyingChanges() { out.println("  Applying moves and flag changes"); }
+                    @Override public void progress(FolderProgress progress) {
+                        out.println("  " + progress.path() + ": " + progress.downloaded() + " downloaded, "
+                                + progress.failed() + " failed, " + progress.removed() + " removed"
+                                + (progress.reset() ? ", folder reset" : "")
+                                + (progress.done() ? "" : " (in progress)"));
+                        if (progress.done()) { done.add(progress); }
+                    }
                 });
             }
         } catch (IndexLockedException e) {

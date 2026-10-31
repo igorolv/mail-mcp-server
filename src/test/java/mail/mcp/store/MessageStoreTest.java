@@ -182,14 +182,16 @@ class MessageStoreTest {
         assertThat(fingerprint.subject()).isEqualTo(" Subject ");
     }
 
-    @Test void oldSyncStatusDefaultsRescannedToFalse() throws IOException {
+    @Test void oldSyncStatusDefaultsRescannedToFalseAndPhaseToNull() throws IOException {
         Path folder = Files.createDirectories(temp.resolve("box"));
         Files.writeString(folder.resolve(MessageStore.SYNC_STATUS_FILE), """
                 {"state":"completed","pid":1,"startedAt":"2026-10-25T12:00:00Z",
                  "folders":[{"path":"INBOX","downloaded":1,"failed":0,"removed":0,"reset":false,"done":true}],
                  "signInRejected":false}
                 """);
-        assertThat(store().readSyncStatus().orElseThrow().folders().getFirst().rescanned()).isFalse();
+        var status = store().readSyncStatus().orElseThrow();
+        assertThat(status.folders().getFirst().rescanned()).isFalse();
+        assertThat(status.phase()).isNull();
     }
 
 

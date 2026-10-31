@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.List;
+import java.util.function.IntConsumer;
 import java.util.stream.Collectors;
 
 /** Derived catalog for one connection, owned by the process holding Lucene's write lock. */
@@ -287,6 +288,11 @@ public final class MailIndex implements AutoCloseable {
      *                      compared, without opening any meta.json (docs/decisions.md, Д30)
      */
     public List<String> reconcile(MessageStore store, boolean checkMetadata) {
+        return reconcile(store, checkMetadata, count -> { });
+    }
+
+    /** @param checked running count of documents compared with their meta.json; called only when checkMetadata is true */
+    public List<String> reconcile(MessageStore store, boolean checkMetadata, IntConsumer checked) {
         Set<String> diskKeys = new HashSet<>(store.keys());
         if (!checkMetadata) {
             Set<String> indexedKeys = keys();
@@ -318,6 +324,7 @@ public final class MailIndex implements AutoCloseable {
                             || !java.util.Objects.equals(labels(meta), document.get("labels"))
                             || !java.util.Objects.equals(meta.stableId(), document.get("stableId"))) { changedKeys.add(key); }
                 }
+                checked.accept(indexedKeys.size());
             }
         } catch (IOException e) { throw new UncheckedIOException(e); }
         for (String key : indexedKeys) {

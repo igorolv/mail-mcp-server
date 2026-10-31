@@ -27,7 +27,7 @@ in `docs/search.md`; background sync outcomes and cross-process locking are in `
 |---|---|---|
 | `listConnections` | None | Configured mailboxes in configuration order, capabilities and configuration errors; no credentials or source access. |
 | `sync` | Required `connection` | Immediate `started`, `alreadyRunning`, `lockedByOtherProcess` or `refused`, with explanation. Unknown/missing connection or unusable definition raises `IllegalArgumentException`. Missing pandoc raises `IllegalStateException`. |
-| `syncStatus` | Required `connection` | Current/last local run, per-folder progress, summed downloaded/failed/removed counts, timestamps, error and `signInRejected`. No file means `never`. |
+| `syncStatus` | Required `connection` | Current/last local run, `phase` reached, per-folder progress, summed downloaded/failed/removed counts, timestamps, error and `signInRejected`. No file means `never`, without a phase. |
 | `listFolders` | Required `connection` | Stored folder keys and paths, committed catalog counts and `synced` (cursor exists), in stored order. No index means zero counts. |
 | `listMessages` | Required `connection`, `folder`; optional `offset`, `limit`, `since`, `until` | Folder cards sorted by descending date (undated last), then key; total, offset, optional nextOffset. Offset defaults to 0; limit to 50, capped at 200. Unknown folder is an error. |
 | `getMessage` | Required `connection`, `key`; optional `offset`, `maxChars` | Metadata, MIME headers, body.md chunk, bodyLength, optional nextOffset and attachment file paths and optional Markdown `textPath`. Offset defaults to 0; maxChars to 20,000, capped at 100,000. Invalid/nonexistent UUID is an error. |
@@ -304,12 +304,18 @@ none of the downloaded/failed/removed counters. No reading tool initiates source
 
 `sync-status.json` is atomically replaced by `SyncRunner`, which runs only while its caller holds
 the connection's Lucene writer lock. Fields: `state` (running/completed/failed), `pid`,
-`startedAt`, optional `finishedAt`, ordered `folders`, optional `error`, `signInRejected`.
+`startedAt`, optional `finishedAt`, ordered `folders`, optional `error`, `signInRejected`, and
+`phase`: the `SyncPhase` id reached (`checkingLocal`, `signingIn`, `checkingFolders`,
+`applyingChanges`, `downloading`; stages and their output in
+[commands.md](commands.md#mail-sync)). A failed run keeps the phase where it stopped; status
+files written before phases read as null. `SyncRunner` writes the status and logs
+`Sync phase: <id>` at INFO before it tells its `SyncListener`; `mail-sync` prints listener events,
+the background run only collects folder progress.
 Each folder entry contains `path`, cumulative `downloaded`, `failed`, `removed`, `reset`, `done`, `rescanned`. `reset` means IMAP UIDVALIDITY invalidated remote refs;
 `rescanned` means EWS recovered an invalid SyncState by a full traversal without invalidating
 known refs. Old status JSON without `rescanned` reads as false.
 Progress replaces an entry without changing its first-appearance order. Status is written before
-reconciliation, after each progress report, and on completion/failure. Run errors use fixed
+reconciliation, on each phase change, after each progress report, and on completion/failure. Run errors use fixed
 `SyncErrors` descriptions; a final status-write failure is suppressed onto the original error.
 
 Readers in any process can inspect the file. If it says running but its pid is no longer alive

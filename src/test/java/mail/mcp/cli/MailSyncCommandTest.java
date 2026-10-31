@@ -138,6 +138,12 @@ class MailSyncCommandTest {
         assertThat(output().lines().toList()).containsExactly(
                 "Mail sync (read-only; one sign-in attempt)",
                 "Connection: test (imap, app-password; address and credentials hidden)",
+                "  Checking every saved message against the index (last run not recorded as completed)",
+                "  Signing in and listing folders",
+                "  Checking changes: 2 folders",
+                "  INBOX: 101 new, 0 gone",
+                "  Archive: 1 new, 0 gone",
+                "  Applying moves and flag changes",
                 "  INBOX: 100 downloaded, 0 failed, 0 removed (in progress)",
                 "  INBOX: 101 downloaded, 0 failed, 0 removed",
                 "  Archive: 0 downloaded, 1 failed, 0 removed",
@@ -150,6 +156,11 @@ class MailSyncCommandTest {
         assertThat(output().lines().toList()).containsExactly(
                 "Mail sync (read-only; one sign-in attempt)",
                 "Connection: test (imap, app-password; address and credentials hidden)",
+                "  Checking saved messages against the index",
+                "  Signing in and listing folders",
+                "  Checking changes: 1 folders",
+                "  INBOX: 1 new, 101 gone",
+                "  Applying moves and flag changes",
                 "  Archive: 0 downloaded, 0 failed, 1 removed",
                 "  INBOX: 1 downloaded, 0 failed, 101 removed, folder reset",
                 "RESULT: OK (2 folders, 1 downloaded, 0 failed, 102 removed)");

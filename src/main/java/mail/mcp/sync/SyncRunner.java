@@ -16,6 +16,8 @@ import mail.mcp.source.MessageUnavailableException;
 import mail.mcp.mime.MimeReader;
 import jakarta.mail.MessagingException;
 import mail.mcp.store.MessageStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigInteger;
 import java.time.Instant;
@@ -35,6 +37,7 @@ import java.util.function.IntConsumer;
 
 /** One synchronous run; the caller owns the store, index writer and mailbox session. */
 public final class SyncRunner {
+    private static final Logger log = LoggerFactory.getLogger(SyncRunner.class);
     private final MessageStore store;
     private final MailIndex index;
     private final MailSource source;
@@ -64,25 +67,24 @@ public final class SyncRunner {
      *                 large after an index rebuild, for example on a schema change
      */
     public void run(Consumer<FolderProgress> progress, IntConsumer restored) {
-        Instant startedAt = Instant.now();
-        long pid = ProcessHandle.current().pid();
-        var folders = new LinkedHashMap<String, FolderProgress>();
+        run(new SyncListener() {
+            @Override public void restored(int count) { restored.accept(count); }
+            @Override public void progress(FolderProgress p) { progress.accept(p); }
+        });
+    }
+
+    /** Runs once, recording each phase and folder progress in sync-status.json before telling the listener. */
+    public void run(SyncListener listener) {
+        var report = new Report(listener);
         // Only a run that did not complete can leave meta.json and the index apart (docs/decisions.md, Д30).
         boolean checkMetadata = !store.readSyncStatus().map(status -> "completed".equals(status.state())).orElse(false);
         try {
-            store.writeSyncStatus(new SyncStatus("running", pid, startedAt, null, List.of(), null, false));
-            synchronize(checkMetadata, restored, p -> {
-                folders.put(p.path(), p);
-                store.writeSyncStatus(new SyncStatus("running", pid, startedAt, null,
-                        List.copyOf(folders.values()), null, false));
-                progress.accept(p);
-            });
-            store.writeSyncStatus(new SyncStatus("completed", pid, startedAt, Instant.now(),
-                    List.copyOf(folders.values()), null, false));
+            report.phase(SyncPhase.CHECKING_LOCAL);
+            synchronize(checkMetadata, report);
+            report.write("completed", Instant.now(), null, false);
         } catch (RuntimeException e) {
             try {
-                store.writeSyncStatus(new SyncStatus("failed", pid, startedAt, Instant.now(),
-                        List.copyOf(folders.values()), SyncErrors.describe(e), SyncErrors.signInRejected(e)));
+                report.write("failed", Instant.now(), SyncErrors.describe(e), SyncErrors.signInRejected(e));
             } catch (RuntimeException statusError) { e.addSuppressed(statusError); }
             throw e;
         }
@@ -95,14 +97,17 @@ public final class SyncRunner {
 
     /** The offline command supplies progress; server reconciliation stays silent. */
     public static void restore(MessageStore store, MailIndex index, MessageProcessor processor, IntConsumer progress) {
-        restore(store, index, processor, progress, true);
+        restore(store, index, processor, count -> { }, progress, true);
     }
 
-    /** @param checkMetadata compare every meta.json with the index; see {@link MailIndex#reconcile(MessageStore, boolean)} */
-    static void restore(MessageStore store, MailIndex index, MessageProcessor processor, IntConsumer progress,
-                        boolean checkMetadata) {
+    /**
+     * @param checked       running count of documents compared with meta.json when checkMetadata is true
+     * @param checkMetadata compare every meta.json with the index; see {@link MailIndex#reconcile(MessageStore, boolean)}
+     */
+    static void restore(MessageStore store, MailIndex index, MessageProcessor processor, IntConsumer checked,
+                        IntConsumer progress, boolean checkMetadata) {
         int count = 0;
-        for (String key : index.reconcile(store, checkMetadata)) {
+        for (String key : index.reconcile(store, checkMetadata, checked)) {
             var meta = store.readMeta(key).orElseThrow();
             var processed = switch (meta.state()) {
                 case DOWNLOADED -> processor.process(meta);
@@ -117,10 +122,17 @@ public final class SyncRunner {
         index.commit();
     }
 
-    private void synchronize(boolean checkMetadata, IntConsumer restored, Consumer<FolderProgress> progress) {
-        restore(store, index, processor, restored, checkMetadata);
+    private void synchronize(boolean checkMetadata, Report report) {
+        var listener = report.listener;
+        Consumer<FolderProgress> progress = report::progress;
+        listener.checkingLocal(checkMetadata);
+        restore(store, index, processor, listener::checked, listener::restored, checkMetadata);
         var local = store.folders();
+        report.phase(SyncPhase.SIGNING_IN);
+        listener.signingIn();
         var remote = source.folders();
+        report.phase(SyncPhase.CHECKING_FOLDERS);
+        listener.checkingFolders(remote.size());
         BigInteger nextKey = local.stream().map(LocalFolder::key)
                 .filter(key -> key.matches("f[0-9]+"))
                 .map(key -> new BigInteger(key.substring(1)))
@@ -166,8 +178,13 @@ public final class SyncRunner {
             if (!changes.added().isEmpty()) {
                 info.putAll(source.metadata(remote.get(i), changes.cursor(), changes.added()));
             }
+            int added = (int) changes.added().stream().filter(ref -> !refs.containsKey(ref) || removed.contains(ref)).count();
+            int gone = (int) removed.stream().filter(refs::containsKey).count();
+            if (added > 0 || gone > 0) { listener.changes(folder.path(), added, gone); }
             plans.add(new FolderPlan(folder, remote.get(i), changes, refs, removed, Map.copyOf(info)));
         }
+        report.phase(SyncPhase.APPLYING_CHANGES);
+        listener.applyingChanges();
         // Pre-run metadata of removed messages: move candidates and the guard against deleting a reassigned one.
         var removedMetas = new HashMap<String, MessageMeta>();
         for (String key : removedKeys) { store.readMeta(key).ifPresent(meta -> removedMetas.put(key, meta)); }
@@ -211,6 +228,7 @@ public final class SyncRunner {
         index.commit();
         checkpoint.accept("movesCommitted");
 
+        report.phase(SyncPhase.DOWNLOADING);
         for (var folder : vanished) {
             int removed = 0;
             for (String key : vanishedKeys.get(folder.key())) {
@@ -404,4 +422,32 @@ public final class SyncRunner {
 
     private record FolderPlan(LocalFolder folder, RemoteFolder remote, FolderChanges changes,
                               Map<String, String> refs, Set<String> removed, Map<String, RemoteMessageInfo> info) { }
+
+    /** sync-status.json of this run: the phase reached and folder progress in first-appearance order. */
+    private final class Report {
+        private final SyncListener listener;
+        private final Instant startedAt = Instant.now();
+        private final long pid = ProcessHandle.current().pid();
+        private final Map<String, FolderProgress> folders = new LinkedHashMap<>();
+        private SyncPhase phase = SyncPhase.CHECKING_LOCAL;
+
+        private Report(SyncListener listener) { this.listener = listener; }
+
+        private void write(String state, Instant finishedAt, String error, boolean signInRejected) {
+            store.writeSyncStatus(new SyncStatus(state, pid, startedAt, finishedAt,
+                    List.copyOf(folders.values()), error, signInRejected, phase.id()));
+        }
+
+        private void phase(SyncPhase next) {
+            phase = next;
+            log.info("Sync phase: {}", next.id());
+            write("running", null, null, false);
+        }
+
+        private void progress(FolderProgress progress) {
+            folders.put(progress.path(), progress);
+            write("running", null, null, false);
+            listener.progress(progress);
+        }
+    }
 }

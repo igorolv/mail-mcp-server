@@ -7,6 +7,7 @@ import mail.mcp.model.FolderProgress;
 import mail.mcp.model.MessageState;
 import mail.mcp.model.MessageFingerprint;
 import mail.mcp.model.MessageMeta;
+import mail.mcp.model.SyncStatus;
 import mail.mcp.source.Downloaded;
 import mail.mcp.source.FolderChanges;
 import mail.mcp.source.MailSource;
@@ -456,6 +457,46 @@ class SyncRunnerTest {
         assertThat(status.signInRejected()).isFalse();
     }
 
+    @Test void phasesAreRecordedBeforeTheListenerHearsOfThem() {
+        source.putFolder("inbox", "INBOX", "7", "2", "1");
+        source.putFolder("archive", "Archive", "9");
+        run();
+        source.putFolder("inbox", "INBOX", "7", "3", "1");
+        // A failed last run makes the next run compare every meta.json with the index.
+        store().writeSyncStatus(new SyncStatus("failed", 1, Instant.now(), Instant.now(), List.of(), "x", false, "downloading"));
+        List<String> events = new ArrayList<>();
+        try (var index = MailIndex.openWriter(connectionDir)) {
+            new SyncRunner(store(), index, source, processor()).run(new SyncListener() {
+                private String phase() { return store().readSyncStatus().orElseThrow().phase(); }
+                @Override public void checkingLocal(boolean full) { events.add(phase() + " full=" + full); }
+                @Override public void checked(int count) { events.add("checked " + count); }
+                @Override public void signingIn() {
+                    assertThat(source.foldersCalls).as("before the mailbox is read").isEqualTo(1);
+                    events.add(phase());
+                }
+                @Override public void checkingFolders(int folders) { events.add(phase() + " " + folders); }
+                @Override public void changes(String path, int added, int removed) { events.add(path + " +" + added + " -" + removed); }
+                @Override public void applyingChanges() { events.add(phase()); }
+                @Override public void progress(FolderProgress progress) { events.add(phase() + " " + progress.path()); }
+            });
+        }
+        assertThat(events).containsExactly("checkingLocal full=true", "checked 1", "checked 2", "signingIn",
+                "checkingFolders 2", "INBOX +1 -1", "applyingChanges", "downloading INBOX", "downloading Archive");
+        var status = store().readSyncStatus().orElseThrow();
+        assertThat(status.state()).isEqualTo("completed");
+        assertThat(status.phase()).isEqualTo("downloading");
+    }
+
+    @Test void failedRunKeepsThePhaseWhereItStopped() {
+        source.putFolder("inbox", "INBOX", "7", "1");
+        source.failOnDownload(1);
+        try (var index = MailIndex.openWriter(connectionDir)) {
+            assertThatThrownBy(() -> new SyncRunner(store(), index, source, processor()).run(p -> { }))
+                    .isInstanceOf(ImapException.class);
+        }
+        assertThat(store().readSyncStatus().orElseThrow().phase()).isEqualTo("downloading");
+    }
+
     @Test void rebuiltIndexReportsRestoredMessagesBeforeTheMailboxIsRead() {
         source.putFolder("inbox", "INBOX", "7", "2", "1");
         source.putFolder("archive", "Archive", "9", "3");
@@ -836,7 +877,7 @@ class SyncRunnerTest {
 
         // After a run that did not complete, every meta.json is compared with the index again.
         store().writeSyncStatus(new mail.mcp.model.SyncStatus("failed", 1, Instant.now(), Instant.now(),
-                List.of(), "synthetic", false));
+                List.of(), "synthetic", false, "downloading"));
         assertThatThrownBy(this::run).isInstanceOf(RuntimeException.class);
         Files.writeString(meta, saved);
         run();

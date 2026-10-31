@@ -244,11 +244,11 @@ class SyncServiceTest {
                     assertThat(service(() -> fake, () -> new Pandoc("unused")).start("local").status()).isEqualTo(SyncStart.Status.LOCKED_BY_OTHER_PROCESS);
                     assertThat(summaries(logs)).isEmpty();
                 } finally { release.countDown(); awaitDone(service); }
-                var rejected = new mail.mcp.model.SyncStatus("failed", 1, java.time.Instant.now(), java.time.Instant.now(), List.of(), "rejected", true);
+                var rejected = new mail.mcp.model.SyncStatus("failed", 1, java.time.Instant.now(), java.time.Instant.now(), List.of(), "rejected", true, "signingIn");
                 store().writeSyncStatus(rejected);
                 assertThat(service.start("local").status()).isEqualTo(SyncStart.Status.REFUSED);
                 assertThat(summaries(logs)).hasSize(1);
-                store().writeSyncStatus(new mail.mcp.model.SyncStatus("completed", 1, java.time.Instant.now(), java.time.Instant.now(), List.of(), null, false));
+                store().writeSyncStatus(new mail.mcp.model.SyncStatus("completed", 1, java.time.Instant.now(), java.time.Instant.now(), List.of(), null, false, "downloading"));
                 assertThatThrownBy(() -> service(() -> fake, () -> { throw new PandocException("missing"); }).start("local"))
                         .isInstanceOf(IllegalStateException.class);
                 assertThat(summaries(logs)).hasSize(1);
