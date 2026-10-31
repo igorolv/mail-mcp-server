@@ -66,8 +66,26 @@ The agent picks the tools itself; these are the chains it usually follows.
 
 ## Quickstart
 
-**1. Install** JDK 25 and [pandoc](https://pandoc.org/installing.html) 3.x. Pandoc must be on
-`PATH`: synchronization refuses to start without it.
+**1. Install the prerequisites**
+
+- JDK 25.
+- [Pandoc 3.x](https://pandoc.org/installing.html), installed separately from this server.
+  **Pandoc is required**, and the directory containing its executable must be on `PATH`.
+
+After installation, open a new terminal and check:
+
+```powershell
+java -version
+pandoc --version
+```
+
+The commands must report Java 25 and pandoc 3.x. If `pandoc` is not found, add its installation
+directory to `PATH`, reopen the terminal and check again before continuing.
+Fully close and reopen any already running MCP client so that the server inherits the updated
+`PATH`.
+
+Pandoc is required for synchronization, reprocessing and reindexing. Reading previously
+synchronized mail works without it.
 
 **2. Build** the jar:
 
@@ -170,6 +188,9 @@ claude mcp add --scope user mail -- java -jar C:/path/to/mail-mcp-server.jar
 
 Codex CLI, OpenCode, VS Code, Cursor, Claude Desktop and environment variables:
 [docs/clients.md](docs/clients.md).
+
+The MCP client must launch the server with a `PATH` that includes pandoc. If the client was
+running before you installed pandoc or changed `PATH`, fully close and reopen it.
 
 **8. Try it.** Ask the agent in plain words:
 
@@ -356,8 +377,11 @@ skipped when it is not installed.
 - **Gmail does not show App passwords.** Open **2-Step Verification** first, then **App passwords**,
   or use the direct link in [Gmail setup](docs/connections.md#app-passwords). That section also
   explains account restrictions and the OAuth2 alternative.
-- **`pandoc not found; install pandoc and put it on PATH`.** Install pandoc and restart the
-  terminal or the MCP client, so that it sees the new `PATH`.
+- **`pandoc not found; install pandoc and put it on PATH`.** Run `pandoc --version` in a new
+  terminal. If it is not found, install pandoc and add the directory containing its executable
+  to `PATH` (see [Quickstart](#quickstart)). A successful terminal check does not update an
+  already running MCP client's environment: fully close and reopen the client so that the
+  server inherits the new `PATH`.
 - **`Connection is being synchronized by another process`, exit code 5.** A sync of the same
   mailbox or an offline data command holds the local write lock. Wait for that operation to
   finish. `syncStatus` reports sync runs only, not progress of offline commands.
