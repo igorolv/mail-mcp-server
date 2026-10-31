@@ -56,8 +56,9 @@ OAuth connections use AUTHENTICATE with XOAUTH2 arguments; the wrapper acknowled
 challenges with an empty response instead of resending credentials (see gmail-oauth-agent.md).
 FETCH/UID FETCH is allowed only with UID, FLAGS, INTERNALDATE, ENVELOPE, RFC822.SIZE,
 BODY.PEEK[] (optionally a partial byte range), and the read-only Gmail items X-GM-MSGID and
-X-GM-LABELS (requested only when the server advertises `X-GM-EXT-1`). Command text containing
-CR/LF is rejected.
+X-GM-LABELS (requested only when the server advertises `X-GM-EXT-1`), and EMAILID (only with
+`OBJECTID` on non-Gmail servers). THREADID, MAILBOXID and arbitrary extension FETCH items remain
+forbidden. Command text containing CR/LF is rejected.
 
 CLOSE is safe because SELECT is forbidden: RFC 3501 section 6.4.2 specifies that CLOSE cannot
 remove messages from a mailbox opened with EXAMINE. Angus uses it to return the socket to the
@@ -71,7 +72,8 @@ Folder names are passed as encoded Angus arguments, never interpolated into comm
 ## MIME download
 
 `folderUids(folderName)` opens the folder with EXAMINE, reads UIDVALIDITY and fetches all UIDs
-with `FETCH 1:N (FLAGS UID)` (no FETCH for an empty folder; Gmail items are added on Gmail).
+with `FETCH 1:N (FLAGS UID)` (no FETCH for an empty folder; Gmail items are added on Gmail,
+or EMAILID on a non-Gmail OBJECTID server).
 Non-positive UIDVALIDITY or UID is a protocol failure. UIDs are returned sorted and copied.
 `ImapMailSource.changes` compares those
 refs with the known local refs. A changed UIDVALIDITY resets the folder: all known refs are
@@ -104,7 +106,10 @@ handling is added for other servers.
 ## Gmail
 
 Gmail is detected by the `X-GM-EXT-1` capability, never by host name, login or folder name.
-`ImapClient.gmailExtensions()` caches that check for the session.
+`ImapClient.gmailExtensions()` and `objectIdExtensions()` share one cached check of the
+authenticated capability map, without another CAPABILITY command or sign-in. Checks are
+case-insensitive. Gmail identity takes precedence: `objectIdExtensions()` is false whenever
+`X-GM-EXT-1` is advertised, even alongside `OBJECTID`, and EMAILID is never requested on Gmail.
 
 - **One folder.** `ImapMailSource.folders()` returns only the folder whose LIST attributes contain
   `\All` (case-insensitive) when exactly one message-holding folder has it. Gmail's label folders
@@ -157,6 +162,36 @@ produced no user flags before filtering. The real-mail results are in `docs/resu
 Support for arbitrary custom keywords remains to verify; the optional user-run addition/removal
 check is in `docs/plan.md` section 2 and does not block publication of `0.1.0`.
 
+## RFC 8474 EMAILID
+
+On non-Gmail servers, only the `OBJECTID` capability enables EMAILID; host names, logins and
+folder names play no part. Both existing profiles add the one read-only item, producing
+`FETCH 1:N (FLAGS UID EMAILID)` for the UID listing and
+`FETCH <set> (ENVELOPE INTERNALDATE RFC822.SIZE FLAGS UID EMAILID)` for added-message metadata.
+There is no extra command, trial request, header/body download or retry.
+
+`ReadOnlyImapStore.getFetchItems()` registers an EMAILID parser alongside the Gmail parsers.
+It consumes the parenthesized `EMAILID (objectid)` value and accepts only 1–255 ASCII letters,
+digits, `_` or `-`, preserving case exactly. An absent or invalid item is unknown, contributes
+no identity and triggers no replacement fetch or value-bearing diagnostic. A separate per-UID
+batch map is cleared by `clearMetadataObservations()` and copied into `FolderUids.emailIds`.
+EMAILID is independent of FLAGS and labels: `changes` includes EMAILID-only known-UID
+observations with null fingerprint, and `metadata` supplies it for added messages even without
+FLAGS. Null preserves a saved identity; a new message without one keeps the fingerprint path.
+Non-Gmail keyword labels retain their independent FLAGS-based behavior.
+
+The value reaches the existing provider-neutral `RemoteMessageInfo.stableId` and storage/index
+path unchanged. Identical content can share one EMAILID with different flags or keywords;
+reuse requires the existing saved/current uniqueness rule in `docs/storage-agent.md` and never
+merges ambiguous copies. MAILBOXID, THREADID, extension SEARCH and server consistency recovery
+are not implemented.
+
+The Mail.ru capability check is complete; its result is in `docs/results.md` section 2. No
+Mail.ru EMAILID move check remains. EMAILID propagation and generic stableId reuse are covered
+offline. The optional real-mail reuse check on a non-Gmail OBJECTID server is in `docs/plan.md`
+section 2 and does not block publication of `0.1.0`. Never enable or share raw protocol logs or
+credentials.
+
 ## Remote identity metadata
 
 `ImapMailSource.metadata(folder, expectedCursor, refs)` requires the UIDVALIDITY cursor just
@@ -165,7 +200,8 @@ UIDVALIDITY still matches before trusting reused UIDs, then resolves and fetches
 of at most 100. A mismatch closes the client and aborts the run without retry. Missing/expunged
 items are omitted; other protocol/authentication/transport errors abort.
 
-The Angus 2.0.5 profile uses ENVELOPE, FLAGS and UID, plus the Gmail items on Gmail. Offline
+The Angus 2.0.5 profile uses ENVELOPE, FLAGS and UID, plus the Gmail items on Gmail or EMAILID
+on a non-Gmail OBJECTID server. Offline
 fake-server tests verify the exact emitted attributes `(ENVELOPE INTERNALDATE RFC822.SIZE FLAGS
 UID)` and, on Gmail, `(ENVELOPE INTERNALDATE RFC822.SIZE FLAGS UID X-GM-MSGID X-GM-LABELS)`;
 ENVELOPE already supplies the date and size fetch attributes, so adding SIZE to the profile would
@@ -221,7 +257,8 @@ No STORE, SELECT, body retrieval or additional authentication is enabled.
 Known mail gets its flags and Gmail items from the UID listing: `folderUids` closes the folder,
 reopens it with EXAMINE and sends one `FETCH 1:n (FLAGS UID)`; ReadOnlyImapStore records UID and
 FLAGS of each parsed response, so a skipped response leaves that UID unobserved. On Gmail the same
-command adds `X-GM-MSGID X-GM-LABELS` (see "Gmail"). Null fields preserve stored
+command adds `X-GM-MSGID X-GM-LABELS` (see "Gmail"); non-Gmail OBJECTID servers add `EMAILID`
+(see "RFC 8474 EMAILID"). Null fields preserve stored
 values; explicit false clears them. Destination flags apply after move reuse but are excluded
 from its identity; a UIDVALIDITY reset uses only fresh observations. Flags are user read/star
 state, independent of Gmail Important. Flag-only and label-only changes update metadata/index
@@ -231,6 +268,12 @@ and selective updates passed the user-run checks in `docs/results.md` section 2;
 cross-tool and flag-clearing checks are in `docs/plan.md` section 2.
 
 ## Failure diagnostics
+
+Once the shared capability check completes, each source session emits one safe INFO line:
+`IMAP extensions: objectId=<true|false>`. It contains only the enabled boolean, with no connection,
+host, login, folder, server text or ObjectID value. At INFO it reaches the MCP server log file
+`<data-dir>\logs\mail-mcp-server.log`; `mail-sync` hides it because `logback-cli.xml` uses WARN.
+Logs never go to `System.out`.
 
 Every sanitized `ImapException` from `ImapClient` first logs one WARN line (stderr in the user-run
 commands, the log file in the server). It names the operation (`listFolders`, `folderUids`,
@@ -257,6 +300,10 @@ Keyword tests cover system and bookkeeping exclusions, junk-filter keyword exclu
 spelling, empty/unknown labels and both existing FETCH shapes. Gmail tests cover capability
 detection, the All Mail folder choice and its fallback, the exact X-GM items in both FETCH
 shapes, a missing extension, decoded labels and isolation from IMAP keywords.
+EMAILID tests cover case-insensitive capability detection, Gmail precedence, exact case and
+length boundaries, invalid/absent values, independent observations without FLAGS, both FETCH
+shapes, batch-map clearing, no extra capability command and the one safe INFO line. Generic
+`SyncRunnerTest` stableId tests cover moves, duplicate/current-copy ambiguity and UIDVALIDITY resets.
 All tests are part of `gradlew.bat build`.
 
 Angus 2.0.5 sources inspected on 2026-10-25:
@@ -265,3 +312,7 @@ Angus 2.0.5 sources inspected on 2026-10-25:
 - [IMAPMessage](https://github.com/eclipse-ee4j/angus-mail/blob/2.0.5/providers/imap/src/main/java/org/eclipse/angus/mail/imap/IMAPMessage.java): getMimeStream, PEEK and getSizeLong.
 - [IMAPFolder](https://github.com/eclipse-ee4j/angus-mail/blob/2.0.5/providers/imap/src/main/java/org/eclipse/angus/mail/imap/IMAPFolder.java): READ_ONLY/EXAMINE, UID/size fetch and close(false).
 - [Protocol](https://github.com/eclipse-ee4j/angus-mail/blob/2.0.5/providers/imap/src/main/java/org/eclipse/angus/mail/iap/Protocol.java): command/writeCommand boundary.
+
+[RFC 8474](https://www.rfc-editor.org/rfc/rfc8474.html), sections 3, 5.1, 5.3, 7 and 8.4,
+checked on 2026-11-01: OBJECTID capability, EMAILID wire syntax, case-sensitive identifiers,
+shared identifiers for identical content and client consistency considerations.

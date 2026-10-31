@@ -53,8 +53,9 @@ text never changes metadata or the converted message state.
 See `docs/mime-agent.md` for parsing, naming and pandoc rules.
 
 Two provider-neutral fields come from the source when it has them. `stableId` is the provider's
-own message identifier that survives moves and UID changes (currently Gmail `X-GM-MSGID`, kept as
-a decimal string). `labels` are the mailbox labels of the latest observation: Gmail labels or
+own message identifier that survives moves and UID changes: Gmail `X-GM-MSGID`, kept as a decimal
+string, or non-Gmail RFC 8474 `EMAILID`, kept with its exact case when `OBJECTID` is advertised
+(`docs/imap-source-agent.md`). `labels` are the mailbox labels of the latest observation: Gmail labels or
 non-Gmail IMAP keywords, mapped by the IMAP source (`docs/imap-source-agent.md`), or Outlook
 categories, preserved as returned by EWS (`docs/ews-source-agent.md`). Both fields are absent in
 old `meta.json` files; when a provider does not supply a field it reads as null, which means unknown.
@@ -142,7 +143,9 @@ changes, this match also applies within one folder and across a UIDVALIDITY rese
 reused for other messages. Such a candidate never matches by fingerprint; candidates without a
 `stableId` (other providers, metadata saved before Д7) keep the heuristic. A message present in two
 included folders at once is two stored messages, as for every provider: one directory per remote
-ref; search and conversations group them as copies.
+ref; search and conversations group them as copies. RFC 8474 permits identical content to share
+an EMAILID with different flags or keywords; the same uniqueness rule rejects such ambiguity
+and leaves ordinary removal/download behavior in place.
 
 Only added refs receive a metadata snapshot, in protocol batches of at most 100 without
 MIME/body downloads (Д29). Known messages keep their saved fingerprints: a flag-only observation

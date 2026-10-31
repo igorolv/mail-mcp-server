@@ -29,16 +29,21 @@ final class FakeImapServer implements AutoCloseable {
             + "((NIL NIL \"Sender\" \"example.com\")) NIL NIL NIL NIL NIL NIL \"<Move@example.com>\")";
 
     record Item(long uid, byte[] bytes, long declaredSize, String flags, String envelope,
-                String msgId, String labels) {
+                String msgId, String labels, String emailId) {
         Item(long uid, byte[] bytes) { this(uid, bytes, bytes.length, ""); }
         Item(long uid, byte[] bytes, long declaredSize, String flags) { this(uid, bytes, declaredSize, flags, ENVELOPE); }
         Item(long uid, byte[] bytes, long declaredSize, String flags, String envelope) {
-            this(uid, bytes, declaredSize, flags, envelope, null, null);
+            this(uid, bytes, declaredSize, flags, envelope, null, null, null);
         }
         /** Synthetic Gmail items: msgId as the wire atom, labels already encoded for the wire. */
         Item gmail(String msgId, String labels) {
-            return new Item(uid, bytes, declaredSize, flags, envelope, msgId, labels);
+            return new Item(uid, bytes, declaredSize, flags, envelope, msgId, labels, emailId);
         }
+        /** Synthetic RFC 8474 value; invalid spellings exercise the parser's unknown path. */
+        Item emailId(String value) {
+            return new Item(uid, bytes, declaredSize, flags, envelope, msgId, labels, value);
+        }
+        String emailIdItem() { return emailId == null ? "" : " EMAILID (" + emailId + ")"; }
         String gmailItems() {
             return msgId == null ? "" : " X-GM-MSGID " + msgId + " X-GM-LABELS (" + (labels == null ? "" : labels) + ")";
         }
@@ -59,6 +64,8 @@ final class FakeImapServer implements AutoCloseable {
     volatile boolean malformedMetadataFlags;
     volatile Long malformedMetadataUid;
     volatile String listingFlags;
+    volatile boolean omitListingFlags;
+    volatile boolean omitEmailIds;
     volatile boolean rejectMetadata;
     /** Folders deleted on the server after the session started: LIST omits them, EXAMINE answers NO. */
     final Set<String> deleted = ConcurrentHashMap.newKeySet();
@@ -91,6 +98,7 @@ final class FakeImapServer implements AutoCloseable {
             boolean oauth = mode.startsWith("oauth"), initial = mode.equals("oauth-ir");
             boolean gmail = mode.contains("gmail");
             String capabilities = "IMAP4rev1" + (gmail ? " X-GM-EXT-1" : "")
+                    + (mode.contains("objectid") ? " oBjEcTiD" : "")
                     + (oauth ? " AUTH=XOAUTH2 AUTH=PLAIN AUTH=LOGIN"
                     : mode.equals("plain") ? " AUTH=PLAIN AUTH=LOGIN" : "") + (initial ? " SASL-IR" : "");
             send(out, "* OK [CAPABILITY " + capabilities + "] synthetic endpoint\r\n");
@@ -158,19 +166,20 @@ final class FakeImapServer implements AutoCloseable {
                             send(out, "* " + (i + 1) + " FETCH (UID " + current.messages().get(i).uid() + ")\r\n");
                         }
                     }
-                } else if (command.matches("FETCH [0-9:,]+ \\(FLAGS UID( X-GM-MSGID X-GM-LABELS)?\\)")) {
+                } else if (command.matches("FETCH [0-9:,]+ \\(FLAGS UID( X-GM-MSGID X-GM-LABELS| EMAILID)?\\)")) {
                     assertThat(current).isNotNull();
                     String set = command.split(" ")[1];
                     boolean withGmail = command.contains("X-GM-LABELS");
                     for (int i = 0; i < current.messages().size(); i++) {
                         if (inSet(i + 1, set)) {
                             var item = current.messages().get(i);
-                            send(out, "* " + (i + 1) + " FETCH (FLAGS ("
-                                    + (listingFlags == null ? item.flags() : listingFlags) + ") UID " + item.uid()
-                                    + (withGmail ? item.gmailItems() : "") + ")\r\n");
+                            send(out, "* " + (i + 1) + " FETCH ("
+                                    + (omitListingFlags ? "" : "FLAGS (" + (listingFlags == null ? item.flags() : listingFlags) + ") ")
+                                    + "UID " + item.uid() + (withGmail ? item.gmailItems() : "")
+                                    + (command.contains("EMAILID") && !omitEmailIds ? item.emailIdItem() : "") + ")\r\n");
                         }
                     }
-                } else if (command.matches("FETCH [0-9:,]+ \\(ENVELOPE INTERNALDATE RFC822\\.SIZE FLAGS UID( X-GM-MSGID X-GM-LABELS)?\\)")) {
+                } else if (command.matches("FETCH [0-9:,]+ \\(ENVELOPE INTERNALDATE RFC822\\.SIZE FLAGS UID( X-GM-MSGID X-GM-LABELS| EMAILID)?\\)")) {
                     assertThat(current).isNotNull();
                     if (rejectMetadata) { send(out, tag + " NO private-server-text\r\n"); continue; }
                     String set = command.split(" ")[1];
@@ -183,7 +192,8 @@ final class FakeImapServer implements AutoCloseable {
                                     + (omitMetadataFlags ? "" : malformedMetadataFlags
                                     || Long.valueOf(item.uid()).equals(malformedMetadataUid) ? " FLAGS NIL"
                                     : " FLAGS (" + (metadataFlags == null ? item.flags() : metadataFlags) + ")")
-                                    + " UID " + item.uid() + (withGmail ? item.gmailItems() : "") + ")\r\n");
+                                    + " UID " + item.uid() + (withGmail ? item.gmailItems() : "")
+                                    + (command.contains("EMAILID") && !omitEmailIds ? item.emailIdItem() : "") + ")\r\n");
                         }
                     }
                 } else if (command.matches("FETCH [0-9]+ \\(RFC822\\.SIZE\\)")) {

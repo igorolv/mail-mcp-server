@@ -49,6 +49,8 @@ has also completed; real OAuth2 sign-in is unverified. Developed and tested on W
   Details: [Read-only Protection](#read-only-protection).
 - **Background sync on request**, incremental, with recognized moves between folders and
   read/flag snapshots; several clients can share one data directory.
+  Non-Gmail IMAP servers advertising `OBJECTID` supply RFC 8474 `EMAILID` for unambiguous reuse
+  of saved content across moves and UID changes, without downloading MIME again.
 - **Optional secret filter** that replaces passwords, codes and tokens in tool responses.
 
 ## Typical Scenarios

@@ -39,13 +39,27 @@ final class ReadOnlyImapStore extends IMAPStore {
      * (X-GM-EXT-1). They are read-only FETCH items; no command or state changes with them.
      */
     static final FetchProfile.Item GMAIL = new FetchProfile.Item("gmail") { };
-    private static final FetchItem[] GMAIL_ITEMS = {
+    static final FetchProfile.Item EMAILID = new FetchProfile.Item("EMAILID") { };
+    private static final FetchItem[] EXTENSION_ITEMS = {
             new FetchItem("X-GM-MSGID", GMAIL) {
                 @Override public Object parseItem(FetchResponse response) { return response.readAtom(); }
             },
             new FetchItem("X-GM-LABELS", GMAIL) {
                 @Override public Object parseItem(FetchResponse response) throws ParsingException {
                     return readLabels(response);
+                }
+            },
+            new FetchItem("EMAILID", EMAILID) {
+                @Override public Object parseItem(FetchResponse response) throws ParsingException {
+                    response.skipSpaces();
+                    if (response.peekByte() != '(') {
+                        response.readAtomString();
+                        return null;
+                    }
+                    response.readByte();
+                    String value = response.readString(')');
+                    if (response.readByte() != ')') { throw new ParsingException("Unterminated EMAILID item"); }
+                    return value != null && value.matches("[A-Za-z0-9_-]{1,255}") ? value : null;
                 }
             }
     };
@@ -86,6 +100,7 @@ final class ReadOnlyImapStore extends IMAPStore {
     private final Map<Long, Flags> metadataFlags = new HashMap<>();
     private final Set<Long> metadataParsed = new HashSet<>();
     private final Map<Long, GmailMessageInfo> metadataGmail = new HashMap<>();
+    private final Map<Long, String> metadataEmailIds = new HashMap<>();
     private int metadataUnparsable;
 
     /** Forgets the previous batch before the next metadata fetch. */
@@ -93,11 +108,14 @@ final class ReadOnlyImapStore extends IMAPStore {
         metadataFlags.clear();
         metadataParsed.clear();
         metadataGmail.clear();
+        metadataEmailIds.clear();
         metadataUnparsable = 0;
     }
     Flags metadataFlags(long uid) { return metadataFlags.get(uid); }
     /** Gmail items of this batch, or null when the response had neither. */
     GmailMessageInfo metadataGmail(long uid) { return metadataGmail.get(uid); }
+    /** Valid RFC 8474 EMAILID of this batch, or null when absent or invalid. */
+    String metadataEmailId(long uid) { return metadataEmailIds.get(uid); }
     /** True when this batch returned a parsed FETCH response with ENVELOPE for the UID. */
     boolean metadataParsed(long uid) { return metadataParsed.contains(uid); }
     /** Responses of this batch that Angus could not parse and skipped. */
@@ -117,8 +135,8 @@ final class ReadOnlyImapStore extends IMAPStore {
             private boolean oauthAuthenticated;
             private int malformedResponses;
 
-            // Advertise the Gmail items so Angus parses them instead of rejecting the response.
-            @Override public FetchItem[] getFetchItems() { return GMAIL_ITEMS; }
+            // Register extension parsers; capability-gated profiles choose which items to request.
+            @Override public FetchItem[] getFetchItems() { return EXTENSION_ITEMS; }
 
             // Angus skips a response it cannot parse; count it so the batch knows what is missing.
             @Override public Response readResponse() throws IOException, ProtocolException {
@@ -136,6 +154,17 @@ final class ReadOnlyImapStore extends IMAPStore {
             @Override public Response[] fetch(MessageSet[] messages, String items) throws ProtocolException {
                 malformedResponses = 0;
                 Response[] responses = super.fetch(messages, items);
+                if (items.contains("EMAILID")) {
+                    for (var response : responses) {
+                        if (response instanceof FetchResponse fetch) {
+                            var uid = fetch.getItem(UID.class);
+                            var extension = fetch.getExtensionItems();
+                            if (uid != null && extension != null && extension.get("EMAILID") instanceof String value) {
+                                metadataEmailIds.put(uid.uid, value);
+                            }
+                        }
+                    }
+                }
                 if (items.contains("X-GM-MSGID")) {
                     for (var response : responses) {
                         if (response instanceof FetchResponse fetch) {
@@ -257,8 +286,8 @@ final class ReadOnlyImapStore extends IMAPStore {
             return;
         }
         // Restrict FETCH attributes as well as its verb: BODY/RFC822 can set \\Seen. X-GM-MSGID and
-        // X-GM-LABELS are read-only Gmail items requested only when X-GM-EXT-1 is advertised.
-        String item = "(?:UID|FLAGS|INTERNALDATE|ENVELOPE|RFC822\\.SIZE|X-GM-MSGID|X-GM-LABELS"
+        // X-GM-LABELS and EMAILID are read-only items requested only with their capabilities.
+        String item = "(?:UID|FLAGS|INTERNALDATE|ENVELOPE|RFC822\\.SIZE|X-GM-MSGID|X-GM-LABELS|EMAILID"
                 + "|BODY\\.PEEK\\[\\](?:<\\d+\\.\\d+>)?)";
         if (upper.matches("(?:UID )?FETCH [0-9:,]+ \\(" + item + "(?: " + item + ")*\\)")) {
             return;

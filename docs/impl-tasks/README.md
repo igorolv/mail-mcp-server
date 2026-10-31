@@ -126,15 +126,7 @@ Next unused number: IT-31. Recording one brief preserves all other rows and depe
 Accepted briefs are kept in git history; remaining real-mail checks are in `docs/plan.md`
 section 2.
 
-The remaining brief builds on the accepted IT-28 and IT-29 code and documentation (Д31, Д32). The original
-batch baseline `db000bc` already contains the sync stages (`SyncListener`, `SyncPhase`) and the
-gone-folder handling (`FolderGoneException`, `ImapClient.open`, the fake server's `deleted`
-folders) that IT-30 builds on. Run the remaining brief from a clean tree, preserving its
-dependency notes.
-
-| Order | Brief | Plan item | Scope and dependency |
-|---|---|---|---|
-| 3 | [IT-30 — RFC 8474 EMAILID as stableId](IT-30-imap-emailid.md) | Д33 | One S session after accepted IT-29; shares IMAP source records, fake server and documentation |
+No implementation briefs remain. The remaining release work is in `docs/plan.md` section 4.
 
 ## Rules for every implementation session
 

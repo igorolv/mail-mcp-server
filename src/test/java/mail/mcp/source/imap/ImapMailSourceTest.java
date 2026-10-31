@@ -105,6 +105,42 @@ class ImapMailSourceTest {
         }
     }
 
+    @Test void changesObserveEmailIdOfKnownRefs() throws Exception {
+        var folder = new FakeImapServer.MailFolder("INBOX",
+                new FakeImapServer.Item(1, MIME, MIME.length, "\\Seen \\Flagged Project $Forwarded").emailId("Fiction_Az-09"),
+                new FakeImapServer.Item(5, MIME).emailId("Fiction_New"),
+                new FakeImapServer.Item(10, MIME),
+                new FakeImapServer.Item(11, MIME).emailId("invalid@fiction"));
+        try (var server = new FakeImapServer("objectid", folder); var source = source(server)) {
+            server.omitListingFlags = true;
+            var changes = source.changes(INBOX, "7", Set.of("1", "10", "11"));
+            assertThat(changes.added()).containsExactly("5");
+            assertThat(changes.observed()).containsOnlyKeys("1");
+            var identity = changes.observed().get("1");
+            assertThat(identity.stableId()).isEqualTo("Fiction_Az-09");
+            assertThat(identity.fingerprint()).isNull();
+            assertThat(identity.labels()).isNull();
+            assertThat(identity.read()).isNull();
+            assertThat(identity.flagged()).isNull();
+
+            server.omitListingFlags = false;
+            changes = source.changes(INBOX, "7", Set.of("1", "10", "11"));
+            assertThat(changes.observed()).containsOnlyKeys("1", "10", "11");
+            assertThat(changes.observed().get("1").labels()).containsExactly("Project");
+            assertThat(changes.observed().get("1").read()).isTrue();
+            assertThat(changes.observed().get("1").flagged()).isTrue();
+            assertThat(changes.observed().get("10").stableId()).isNull();
+            assertThat(changes.observed().get("10").labels()).isEmpty();
+            assertThat(changes.observed().get("11").stableId()).isNull();
+            server.omitEmailIds = true;
+            assertThat(source.changes(INBOX, "7", Set.of("1")).observed().get("1").stableId()).isNull();
+            assertThat(source.changes(INBOX, "8", Set.of("1")).observed()).isEmpty();
+            assertThat(server.commands.stream().filter(c -> c.contains("FETCH")))
+                    .containsExactly(java.util.Collections.nCopies(4, "FETCH 1:4 (FLAGS UID EMAILID)").toArray(String[]::new));
+            assertThat(server.commands.stream().filter(c -> c.startsWith("LOGIN "))).hasSize(1);
+        }
+    }
+
     @Test void removedIsKnownMinusPresent() throws Exception {
         try (var server = new FakeImapServer(inbox()); var source = source(server)) {
             var changes = source.changes(INBOX, "7", Set.of("1", "2", "20", "11", "0", "bad", "gone"));

@@ -32,6 +32,132 @@ class ImapClientTest {
         return new ImapSettings("127.0.0.1", port, true, AuthKind.APP_PASSWORD, "user", "synthetic-test-value");
     }
 
+    @Test void objectIdEmailIdIsFetchedAsStableId() throws Exception {
+        var logs = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ImapClient.class);
+        var previousLevel = logger.getLevel();
+        logger.setLevel(ch.qos.logback.classic.Level.INFO);
+        logs.start();
+        logger.addAppender(logs);
+        var folder = new FakeImapServer.MailFolder("INBOX",
+                new FakeImapServer.Item(42, MIME, MIME.length, "\\Seen Project").emailId("Fiction_Az-09"),
+                new FakeImapServer.Item(43, MIME).emailId("Z"),
+                new FakeImapServer.Item(44, MIME).emailId("a".repeat(255)),
+                new FakeImapServer.Item(45, MIME));
+        try (var server = new FakeImapServer("objectid", folder);
+             var client = new ImapClient(settings(server.port()), false)) {
+            client.listFolders();
+            int capabilities = (int) server.commands.stream().filter(c -> c.equals("CAPABILITY")).count();
+            assertThat(client.objectIdExtensions()).isTrue();
+            assertThat(client.gmailExtensions()).isFalse();
+            assertThat(client.objectIdExtensions()).isTrue();
+            var uids = client.folderUids("INBOX");
+            assertThat(uids.emailIds()).containsExactlyInAnyOrderEntriesOf(
+                    java.util.Map.of(42L, "Fiction_Az-09", 43L, "Z", 44L, "a".repeat(255)));
+            assertThatThrownBy(uids.emailIds()::clear).isInstanceOf(UnsupportedOperationException.class);
+            var result = client.metadata("INBOX", uids.uidValidity(), uids.uids());
+            assertThat(result.get("42").stableId()).isEqualTo("Fiction_Az-09");
+            assertThat(result.get("42").labels()).containsExactly("Project");
+            assertThat(result.get("42").read()).isTrue();
+            assertThat(result.get("43").stableId()).isEqualTo("Z");
+            assertThat(result.get("44").stableId()).isEqualTo("a".repeat(255));
+            assertThat(result.get("45").stableId()).isNull();
+            assertThat(result.get("45").fingerprint()).isNotNull();
+            server.omitMetadataFlags = true;
+            var identityOnly = client.metadata("INBOX", 7, List.of(42L)).get("42");
+            assertThat(identityOnly.stableId()).isEqualTo("Fiction_Az-09");
+            assertThat(identityOnly.labels()).isNull();
+            assertThat(identityOnly.read()).isNull();
+            server.omitEmailIds = true;
+            assertThat(client.folderUids("INBOX").emailIds()).isEmpty();
+            assertThat(client.metadata("INBOX", 7, List.of(42L)).get("42").stableId()).isNull();
+            assertThat(server.commands.stream().filter(c -> c.contains("FETCH"))).containsExactly(
+                    "FETCH 1:4 (FLAGS UID EMAILID)", "UID FETCH 42,43,44,45 (UID)",
+                    "FETCH 1:4 (ENVELOPE INTERNALDATE RFC822.SIZE FLAGS UID EMAILID)",
+                    "UID FETCH 42 (UID)", "FETCH 1 (ENVELOPE INTERNALDATE RFC822.SIZE FLAGS UID EMAILID)",
+                    "FETCH 1:4 (FLAGS UID EMAILID)", "UID FETCH 42 (UID)",
+                    "FETCH 1 (ENVELOPE INTERNALDATE RFC822.SIZE FLAGS UID EMAILID)");
+            assertThat(server.commands.stream().filter(c -> c.equals("CAPABILITY"))).hasSize(capabilities);
+            assertThat(server.commands.stream().filter(c -> c.startsWith("LOGIN "))).hasSize(1);
+            assertThat(server.commands).noneMatch(c -> c.contains("BODY") || c.contains("X-GM")
+                    || c.matches("(?i).*(SELECT |STORE |EXPUNGE|APPEND ).*"));
+            assertThat(logs.list).extracting(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                    .containsExactly("IMAP extensions: objectId=true");
+            assertThat(logs.list.getFirst().getLevel()).isEqualTo(ch.qos.logback.classic.Level.INFO);
+        } finally {
+            logger.detachAppender(logs);
+            logger.setLevel(previousLevel);
+        }
+    }
+
+    @Test void emailIdIsNotRequestedWithoutObjectIdOrOnGmail() throws Exception {
+        var folder = new FakeImapServer.MailFolder("INBOX",
+                new FakeImapServer.Item(42, MIME).emailId("Fiction_Az-09").gmail("123", "\\Inbox"));
+        for (String mode : List.of("login", "gmail-objectid")) {
+            try (var server = new FakeImapServer(mode, folder);
+                 var client = new ImapClient(settings(server.port()), false)) {
+                assertThat(client.objectIdExtensions()).isFalse();
+                var uids = client.folderUids("INBOX");
+                assertThat(uids.emailIds()).isEmpty();
+                var metadata = client.metadata("INBOX", uids.uidValidity(), uids.uids()).get("42");
+                if (mode.contains("gmail")) {
+                    assertThat(client.gmailExtensions()).isTrue();
+                    assertThat(uids.gmail().get(42L).msgId()).isEqualTo("123");
+                    assertThat(metadata.stableId()).isEqualTo("123");
+                } else {
+                    assertThat(client.gmailExtensions()).isFalse();
+                    assertThat(metadata.stableId()).isNull();
+                    assertThat(metadata.fingerprint()).isNotNull();
+                }
+                assertThat(server.commands).noneMatch(c -> c.contains("EMAILID"));
+            }
+        }
+    }
+
+    @Test void invalidEmailIdIsNotTrusted() throws Exception {
+        var logs = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ImapClient.class);
+        var previousLevel = logger.getLevel();
+        logger.setLevel(ch.qos.logback.classic.Level.INFO);
+        logs.start();
+        logger.addAppender(logs);
+        var invalid = List.of("invalid@fiction", "X".repeat(256), "", "two values", "\"quoted\"");
+        var messages = java.util.stream.IntStream.range(0, invalid.size())
+                .mapToObj(i -> new FakeImapServer.Item(i + 1, MIME).emailId(invalid.get(i))).toList();
+        try (var server = new FakeImapServer("objectid", new FakeImapServer.MailFolder("INBOX", 7, List.of(), messages));
+             var client = new ImapClient(settings(server.port()), false)) {
+            var uids = client.folderUids("INBOX");
+            assertThat(uids.emailIds()).isEmpty();
+            var metadata = client.metadata("INBOX", 7, uids.uids());
+            assertThat(metadata).hasSize(invalid.size());
+            assertThat(metadata.values()).allSatisfy(info -> {
+                assertThat(info.stableId()).isNull();
+                assertThat(info.fingerprint()).isNotNull();
+            });
+            assertThat(server.commands.stream().filter(c -> c.contains("FETCH"))).containsExactly(
+                    "FETCH 1:5 (FLAGS UID EMAILID)", "UID FETCH 1,2,3,4,5 (UID)",
+                    "FETCH 1:5 (ENVELOPE INTERNALDATE RFC822.SIZE FLAGS UID EMAILID)");
+            assertThat(logs.list).extracting(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                    .containsExactly("IMAP extensions: objectId=true");
+        } finally {
+            logger.detachAppender(logs);
+            logger.setLevel(previousLevel);
+        }
+    }
+
+    @Test void guardAllowsEmailIdButRejectsOtherObjectIdItems() throws Exception {
+        for (String command : List.of("FETCH 1:3 (FLAGS UID EMAILID)",
+                "UID FETCH 42 (ENVELOPE INTERNALDATE RFC822.SIZE FLAGS UID EMAILID)",
+                "fetch 1 (emailid)")) {
+            ReadOnlyImapStore.requireReadCommand(command);
+        }
+        for (String command : List.of("FETCH 1 (UID THREADID)", "UID FETCH 42 (MAILBOXID)",
+                "FETCH 1 (UID EMAILID THREADID)", "FETCH 1 (EMAILID X-FICTION)",
+                "FETCH 1 (EMAILID BODY[])", "UID STORE 42 (EMAILID)")) {
+            assertThatThrownBy(() -> ReadOnlyImapStore.requireReadCommand(command)).isInstanceOf(ProtocolException.class);
+        }
+    }
+
     @Test void metadataFetchUsesEnvelopeSizeUidAndNeverBodyOrWrites() throws Exception {
         var messages = java.util.stream.LongStream.rangeClosed(1, 205)
                 .mapToObj(uid -> new FakeImapServer.Item(uid, MIME, 987654L, "")).toList();
@@ -512,7 +638,8 @@ class ImapClientTest {
             assertThat(server.commands.stream().filter(c -> c.contains("ENVELOPE")))
                     .as("no replacement fetch for the skipped message").hasSize(1);
             assertThat(logs.list).extracting(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
-                    .containsExactly("IMAP metadata batch 1/1: 1 of 3 messages have no parsed metadata response "
+                    .containsExactly("IMAP extensions: objectId=false",
+                            "IMAP metadata batch 1/1: 1 of 3 messages have no parsed metadata response "
                             + "(1 responses unparsable); their metadata stays unknown");
 
             server.malformedMetadataUid = null;
@@ -539,10 +666,12 @@ class ImapClientTest {
                 assertThatThrownBy(() -> client.metadata("INBOX", 8, List.of(42L))).isInstanceOf(ImapException.class);
             }
             var lines = logs.list.stream().map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage).toList();
-            assertThat(lines).hasSize(2);
-            assertThat(lines.get(0)).startsWith("IMAP metadata batch 1/1 failed (PROTOCOL): MessagingException")
+            assertThat(lines).hasSize(4);
+            assertThat(lines.get(0)).isEqualTo("IMAP extensions: objectId=false");
+            assertThat(lines.get(1)).startsWith("IMAP metadata batch 1/1 failed (PROTOCOL): MessagingException")
                     .contains("\"Metadata fetch failed: CommandFailedException\"");
-            assertThat(lines.get(1)).isEqualTo("IMAP metadata (1 UIDs) failed (PROTOCOL): UIDVALIDITY changed");
+            assertThat(lines.get(2)).isEqualTo("IMAP extensions: objectId=false");
+            assertThat(lines.get(3)).isEqualTo("IMAP metadata (1 UIDs) failed (PROTOCOL): UIDVALIDITY changed");
             assertThat(lines).noneMatch(line -> line.contains("private-server-text") || line.contains("INBOX"));
         } finally {
             logger.detachAppender(logs);

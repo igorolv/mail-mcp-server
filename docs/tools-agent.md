@@ -298,8 +298,10 @@ English fields keep their original behavior.
 Sync discovery, observation updates, matching and recovery are specified in
 [storage-agent.md](storage-agent.md#disk-layout) and its "Write order and failures" and
 "Lucene catalog and reconciliation" sections. The runner can reuse removed saved messages by a
-unique provider `stableId`, including across UIDVALIDITY resets, or by the stricter metadata
-heuristic when no saved `stableId` exists. Reuse preserves the local key and content, and increases
+provider `stableId` (Gmail `X-GM-MSGID` or non-Gmail RFC 8474 `EMAILID` when `OBJECTID` is advertised),
+including across UIDVALIDITY resets, only under the storage uniqueness rule. It uses the metadata
+heuristic when no saved `stableId` exists. The identifier remains internal and is never returned
+by tools. Reuse preserves the local key and content, and increases
 none of the downloaded/failed/removed counters. No reading tool initiates source requests.
 
 `sync-status.json` is atomically replaced by `SyncRunner`, which runs only while its caller holds

@@ -25,6 +25,7 @@ preparation (Д18).** All three user mailboxes work: corporate Exchange (EWS), M
 - local conversations across folders of one connection;
 - message copies counted once in search and conversations, with other copies listed in `copies`;
 - detection of unambiguous moves between folders without downloading MIME again;
+- RFC 8474 EMAILID identity on non-Gmail IMAP servers advertising OBJECTID, reusing saved content across moves and UID changes;
 - snapshots of read status and user flags/stars, without writing to the mailbox;
 - Gmail synchronized once through All Mail, with its labels on messages and a `label` search field;
 - Outlook categories exposed and searchable through the same provider-neutral labels;
@@ -89,6 +90,7 @@ runs do not repeat that work. The measured Mail.ru runs are in
 | Sync stages in `mail-sync` and `syncStatus` (`docs/commands.md`) | On the next `mail-sync mailru`, check that the stage lines appear before folder progress, with `saved messages checked` counts only after a run that did not complete. Restart the MCP server, call `sync`, and check that `syncStatus` shows `phase` moving through the stages and the log file has `Sync phase:` lines | 2026-10-31; 734 tests, 1 expected skip, 0 failures |
 | IMAP folder gone during a run, Д34 (`docs/storage-agent.md`) | During a long `mail-sync mailru`, delete or rename an included folder in the web interface: the run continues, the folder's line ends with `, gone from the server during the run`, and the result is `RESULT: OK`. The next run removes the folder's local messages; after a rename they reappear under the new name, recognized as moves where unique | 2026-11-01; 738 tests, 1 expected skip, 0 failures |
 | Non-Gmail IMAP keywords as labels, Д32 (`docs/imap-source-agent.md`) | Optional: if an ordinary mail client can assign a custom IMAP keyword in an included Mail.ru folder, assign one, run `mail-sync mailru` and confirm `labels` and `field: "label"` reflect it without a MIME download; remove it and sync again to confirm clearing. The checked built-in web category returned no user keywords ([results.md, section 2](results.md#2-mailru-and-gmail)); it does not establish support for arbitrary custom keywords. This remaining check does not block publication | 2026-11-01; 743 tests, 1 expected skip, 0 failures; user accepted the implementation with the observed Mail.ru limitation |
+| RFC 8474 EMAILID reuse, Д33 (`docs/imap-source-agent.md`) | Optional during future use of a non-Gmail IMAP server advertising OBJECTID: synchronize a message, move it between included folders in the ordinary mail client, then sync and confirm that its local key/path/content are reused with zero MIME downloads. A natural UIDVALIDITY reset may be checked later; do not trigger one deliberately. The Mail.ru capability check is complete ([results.md, section 2](results.md#2-mailru-and-gmail)), so no Mail.ru move check remains. EMAILID propagation and reuse are covered offline; this optional positive-path check does not block publication | 2026-11-01; 748 tests, 1 expected skip, 0 failures; user accepted the implementation |
 | Gmail OAuth2 sign-in (`docs/gmail-oauth-agent.md`) | Only if needed instead of the verified app password: run `gmail-oauth gmail`, then `mail-sync gmail`. Token encryption is in [backlog.md](backlog.md), Д27 | 2026-10-25 |
 | Passwords from Windows Credential Manager and password managers (`docs/connections.md`) | `windowsCredential`: replace `passwordCommand` with `"windowsCredential": "mail-mcp/<name>"`, run `mail-sync` for `work` and `mailru`, then restart the MCP server and run `sync` and `syncStatus`. `passwordCommand` in `mail-sync` for EWS is already verified ([results.md, section 1](results.md#1-corporate-exchange)); server use and specific password managers: to verify | 2026-10-27; 702 tests, 1 expected skip, 0 failures |
 
@@ -171,12 +173,11 @@ Status: ⬜ not started · 🔨 in progress. Size: S — hours, M — a brief fo
 briefs. When work starts, mark the item 🔨 and write a brief in `docs/impl-tasks/`.
 Remove accepted items from the table: completed behavior is described in engineering and user
 documents, pending real-mail checks in section 2, history in git. Numbers are never reused;
-completed: Д1–Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30, Д31, Д32, Д34.
+completed: Д1–Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30, Д31, Д32, Д33, Д34.
 
 | ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|
 | Д18 | Publish `0.1.0` | Done: documents separated, user documentation extracted, README rewritten following jdbc-mcp-server. Remaining: `LICENSE` and `THIRD_PARTY_NOTICES.md` (then link `LICENSE` from README), build version, CI and jar releases through GitHub Actions on tags (then add release jar download and CI, Release, License badges to README) | polish | M | 🔨 |
-| Д33 | RFC 8474 `EMAILID` as `stableId` | On non-Gmail IMAP servers advertising `OBJECTID`, fetch `EMAILID` with the existing UID listing and metadata requests and store it as the provider-neutral `stableId`. Extend the read-only FETCH allow-list by `EMAILID`; no contract or schema change. Verify whether Mail.ru advertises `OBJECTID` | Д7 review of 2026-10-28; included in `0.1.0` by the decision of 2026-10-31 | S | 🔨 |
 
 Before publication, the only required real-mail check is the EML/ZIP/MSG/TNEF and legacy Office
 reprocessing check for `work` and `mailru` in section 2.

@@ -65,9 +65,10 @@ public final class ImapMailSource implements MailSource {
         var removed = known.stream().filter(ref -> reset || !presentSet.contains(ref)).sorted(REF_ORDER).toList();
         var observed = new HashMap<String, RemoteMessageInfo>();
         if (!reset) {
-            // FLAGS and the Gmail items are parsed independently; either one is an observation.
+            // Flags and extension items are independent observations of a known UID.
             var observedUids = new HashSet<>(uids.flags().keySet());
             observedUids.addAll(uids.gmail().keySet());
+            observedUids.addAll(uids.emailIds().keySet());
             for (long uid : observedUids) {
                 String ref = String.valueOf(uid);
                 if (known.contains(ref)) {
@@ -76,7 +77,7 @@ public final class ImapMailSource implements MailSource {
                     observed.put(ref, new RemoteMessageInfo(ref, null,
                             flags == null ? null : flags.contains(Flags.Flag.SEEN),
                             flags == null ? null : flags.contains(Flags.Flag.FLAGGED),
-                            gmail == null ? null : gmail.msgId(),
+                            gmail == null ? uids.emailIds().get(uid) : gmail.msgId(),
                             gmail == null ? uids.keywords().get(uid) : gmail.labels()));
                 }
             }
