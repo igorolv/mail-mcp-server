@@ -194,8 +194,14 @@ one `folders.json` replacement save all new cursors and drop vanished folders. N
 on partial completion. With old cursors, current local refs skip already stored additions on
 rerun. A `MessageUnavailableException` writes `state=failed`, size 0, null SHA-256 and the
 exception's fixed message, without `message.eml`. Its ref is indexed, so the next run does not
-retry it; normal removals delete failed messages too. Other exceptions propagate without retries
-or cleanup; the next run reconciles before contacting the source. Closing the index commits
+retry it; normal removals delete failed messages too. A `FolderGoneException` (a listed folder
+has left the server, for example deleted or renamed by the user during the run) skips that folder
+instead: thrown while collecting changes, the folder gets no plan; thrown by a download, the
+runner deletes the new empty message directory and stops that folder, keeping messages already
+saved. Either way the folder keeps its old cursor in `folders.json` and reports
+`FolderProgress.gone`; the next run no longer lists it and removes it as a vanished folder.
+Other exceptions propagate without retries or cleanup; the next run reconciles before contacting
+the source. Closing the index commits
 pending entries, including a partial batch with completed metadata.
 
 `FolderProgress.downloaded` counts new messages ending converted; `failed` includes download

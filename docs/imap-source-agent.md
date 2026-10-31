@@ -36,7 +36,10 @@ lifecycle are in `docs/gmail-oauth-agent.md`. Angus objects stay private.
   including an internal Angus reconnect. No provider object is exposed to callers.
 - A rejected sign-in, broken connection or protocol error closes the client permanently; nothing
   retries. Successful downloads and `MessageUnavailableException` (GONE or TOO_LARGE) leave
-  the session usable. At most one folder is open READ_ONLY; switching closes it with
+  the session usable. So does a folder that left the server after LIST: Angus answers the failed
+  EXAMINE with a LIST check, throws `FolderNotFoundException` and returns the connection to the
+  pool ("connection still good"); `ImapClient.open` forgets the folder and throws
+  `FolderGoneException` (`folderDeletedDuringTheSessionIsGoneAndSessionContinues`). At most one folder is open READ_ONLY; switching closes it with
   `close(false)`. LIST also closes the current folder first, returning its socket to the pool
   before Angus requests a store connection. Closing the source closes the client and store,
   including the selected folder.

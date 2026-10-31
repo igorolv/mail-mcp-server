@@ -167,6 +167,19 @@ class MailSyncCommandTest {
         assertThat(source.downloadCalls).isEqualTo(1);
     }
 
+    @Test void folderGoneDuringTheRunIsReportedAndTheRunSucceeds() throws Exception {
+        imapConnection();
+        var source = new FakeMailSource();
+        source.putFolder("inbox", "INBOX", "7", "1", "2");
+        source.putFolder("archive", "Archive", "9", "3");
+        source.folderGoneOnDownload(2);
+        assertThat(run(d -> new MailConnection(d, () -> source), "test")).isZero();
+        assertThat(output().lines().toList()).contains(
+                "  INBOX: 1 downloaded, 0 failed, 0 removed, gone from the server during the run",
+                "  Archive: 1 downloaded, 0 failed, 0 removed",
+                "RESULT: OK (2 folders, 2 downloaded, 0 failed, 0 removed)");
+    }
+
     @Test void configurationErrorsWithholdRawValues() throws Exception {
         Files.writeString(temp.resolve("connections.json"), """
                 {"connections":{"test":{"type":"imap","password":{"private":"SYNTHETIC_PRIVATE_VALUE"}}}}

@@ -4,6 +4,7 @@ import jakarta.mail.AuthenticationFailedException;
 import jakarta.mail.FetchProfile;
 import jakarta.mail.Flags;
 import jakarta.mail.Folder;
+import jakarta.mail.FolderNotFoundException;
 import jakarta.mail.Message;
 import jakarta.mail.MessagingException;
 import jakarta.mail.Session;
@@ -15,6 +16,7 @@ import mail.mcp.source.RemoteMessageInfo;
 import mail.mcp.connections.AuthKind;
 import mail.mcp.connections.SecretUnavailableException;
 import mail.mcp.source.Downloaded;
+import mail.mcp.source.FolderGoneException;
 import mail.mcp.source.MessageUnavailableException;
 import mail.mcp.source.oauth.google.GoogleAccessTokenProvider;
 import mail.mcp.source.oauth.OAuthException;
@@ -142,7 +144,14 @@ public final class ImapClient implements AutoCloseable {
             currentFolder.close(false);
         }
         currentFolder = (IMAPFolder) store.getFolder(name);
-        currentFolder.open(Folder.READ_ONLY); // EXAMINE, never SELECT
+        try {
+            currentFolder.open(Folder.READ_ONLY); // EXAMINE, never SELECT
+        } catch (FolderNotFoundException e) {
+            // Angus answers a failed EXAMINE with a LIST check and keeps the connection usable.
+            currentFolder = null;
+            diagnostics.warn("IMAP folder is no longer on the server; it is skipped in this run");
+            throw new FolderGoneException();
+        }
         return currentFolder;
     }
 

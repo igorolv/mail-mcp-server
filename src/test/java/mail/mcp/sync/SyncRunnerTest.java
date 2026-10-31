@@ -487,6 +487,42 @@ class SyncRunnerTest {
         assertThat(status.phase()).isEqualTo("downloading");
     }
 
+    @Test void folderGoneDuringDownloadsIsSkippedAndTheNextRunRemovesItsMessages() {
+        source.putFolder("inbox", "INBOX", "7", "1", "2", "3");
+        source.putFolder("archive", "Archive", "9", "4");
+        source.folderGoneOnDownload(2);
+        assertThat(run()).containsExactly(new FolderProgress("INBOX", 1, 0, 0, false, true, false, true),
+                new FolderProgress("Archive", 1, 0, 0, false, true));
+        assertThat(store().readSyncStatus().orElseThrow().state()).isEqualTo("completed");
+        assertThat(store().keys()).as("no directory left for the message that was not downloaded").hasSize(2);
+        assertThat(store().folders()).extracting(LocalFolder::path, LocalFolder::cursor)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("INBOX", null), org.assertj.core.groups.Tuple.tuple("Archive", "9"));
+
+        source.resetCounts();
+        assertThat(run()).containsExactly(new FolderProgress("INBOX", 0, 0, 1, false, true),
+                new FolderProgress("Archive", 0, 0, 0, false, true));
+        assertThat(store().keys()).hasSize(1);
+        assertThat(source.downloadCalls).isZero();
+    }
+
+    @Test void folderGoneAfterListingIsSkippedWithItsOldCursor() {
+        source.putFolder("inbox", "INBOX", "7", "1");
+        source.putFolder("archive", "Archive", "9", "2");
+        run();
+        source.putFolder("archive", "Archive", "9", "2", "3");
+        source.goneAfterListing.add("archive");
+        source.resetCounts();
+        assertThat(run()).containsExactly(new FolderProgress("Archive", 0, 0, 0, false, true, false, true),
+                new FolderProgress("INBOX", 0, 0, 0, false, true));
+        assertThat(source.downloadCalls).isZero();
+        assertThat(store().folders()).extracting(LocalFolder::path, LocalFolder::cursor)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("INBOX", "7"), org.assertj.core.groups.Tuple.tuple("Archive", "9"));
+
+        assertThat(run()).containsExactly(new FolderProgress("Archive", 0, 0, 1, false, true),
+                new FolderProgress("INBOX", 0, 0, 0, false, true));
+        assertThat(store().folders()).extracting(LocalFolder::path).containsExactly("INBOX");
+    }
+
     @Test void failedRunKeepsThePhaseWhereItStopped() {
         source.putFolder("inbox", "INBOX", "7", "1");
         source.failOnDownload(1);

@@ -6,7 +6,11 @@ import java.util.Set;
 import java.util.Collection;
 import java.util.Map;
 
-/** One session with one mailbox: signs in at most once, never retries, read-only. */
+/**
+ * One session with one mailbox: signs in at most once, never retries, read-only. changes, metadata
+ * and download throw {@link FolderGoneException} when a listed folder has since left the server;
+ * the session stays usable.
+ */
 public interface MailSource extends AutoCloseable {
     /** Mail folders to synchronize, in server order. */
     List<RemoteFolder> folders();

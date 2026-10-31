@@ -10,6 +10,8 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -58,6 +60,8 @@ final class FakeImapServer implements AutoCloseable {
     volatile Long malformedMetadataUid;
     volatile String listingFlags;
     volatile boolean rejectMetadata;
+    /** Folders deleted on the server after the session started: LIST omits them, EXAMINE answers NO. */
+    final Set<String> deleted = ConcurrentHashMap.newKeySet();
 
     FakeImapServer() throws IOException { this(false, false, "login"); }
 
@@ -118,12 +122,16 @@ final class FakeImapServer implements AutoCloseable {
                 } else if (command.startsWith("LOGIN ")) {
                     if (reject) { send(out, tag + " NO private-server-text\r\n"); continue; }
                 } else if (command.startsWith("LIST ")) {
+                    String[] words = command.split(" ");
+                    String pattern = words[words.length - 1].replace("\"", "");
                     for (var folder : folders) {
+                        if (deleted.contains(folder.name()) || !(pattern.equals("*") || pattern.equals(folder.name()))) { continue; }
                         send(out, "* LIST (" + String.join(" ", folder.attributes()) + ") \"/\" \"" + folder.name() + "\"\r\n");
                     }
                 } else if (command.startsWith("EXAMINE ")) {
                     assertThat(current).as("previous folder must be closed").isNull();
                     String name = command.substring("EXAMINE ".length()).replace("\"", "");
+                    if (deleted.contains(name)) { send(out, tag + " NO [NONEXISTENT] private-server-text\r\n"); continue; }
                     current = folders.stream().filter(f -> f.name().equals(name)).findFirst().orElseThrow();
                     long next = current.messages().stream().mapToLong(Item::uid).max().orElse(0) + 1;
                     send(out, "* FLAGS (\\Seen)\r\n* " + current.messages().size() + " EXISTS\r\n"

@@ -94,6 +94,12 @@ tool:
   1,000 messages.
 - After an interruption, the next run cleans up incomplete directories and continues without
   downloading stored messages again.
+- You can keep working in your mail client during a long run. A message deleted or moved in the
+  meantime counts as `failed` and is cleaned up by the next run. An IMAP folder deleted or
+  renamed in the meantime does not stop the run: its line ends with
+  `, gone from the server during the run`, its remaining messages are skipped, and the next run
+  removes its local messages (a renamed folder's messages then appear under the new name, without
+  downloading again when they are recognized as moves).
 - **A rejected sign-in** prints `RESULT: FAILED (... sign-in rejected ...)` and exits with 3. Do not
   run it again blindly: every attempt with a wrong password counts toward the account lockout.
   The MCP `sync` tool refuses this connection until a successful `mail-sync` clears the state; see

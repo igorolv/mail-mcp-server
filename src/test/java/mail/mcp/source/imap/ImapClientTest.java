@@ -4,6 +4,7 @@ import mail.mcp.connections.AuthKind;
 import mail.mcp.connections.ConnectionDefinition;
 import mail.mcp.connections.ConnectionType;
 import mail.mcp.connections.MailConnectionFactory;
+import mail.mcp.source.FolderGoneException;
 import mail.mcp.source.MessageUnavailableException;
 import mail.mcp.source.ews.EwsMailSource;
 import mail.mcp.source.ews.EwsSettings;
@@ -345,6 +346,24 @@ class ImapClientTest {
             client.download("A", 1, temp.resolve("a.eml"), 1024);
             assertThat(server.commands.stream().filter(s -> s.startsWith("EXAMINE ") || s.equals("CLOSE")))
                     .containsExactly("EXAMINE A", "CLOSE", "EXAMINE B", "CLOSE", "EXAMINE A");
+            assertThat(server.commands.stream().filter(s -> s.startsWith("LOGIN "))).hasSize(1);
+            assertThat(server.commands).noneMatch(s -> s.startsWith("SELECT "));
+        }
+    }
+
+    @Test void folderDeletedDuringTheSessionIsGoneAndSessionContinues() throws Exception {
+        try (var server = new FakeImapServer(new FakeImapServer.MailFolder("A", new FakeImapServer.Item(1, MIME)),
+                new FakeImapServer.MailFolder("B", new FakeImapServer.Item(2, MIME)));
+             var client = new ImapClient(settings(server.port()), false)) {
+            client.folderUids("A");
+            server.deleted.add("B");
+            assertThatThrownBy(() -> client.download("B", 2, temp.resolve("b.eml"), 1024))
+                    .isInstanceOf(FolderGoneException.class).hasMessage("Folder is no longer on the server").hasNoCause();
+            assertThatThrownBy(() -> client.folderUids("B")).isInstanceOf(FolderGoneException.class);
+            assertThatThrownBy(() -> client.metadata("B", 7, List.of(2L))).isInstanceOf(FolderGoneException.class);
+            client.download("A", 1, temp.resolve("a.eml"), 1024);
+            assertThat(Files.readAllBytes(temp.resolve("a.eml"))).isEqualTo(MIME);
+            assertThat(Files.exists(temp.resolve("b.eml"))).isFalse();
             assertThat(server.commands.stream().filter(s -> s.startsWith("LOGIN "))).hasSize(1);
             assertThat(server.commands).noneMatch(s -> s.startsWith("SELECT "));
         }

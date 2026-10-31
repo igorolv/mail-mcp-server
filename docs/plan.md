@@ -79,6 +79,7 @@ reprocessing check for `work` and `mailru` is the only real-mail check required 
 | RFC 1556 directional charsets `iso-8859-6-e/-i`, `iso-8859-8-e/-i` (`docs/mime-agent.md`) | Run `mail-reprocess gmail`: the one Gmail message that failed with `MIME parsing failed (UnsupportedEncodingException)` should become `converted` with a readable Hebrew body and subject. Optionally run `mail-reprocess mailru` and compare its 7 charset failures ([results.md](results.md)) | 2026-10-31; 730 tests, 1 expected skip, 0 failures |
 | Lenient `Content-Disposition` and the `cp-1251` label (`docs/mime-agent.md`) | After the current Mail.ru sync ends, rebuild the jar, run `mail-reprocess mailru` and count the `error` values of failed `meta.json` files again. Of the 24 failures counted on 2026-10-31, the 16 with an unparsable `Content-Disposition` and the 3 with `cp-1251` should become `converted`; 1 `ParseException` and 4 UTF-7 `UnsupportedEncodingException` are expected to remain | 2026-10-31; 732 tests, 1 expected skip, 0 failures |
 | Sync stages in `mail-sync` and `syncStatus` (`docs/commands.md`) | On the next `mail-sync mailru`, check that the stage lines appear before folder progress, with `saved messages checked` counts only after a run that did not complete. Restart the MCP server, call `sync`, and check that `syncStatus` shows `phase` moving through the stages and the log file has `Sync phase:` lines | 2026-10-31; 734 tests, 1 expected skip, 0 failures |
+| IMAP folder gone during a run, Д34 (`docs/storage-agent.md`) | During a long `mail-sync mailru`, delete or rename an included folder in the web interface: the run continues, the folder's line ends with `, gone from the server during the run`, and the result is `RESULT: OK`. The next run removes the folder's local messages; after a rename they reappear under the new name, recognized as moves where unique | 2026-11-01; 738 tests, 1 expected skip, 0 failures |
 | Gmail OAuth2 sign-in (`docs/gmail-oauth-agent.md`) | Only if needed instead of the verified app password: run `gmail-oauth gmail`, then `mail-sync gmail`. Token encryption is in [backlog.md](backlog.md), Д27 | 2026-10-25 |
 | Passwords from Windows Credential Manager and password managers (`docs/connections.md`) | `windowsCredential`: replace `passwordCommand` with `"windowsCredential": "mail-mcp/<name>"`, run `mail-sync` for `work` and `mailru`, then restart the MCP server and run `sync` and `syncStatus`. `passwordCommand` in `mail-sync` for EWS is already verified ([results.md, section 1](results.md#1-corporate-exchange)); server use and specific password managers: to verify | 2026-10-27; 702 tests, 1 expected skip, 0 failures |
 
@@ -161,7 +162,7 @@ Status: ⬜ not started · 🔨 in progress. Size: S — hours, M — a brief fo
 briefs. When work starts, mark the item 🔨 and write a brief in `docs/impl-tasks/`.
 Remove accepted items from the table: completed behavior is described in engineering and user
 documents, pending real-mail checks in section 2, history in git. Numbers are never reused;
-completed: Д1–Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30.
+completed: Д1–Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30, Д34.
 
 | ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|

@@ -118,6 +118,7 @@ public final class MailSyncCommand {
                         out.println("  " + progress.path() + ": " + progress.downloaded() + " downloaded, "
                                 + progress.failed() + " failed, " + progress.removed() + " removed"
                                 + (progress.reset() ? ", folder reset" : "")
+                                + (progress.gone() ? ", gone from the server during the run" : "")
                                 + (progress.done() ? "" : " (in progress)"));
                         if (progress.done()) { done.add(progress); }
                     }

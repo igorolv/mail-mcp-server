@@ -17,9 +17,12 @@ public record FolderSyncInfo(
         @Schema(description = "True when the folder is finished in this sync.", requiredMode = Schema.RequiredMode.REQUIRED)
         boolean done,
         @Schema(description = "True when Exchange required rescanning the whole folder.", requiredMode = Schema.RequiredMode.REQUIRED)
-        boolean rescanned
+        boolean rescanned,
+        @Schema(description = "True when the folder left the mail server during this sync, for example deleted or " +
+                "renamed: it was skipped, and the next sync removes its local messages.", requiredMode = Schema.RequiredMode.REQUIRED)
+        boolean gone
 ) {
     public FolderSyncInfo(String path, int downloaded, int failed, int removed, boolean reset, boolean done) {
-        this(path, downloaded, failed, removed, reset, done, false);
+        this(path, downloaded, failed, removed, reset, done, false, false);
     }
 }

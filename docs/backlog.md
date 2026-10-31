@@ -6,7 +6,7 @@ in [plan.md, section 4](plan.md#4-version-010); rejected ideas and reasons are i
 
 Status: ⬜ not started · 🔨 in progress. Size: S — hours, M — a brief for one session, L — several
 briefs. When the user includes an item in a version, move its row to section 4 of the plan. A new
-idea gets a new row with the next number; numbers are never reused (next available: Д34).
+idea gets a new row with the next number; numbers are never reused (next available: Д35).
 
 | ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|

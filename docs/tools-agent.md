@@ -311,9 +311,11 @@ the connection's Lucene writer lock. Fields: `state` (running/completed/failed),
 files written before phases read as null. `SyncRunner` writes the status and logs
 `Sync phase: <id>` at INFO before it tells its `SyncListener`; `mail-sync` prints listener events,
 the background run only collects folder progress.
-Each folder entry contains `path`, cumulative `downloaded`, `failed`, `removed`, `reset`, `done`, `rescanned`. `reset` means IMAP UIDVALIDITY invalidated remote refs;
+Each folder entry contains `path`, cumulative `downloaded`, `failed`, `removed`, `reset`, `done`, `rescanned`, `gone`. `reset` means IMAP UIDVALIDITY invalidated remote refs;
 `rescanned` means EWS recovered an invalid SyncState by a full traversal without invalidating
-known refs. Old status JSON without `rescanned` reads as false.
+known refs; `gone` (with `done`) means the source reported the folder gone during the run
+(`FolderGoneException`, see [storage-agent.md](storage-agent.md), "Write order and failures").
+Old status JSON without `rescanned` or `gone` reads them as false.
 Progress replaces an entry without changing its first-appearance order. Status is written before
 reconciliation, on each phase change, after each progress report, and on completion/failure. Run errors use fixed
 `SyncErrors` descriptions; a final status-write failure is suppressed onto the original error.

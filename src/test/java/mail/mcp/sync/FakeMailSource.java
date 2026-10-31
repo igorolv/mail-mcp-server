@@ -2,6 +2,7 @@ package mail.mcp.sync;
 
 import mail.mcp.source.Downloaded;
 import mail.mcp.source.FolderChanges;
+import mail.mcp.source.FolderGoneException;
 import mail.mcp.source.MailSource;
 import mail.mcp.source.MessageUnavailableException;
 import mail.mcp.source.RemoteFolder;
@@ -81,6 +82,15 @@ public final class FakeMailSource implements MailSource {
 
     public void failOnDownload(int call) { failAt = call; }
 
+    /** Folders deleted on the server: not listed, and every other call for them throws FolderGoneException. */
+    public final Set<String> goneFolders = new HashSet<>();
+    /** Listed by the next folders() call, then deleted on the server before changes are read. */
+    public final Set<String> goneAfterListing = new HashSet<>();
+    private int goneAt;
+
+    /** The folder of the given download call is deleted on the server just before that call. */
+    public void folderGoneOnDownload(int call) { goneAt = call; }
+
     public void fingerprint(String folder, String ref, MessageFingerprint fingerprint) {
         fingerprints.put(folder + "/" + ref, fingerprint);
     }
@@ -95,11 +105,15 @@ public final class FakeMailSource implements MailSource {
 
     @Override public List<RemoteFolder> folders() {
         foldersCalls++;
-        return List.copyOf(folders.values());
+        var listed = folders.values().stream().filter(f -> !goneFolders.contains(f.remoteId())).toList();
+        goneFolders.addAll(goneAfterListing);
+        goneAfterListing.clear();
+        return listed;
     }
 
     @Override public FolderChanges changes(RemoteFolder folder, String cursor, Set<String> known) {
         changesCalls++;
+        if (goneFolders.contains(folder.remoteId())) { throw new FolderGoneException(); }
         var present = messages.get(folder.remoteId()).keySet();
         String nextCursor = cursors.get(folder.remoteId());
         boolean reset = cursor != null && !cursor.equals(nextCursor);
@@ -139,6 +153,8 @@ public final class FakeMailSource implements MailSource {
     @Override public Downloaded download(RemoteFolder folder, String ref, Path target) {
         downloadCalls++;
         if (downloadCalls == failAt) { throw new ImapException(ImapException.Kind.CONNECTION); }
+        if (downloadCalls == goneAt) { goneFolders.add(folder.remoteId()); }
+        if (goneFolders.contains(folder.remoteId())) { throw new FolderGoneException(); }
         if (tooLarge.contains(folder.remoteId() + "/" + ref)) {
             throw new MessageUnavailableException(MessageUnavailableException.Reason.TOO_LARGE);
         }

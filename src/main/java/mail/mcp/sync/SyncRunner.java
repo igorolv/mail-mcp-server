@@ -9,6 +9,7 @@ import mail.mcp.model.MessageMeta;
 import mail.mcp.model.MessageState;
 import mail.mcp.model.MessageFingerprint;
 import mail.mcp.source.FolderChanges;
+import mail.mcp.source.FolderGoneException;
 import mail.mcp.source.RemoteFolder;
 import mail.mcp.source.RemoteMessageInfo;
 import mail.mcp.source.MailSource;
@@ -162,10 +163,21 @@ public final class SyncRunner {
             vanishedKeys.put(folder.key(), keys);
             removedKeys.addAll(keys);
         }
+        // Folders the server lost after listing them: skipped with their old cursors (FolderGoneException).
+        var goneFolders = new ArrayList<LocalFolder>();
         for (int i = 0; i < folders.size(); i++) {
             var folder = folders.get(i);
             var refs = index.folderRefs(folder.key());
-            var changes = source.changes(remote.get(i), folder.cursor(), refs.keySet());
+            final FolderChanges changes;
+            final Map<String, RemoteMessageInfo> addedInfo;
+            try {
+                changes = source.changes(remote.get(i), folder.cursor(), refs.keySet());
+                addedInfo = changes.added().isEmpty() ? Map.of()
+                        : source.metadata(remote.get(i), changes.cursor(), changes.added());
+            } catch (FolderGoneException e) {
+                goneFolders.add(folder);
+                continue;
+            }
             Set<String> removed = changes.reset() ? Set.copyOf(refs.keySet()) : Set.copyOf(changes.removed());
             removed.stream().map(refs::get).filter(java.util.Objects::nonNull).forEach(removedKeys::add);
             if (changes.reset()) { resetFolders.add(folder.key()); }
@@ -175,9 +187,7 @@ public final class SyncRunner {
             changes.observed().forEach((ref, observed) -> {
                 if (refs.containsKey(ref) && !removed.contains(ref)) { info.put(ref, observed); }
             });
-            if (!changes.added().isEmpty()) {
-                info.putAll(source.metadata(remote.get(i), changes.cursor(), changes.added()));
-            }
+            info.putAll(addedInfo);
             int added = (int) changes.added().stream().filter(ref -> !refs.containsKey(ref) || removed.contains(ref)).count();
             int gone = (int) removed.stream().filter(refs::containsKey).count();
             if (added > 0 || gone > 0) { listener.changes(folder.path(), added, gone); }
@@ -239,6 +249,9 @@ public final class SyncRunner {
             progress.accept(new FolderProgress(folder.path(), 0, 0, removed, false, true));
         }
         var completed = new ArrayList<FolderProgress>();
+        goneFolders.forEach(folder -> completed.add(new FolderProgress(folder.path(), 0, 0, 0, false, true, false, true)));
+        var goneKeys = new HashSet<String>();
+        goneFolders.forEach(folder -> goneKeys.add(folder.key()));
         for (var plan : plans) {
             var folder = plan.folder();
             var changes = plan.changes();
@@ -252,6 +265,7 @@ public final class SyncRunner {
             int downloaded = 0;
             int failed = 0;
             var currentRefs = index.folderRefs(folder.key());
+            boolean gone = false;
             for (String ref : changes.added()) {
                 // Current local refs, not merely old cursors, make interrupted runs idempotent.
                 if (currentRefs.containsKey(ref)) { continue; }
@@ -265,6 +279,12 @@ public final class SyncRunner {
                 } catch (MessageUnavailableException e) {
                     meta = identity(new MessageMeta(key, folder.key(), folder.path(), ref, 0, null,
                             Instant.now(), MessageState.FAILED, e.getMessage()), folder, ref, plan.info().get(ref));
+                } catch (FolderGoneException e) {
+                    // Saved messages stay until the next run, which no longer lists the folder, removes them.
+                    store.delete(key);
+                    goneKeys.add(folder.key());
+                    gone = true;
+                    break;
                 }
                 store.writeMeta(meta);
                 var processed = meta.state() == MessageState.DOWNLOADED
@@ -280,11 +300,15 @@ public final class SyncRunner {
                 }
             }
             index.commit();
-            completed.add(new FolderProgress(folder.path(), downloaded, failed, removed, changes.reset(), true, changes.rescanned()));
+            completed.add(new FolderProgress(folder.path(), downloaded, failed, removed, changes.reset(), true,
+                    changes.rescanned(), gone));
         }
         checkpoint.accept("beforeCursorSave");
-        store.saveFolders(plans.stream().map(p -> new LocalFolder(p.folder().key(), p.folder().remoteId(),
-                p.folder().path(), p.changes().cursor())).toList());
+        // A gone folder keeps its old cursor, so the next run sees it as vanished rather than finished.
+        var cursors = new HashMap<String, String>();
+        plans.forEach(p -> cursors.put(p.folder().key(), p.changes().cursor()));
+        store.saveFolders(folders.stream().map(f -> goneKeys.contains(f.key()) ? f
+                : new LocalFolder(f.key(), f.remoteId(), f.path(), cursors.get(f.key()))).toList());
         completed.forEach(progress);
     }
 
