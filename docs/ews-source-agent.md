@@ -140,7 +140,9 @@ and [FlagStatus](https://learn.microsoft.com/en-us/exchange/client-developer/web
   `EwsAuthenticationException` — one sign-in attempt (one NTLM Type 3 message), never repeated. A
   401 where no credentials were sent (server does not offer the scheme) gets its own message.
 - HTTP 500 with an XML body goes to the parser (SOAP fault); other statuses are `EwsHttpException`;
-  I/O failures are `EwsTransportException`.
+  I/O failures are `EwsTransportException` with the I/O exception as its cause. `SyncErrors` names
+  the failure kind from the cause chain (unknown host, TLS, no route, refused, timeout; otherwise
+  the cause's class name) and never prints the host or the cause's message.
 - An exec interceptor counts requests on the wire (`requestCount()`), including handshake legs: a
   first NTLM call costs 3 requests (anonymous, Type 1, Type 3).
 

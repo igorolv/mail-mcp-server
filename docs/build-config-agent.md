@@ -162,11 +162,14 @@ without the host or server message:
 
 ```text
 RESULT: FAILED (EWS sign-in rejected; check the connection locally before the next run)
+RESULT: FAILED (EWS connection failed: <kind>; <hint>)
 RESULT: FAILED (EWS error: <code>)
 ```
 
-`<code>` is the response code for an EWS error response or SOAP fault when present; otherwise
-it is the exception's simple class name. No EWS failure is retried, including `ErrorServerBusy`.
+A connection failure (`EwsTransportException`) names its kind from the cause chain; the texts are
+listed in `docs/commands.md`, `mail-sync`. Otherwise `<code>` is the response code for an EWS error
+response or SOAP fault when present, or the exception's simple class name. No EWS failure is
+retried, including `ErrorServerBusy`.
 
 ### mail-reprocess
 

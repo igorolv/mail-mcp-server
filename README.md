@@ -341,6 +341,10 @@ skipped when it is not installed.
 - **`RESULT: FAILED (... sign-in rejected ...)`, exit code 3.** Do not run it again blindly: every
   attempt with a wrong password counts toward the account lockout policy. Check the login and
   password first. For Exchange, a bare login with `auth: ntlm` is the combination known to work.
+- **`RESULT: FAILED (EWS connection failed: ...)`, exit code 4.** The Exchange server was not
+  reached, so no sign-in was rejected. `server name not found` usually means a wrong or placeholder
+  host in `url`, or a name known only inside the company network: connect to it or its VPN. Other
+  reasons: [`mail-sync`](docs/commands.md#mail-sync).
 - **`Password of connection '...' is unavailable: ...; no sign-in was attempted`.** Nothing was
   sent to the mail server. For `windowsCredential`, check that a *generic* credential with exactly
   that target name exists under the Windows user running the server (`cmdkey /list:<name>` prints

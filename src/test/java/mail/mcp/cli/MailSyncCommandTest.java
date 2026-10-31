@@ -20,6 +20,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -84,9 +85,9 @@ class MailSyncCommandTest {
         assertThat(output()).contains("RESULT: FAILED (EWS error: ErrorServerBusy)")
                 .doesNotContain("webmail.example.com");
         output.reset();
-        assertThat(run(d -> { throw new EwsTransportException("Cannot contact webmail.example.com", null); },
-                "work")).isEqualTo(4);
-        assertThat(output()).contains("RESULT: FAILED (EWS error: EwsTransportException)")
+        assertThat(run(d -> { throw new EwsTransportException("Cannot contact webmail.example.com",
+                new UnknownHostException("webmail.example.com")); }, "work")).isEqualTo(4);
+        assertThat(output()).contains("RESULT: FAILED (EWS connection failed: server name not found;")
                 .doesNotContain("webmail.example.com");
         for (var failure : new EwsException[]{
                 new EwsResponseException(EwsOperation.SYNC_FOLDER_ITEMS, "ErrorAccessDenied", "webmail.example.com"),

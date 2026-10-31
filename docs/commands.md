@@ -80,6 +80,18 @@ RESULT: OK (1 folders, 120 downloaded, 1 failed, 2 removed)
   [Security](security.md#sign-in-policy).
 - A password from [Windows Credential Manager or a password command](connections.md#passwords)
   is read before the sign-in. If it cannot be obtained, nothing is sent and the command exits with 2.
+- **An Exchange connection failure** prints `RESULT: FAILED (EWS connection failed: <reason>)` and
+  exits with 4. No sign-in was rejected, so it does not count toward the lockout; fix the cause and
+  run again. The reason never contains the server address:
+
+  | Reason starts with | Usual cause |
+  |---|---|
+  | `server name not found` | A wrong or placeholder host in `url`, or the name is known only inside the company network: connect to it or its VPN |
+  | `connection refused` | Wrong host or port in `url`, or a firewall |
+  | `server unreachable` | No route to the server: outside the company network or VPN |
+  | `timed out` | Slow or blocked network, VPN not connected |
+  | `TLS handshake failed` | The server certificate is not trusted by Java, or `url` points to a non-TLS port |
+  | an exception class name | Another network failure; check `url` and the network |
 
 Folders that are synchronized:
 

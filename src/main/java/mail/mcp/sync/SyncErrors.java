@@ -6,10 +6,16 @@ import mail.mcp.source.ews.EwsAuthenticationException;
 import mail.mcp.source.ews.EwsException;
 import mail.mcp.source.ews.EwsResponseException;
 import mail.mcp.source.ews.EwsSoapFaultException;
+import mail.mcp.source.ews.EwsTransportException;
 import mail.mcp.source.imap.ImapException;
 import mail.mcp.source.oauth.OAuthException;
 
+import javax.net.ssl.SSLException;
+import java.io.InterruptedIOException;
 import java.io.UncheckedIOException;
+import java.net.ConnectException;
+import java.net.NoRouteToHostException;
+import java.net.UnknownHostException;
 
 /** Fixed, non-sensitive failure descriptions shared by status files and the CLI. */
 public final class SyncErrors {
@@ -23,6 +29,7 @@ public final class SyncErrors {
             case ImapException imap -> imap.getMessage();
             case EwsAuthenticationException ignored ->
                     "EWS sign-in rejected; check the connection locally before the next run";
+            case EwsTransportException transport -> "EWS connection failed: " + transportCause(transport);
             case EwsException ews -> {
                 String code = switch (ews) {
                     case EwsResponseException response -> response.responseCode();
@@ -34,6 +41,32 @@ public final class SyncErrors {
             case UncheckedIOException ignored -> "local storage error; details withheld";
             default -> "unexpected local error; details withheld";
         };
+    }
+
+    /** Names the kind of network failure from the cause chain, never the host or the cause's message. */
+    private static String transportCause(EwsTransportException e) {
+        for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
+            switch (cause) {
+                case UnknownHostException ignored -> {
+                    return "server name not found; check the url and the network or VPN";
+                }
+                case SSLException ignored -> {
+                    return "TLS handshake failed; check the url and the server certificate";
+                }
+                case NoRouteToHostException ignored -> {
+                    return "server unreachable; check the network or VPN";
+                }
+                case ConnectException ignored -> {
+                    return "connection refused; check the url and the network or VPN";
+                }
+                case InterruptedIOException ignored -> {
+                    return "timed out; check the network or VPN";
+                }
+                default -> { }
+            }
+        }
+        Throwable first = e.getCause() == null ? e : e.getCause();
+        return first.getClass().getSimpleName() + "; check the url and the network";
     }
 
     public static boolean signInRejected(RuntimeException e) {
