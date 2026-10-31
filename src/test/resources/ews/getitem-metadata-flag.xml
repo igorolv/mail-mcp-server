@@ -4,7 +4,8 @@
  <m:GetItemResponse><m:ResponseMessages>
   <m:GetItemResponseMessage ResponseClass="Success"><m:ResponseCode>NoError</m:ResponseCode>
    <m:Items><t:Message><t:ItemId Id="AAMkSYNTH-a"/><t:Subject>Synthetic subject</t:Subject>
-    <t:Flag><t:FlagStatus>Flagged</t:FlagStatus></t:Flag><t:IsRead>true</t:IsRead></t:Message></m:Items>
+    <t:Flag><t:FlagStatus>Flagged</t:FlagStatus></t:Flag><t:IsRead>true</t:IsRead>
+    <t:Categories><t:String>Project</t:String><t:String>Review</t:String></t:Categories></t:Message></m:Items>
   </m:GetItemResponseMessage>
  </m:ResponseMessages></m:GetItemResponse>
 </s:Body></s:Envelope>

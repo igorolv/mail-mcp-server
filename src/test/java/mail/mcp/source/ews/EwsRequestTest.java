@@ -178,7 +178,8 @@ class EwsRequestTest {
         try (var client = new EwsClient(transport)) {
             assertThatThrownBy(() -> client.metadata(List.of("item"))).isInstanceOf(UnsupportedOperationException.class);
         }
-        assertThat(transport.lastRequest()).contains("FieldURI=\"message:IsRead\"", "FieldURI=\"item:Flag\"")
+        assertThat(transport.lastRequest()).contains("FieldURI=\"message:IsRead\"", "FieldURI=\"item:Flag\"",
+                "FieldURI=\"item:Categories\"")
                 .doesNotContain("MimeContent", "item:Body", "Importance");
     }
 

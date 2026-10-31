@@ -130,10 +130,10 @@ Remaining cross-tool and flag-clearing checks are in `docs/plan.md` section 2.
 
 The same four records append optional `List<String> labels` after `flagged`: mailbox labels of
 the latest observation, omitted when unknown or when the provider has none, empty when known
-empty. Only Gmail provides them now (`docs/imap-source-agent.md`); the contract and the
-`label` search group are provider-neutral, so another source can fill them without changing
-it. Labels are text and pass through `SecretRedactor.texts`, like folder paths. `getMessage`
-reads them from metadata; list, search and thread cards from the stored `labels` index field.
+empty. Gmail labels (`docs/imap-source-agent.md`) and Outlook categories
+(`docs/ews-source-agent.md`) fill this provider-neutral field without changing the response or
+`label` search contract. Labels are text and pass through `SecretRedactor.texts`, like folder paths.
+`getMessage` reads them from metadata; list, search and thread cards from the stored `labels` index field.
 The `field` description of `search` lists `label`; it is part of `any`. The provider `stableId`
 is used only for synchronization and is never returned.
 

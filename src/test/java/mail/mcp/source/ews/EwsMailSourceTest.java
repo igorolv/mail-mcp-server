@@ -324,6 +324,35 @@ class EwsMailSourceTest {
         assertThat(transport.requests.get(1)).contains("Id=\"AAMkSYNTH-a\"").doesNotContain("AAMkSYNTH-b");
     }
 
+    @Test void knownItemCategoriesComeFromUpdatedItemsOnly() {
+        var transport = new ScriptedEwsTransport().answer(GET_ITEM, "getitem-metadata-categories.xml")
+                .answer(SYNC_FOLDER_ITEMS, "sync-flag-changes.xml")
+                .answer(GET_ITEM, "getitem-metadata-flag.xml");
+        try (var source = new EwsMailSource(new EwsClient(transport))) {
+            var added = source.metadata(INBOX, "state", List.of("AAMkSYNTH-a", "AAMkSYNTH-b", "AAMkSYNTH-c"));
+            assertThat(added.get("AAMkSYNTH-a").labels()).containsExactly(" Project & Review ", "Срочно", "project", "Срочно", "");
+            assertThat(added.get("AAMkSYNTH-b").labels()).isEmpty();
+            assertThat(added.get("AAMkSYNTH-c").labels()).isEmpty();
+            var changes = source.changes(INBOX, "state", Set.of("AAMkSYNTH-a", "AAMkSYNTH-b"));
+            assertThat(changes.added()).isEmpty();
+            assertThat(changes.removed()).isEmpty();
+            assertThat(changes.observed()).containsOnlyKeys("AAMkSYNTH-a", "AAMkSYNTH-b");
+            var updated = changes.observed().get("AAMkSYNTH-a");
+            assertThat(updated.labels()).containsExactly("Project", "Review");
+            assertThat(updated.fingerprint()).isNull();
+            assertThat(updated.read()).isTrue();
+            assertThat(updated.flagged()).isTrue();
+            var readOnly = changes.observed().get("AAMkSYNTH-b");
+            assertThat(readOnly.labels()).isNull();
+            assertThat(readOnly.read()).isFalse();
+        }
+        transport.assertDrained();
+        assertThat(transport.operations).containsExactly(GET_ITEM, SYNC_FOLDER_ITEMS, GET_ITEM);
+        assertThat(transport.requests.get(2)).contains("Id=\"AAMkSYNTH-a\"")
+                .doesNotContain("AAMkSYNTH-b", "MimeContent", "item:Body");
+        assertThat(transport.requests.get(1)).doesNotContain("item:Categories");
+    }
+
     @Test void invalidSyncStateReportsRescanWithoutResetOrKnownDownloads() {
         var transport = new ScriptedEwsTransport().answer(SYNC_FOLDER_ITEMS, "sync-invalid-state.xml")
                 .answer(SYNC_FOLDER_ITEMS, "sync-changes.xml");

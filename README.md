@@ -254,8 +254,8 @@ lists the names.
 
 - Lists and text come in pages and chunks with `nextOffset`; every card has an absolute
   `localPath` to the message directory.
-- Cards carry optional `read`, `flagged` and `labels` (Gmail labels) — the state seen at the last
-  synchronization.
+- Cards carry optional `read`, `flagged` and `labels` (Gmail labels or Outlook categories) — the
+  state seen at the last synchronization.
 - The same message in several folders appears once in `search` and `getThread`, with the other
   copies under `copies`.
 

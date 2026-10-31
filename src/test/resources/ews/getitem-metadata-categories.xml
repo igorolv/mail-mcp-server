@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Synthetic metadata with ordered, absent and empty categories; no real mailbox data. -->
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+ xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+ xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"
+ xmlns:x="urn:synthetic:unknown"><s:Body>
+ <m:GetItemResponse><m:ResponseMessages>
+  <m:GetItemResponseMessage ResponseClass="Success"><m:ResponseCode>NoError</m:ResponseCode>
+   <m:Items><t:Message><t:ItemId Id="AAMkSYNTH-a"/>
+    <t:Categories><t:String> Project &amp; Review </t:String><t:String>Срочно</t:String>
+     <t:Unknown><t:String>Skipped nested value</t:String></t:Unknown>
+     <x:String>Skipped foreign value</x:String>
+     <t:String>project</t:String><t:String>Срочно</t:String><t:String/>
+    </t:Categories></t:Message></m:Items>
+  </m:GetItemResponseMessage>
+  <m:GetItemResponseMessage ResponseClass="Success"><m:ResponseCode>NoError</m:ResponseCode>
+   <m:Items><t:Message><t:ItemId Id="AAMkSYNTH-b"/></t:Message></m:Items>
+  </m:GetItemResponseMessage>
+  <m:GetItemResponseMessage ResponseClass="Success"><m:ResponseCode>NoError</m:ResponseCode>
+   <m:Items><t:Message><t:ItemId Id="AAMkSYNTH-c"/><t:Categories/></t:Message></m:Items>
+  </m:GetItemResponseMessage>
+ </m:ResponseMessages></m:GetItemResponse>
+</s:Body></s:Envelope>

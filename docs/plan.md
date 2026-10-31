@@ -13,7 +13,7 @@ version `0.1.0`. Related documents:
 
 Discussion history is in git history.
 
-**Status (2026-10-28): the draft is complete; the first published version, `0.1.0`, is in
+**Status (2026-11-01): the draft is complete; the first published version, `0.1.0`, is in
 preparation (Д18).** All three user mailboxes work: corporate Exchange (EWS), Mail.ru and Gmail
 (IMAP). Implemented:
 
@@ -27,6 +27,7 @@ preparation (Д18).** All three user mailboxes work: corporate Exchange (EWS), M
 - detection of unambiguous moves between folders without downloading MIME again;
 - snapshots of read status and user flags/stars, without writing to the mailbox;
 - Gmail synchronized once through All Mail, with its labels on messages and a `label` search field;
+- Outlook categories exposed and searchable through the same provider-neutral labels;
 - expansion of attached messages and archives (EML, ZIP, MSG, TNEF), and DOC/XLS/PPT text;
 - an optional secret filter in responses;
 - nine MCP tools.
@@ -162,12 +163,11 @@ Status: ⬜ not started · 🔨 in progress. Size: S — hours, M — a brief fo
 briefs. When work starts, mark the item 🔨 and write a brief in `docs/impl-tasks/`.
 Remove accepted items from the table: completed behavior is described in engineering and user
 documents, pending real-mail checks in section 2, history in git. Numbers are never reused;
-completed: Д1–Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30, Д34.
+completed: Д1–Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30, Д31, Д34.
 
 | ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|
 | Д18 | Publish `0.1.0` | Done: documents separated, user documentation extracted, README rewritten following jdbc-mcp-server. Remaining: `LICENSE` and `THIRD_PARTY_NOTICES.md` (then link `LICENSE` from README), build version, CI and jar releases through GitHub Actions on tags (then add release jar download and CI, Release, License badges to README) | polish | M | 🔨 |
-| Д31 | Outlook categories as labels | Fill the provider-neutral `labels` from EWS `item:Categories` in the existing metadata `GetItem` for added items and known items with an `Update` change. No new EWS operation, contract or schema. Verify that a category change produces `Update` in `SyncFolderItems` on the user's server | Д7 review of 2026-10-28; included in `0.1.0` by the decision of 2026-10-31 | S | 🔨 |
 | Д32 | IMAP keywords as labels | Fill the provider-neutral `labels` on non-Gmail IMAP servers from user keywords already returned in `FLAGS`; exclude system flags, every `$`-prefixed bookkeeping keyword and the junk-filter keywords `Junk`, `NonJunk`, `NotJunk` (decision of 2026-11-01). No new IMAP command, contract or schema. Verify whether Mail.ru stores and returns keywords | Д7 review of 2026-10-28; included in `0.1.0` by the decision of 2026-10-31 | S | 🔨 |
 | Д33 | RFC 8474 `EMAILID` as `stableId` | On non-Gmail IMAP servers advertising `OBJECTID`, fetch `EMAILID` with the existing UID listing and metadata requests and store it as the provider-neutral `stableId`. Extend the read-only FETCH allow-list by `EMAILID`; no contract or schema change. Verify whether Mail.ru advertises `OBJECTID` | Д7 review of 2026-10-28; included in `0.1.0` by the decision of 2026-10-31 | S | 🔨 |
 

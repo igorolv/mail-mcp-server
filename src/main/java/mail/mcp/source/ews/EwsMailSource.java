@@ -105,8 +105,8 @@ public final class EwsMailSource implements MailSource {
     }
 
     /**
-     * Read/star observations of known items that changed (docs/decisions.md, Д29): ReadFlagChange
-     * carries IsRead; an Update, for example of a follow-up flag, is read with a short metadata
+     * Read/star/category observations of known items that changed (docs/decisions.md, Д29): ReadFlagChange
+     * carries IsRead; an Update, for example of a follow-up flag or category, is read with a short metadata
      * request for those items only. Fingerprints are dropped: known items keep their stored identity.
      */
     private Map<String, RemoteMessageInfo> observed(Set<String> known, Set<String> removed,
@@ -118,7 +118,7 @@ public final class EwsMailSource implements MailSource {
         var changed = updated.stream().filter(known::contains).filter(ref -> !removed.contains(ref)).toList();
         for (int i = 0; i < changed.size(); i += 100) {
             for (var info : client.metadata(changed.subList(i, Math.min(i + 100, changed.size()))).values()) {
-                result.put(info.ref(), new RemoteMessageInfo(info.ref(), null, info.read(), info.flagged()));
+                result.put(info.ref(), new RemoteMessageInfo(info.ref(), null, info.read(), info.flagged(), null, info.labels()));
             }
         }
         return result;

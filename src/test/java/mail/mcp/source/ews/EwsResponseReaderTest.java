@@ -244,6 +244,17 @@ class EwsResponseReaderTest {
         }).isInstanceOf(EwsProtocolException.class).hasMessageContaining("truncated");
     }
 
+    @Test void metadataReadsAbsentEmptyAndOrderedCategories() throws Exception {
+        var items = EwsResponseReader.readMetadata(fixture("getitem-metadata-categories.xml"),
+                List.of("AAMkSYNTH-a", "AAMkSYNTH-b", "AAMkSYNTH-c"));
+        assertThat(items.get("AAMkSYNTH-b").labels()).as("absent categories").isEmpty();
+        assertThat(items.get("AAMkSYNTH-c").labels()).as("present-empty categories").isEmpty();
+        assertThat(items.get("AAMkSYNTH-a").labels()).containsExactly(" Project & Review ", "Срочно", "project", "Срочно", "");
+        assertThatThrownBy(() -> EwsResponseReader.readMetadata(metadataXml(metadataItem("one")
+                .replace("</t:Message>", "<t:Categories/><t:Categories/></t:Message>")), List.of("one")))
+                .isInstanceOf(EwsProtocolException.class).hasMessageContaining("Duplicate metadata field");
+    }
+
     @Test void metadataReadsFlaggedCompleteNotFlaggedAndUnknown() throws Exception {
         String[] statuses = {"Flagged", "Complete", "NotFlagged", "Unexpected", ""};
         Boolean[] expected = {true, false, false, null, null};

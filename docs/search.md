@@ -130,11 +130,14 @@ flags in the mailbox.
 ## Labels
 
 Cards and messages carry optional `labels`: the mailbox labels seen at the last synchronization.
-Currently only Gmail provides them. With its All Mail folder available, Gmail is synchronized as
-one folder, so a message is stored once rather than once per label (without it,
+Gmail supplies its labels and Exchange supplies Outlook categories. Both are visible in `labels`
+and searchable with `field: "label"`, as well as `any`. Categories are observed for added messages
+and when EWS reports an update; sync does not scan unchanged messages for categories.
+With its All Mail folder available, Gmail is synchronized as one folder, so a message is stored
+once rather than once per label (without it,
 [ordinary folder synchronization applies](connections.md#app-passwords)). Its labels (`Inbox`,
-`Sent`, `Starred`, your own labels) let you find messages by label. `field: "label"` searches their words;
-Russian word forms are not applied there, so use the label's own words. Gmail's `All` label is not
+`Sent`, `Starred`, your own labels) let you find messages by label. `field: "label"` searches label
+and category words; Russian word forms are not applied there, so use the label's own words. Gmail's `All` label is not
 listed because it names the folder itself. An empty list means the message has no labels; a
 missing `labels` means unknown or a mailbox without labels. The server never changes labels.
 

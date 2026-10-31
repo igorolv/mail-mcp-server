@@ -60,8 +60,9 @@ next request. `Create` entries of any item kind contribute ids in server order; 
 an id created during this call or contributes a deletion. `ReadFlagChange` gives an item id and
 IsRead (a later change of the same item wins); `Update` gives an item id. For known, still present
 items these become `FolderChanges.observed`: IsRead from ReadFlagChange, and IsRead plus
-Flag/FlagStatus from one IdOnly metadata GetItem per 100 Update items (Д29). Fingerprints from that
-request are dropped. Changes of unknown items are ignored. The last page's opaque state is returned unchanged. Known refs are skipped
+Flag/FlagStatus and categories from one IdOnly metadata GetItem per 100 Update items (Д29).
+Fingerprints from that request are dropped. Changes of unknown items are ignored.
+The last page's opaque state is returned unchanged. Known refs are skipped
 in the added list, and known deletions are returned in natural string order.
 
 A first sync (null state) enumerates all items, so known refs absent from the created set are
@@ -82,7 +83,7 @@ when Exchange throttles it; a later user-run sync resumes using known refs and s
 `EwsMailSource.metadata(folder, expectedCursor, refs)` reads every resulting present ref,
 including known ones, in batches of at most 100 on the same session. Its `IdOnly` ItemShape adds
 `message:InternetMessageId`, `item:Size`, `item:DateTimeSent`, `message:From`, `item:Subject`,
-`message:IsRead` and `item:Flag`.
+`message:IsRead`, `item:Flag` and `item:Categories`.
 It requests neither IncludeMimeContent nor Body. The cursor remains opaque; EWS has no IMAP
 UIDVALIDITY check. A dedicated reader uses the shared safe parser and SOAP-fault checks,
 validates each GetItemResponseMessage and the response count, omits ErrorItemNotFound, and
@@ -124,6 +125,24 @@ section 1; remaining cross-tool and flag-clearing checks are in `docs/plan.md` s
 
 Primary references: [Flag](https://learn.microsoft.com/en-us/exchange/client-developer/web-service-reference/flag)
 and [FlagStatus](https://learn.microsoft.com/en-us/exchange/client-developer/web-service-reference/flagstatus).
+
+## Category snapshots
+
+The existing metadata GetItem also reads `item:Categories` for added items and known items with
+an Update change. The reader copies the direct `t:String` children in response order, preserving
+their text, case, whitespace and duplicates. An absent or present-empty Categories property in a
+successful metadata item gives an empty requested list; duplicate top-level Categories fields
+are protocol errors, and unknown nested elements are skipped.
+
+`EwsMailSource` passes these strings through the provider-neutral `labels` field, retaining them
+when it drops the fingerprint from a known Update observation. ReadFlagChange alone has null
+labels and preserves saved categories. The shared storage/index path handles changes and clearing
+without MIME downloads or conversion (`docs/storage-agent.md`); user-visible labels and search
+are described in [search.md](search.md#labels). No category master list or color definitions are read.
+
+Synthetic tests cover parsing and selective Update observations. Category addition and removal
+on an existing message passed the real-mail check on the user's Exchange server; verified
+results are in [results.md, section 1](results.md#1-corporate-exchange).
 
 ## Transport and NTLM
 

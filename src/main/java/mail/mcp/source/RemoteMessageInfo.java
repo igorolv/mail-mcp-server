@@ -7,8 +7,8 @@ import java.util.List;
 /**
  * Metadata from one present remote item; optional identity fields and flag observations may be missing.
  * stableId: the provider's own message identifier that survives moves and UID changes (Gmail
- * X-GM-MSGID); labels: the labels the mailbox assigns to the message (Gmail labels). Both are null
- * when the provider has none or did not return them.
+ * X-GM-MSGID); labels: the labels the mailbox assigns to the message (Gmail labels or EWS categories).
+ * Both are null when the provider has none or did not return them.
  */
 public record RemoteMessageInfo(String ref, MessageFingerprint fingerprint, Boolean read, Boolean flagged,
                                 String stableId, List<String> labels) {

@@ -54,9 +54,10 @@ See `docs/mime-agent.md` for parsing, naming and pandoc rules.
 
 Two provider-neutral fields come from the source when it has them. `stableId` is the provider's
 own message identifier that survives moves and UID changes (currently Gmail `X-GM-MSGID`, kept as
-a decimal string). `labels` are the mailbox labels of the latest observation (currently Gmail
-labels, normalized by the IMAP source: `docs/imap-source-agent.md`). Both are absent in old
-`meta.json` files and for other providers and read as null, which means unknown; an empty label
+a decimal string). `labels` are the mailbox labels of the latest observation: Gmail labels,
+normalized by the IMAP source (`docs/imap-source-agent.md`), or Outlook categories, preserved as
+returned by EWS (`docs/ews-source-agent.md`). Both fields are absent in old `meta.json` files;
+when a provider does not supply a field it reads as null, which means unknown. An empty label
 list means the message has no labels. Processing, failures, offline reprocessing, reindexing and
 flag updates preserve them; a sync observation replaces either one only when the source returned it.
 The XLSX exception uses the resolved format and actual file size, including inside containers;
@@ -172,7 +173,8 @@ change automatically rebuilds older indexes from disk through the existing resto
 cannot observe remote state. Reconciliation repairs a flag, label or `stableId` mismatch after
 metadata was saved before an interrupted index write, just as for folder/ref mismatches. Labels
 follow the flag rules: a changed label list rewrites metadata and the document without download,
-conversion or content writes, and counts as no downloaded/failed/removed message.
+conversion or content writes, and counts as no downloaded/failed/removed message. An explicit
+empty list clears saved labels; a null observation preserves them.
 
 ## Write order and failures
 

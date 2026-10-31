@@ -315,6 +315,7 @@ final class EwsResponseReader {
         Long size = null;
         Instant sentAt = null;
         Boolean read = null, flagged = null;
+        List<String> labels = new ArrayList<>();
         var fields = new java.util.HashSet<String>();
         while (r.hasNext()) {
             int event = r.next();
@@ -347,6 +348,16 @@ final class EwsResponseReader {
                         } else { skipElement(r); }
                     }
                 }
+                case "Categories" -> {
+                    while (r.hasNext()) {
+                        int child = r.next();
+                        if (child == END_ELEMENT) { break; }
+                        if (child != START_ELEMENT) { continue; }
+                        if (EwsXml.TYPES_NS.equals(r.getNamespaceURI()) && "String".equals(r.getLocalName())) {
+                            labels.add(r.getElementText());
+                        } else { skipElement(r); }
+                    }
+                }
                 case "InternetMessageId" -> messageId = r.getElementText();
                 case "Subject" -> subject = r.getElementText();
                 case "Size" -> {
@@ -373,7 +384,8 @@ final class EwsResponseReader {
                 default -> skipElement(r);
             }
         }
-        return new RemoteMessageInfo(ref, new MessageFingerprint(messageId, size, sentAt, from, subject), read, flagged);
+        return new RemoteMessageInfo(ref, new MessageFingerprint(messageId, size, sentAt, from, subject),
+                read, flagged, null, labels);
     }
 
     @FunctionalInterface
