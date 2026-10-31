@@ -36,7 +36,10 @@ path unchanged. Gmail continues to obtain labels only from `X-GM-LABELS`.
    as `\Seen`, `\Flagged`, `\Answered`, `\Deleted` and `\Draft`; none of those system flags
    becomes a label.
 2. Exclude every user flag whose returned name starts with `$`, including standardized/client
-   bookkeeping keywords such as `$Forwarded`, `$MDNSent`, `$Junk` and `$NotJunk`. There is no
+   bookkeeping keywords such as `$Forwarded`, `$MDNSent`, `$Junk` and `$NotJunk`. Also exclude the
+   junk-filter keywords `Junk`, `NonJunk` and `NotJunk` without a `$`, compared case-insensitively,
+   which some clients (for example Thunderbird, to verify) set on IMAP messages (user decision of
+   2026-11-01). Consequently tags stored as `$label1`…`$label5` are not labels either. There is no
    setting or allow-list exception in this task. Preserve every other keyword exactly as returned,
    including case; sort the resulting strings by Java natural order for stable comparisons.
 3. A parsed `FLAGS` value with no remaining keyword produces a known empty label list. Missing or
@@ -85,8 +88,9 @@ command or external connection.
 The following test names are exact:
 
 - `ImapClientTest.nonGmailKeywordsBecomeSortedLabelsWithoutDollarKeywords` — cover system flags,
-  at least two ordinary keywords, at least one `$` keyword, stable sorted spelling, the UID
-  listing and metadata paths, and unchanged FETCH command shapes;
+  at least two ordinary keywords, at least one `$` keyword, `Junk` and `nonjunk` (excluded in any
+  case), stable sorted spelling, the UID listing and metadata paths, and unchanged FETCH command
+  shapes;
 - `ImapClientTest.gmailContinuesToUseOnlyGmailLabels` — return both IMAP user keywords and
   `X-GM-LABELS`, then prove only the Gmail labels are exposed in both paths;
 - `ImapMailSourceTest.changesObserveNonGmailKeywordsAsLabels` — prove a known ref receives
@@ -136,8 +140,8 @@ if needed, results after review.
 - Do not add IMAP commands, fetch items, sign-ins, retries, writes, `STORE`, `SELECT`, CONDSTORE or
   QRESYNC.
 - Do not combine IMAP keywords with Gmail labels or change Gmail normalization.
-- Do not expose system flags or any `$`-prefixed keyword as a label; do not add a setting to
-  configure that policy.
+- Do not expose system flags, any `$`-prefixed keyword or `Junk`/`NonJunk`/`NotJunk` as a label;
+  do not add a setting to configure that policy or extend the excluded list.
 - Do not change the MCP schema, Java API records, `MessageMeta`, `MessageCard`, Lucene fields,
   index schema version, search analyzer or label redaction.
 - Do not assume that Mail.ru supports keywords, add provider host-name checks or rebuild the
