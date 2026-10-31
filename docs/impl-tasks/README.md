@@ -122,10 +122,20 @@ The reviewer checks; it does not fix. Work through every point and report what y
 
 ## Task list
 
-No brief is open. Next unused number: IT-28. A new brief gets a row in a table with the columns
-Order, Brief, Plan item, Scope and dependency. Recording one brief preserves all other rows and
-dependency notes. Accepted briefs are kept in git history; remaining real-mail checks are in
-`docs/plan.md` section 2.
+Next unused number: IT-31. Recording one brief preserves all other rows and dependency notes.
+Accepted briefs are kept in git history; remaining real-mail checks are in `docs/plan.md`
+section 2.
+
+Open-batch code baseline: `db000bc`, which already contains the sync stages (`SyncListener`,
+`SyncPhase`) and the gone-folder handling (`FolderGoneException`, `ImapClient.open`, the fake
+server's `deleted` folders) that IT-29 and IT-30 build on. Commit these planning files before
+implementation, then run the briefs from a clean tree in the order below.
+
+| Order | Brief | Plan item | Scope and dependency |
+|---|---|---|---|
+| 1 | [IT-28 — Outlook categories as labels](IT-28-outlook-categories.md) | Д31 | One S session; accepted code baseline, no dependency on another open brief |
+| 2 | [IT-29 — Non-Gmail IMAP keywords as labels](IT-29-imap-keywords.md) | Д32 | One S session after accepted IT-28; code is independent, shared label documentation is not |
+| 3 | [IT-30 — RFC 8474 EMAILID as stableId](IT-30-imap-emailid.md) | Д33 | One S session after accepted IT-29; shares IMAP source records, fake server and documentation |
 
 ## Rules for every implementation session
 
