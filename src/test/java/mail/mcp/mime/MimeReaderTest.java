@@ -47,6 +47,7 @@ class MimeReaderTest {
         assertThat(System.getProperty("mail.mime.decodefilename")).isEqualTo("true");
         assertThat(System.getProperty("mail.mime.parameters.strict")).isEqualTo("false");
         assertThat(System.getProperty("mail.mime.base64.ignoreerrors")).isEqualTo("true");
+        assertThat(System.getProperty("mail.mime.contentdisposition.strict")).isEqualTo("false");
     }
 
     @ParameterizedTest(name = "{0}") @MethodSource("cases")
@@ -231,6 +232,53 @@ class MimeReaderTest {
         assertThat(result.message().attachments().getFirst().charset()).isEqualTo("iso-8859-6-e");
         assertThat(MimeReader.charset("ISO-8859-6-E ").name()).isEqualTo("ISO-8859-6");
         assertThat(MimeReader.charset("windows-1251").name()).isEqualTo("windows-1251");
+    }
+
+    @Test void misspelledCp1251DecodesAsWindows1251() throws Exception {
+        // "Привет" in windows-1251 is CF F0 E8 E2 E5 F2.
+        Path eml = temp.resolve("cp1251.eml");
+        Files.writeString(eml, """
+                Subject: =?cp-1251?Q?=CF=F0=E8=E2=E5=F2?= 1
+                From: =?CP-1251?Q?=CF=F0=E8=E2=E5=F2?= <sender@example.com>
+                Content-Type: text/html;  charset="cp-1251"
+                Content-Transfer-Encoding: quoted-printable
+
+                <p>=CF=F0=E8=E2=E5=F2</p>
+                """.replace("\n", "\r\n"));
+        var result = MimeReader.read(eml, null);
+        assertThat(result.body()).isEqualTo("<p>Привет</p>\r\n");
+        assertThat(result.html()).isTrue();
+        assertThat(result.message().subject()).isEqualTo("Привет 1");
+        assertThat(result.message().from()).containsExactly(new Address("Привет", "sender@example.com"));
+        assertThat(MimeReader.charset("CP-1251").name()).isEqualTo("windows-1251");
+    }
+
+    @Test void unparsableContentDispositionIsIgnoredInsteadOfFailingTheMessage() throws Exception {
+        Path eml = temp.resolve("disposition.eml");
+        Files.writeString(eml, """
+                Subject: x
+                Content-Type: multipart/mixed; boundary=outer
+
+                --outer
+                Content-Type: text/html; charset="utf-8"
+                Content-Disposition: =?utf-8?Q?inline?=
+
+                <p>body</p>
+                --outer
+                Content-Type: application/pdf; name="report.pdf"
+                Content-Disposition: attachment;filename=other.pdf;size = "3"; :=
+
+                pdf
+                --outer--
+                """.replace("\n", "\r\n"));
+        var result = MimeReader.read(eml, temp.resolve("attachments"));
+        assertThat(result.body()).isEqualTo("<p>body</p>");
+        assertThat(result.html()).isTrue();
+        var attachment = result.message().attachments().getFirst();
+        assertThat(result.message().attachments()).hasSize(1);
+        assertThat(attachment.name()).isEqualTo("report.pdf");
+        assertThat(attachment.file()).isEqualTo("1__report.pdf");
+        assertThat(attachment.inline()).isFalse();
     }
 
     @Test void unknownCharsetOfTheSelectedBodyStillFails() throws Exception {

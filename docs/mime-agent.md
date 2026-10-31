@@ -9,13 +9,15 @@ Jakarta Mail; no stream escapes the reader.
 
 Call `MimeReader.configureAngus()` before any Jakarta Mail class is used. The application
 entry point and the standalone sync/reprocess/reindex entry points do this. Gradle sets the same
-properties on the test JVM. Angus reads the first two once at class initialization.
+properties on the test JVM. Angus reads the first two and `mail.mime.contentdisposition.strict`
+once at class initialization.
 
 | Property | Value | Reason |
 |---|---|---|
 | `mail.mime.decodefilename` | `true` | Outlook-style RFC 2047 encoded-word filenames (M02) |
 | `mail.mime.parameters.strict` | `false` | Accept the unquoted extended filename `/etc/passwd` in M16 |
 | `mail.mime.base64.ignoreerrors` | `true` | Preserve the five decoded bytes of truncated base64 in M14 |
+| `mail.mime.contentdisposition.strict` | `false` | An unparsable `Content-Disposition`, such as the encoded word `=?utf-8?Q?inline?=`, has no disposition instead of failing the message; unparsable parameters are dropped, so the filename falls back to the Content-Type `name` (`MimeReaderTest`) |
 
 ## Headers, body and attachments
 
@@ -32,19 +34,22 @@ Use the declared charset without guessing. Every other leaf is an attachment, in
 binary parts and inline images. The MIME reader keeps containers as leaves;
 `Containers` expands saved EML, ZIP, MSG and TNEF files afterward. S/MIME and calendars remain opaque.
 
-RFC 1556 directional labels `iso-8859-6-e`, `iso-8859-6-i`, `iso-8859-8-e` and `iso-8859-8-i`
-(any case) are unknown to Java and Angus but encode bytes exactly as `ISO-8859-6` and
-`ISO-8859-8`, so `MimeReader.charset` maps them to the base charset; this is not guessing.
-`read` applies the mapping in three places:
+Some declared labels are unknown to Java and Angus but name exactly one Java charset, so
+`MimeReader.charset` maps them; this maps a declared label and is not guessing:
+- RFC 1556 directional labels `iso-8859-6-e`, `iso-8859-6-i`, `iso-8859-8-e` and
+  `iso-8859-8-i` encode bytes exactly as `ISO-8859-6` and `ISO-8859-8`;
+- `cp-1251` is a misspelled `windows-1251` (`docs/decisions.md`, 2026-10-31).
+
+Labels match in any case. `read` applies the mapping in three places:
 - The selected body is decoded by Angus first; only its `UnsupportedEncodingException` for one
-  of these labels falls back to the decoded part bytes in the base charset.
+  of these labels falls back to the decoded part bytes in the mapped charset.
 - Top-level header encoded words with these labels, including an RFC 2231 language suffix, get
-  the base label in the in-memory message before the getters decode the subject and names.
+  the mapped label in the in-memory message before the getters decode the subject and names.
   `fingerprint` keeps raw headers, matching the IMAP ENVELOPE evidence.
 - Text attachments use the mapping through `AttachmentText`.
 
-Any other charset unknown to Java still fails the message with
-`MIME parsing failed (UnsupportedEncodingException)`.
+Any other charset unknown to Java, such as UTF-7, which the JDK does not provide, still fails
+the message with `MIME parsing failed (UnsupportedEncodingException)`.
 
 Attachments are numbered from one in walk order; the three-argument `read` starts at its
 `firstNumber` argument. Stored names are `<n>__<sanitized name>` or

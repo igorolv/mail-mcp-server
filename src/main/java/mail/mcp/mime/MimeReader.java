@@ -32,14 +32,16 @@ import java.util.regex.Pattern;
 /** Reads a local MIME file; only multipart containers are traversed. */
 public final class MimeReader {
     /**
-     * RFC 1556 directional labels, which Java does not know. Each encodes bytes exactly as its base
-     * charset, so mapping them is not charset guessing (docs/mime-agent.md).
+     * Declared labels Java does not know, each naming exactly one Java charset: RFC 1556 directional
+     * labels encode bytes as their base charset, and {@code cp-1251} is a misspelled
+     * {@code windows-1251}. Mapping a declared label is not charset guessing (docs/mime-agent.md).
      */
-    private static final Map<String, String> DIRECTIONAL = Map.of(
+    private static final Map<String, String> LABELS = Map.of(
             "iso-8859-6-e", "ISO-8859-6", "iso-8859-6-i", "ISO-8859-6",
-            "iso-8859-8-e", "ISO-8859-8", "iso-8859-8-i", "ISO-8859-8");
-    /** The charset label of an RFC 2047 encoded word with a directional suffix, optionally with an RFC 2231 language. */
-    private static final Pattern DIRECTIONAL_WORD = Pattern.compile("=\\?(iso-8859-[68])-[ei]([*?])", Pattern.CASE_INSENSITIVE);
+            "iso-8859-8-e", "ISO-8859-8", "iso-8859-8-i", "ISO-8859-8",
+            "cp-1251", "windows-1251");
+    /** One of these labels in an RFC 2047 encoded word, optionally with an RFC 2231 language. */
+    private static final Pattern LABEL_WORD = Pattern.compile("=\\?(iso-8859-[68]-[ei]|cp-1251)([*?])", Pattern.CASE_INSENSITIVE);
 
     private MimeReader() { }
 
@@ -48,6 +50,7 @@ public final class MimeReader {
         System.setProperty("mail.mime.decodefilename", "true");
         System.setProperty("mail.mime.parameters.strict", "false");
         System.setProperty("mail.mime.base64.ignoreerrors", "true");
+        System.setProperty("mail.mime.contentdisposition.strict", "false");
     }
 
     /** Parses MIME, saving decoded attachments only when attachmentsDir is non-null. */
@@ -111,25 +114,25 @@ public final class MimeReader {
         }
     }
 
-    /** The Java charset of a declared charset name, accepting RFC 1556 directional labels. */
+    /** The Java charset of a declared charset name, accepting the labels above. */
     public static Charset charset(String declared) {
-        String base = DIRECTIONAL.get(declared.trim().toLowerCase(Locale.ROOT));
+        String base = LABELS.get(declared.trim().toLowerCase(Locale.ROOT));
         return Charset.forName(base == null ? declared : base);
     }
 
-    /** Body text as Angus decodes it; a directional label Angus cannot map decodes with its base charset. */
+    /** Body text as Angus decodes it; a label above that Angus cannot map decodes with its Java charset. */
     private static String text(Part part) throws MessagingException, IOException {
         try {
             return (String) part.getContent();
         } catch (UnsupportedEncodingException e) {
             String declared = new ContentType(part.getContentType()).getParameter("charset");
-            if (declared == null || !DIRECTIONAL.containsKey(declared.trim().toLowerCase(Locale.ROOT))) { throw e; }
+            if (declared == null || !LABELS.containsKey(declared.trim().toLowerCase(Locale.ROOT))) { throw e; }
             try (var input = part.getInputStream()) { return new String(input.readAllBytes(), charset(declared)); }
         }
     }
 
     /**
-     * Rewrites directional labels in encoded words of the message headers to their base charset, so
+     * Rewrites the labels above in encoded words of the message headers to their Java charset, so
      * the Jakarta Mail getters decode the subject and names instead of returning the encoded words.
      * Only the in-memory message changes; fingerprint() keeps the raw behavior of IMAP ENVELOPE.
      */
@@ -137,12 +140,13 @@ public final class MimeReader {
         var names = new LinkedHashSet<String>();
         for (var headers = mime.getAllHeaders(); headers.hasMoreElements(); ) {
             var header = headers.nextElement();
-            if (header.getValue() != null && DIRECTIONAL_WORD.matcher(header.getValue()).find()) { names.add(header.getName()); }
+            if (header.getValue() != null && LABEL_WORD.matcher(header.getValue()).find()) { names.add(header.getName()); }
         }
         for (String name : names) {
             String[] values = mime.getHeader(name);
             mime.removeHeader(name);
-            for (String value : values) { mime.addHeader(name, DIRECTIONAL_WORD.matcher(value).replaceAll("=?$1$2")); }
+            for (String value : values) { mime.addHeader(name, LABEL_WORD.matcher(value).replaceAll(
+                    word -> "=?" + LABELS.get(word.group(1).toLowerCase(Locale.ROOT)) + word.group(2))); }
         }
     }
 

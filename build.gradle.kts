@@ -57,6 +57,7 @@ tasks.test {
     systemProperty("mail.mime.decodefilename", "true")
     systemProperty("mail.mime.parameters.strict", "false")
     systemProperty("mail.mime.base64.ignoreerrors", "true")
+    systemProperty("mail.mime.contentdisposition.strict", "false")
 }
 
 // Offline conversion of messages already on disk; never signs in.

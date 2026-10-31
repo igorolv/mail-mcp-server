@@ -65,6 +65,7 @@ in section 3.
 | 2026-10-28 | Translate project documentation into English and use English for future documentation changes | User request |
 | 2026-10-28 | Д7: increase the shared IMAP partial MIME block from 16 KiB to 256 KiB; accept IT-26 after the user-run Gmail check | Sequential network waits dominate Gmail downloads; the observed intervals improved from 21.9 to 37.9 messages/min. Keep streaming, byte limits, read-only commands and one connection |
 | 2026-10-28 | Д7: Gmail identity and labels are provider-neutral outside `source/imap/`: `X-GM-MSGID` is stored as `stableId`, Gmail labels as `labels`, and `stableId` reuse runs in the existing move-matching pass under its uniqueness rule. Outlook categories, IMAP keywords and RFC 8474 `EMAILID` are later improvements (Д31–Д33) | Review of IT-27: Outlook and IMAP have the same concepts; `meta.json` and the MCP contract are costly to rename after `0.1.0` |
+| 2026-10-31 | Parse `Content-Disposition` leniently (`mail.mime.contentdisposition.strict=false`) and map the declared label `cp-1251` to `windows-1251`. UTF-7 bodies and a `Content-Type` without `;` before its parameters still fail the message | Of 24 failed Mail.ru messages in a user-run count, 16 had an unparsable `Content-Disposition` (15 the encoded word `=?utf-8?Q?inline?=`), 3 declared `cp-1251`, 4 were UTF-7 delivery reports and 1 lacked `;` in `Content-Type`. The label names one charset, so mapping it is not charset guessing |
 
 ## 3. Agent proposals and implementation choices
 
