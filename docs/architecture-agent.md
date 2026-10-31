@@ -25,8 +25,9 @@ boundaries are in `docs/decisions.md` and possible improvements in `docs/backlog
 JSON-RPC channel; use SLF4J instead. `logback-spring.xml` has only `FILE` and `STDERR` appenders,
 and the HttpClient `headers`/`wire` loggers are `OFF` because they would print `Authorization`
 headers. Both logging configurations keep the Angus/Jakarta Mail loggers off and log only errors
-from PDFBox, FontBox and the POI Word 97-2003 converter, whose unsupported-field warnings
-quote document text. `McpServerConfig` sets `immediateExecution(true)` on the `McpSyncServer` builder (copied
+from PDFBox, FontBox and the POI Word 97-2003 and Visio parsers: they warn about damaged but
+readable files, and Word's unsupported-field warnings quote document text.
+`McpServerConfig` sets `immediateExecution(true)` on the `McpSyncServer` builder (copied
 from redmine-mcp-server @ `f62b3e5`): tool calls of one session run one at a time, so long work —
 synchronization — runs in the background and returns at once (`docs/tools-agent.md`).
 `config/McpStdioConcurrencyTest` documents the race; its disabled half passed once with MCP SDK
