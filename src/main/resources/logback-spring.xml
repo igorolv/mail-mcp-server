@@ -41,4 +41,7 @@
          PAGE produce warnings that quote document text; the text is still extracted. -->
     <logger name="org.apache.poi.hwpf" level="ERROR"/>
     <logger name="org.apache.poi.hdgf" level="ERROR"/>
+    <!-- Office 97-2003 files without the optional document summary stream, common in generated
+         XLS/DOC files; the text is still extracted. -->
+    <logger name="org.apache.poi.POIDocument" level="ERROR"/>
 </configuration>
