@@ -21,4 +21,7 @@
     <!-- Damaged but readable PDFs produce warnings; their text is still extracted. -->
     <logger name="org.apache.pdfbox" level="ERROR"/>
     <logger name="org.apache.fontbox" level="ERROR"/>
+    <!-- Word 97-2003 fields such as PAGE are unsupported; the warning quotes document text, and the
+         field's result text is still extracted. -->
+    <logger name="org.apache.poi.hwpf.converter" level="ERROR"/>
 </configuration>
