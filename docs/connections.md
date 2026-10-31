@@ -276,24 +276,56 @@ every call (`keepassxc-cli`, Bitwarden CLI without a session) work only in `mail
 
 ## Exchange (EWS)
 
-```json
-"work": {
-  "type": "ews",
-  "url": "https://webmail.example.com/EWS/Exchange.asmx",
-  "auth": "ntlm",
-  "username": "user",
-  "windowsCredential": "mail-mcp/work",
-  "description": "Work mail, Exchange 2013"
-}
-```
+Tested with Exchange 2013 and NTLM. Every failed sign-in counts toward the domain's lockout
+policy, so check the setup before the first synchronization. The server signs in once per run and
+never retries; see [Security](security.md#sign-in-policy).
 
-- Tested with Exchange 2013. The EWS endpoint is usually the Outlook on the web host followed by
-  `/EWS/Exchange.asmx`.
-- **NTLM with a bare login** (no domain part) is the combination known to work: the server fills
-  in the domain. Basic with a bare login was rejected by the tested server. Set `domain` only if
-  your server requires it.
-- Every failed sign-in counts toward the domain's lockout policy. The server signs in once per
-  run and never retries; see [Security](security.md#sign-in-policy).
+1. Find the EWS endpoint. It is usually the Outlook on the web host followed by
+   `/EWS/Exchange.asmx`: if you read mail at `https://webmail.example.com/owa`, the endpoint is
+   `https://webmail.example.com/EWS/Exchange.asmx`. Ask your administrator if your server differs.
+2. Store your domain account password, the one you use for Outlook on the web, in a generic
+   Windows credential with the address `mail-mcp/work` and the user name `work`; follow
+   [Windows Credential Manager](#windows-credential-manager). On other platforms use another
+   [password source](#passwords).
+3. Add the entry inside the `connections` object in `connections.json`:
+
+   ```json
+   "work": {
+     "type": "ews",
+     "url": "https://webmail.example.com/EWS/Exchange.asmx",
+     "auth": "ntlm",
+     "username": "user",
+     "windowsCredential": "mail-mcp/work",
+     "description": "Work mail, Exchange 2013"
+   }
+   ```
+
+   - `username` is your **bare login**, without a domain part or `@`: with NTLM the server fills
+     in the domain. Basic with a bare login was rejected by the tested server. Set `domain` only
+     if your server requires it.
+   - `windowsCredential` must equal the address from step 2.
+4. Check that Windows finds the credential. This contacts no mail server and never prints the
+   password; `* NONE *` means the name does not match or the entry belongs to another Windows user:
+
+   ```powershell
+   cmdkey /list:mail-mcp/work
+   ```
+
+5. Run the first synchronization yourself:
+
+   ```powershell
+   java -jar mail-mcp-server.jar mail-sync work
+   ```
+
+   If it ends with exit code 3 (sign-in rejected), do not run it again until you have checked the
+   login and the stored password. See [`mail-sync`](commands.md#mail-sync) for the output.
+
+**When your domain password changes**, for example because it expires, update the credential
+first: expand `mail-mcp/work` under **Generic Credentials**, choose **Edit** and enter the new
+password. Then restart every MCP server process and run `mail-sync work` in a terminal. A server
+still holding the old password signs in with it on the next sync; that rejected attempt counts
+toward the lockout policy, and the `sync` tool then refuses the connection until a successful
+`mail-sync`.
 
 ## Mail.ru
 
@@ -332,9 +364,11 @@ separate app password for this server instead of your normal Google account pass
    [App passwords directly](https://myaccount.google.com/apppasswords).
 4. Enter the app name `mail-mcp-server` and create the password. Google shows it only once.
 5. Save the generated 16-character password, without the visual grouping spaces, in a generic
-   Windows credential named `mail-mcp/gmail`; follow [Windows Credential Manager](#windows-credential-manager).
-   Enter it only in the local password dialog, never in chat or a command line. On other platforms
-   use a [password source](#passwords) available there.
+   Windows credential with the address `mail-mcp/gmail` and the user name `gmail`; follow
+   [Windows Credential Manager](#windows-credential-manager). The address must equal
+   `windowsCredential` in the next step. Enter the password only in the local password dialog,
+   never in chat or a command line. On other platforms use a [password source](#passwords)
+   available there.
 6. Add the following entry inside the `connections` object in `connections.json`. Replace the
    example address with yours; put a comma between it and the preceding connection:
 
@@ -351,7 +385,14 @@ separate app password for this server instead of your normal Google account pass
    }
    ```
 
-7. Run the first synchronization yourself:
+7. Check that Windows finds the credential. This contacts no mail server and never prints the
+   password; `* NONE *` means the name does not match or the entry belongs to another Windows user:
+
+   ```powershell
+   cmdkey /list:mail-mcp/gmail
+   ```
+
+8. Run the first synchronization yourself:
 
    ```powershell
    java -jar mail-mcp-server.jar mail-sync gmail
