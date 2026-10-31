@@ -74,19 +74,36 @@ The agent picks the tools itself; these are the chains it usually follows.
 .\gradlew.bat bootJar      # -> build\libs\mail-mcp-server.jar
 ```
 
-**3. Describe your mailboxes** in `%USERPROFILE%\.mail-mcp-server\connections.json`
+**3. Get a password for each mailbox.** Which password depends on the provider:
+
+| Mailbox | Password |
+|---|---|
+| Exchange (EWS) | Your domain account password. NTLM with a bare login (no domain part) is the combination known to work. [Exchange setup](docs/connections.md#exchange-ews) |
+| Mail.ru | An app password (a password for external applications) created in the mailbox's security settings. [Mail.ru setup](docs/connections.md#mailru) |
+| Gmail | An app password: profile picture → **Manage your Google Account** → **Security & sign-in** → **2-Step Verification** → **App passwords**; it requires 2-Step Verification. Use the 16 characters without spaces. Where app passwords are unavailable, sign in with [OAuth2](docs/connections.md#oauth2) instead. [Gmail setup](docs/connections.md#gmail) |
+
+**4. Choose where the server reads each password.** Every source works with every mailbox. Use
+exactly one source per connection; different connections may use different sources.
+
+| Source | Key in the connection entry | Suits | Keep in mind |
+|---|---|---|---|
+| Windows Credential Manager | `"windowsCredential": "mail-mcp/work"` | Windows, including MCP clients started from the desktop | 64-bit Windows only; the credential belongs to one Windows user |
+| Password manager | `"passwordCommand": ["op", "read", "op://Private/Work mail/password"]` | Any OS, a password already kept in a manager | The program must print only the password; unlock the manager before a sync |
+| Literal | `"password": "..."` | The quickest setup | The password lies in the file; in JSON write `\` as `\\` and `"` as `\"` |
+| Environment variable | `"password": "${MAIL_WORK_PASSWORD}"` | Clients and `mail-sync` started from one terminal | Clients started from the desktop do not see it; an unset variable stops the server |
+
+For Credential Manager, search Start for **Credential Manager** → **Windows Credentials** →
+**Add a generic credential**. Set the address to the name in `windowsCredential`
+(`mail-mcp/work`), the user name to a plain label such as `work` (the server ignores it) and the
+password to the mailbox password from step 3. Repeat for each connection with its own name.
+Setup of every source, password manager recipes and password changes:
+[Passwords](docs/connections.md#passwords).
+
+**5. Describe your mailboxes** in `%USERPROFILE%\.mail-mcp-server\connections.json`
 (`~/.mail-mcp-server/connections.json` elsewhere) — one entry per mailbox, keyed by the
-connection name. This example shows three password sources:
-
-| Connection | Password source | JSON key |
-|---|---|---|
-| Exchange (`work`) | Environment variable | `password` with `${MAIL_WORK_PASSWORD}` |
-| Mail.ru (`mailru`) | Password manager CLI (1Password in this example) | `passwordCommand` |
-| Gmail (`gmail`) | Windows Credential Manager | `windowsCredential` |
-
-These choices are independent of the mail provider: any password-based connection can use any
-of these sources. Keep only the mailboxes you need, replace the example usernames and choose
-**one password source per entry**.
+connection name. Keep only the mailboxes you need and replace the example addresses. This example
+reads every password from Credential Manager; replace any `windowsCredential` line with another
+key from step 4.
 
 ```json
 {
@@ -96,7 +113,7 @@ of these sources. Keep only the mailboxes you need, replace the example username
       "url": "https://webmail.example.com/EWS/Exchange.asmx",
       "auth": "ntlm",
       "username": "user",
-      "password": "${MAIL_WORK_PASSWORD}",
+      "windowsCredential": "mail-mcp/work",
       "description": "Work mail, Exchange 2013"
     },
     "mailru": {
@@ -106,7 +123,7 @@ of these sources. Keep only the mailboxes you need, replace the example username
       "tls": true,
       "auth": "app-password",
       "username": "user@mail.ru",
-      "passwordCommand": ["op", "read", "op://Private/Mailru/password"],
+      "windowsCredential": "mail-mcp/mailru",
       "description": "Personal Mail.ru"
     },
     "gmail": {
@@ -123,41 +140,16 @@ of these sources. Keep only the mailboxes you need, replace the example username
 }
 ```
 
-Keep the file readable only by you. Every field and provider setup:
+Make the file readable only by you, which matters most with a literal password:
+
+```powershell
+icacls "$HOME\.mail-mcp-server\connections.json" /inheritance:r /grant:r "${env:USERNAME}:F"
+```
+
+An entry without a password is reported as unusable and never signs in. Every field:
 [docs/connections.md](docs/connections.md).
 
-**4. Prepare the passwords** for the sources you chose:
-
-- **Exchange — environment variable.** In PowerShell, enter the mailbox password at a hidden
-  prompt; the following stores it in the current process environment:
-
-  ```powershell
-  $workPassword = Read-Host 'Exchange password' -AsSecureString
-  $env:MAIL_WORK_PASSWORD = [System.Net.NetworkCredential]::new('', $workPassword).Password
-  ```
-
-  Run `mail-sync` and start your MCP client from this terminal so they inherit the variable.
-  A client opened elsewhere needs the variable in its own environment, or a different password
-  source. An unset `${VAR}` prevents server startup. For Exchange, NTLM with a bare login
-  (no domain) is the combination known to work. [Environment variables](docs/connections.md#environment-variables).
-- **Mail.ru — password command.** Create a Mail.ru app password and save it in your password
-  manager. The example uses [1Password CLI](https://developer.1password.com/docs/cli/reference/commands/read/):
-  install `op` on the client's `PATH`, sign in/unlock the manager, and replace
-  `op://Private/Mailru/password` with your vault/item/field reference. The server runs the array
-  without a shell and reads its single output line as the password. For another manager, replace
-  the array with its command, or use either of the other sources.
-  [Password manager recipes and prompts](docs/connections.md#password-commands).
-- **Gmail — Windows Credential Manager (64-bit Windows).** In Gmail, click your profile picture
-  → **Manage your Google Account**
-  → **Security & sign-in** → **2-Step Verification** → **App passwords**. Create one for
-  `mail-mcp-server`; this requires 2-Step Verification. In Windows, search Start for
-  **Credential Manager** → **Windows Credentials** → **Add a generic credential**. Set the address
-  to `mail-mcp/gmail`, the user name to `gmail` and the password to the generated app password.
-  The actual Gmail address stays in `connections.json`.
-  [Credential Manager setup and password changes](docs/connections.md#windows-credential-manager).
-  [Detailed Gmail setup, direct link and OAuth2 alternative](docs/connections.md#gmail).
-
-**5. Run the first synchronization** in a terminal. It downloads the whole mailbox, which takes
+**6. Run the first synchronization** in a terminal. It downloads the whole mailbox, which takes
 a while on a large one; a second run should end with `0 downloaded`:
 
 ```powershell
@@ -167,7 +159,7 @@ java -jar build\libs\mail-mcp-server.jar mail-sync work
 Use `mailru` or `gmail` instead of `work` to synchronize those connections. With a Gmail app
 password, run `mail-sync gmail` directly; `gmail-oauth` is only for the OAuth2 alternative.
 
-**6. Register the server** with your MCP client, with an absolute path to the jar. Claude Code:
+**7. Register the server** with your MCP client, with an absolute path to the jar. Claude Code:
 
 ```powershell
 claude mcp add --scope user mail -- java -jar C:/path/to/mail-mcp-server.jar
@@ -176,7 +168,7 @@ claude mcp add --scope user mail -- java -jar C:/path/to/mail-mcp-server.jar
 Codex CLI, OpenCode, VS Code, Cursor, Claude Desktop and environment variables:
 [docs/clients.md](docs/clients.md).
 
-**7. Try it.** Ask the agent in plain words:
+**8. Try it.** Ask the agent in plain words:
 
 - *"Which mailboxes can you read?"* — it calls `listConnections`.
 - *"Find the letters about the supply contract in `work` from last week."* — it calls `search`

@@ -34,7 +34,7 @@ The file holds one object, `connections`, keyed by the connection name:
       "url": "https://webmail.example.com/EWS/Exchange.asmx",
       "auth": "ntlm",
       "username": "user",
-      "password": "${MAIL_WORK_PASSWORD}",
+      "windowsCredential": "mail-mcp/work",
       "description": "Work mail, Exchange 2013"
     },
     "mailru": {
@@ -44,7 +44,7 @@ The file holds one object, `connections`, keyed by the connection name:
       "tls": true,
       "auth": "app-password",
       "username": "user@mail.ru",
-      "passwordCommand": ["op", "read", "op://Private/Mailru/password"],
+      "windowsCredential": "mail-mcp/mailru",
       "description": "Personal Mail.ru"
     },
     "gmail": {
@@ -61,12 +61,12 @@ The file holds one object, `connections`, keyed by the connection name:
 }
 ```
 
-Replace the example usernames with your own and keep only the entries you need. The examples
-demonstrate an [environment variable](#environment-variables), a [password command](#password-commands)
-and [Windows Credential Manager](#windows-credential-manager). These are interchangeable password
-sources for EWS and app-password IMAP; they are not tied to the provider. Use exactly one per
-entry. Windows Credential Manager requires 64-bit Windows; the other sources work on other
-platforms too.
+Replace the example usernames with your own and keep only the entries you need. The example
+reads every password from [Windows Credential Manager](#windows-credential-manager), but the
+password source is not tied to the provider: any entry may instead use a literal password, an
+[environment variable](#environment-variables) or a [password command](#password-commands), and
+different entries may use different sources ([Passwords](#passwords)). Use exactly one per entry.
+Windows Credential Manager requires 64-bit Windows; the other sources work on other platforms too.
 
 - The server reads the file once at startup. After editing it, restart the server in your MCP
   client; the user-run [commands](commands.md) read it on every run.
