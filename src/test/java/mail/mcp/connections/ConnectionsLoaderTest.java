@@ -326,7 +326,10 @@ class ConnectionsLoaderTest {
         assertThat(loadOne("{" + ews + ", \"passwordCommand\": [\"op\"], \"windowsCredential\": \"mail-mcp/work\"}").configError())
                 .contains("only one of");
         assertThat(loadOne("{" + ews + ", \"windowsCredential\": \" \"}").configError())
-                .contains("no 'password', 'passwordCommand' or 'windowsCredential'");
+                .contains("'windowsCredential' is empty").contains("'mail-mcp/box'");
+        assertThat(loadOne("{" + ews + ", \"windowsCredential\": \"\"}").configError())
+                .contains("'windowsCredential' is empty");
+        assertThat(loadOne("{" + ews + ", \"password\": \"p\", \"windowsCredential\": \"\"}").usable()).isTrue();
     }
 
     @Test

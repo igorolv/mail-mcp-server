@@ -162,6 +162,16 @@ After changing the variable, restart the MCP server with the new environment. Se
 
 ### Windows Credential Manager
 
+You choose a name for each mailbox's credential, such as `mail-mcp/work`, and write the same name
+in two places: as `windowsCredential` in `connections.json` and as the address of a generic
+credential in Windows. The password itself is stored only in Windows:
+
+| In `connections.json` | In the Windows dialog |
+|---|---|
+| `"windowsCredential": "mail-mcp/work"` | Internet or network address: `mail-mcp/work` |
+| `"username": "user"` (the login the server uses) | User name: any label, e.g. `work` (ignored) |
+| no password key | Password: the mailbox password |
+
 ```json
 "work": {
   "type": "ews",
@@ -171,9 +181,9 @@ After changing the variable, restart the MCP server with the new environment. Se
 }
 ```
 
-The JSON stores a credential's name; you enter its password separately in Windows. Create one
-generic credential per mailbox, under the **same Windows user that runs the MCP client and
-`mail-sync`**:
+Any name works as long as both places match; `mail-mcp/<connection>` is only a convention. An
+empty `windowsCredential` makes the entry unusable. Create one generic credential per mailbox,
+under the **same Windows user that runs the MCP client and `mail-sync`**:
 
 1. Open Start, search for **Credential Manager** and open the Control Panel result. You can also
    open **Control Panel → User Accounts → Credential Manager**.
@@ -197,8 +207,16 @@ generic credential per mailbox, under the **same Windows user that runs the MCP 
 
 5. In each connection, set `windowsCredential` to the matching name. Remove `password` and
    `passwordCommand` from that entry: use exactly one password source.
-6. Restart the MCP server after editing `connections.json`. Run
-   [`mail-sync <connection>`](commands.md#mail-sync) yourself in a terminal to check the setup.
+6. Check that Windows finds each credential, without contacting the mail server. The command
+   prints the entry's type and user name, never the password; `* NONE *` means no entry with that
+   name exists for the current Windows user:
+
+   ```powershell
+   cmdkey /list:mail-mcp/work
+   ```
+
+7. Restart the MCP server after editing `connections.json`. Run
+   [`mail-sync <connection>`](commands.md#mail-sync) yourself in a terminal to check the sign-in.
 
 To replace a password, expand its entry under **Generic Credentials**, choose **Edit**, enter the
 new password and save. Restart every MCP server process using that credential to clear its cached
@@ -207,7 +225,8 @@ successful terminal run is also needed to clear the sync refusal. Removing a Win
 removes the local credential; revoke an app password separately in the provider's settings.
 
 If the server reports that the password is unavailable, check the Windows user, the generic
-credential category and the exact name. No sign-in was attempted in that case. Never put a
+credential category and the exact name, for example with `cmdkey /list:<name>`. No sign-in was
+attempted in that case. Never put a
 password on a command line or send it in chat.
 
 The server reads the credential itself through the Windows API, without PowerShell or another
@@ -414,6 +433,7 @@ other connections keep working:
 - a missing `url`, `host` or `username`;
 - not exactly one of `password`, `windowsCredential` and `passwordCommand`;
 - an empty `passwordCommand` or an empty element in it;
+- an empty `windowsCredential` with no other password source;
 - `windowsCredential` on anything but 64-bit Windows;
 - `http://` EWS URL, `tls: false`, out-of-range values.
 

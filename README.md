@@ -92,10 +92,12 @@ exactly one source per connection; different connections may use different sourc
 | Literal | `"password": "..."` | The quickest setup | The password lies in the file; in JSON write `\` as `\\` and `"` as `\"` |
 | Environment variable | `"password": "${MAIL_WORK_PASSWORD}"` | Clients and `mail-sync` started from one terminal | Clients started from the desktop do not see it; an unset variable stops the server |
 
-For Credential Manager, search Start for **Credential Manager** → **Windows Credentials** →
-**Add a generic credential**. Set the address to the name in `windowsCredential`
-(`mail-mcp/work`), the user name to a plain label such as `work` (the server ignores it) and the
-password to the mailbox password from step 3. Repeat for each connection with its own name.
+For Credential Manager, you choose a name per mailbox, such as `mail-mcp/work`, and write it both
+as `windowsCredential` in `connections.json` and as the address of a Windows credential. Search
+Start for **Credential Manager** → **Windows Credentials** → **Add a generic credential**. Set the
+address to that name, the user name to a plain label such as `work` (the server ignores it) and
+the password to the mailbox password from step 3. Repeat for each connection with its own name.
+`cmdkey /list:mail-mcp/work` shows whether Windows finds the entry, without the password.
 Setup of every source, password manager recipes and password changes:
 [Passwords](docs/connections.md#passwords).
 
@@ -341,8 +343,8 @@ skipped when it is not installed.
   password first. For Exchange, a bare login with `auth: ntlm` is the combination known to work.
 - **`Password of connection '...' is unavailable: ...; no sign-in was attempted`.** Nothing was
   sent to the mail server. For `windowsCredential`, check that a *generic* credential with exactly
-  that target name exists under the Windows user running the server; see
-  [Credential Manager setup](docs/connections.md#windows-credential-manager).
+  that target name exists under the Windows user running the server (`cmdkey /list:<name>` prints
+  `* NONE *` if not); see [Credential Manager setup](docs/connections.md#windows-credential-manager).
   For `passwordCommand`, run the program in a terminal and check that it
   prints only the password; unlock the password manager, or run `mail-sync` in a terminal where it
   can ask.

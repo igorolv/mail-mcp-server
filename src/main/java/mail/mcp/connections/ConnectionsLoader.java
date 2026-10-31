@@ -219,6 +219,9 @@ public final class ConnectionsLoader {
                 secret = new PasswordCommand(name, passwordCommand, terminal);
             } else if (hasPassword) {
                 secret = Secret.of(password);
+            } else if (entry.windowsCredential() != null) {
+                return common.unusable(type, auth, "'windowsCredential' is empty; set it to the name of a generic"
+                        + " credential in Windows Credential Manager, such as 'mail-mcp/" + name + "'");
             } else {
                 return common.unusable(type, auth, "no 'password', 'passwordCommand' or 'windowsCredential'");
             }
