@@ -74,7 +74,9 @@ source-reported metadata. Its nullable Long size is independent of `MessageMeta.
 bytes); EWS item size can differ. Matching needs one nonempty angle-bracketed Message-ID without
 whitespace/nested brackets, positive size, known Instant, nonblank sender and subject. Only
 ID/address outer whitespace is stripped; comparison preserves case and the exact decoded subject.
-Processing, reprocessing and reindexing preserve the fingerprint. It is not indexed; flags have separate schema-4 fields.
+Processing, reprocessing and reindexing preserve the fingerprint. Its Message-ID is indexed as
+`fingerprintId` for candidate lookup; full fingerprints stay in metadata. Flags have separate
+stored fields.
 Binary DOC/XLS/PPT (Office 97-2003) use the same `<file>.md` sidecars and index fields,
 including documents inside containers. No disk/API/schema change is required. Existing
 files need offline `mail-reprocess`, not merely `mail-reindex`, to create the newly supported
@@ -87,7 +89,8 @@ attachment's stored filename. The expanded list is derived from saved containers
 processing and every read; there is no new JSON file or `meta.json` field. Existing messages
 need offline `mail-reprocess <connection>` to save extracted files and Markdown and update
 their indexed text. Until then, readers may list entries without paths or text paths.
-Index fields come from the expanded attachment list and saved Markdown; schema remains 3.
+Index fields come from the expanded attachment list and saved Markdown; container support uses
+the current schema without extra container fields.
 MSG/TNEF expansion can renumber later extracted files in a mixed list. Finish reprocessing a
 connection before attachment lookup/search with this version; extracted filenames are not
 stable across the upgrade. `mail-reindex` alone does not create children or their Markdown.

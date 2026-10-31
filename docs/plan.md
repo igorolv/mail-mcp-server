@@ -57,25 +57,27 @@ Why build our own:
 ## 2. Checks pending on real mail
 
 Implemented and accepted through offline verification; the user runs the checks. Record results
-in [results.md](results.md) and remove the corresponding row here. Only the first row is required
-before publishing `0.1.0` (decision of 2026-10-28); the remaining checks happen during use.
+in [results.md](results.md) and remove the corresponding row here once all its checks pass;
+when only part passes, retain only the remaining checks. The EML/ZIP/MSG/TNEF and legacy Office
+reprocessing check for `work` and `mailru` is the only real-mail check required before publishing
+`0.1.0` (decision of 2026-10-28); the remaining checks happen during use.
 
 | Feature | How to check | Accepted |
 |---|---|---|
-| **Before publication.** EML/ZIP/MSG/TNEF expansion and DOC/XLS/PPT text (`docs/mime-agent.md`) | Run `mail-reprocess` for each connection, then search text in files from archives and older Office formats | 2026-10-27; 582 tests, 1 expected skip, 0 failures |
+| **Before publication.** EML/ZIP/MSG/TNEF expansion and DOC/XLS/PPT text (`docs/mime-agent.md`) | Run `mail-reprocess work` and `mail-reprocess mailru`, then search text in files from archives and older Office formats | 2026-10-27; 582 tests, 1 expected skip, 0 failures |
 | Search by full address without display names (`docs/search.md`) | Restart the MCP server and search `from`/`to` by a full address | 2026-10-26 |
 | Background sync summary and a separate EWS rescan indicator (`docs/tools-agent.md`) | On the next user-requested `sync`, check for one summary line in the log; observe `rescanned` only during natural EWS recovery, without deliberately resetting the cursor | 2026-10-27; 592 tests, 1 expected skip, 0 failures |
 | Date filters and date-only search (`docs/search.md`) | After rebuilding the index to schema 5, restart the MCP server; check a known period with `search` without words and `listMessages` with `since`/`until` on saved data; no separate sync is needed to check dates | 2026-10-27; 603 tests, 1 expected skip, 0 failures |
 | Local conversations (`docs/search.md`) | After rebuilding the index to schema 5, restart the MCP server; call `getThread` with the key of a known conversation and check its membership, order and pages on saved data; no separate sync is needed to check conversations | 2026-10-27; 612 tests, 1 expected skip, 0 failures |
-| Moves without downloading again (`docs/storage-agent.md`) | The user runs sync to populate fingerprints, manually moves a test message between included folders in a mail client and syncs again; check that UUID, path and content are preserved and MIME is not downloaded again. Availability of EWS/IMAP metadata requests on real servers: to verify | 2026-10-27; 635 tests, 1 expected skip, 0 failures |
+| Moves without downloading again (`docs/storage-agent.md`) | The user synchronizes a test message, records its local key and path, moves it between included folders in their mail client and syncs again; check that key, path and content are preserved and MIME is not downloaded again. Known messages are not given a bulk fingerprint pass; removed old messages can use saved headers, subject to the matching rules in `docs/storage-agent.md`. End-to-end move reuse remains to verify | 2026-10-27; 635 tests, 1 expected skip, 0 failures |
 | 5 MiB XLSX text conversion threshold (`docs/mime-agent.md`) | An optional user-run `mail-reprocess` applies the threshold to saved messages: for XLSX files over 5 MiB, old text disappears from `.md` files and search, while originals remain. Until reprocessing, old text is available; reads and `mail-reindex` retain it for `converted` messages | 2026-10-27; 640 tests, 1 expected skip, 0 failures |
-| read/flagged snapshots (`docs/storage-agent.md`, `docs/tools-agent.md`) | The user changes read status and flag/star in their client, runs `sync` or `mail-sync` for EWS and IMAP, and compares `getMessage`, `listMessages`, text search, date search and `getThread`; repeat after clearing flags. Check that known messages are not downloaded again and content is preserved. Real flag requests: to verify | 2026-10-27; 655 tests, 1 expected skip, 0 failures |
+| read/flagged snapshots (`docs/storage-agent.md`, `docs/tools-agent.md`) | EWS and Mail.ru delivery of read/flag changes and selective metadata updates passed ([results.md](results.md), sections 1–2). Remaining: compare `getMessage`, `listMessages`, text search, date search and `getThread` after setting and clearing flags in the mail client and running sync; confirm no MIME download or content change | 2026-10-27; 655 tests, 1 expected skip, 0 failures |
 | Message copy grouping (`docs/search.md`) | Restart the MCP server and find a saved message present in several folders, such as a message sent to yourself: `search` and `getThread` show one card, with other keys and folders in `copies`; totals and paging count the group once. No index rebuild or sync is needed for current schema 5 | 2026-10-27; 665 tests, 1 expected skip, 0 failures |
-| User word forms (`docs/search.md`) | Optionally create `word-forms.txt`, check rules with `mail-analyze`, run `mail-reindex` for each connection and search for irregular forms on saved data. After editing, check that text search refuses until a rebuild; lists, conversations and date-only search should work. No rebuild is needed if the file is absent | 2026-10-27; 681 tests, 1 expected skip, 0 failures; control set with rules: 7/7 irregular forms, 86/86 overall, 7 false positives |
+| User word forms (`docs/search.md`) | Optionally create `word-forms.txt`, check rules with `mail-analyze`, run `mail-reindex` for each connection and search for irregular forms on saved data. After editing, check that text search refuses until a rebuild; lists, conversations and date-only search should work. No rebuild is needed if the file is absent | 2026-10-27; 681 tests, 1 expected skip, 0 failures; synthetic baseline: `docs/tools-agent.md`, Search |
 | 256 KiB IMAP MIME blocks on Mail.ru (`docs/imap-source-agent.md`) | On the next user-requested Mail.ru sync that downloads new messages, confirm successful downloads and conversion. Gmail already passed the user-run check ([results.md, section 2](results.md#2-mailru-and-gmail)); no reprocessing is needed | 2026-10-28; 709 tests, 1 expected skip, 0 failures |
-| Gmail reuse by `stableId` across a UIDVALIDITY reset (`docs/storage-agent.md`) | Cannot be triggered deliberately; if a Gmail `mail-sync` reports a reset of All Mail, check that it downloaded no messages and that message keys and paths are unchanged. All Mail sync, labels and label search already passed ([results.md, section 2](results.md#2-mailru-and-gmail)) | 2026-10-28; offline tests |
+| Gmail reuse by `stableId` across a UIDVALIDITY reset (`docs/storage-agent.md`) | Cannot be triggered deliberately; if a Gmail `mail-sync` reports a reset of All Mail, check that previously saved, uniquely identified messages retain their keys and paths without redownloading; genuinely new messages may still download. All Mail sync, labels and label search already passed ([results.md, section 2](results.md#2-mailru-and-gmail)) | 2026-10-28; offline tests |
 | Gmail OAuth2 sign-in (`docs/gmail-oauth-agent.md`) | Only if needed instead of the verified app password: run `gmail-oauth gmail`, then `mail-sync gmail`. Token encryption is in [backlog.md](backlog.md), Д27 | 2026-10-25 |
-| Passwords from Windows Credential Manager and password managers (`docs/connections.md`) | `windowsCredential`: replace `passwordCommand` with `"windowsCredential": "mail-mcp/<name>"`, run `mail-sync` for `work` and `mailru`, then restart the MCP server and run `sync` and `syncStatus`. `passwordCommand` in `mail-sync` for EWS is already verified ([results.md, section 1](results.md#1-corporate-exchange)); server use, specific password managers and `cmdkey /pass` without a value: to verify | 2026-10-27; 702 tests, 1 expected skip, 0 failures |
+| Passwords from Windows Credential Manager and password managers (`docs/connections.md`) | `windowsCredential`: replace `passwordCommand` with `"windowsCredential": "mail-mcp/<name>"`, run `mail-sync` for `work` and `mailru`, then restart the MCP server and run `sync` and `syncStatus`. `passwordCommand` in `mail-sync` for EWS is already verified ([results.md, section 1](results.md#1-corporate-exchange)); server use and specific password managers: to verify | 2026-10-27; 702 tests, 1 expected skip, 0 failures |
 
 ## 3. Design
 
@@ -103,7 +105,8 @@ Principles and data flow. Details are in the engineering documents (section 3.3)
    - IMAP: `EXAMINE`, `BODY.PEEK`, `CLOSE`; the command guard forbids `SELECT` and all mutations.
 6. **One sign-in per run, without retries.** A rejected sign-in stops sync for that connection:
    an outdated password can quickly lock a domain account.
-7. **Pandoc is required** for sync and reprocessing. Read tools work without it.
+7. **Pandoc is required** for sync, reprocessing and reindexing (which can finish processing
+   `downloaded` messages). Read tools work without it.
 8. **Simpler is better.** Thresholds: messages up to 64 MiB; attachments for text conversion up
    to 20 MiB, XLSX up to 5 MiB inclusive; tool responses are paged. Disk space is not a constraint.
    What requires a user decision: [decisions.md, section 1](decisions.md#1-what-requires-a-user-decision).
@@ -116,8 +119,8 @@ MailSource (EWS | IMAP): folders() · changes() · metadata() · download()
         ▼
 SyncRunner — one run per connection, only in the process holding IndexWriter
   1. recovery: remove directories without meta.json and documents without directories;
-     finish directories without documents according to their state; if folder/ref/flags
-     differ from meta.json, rebuild only affected documents from saved content
+     finish missing entries according to their state; after an incomplete run, also repair
+     indexed folder/ref/observation mismatches from saved content (storage-agent.md)
   2. folders: match by remoteId; assign f<n> keys to new ones; collect changes and metadata
      from all included folders before deletions; save folders with old/null cursors,
      keeping missing folders until their deletions finish
@@ -147,8 +150,8 @@ MCP tools: folders.json, sync-status.json, index and message directories; no net
 
 ## 4. Version 0.1.0
 
-The first published version, licensed under Apache 2.0 (decisions of 2026-10-28). It includes
-only the rows in this table; other improvements are in [backlog.md](backlog.md), rejected ideas
+The first published version, licensed under Apache 2.0 (decisions of 2026-10-28). The table lists
+remaining work for this version; other improvements are in [backlog.md](backlog.md), rejected ideas
 in [decisions.md](decisions.md).
 
 Status: ⬜ not started · 🔨 in progress. Size: S — hours, M — a brief for one session, L — several
@@ -161,8 +164,8 @@ completed: Д1–Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30.
 |---|---|---|---|---|---|
 | Д18 | Publish `0.1.0` | Done: documents separated, user documentation extracted, README rewritten following jdbc-mcp-server. Remaining: `LICENSE` and `THIRD_PARTY_NOTICES.md` (then link `LICENSE` from README), build version, CI and jar releases through GitHub Actions on tags (then add release jar download and CI, Release, License badges to README) | polish | M | 🔨 |
 
-Before publication, in addition to these items, only the first check in section 2 is required
-(`mail-reprocess` on both mailboxes).
+Before publication, the only required real-mail check is the EML/ZIP/MSG/TNEF and legacy Office
+reprocessing check for `work` and `mailru` in section 2.
 
 ## 5. Workflow
 

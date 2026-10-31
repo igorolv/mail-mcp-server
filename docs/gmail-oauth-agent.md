@@ -3,7 +3,8 @@
 Read before changing `source/oauth/google/`, Gmail OAuth configuration or the `gmail-oauth` command.
 Design: the 2026-10-25 decision on Gmail OAuth2 (`docs/decisions.md`); status: `docs/results.md`,
 section 2. No real Gmail OAuth sign-in is verified yet; all agent checks use synthetic inputs and
-loopback servers. Connecting and checking Gmail is part of `0.1.0` (`docs/plan.md` section 4, Д7).
+loopback servers. Gmail app-password and All Mail checks are recorded in `docs/results.md`
+section 2; the optional real OAuth2 check remains in `docs/plan.md` section 2.
 App-password and Windows Credential Manager setup is in `docs/connections.md`; it does not use
 the OAuth flow. The user runs every real authorization and sign-in.
 

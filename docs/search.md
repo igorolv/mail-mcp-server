@@ -10,6 +10,7 @@ forms. The agent calls these tools itself; this page explains what to expect fro
 - [Copies of one message](#copies-of-one-message)
 - [Conversations](#conversations)
 - [Read and flag snapshots](#read-and-flag-snapshots)
+- [Labels](#labels)
 - [Coverage](#coverage)
 - [Word forms](#word-forms)
 - [Known limits](#known-limits)
@@ -129,9 +130,10 @@ flags in the mailbox.
 ## Labels
 
 Cards and messages carry optional `labels`: the mailbox labels seen at the last synchronization.
-Currently only Gmail provides them. Gmail is synchronized as one folder, its All Mail folder, so a
-message is stored once rather than once per label; its labels (`Inbox`, `Sent`, `Starred`, your
-own labels) replace the folders for finding it. `field: "label"` searches labels by their words;
+Currently only Gmail provides them. With its All Mail folder available, Gmail is synchronized as
+one folder, so a message is stored once rather than once per label (without it,
+[ordinary folder synchronization applies](connections.md#app-passwords)). Its labels (`Inbox`,
+`Sent`, `Starred`, your own labels) let you find messages by label. `field: "label"` searches their words;
 Russian word forms are not applied there, so use the label's own words. Gmail's `All` label is not
 listed because it names the folder itself. An empty list means the message has no labels; a
 missing `labels` means unknown or a mailbox without labels. The server never changes labels.
@@ -185,5 +187,5 @@ rebuilt, a text search reports that the word forms changed. Date-only search, `l
 - The stemmer sometimes joins different names (`Тестову` matches `Тестова`).
 - The agent should retry with other forms, synonyms or the other language before concluding that
   a message does not exist; the `search` tool description tells it so.
-- On a synthetic control set of 48 messages and 80 queries, search finds 79 of 86 expected matches
-  with 7 false positives; with four word-forms groups, all 86.
+- Synthetic search quality and accepted limitations are recorded in
+  [the control-set baseline](tools-agent.md#search).

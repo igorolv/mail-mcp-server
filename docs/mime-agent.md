@@ -8,7 +8,7 @@ Jakarta Mail; no stream escapes the reader.
 ## Angus startup properties
 
 Call `MimeReader.configureAngus()` before any Jakarta Mail class is used. The application
-entry point and both standalone sync/reprocess entry points do this. Gradle sets the same
+entry point and the standalone sync/reprocess/reindex entry points do this. Gradle sets the same
 properties on the test JVM. Angus reads the first two once at class initialization.
 
 | Property | Value | Reason |
@@ -125,7 +125,8 @@ Extracted filenames are not stable across this upgrade. Original `message.eml` s
 ## Pandoc and processing
 
 `convert/Pandoc.locate()` runs `pandoc --version`. Pandoc must be on `PATH`; there is no path
-setting or fallback. Both commands check it before opening the index or contacting a mailbox.
+setting or fallback. Sync, reprocess and reindex check it before opening the index or contacting
+a mailbox.
 Each body or attachment conversion through pandoc starts one process:
 
 ```text
@@ -137,7 +138,8 @@ has the fixed message `pandoc failed with exit code <n>`. I/O and interruption m
 fixed too and never include mail or process output. There are no timeouts or retries.
 
 The reviewer measured pandoc 3.1.11 on 2026-10-25: `pandoc server` listens on `0.0.0.0` without
-a localhost-only option; therefore the sandboxed per-conversion mode applies (decision 2026-10-25 in `docs/decisions.md`).
+a localhost-only option; therefore the sandboxed per-conversion mode applies (implementation choice recorded in
+`docs/decisions.md` section 3).
 A run cost about 27 ms; unknown formats exited 21. The sandbox refused a local LaTeX `\input`.
 Tests cover UTF-8 Markdown, removal of styles/scripts and no inclusion of local image content.
 

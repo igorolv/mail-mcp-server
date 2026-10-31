@@ -65,7 +65,7 @@ pagination. Only the returned cards' subject and displayed from are filtered. Co
 anchor/message keys, folder keys, dates, states and original localPath values are preserved,
 even when paths or folder keys contain detector matches. No raw header IDs or bodies are in
 the thread result. Thread reading loads no MIME, body or attachment text and performs no writes;
-threads use the schema-4 catalog without extra link fields or persisted thread data.
+threads use the current catalog without extra link fields or persisted thread data.
 
 ## Rules and replacement
 

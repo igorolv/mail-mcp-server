@@ -4,7 +4,7 @@
 [![MCP](https://img.shields.io/badge/MCP-server-8A2BE2)](https://modelcontextprotocol.io/)
 
 MCP server (stdio) that lets an AI agent read several mailboxes — Microsoft Exchange over EWS,
-Mail.ru and Gmail over IMAP — from a full local copy. It downloads every message as the original
+Mail.ru and Gmail over IMAP — from a local copy of the included folders. It downloads messages as the original
 `.eml`, saves attachments as files, converts bodies and attachments (PDF, Office, archives,
 attached messages) to Markdown and builds a local Lucene index with Russian and English word
 forms. Tools answer from the local copy only; the mailbox is never modified.
@@ -31,7 +31,7 @@ has also completed; real OAuth2 sign-in is unverified. Developed and tested on W
 ## Features
 
 - **Several mailboxes** in one [`connections.json`](docs/connections.md) outside the project;
-  every tool takes a `connection` argument. Passwords can stay out of the file: in an environment
+  every tool except `listConnections` takes a `connection` argument. Passwords can stay out of the file: in an environment
   variable, Windows Credential Manager or a password manager.
 - **Exchange without Graph:** EWS with NTLM for Exchange 2013 and later, incremental sync with
   `SyncFolderItems`. **IMAP** for Mail.ru and Gmail with app passwords, Gmail also with OAuth2.
@@ -44,8 +44,9 @@ has also completed; real OAuth2 sign-in is unverified. Developed and tested on W
   and attachment text; date filters; snippets; copies of one message shown once; optional
   [word forms file](docs/search.md#word-forms) for irregular forms.
 - **Conversations** across folders, linked by `Message-ID`, `In-Reply-To` and `References`.
-- **Read-only at the protocol level**, one sign-in per synchronization, no retries — a stale
-  password cannot lock a domain account. Details: [Read-only Protection](#read-only-protection).
+- **Read-only at the protocol level**, one sign-in per synchronization, no retries, and refusal
+  after a rejected sign-in to reduce the risk of account lockout.
+  Details: [Read-only Protection](#read-only-protection).
 - **Background sync on request**, incremental, with recognized moves between folders and
   read/flag snapshots; several clients can share one data directory.
 - **Optional secret filter** that replaces passwords, codes and tokens in tool responses.
@@ -184,7 +185,7 @@ Codex CLI, OpenCode, VS Code, Cursor, Claude Desktop and environment variables:
       v
 +- mail-mcp-server: one JVM per client -------------------------------------------+
 |                                                                                 |
-|  MCP layer: 9 tools, every call names its `connection`                          |
+|  MCP layer: 9 tools; all except listConnections require connection              |
 |      |                                   |                                      |
 |      | read tools                        | sync: background thread              |
 |      v                                   v                                      |
@@ -200,7 +201,7 @@ Codex CLI, OpenCode, VS Code, Cursor, Claude Desktop and environment variables:
 ```
 
 - **Local copy first.** Synchronization runs only on request — the `sync` tool or the `mail-sync`
-  command. It downloads everything once, then only changes: new and deleted messages, moves
+  command. It downloads included folders once, then only changes: new and deleted messages, moves
   between folders, read and flag state. All other tools read local files and the index; they
   never contact a mail server and work while it is unreachable.
 - **The disk is the copy, the index is derived.** Each message has its own directory with the

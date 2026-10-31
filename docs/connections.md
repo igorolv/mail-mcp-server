@@ -70,8 +70,8 @@ Windows Credential Manager requires 64-bit Windows; the other sources work on ot
 
 - The server reads the file once at startup. After editing it, restart the server in your MCP
   client; the user-run [commands](commands.md) read it on every run.
-- Every tool takes the connection name as its `connection` argument. There is no default
-  connection and no call that spans mailboxes.
+- Every tool except `listConnections` takes the connection name as its `connection` argument.
+  There is no default connection and no call that spans mailboxes.
 - `description` is returned by `listConnections`, so an agent can pick a mailbox by meaning.
 - The name is also the name of the connection's data directory: `<data-dir>/<name>/`. Renaming a
   connection therefore starts a new local copy; rename the directory too to keep the old one.
@@ -470,9 +470,11 @@ What stops the server at startup (it reports the reason on stderr and in its log
 What makes only one entry unusable — it appears with `configError` in `listConnections`, and the
 other connections keep working:
 
-- a missing or unknown `type` or `auth`;
+- a missing or unknown `type`, or an unknown/incompatible `auth` (omitted `auth` uses the
+  type's default);
 - a missing `url`, `host` or `username`;
-- not exactly one of `password`, `windowsCredential` and `passwordCommand`;
+- not exactly one password source (`password`, `windowsCredential` or `passwordCommand`)
+  for non-OAuth2 authentication;
 - an empty `passwordCommand` or an empty element in it;
 - an empty `windowsCredential` with no other password source;
 - `windowsCredential` on anything but 64-bit Windows;

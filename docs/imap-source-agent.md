@@ -125,7 +125,9 @@ Gmail is detected by the `X-GM-EXT-1` capability, never by host name, login or f
 - **No writes.** No label change is ever sent: the guard still refuses STORE, and the extensions
   add no command.
 
-Real-server behavior of the extensions is unverified; only synthetic protocol tests have run.
+All Mail synchronization, labels and label search passed the user-run check recorded in
+`docs/results.md` section 2. Reuse by `stableId` across a UIDVALIDITY reset remains checked
+offline only; its pending real-mail check is in `docs/plan.md` section 2.
 
 ## Remote identity metadata
 
@@ -168,8 +170,8 @@ MIME download succeeded with EXAMINE and BODY.PEEK. A later check through `MailS
 one session. The downloaded message was already read; unread behavior was not tested.
 See `docs/results.md` section 2. Gmail app-password synchronization with 256 KiB blocks
 completed in the user-run check on 2026-10-28; per-message failure counts are recorded there.
-All Mail synchronization, labels and `X-GM-MSGID` reuse are implemented offline and await the
-user's real-mail check; real OAuth2 sign-in is unverified.
+The All Mail and label checks are recorded there too. Reuse across a UIDVALIDITY reset and
+real OAuth2 sign-in remain unverified.
 
 ## Read/star observations
 
@@ -196,8 +198,9 @@ values; explicit false clears them. Destination flags apply after move reuse but
 from its identity; a UIDVALIDITY reset uses only fresh observations. Flags are user read/star
 state, independent of Gmail Important. Flag-only and label-only changes update metadata/index
 without writing MIME/body/attachments or changing state, error, time or counters. Schema 5 rebuilds offline
-from saved data; old metadata stays unknown until a requested sync. Real-server flag behavior
-remains to verify.
+from saved data; old metadata stays unknown until a requested sync. Mail.ru read/flag delivery
+and selective updates passed the user-run checks in `docs/results.md` section 2; remaining
+cross-tool and flag-clearing checks are in `docs/plan.md` section 2.
 
 ## Failure diagnostics
 

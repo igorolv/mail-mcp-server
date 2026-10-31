@@ -1,21 +1,14 @@
 # mail-mcp-server — instructions for agents
 
 A local stdio MCP server that lets AI agents read several mailboxes: a corporate Exchange server
-over EWS, Mail.ru and Gmail over IMAP. It keeps a full local copy of every message (`.eml`,
-metadata, body and attachments with Markdown text), indexes it with Lucene and answers tools from
-local data only. User-facing overview: `README.md`.
+over EWS, Mail.ru and Gmail over IMAP. It keeps a local copy of messages in the included
+folders (`.eml`, metadata, body and attachments with Markdown text), indexes it with Lucene and
+serves reading tools from local data only. User-facing overview: `README.md`.
 
-**Current status (2026-10-28): the draft version is complete and checked on the user's real
-mailboxes** (`work` over EWS, `mailru` and `gmail` over IMAP; `docs/results.md`). The first
-published version `0.1.0` (Apache 2.0) is in preparation: `docs/plan.md` section 4 lists its
-remaining scope, Д18 (publication).
-- Nine MCP tools, background sync, offline reprocessing and reindexing work.
-- Gmail with an app password is verified (`docs/results.md`): 256 KiB IMAP blocks, and All Mail
-  synchronized once with labels (Д7). Real OAuth2 sign-in and reuse across a UIDVALIDITY reset are
-  unverified. The user runs every real-mail check.
-- Features accepted offline but not yet checked by the user on real mail are listed in
-  `docs/plan.md` section 2, each with how to check it. Only the first, a user-run
-  `mail-reprocess` of both mailboxes, blocks `0.1.0`; the rest are checked as the user works.
+**Current status:** the draft is complete; the first published version, `0.1.0` (Apache 2.0),
+is in preparation. Release scope and checks pending on real mail are maintained only in
+`docs/plan.md` sections 4 and 2; verified real-mail results are in `docs/results.md`.
+Only the user runs real-mail checks.
 
 Work now consists of finishing `0.1.0`, then optional improvements:
 - `docs/plan.md` section 4 lists what `0.1.0` includes; accepted items are removed from that table.
@@ -131,7 +124,13 @@ one in this table.
   updates the user document in the same change. User documents describe the current version for a
   new user; upgrade steps for the user's own data belong in `docs/plan.md` section 2.
 - The project documents describe the current state, not the history. Replace outdated statements
-  instead of appending corrections. Git keeps the history.
+  instead of appending corrections. Git keeps the history; dated research reports and recorded
+  real-mail results retain their original scope.
+- Keep each changeable fact in its owning document from the routing table. Other documents may
+  summarize it and link to the owner, but must not repeat full algorithms or verification status.
+  User decisions constrain implementation; user documents own the public contract; engineering
+  documents own implementation details. If these disagree, check the code and recorded decisions
+  and correct the affected documents without inventing a new user decision.
 - Where to record what:
   - a verified fact or a real-mailbox result goes to `docs/results.md`, anonymized: numbers only,
     no folder names, addresses, file names or message content;
@@ -147,8 +146,8 @@ one in this table.
     next free number (stated above its table). Numbers are never reused. When the user takes an
     item into the version, move its row to `docs/plan.md` section 4. A rejected idea is deleted
     from the table and recorded with its reason in `docs/decisions.md`;
-  - `docs/decisions.md` section 2 gets a row **only for decisions the user made**; mark your own
-    proposals "Proposed". Rows go in date order.
+  - `docs/decisions.md` section 2 gets a row **only for decisions the user made**. Unconfirmed
+    agent proposals belong in section 3, separate from user decisions. Rows go in date order.
 - Delete an implementation brief once it is accepted and recorded, and update the task list in
   `docs/impl-tasks/README.md`.
 - Always use absolute dates in `YYYY-MM-DD` form, never "today" or "yesterday".
@@ -159,114 +158,21 @@ one in this table.
 
 ## Architecture summary
 
-This summarizes the engineering documents and the decisions in `docs/decisions.md`, so you can
-keep changes consistent with them. Those documents are authoritative where this summary is shorter. What exists in
-code is listed in `docs/architecture-agent.md`.
+Package layout, layers and dependency versions are maintained in `docs/architecture-agent.md`.
+Keep these boundaries in every change:
 
-- **Stack:** Java 25, Spring Boot `4.2.0-RC1`, Spring AI `2.1.0-RC1`, Gradle 9 with a version
-  catalog. The 2.1 line is a deliberate choice; move to `2.1.0` when it is released.
-- **Transport:** stdio only; nothing but JSON-RPC may be written to `System.out`.
-- **Packages:** `config/`, `connections/`, `source/` (`MailSource`; `ews/`, `imap/`, `oauth/`,
-  `oauth/google/`), `model/` (one record per file), `mime/`, `convert/`, `store/`, `index/`,
-  `sync/`, `redaction/`, `tools/`, `api/`, `cli/`. There is no `service/` layer. `api/` records are the MCP
-  wire contract; `model/` records are not returned directly.
-- **Connections:** a `connections.json` file outside the repository
-  (`%USERPROFILE%\.mail-mcp-server\`), modeled on the sibling project `jdbc-mcp-server`.
-  - Each connection has a name, a type (`ews` or `imap`), an `auth` kind, its own properties and
-    credentials.
-  - A password is a literal, a `${VAR}`, `windowsCredential` (a generic Windows Credential Manager
-    entry read with `CredReadW` through the foreign function API) or `passwordCommand` (a password
-    manager CLI run without a shell). The last two are read right before the first sign-in and kept
-    in process memory until a rejected sign-in; their failure is not a rejected sign-in.
-  - Every tool, including search, takes a required `connection`.
-- **Mail sources:**
-  - EWS: own thin SOAP client on StAX over Apache HttpClient 5 with NTLM explicitly registered.
-  - IMAP (Gmail, Mail.ru): Eclipse Angus Mail with app passwords or Gmail OAuth2/XOAUTH2.
-  - Initial Gmail OAuth consent is a user-run command, never an MCP tool.
-- **Read-only at protocol level:** an allow-list of 10 EWS read operations; IMAP `EXAMINE`,
-  `BODY.PEEK` and `CLOSE`, never `SELECT`; never set flags in the mailbox.
-- **MIME:** every source delivers MIME (`.eml`), kept exactly as downloaded and parsed with Angus
-  Mail. `Containers` expands EML, ZIP, MSG and TNEF breadth first into a flat attachment list
-  with immediate `parent` links, depth 5 and message-wide extracted-output limits of 1,000
-  files / 256 MiB. ZIP entries have a 20 MiB limit. Original containers remain unchanged;
-  embedded MAPI messages gain standalone `.msg` files. There is no separate parsing process
-  or shared budget object; POI parsing itself is eager. Existing data needs user-run
-  `mail-reprocess`; finish a connection before attachment lookup/search because extracted
-  filenames can change across this upgrade.
-- **Pandoc is required** (user decision).
-  - One sandboxed `pandoc --sandbox` process per conversion turns HTML bodies and
-    DOCX/ODT/RTF/EPUB/HTML/CSV attachments into Markdown.
-  - PDF uses PDFBox; DOC/XLS/PPT (Office 97-2003), XLSX and PPTX use POI.
-  - Attachment text conversion admits up to 20 MiB of decoded bytes, except XLSX up to 5 MiB
-    inclusive, using the resolved format and actual file size, including inside containers.
-    This reduces risk without bounding eager POI memory use. Existing XLSX text remains until
-    optional user-run `mail-reprocess`; reads and `mail-reindex` of converted messages retain it.
-  - MSG headers and the first nonblank plain/HTML/RTF body become Markdown; TNEF provides
-    its subject and RTF body. HTML/RTF use pandoc. Declared code pages are applied without guessing.
-  - Without pandoc, sync and reprocessing refuse to start.
-- **Storage, no SQLite:**
-  - one directory per message, `<connection>/messages/<k2>/<key>/`, with `message.eml`,
-    `meta.json`, `body.md` and `attachments/` (each file plus its `.md`);
-  - `folders.json` with an opaque cursor per folder, and `sync-status.json`;
-  - the disk is the complete copy. One Lucene index per connection (catalog and search, schema
-    version in the commit data) is derived and rebuilt from disk without the network.
-- **Optional output filter:** `MAIL_MCP_REDACT_SECRETS=true` replaces recognized secrets only in
-  tool response text. Downloads, disk and index hold everything as is. Tools still return original
-  file paths and stored filenames. This reduces accidental context exposure, not intentional
-  extraction. See `docs/redaction-agent.md`.
-- **Local conversations:** `getThread` follows case-sensitive Message-ID, In-Reply-To and
-  References across folders of one connection in one committed index snapshot. Cards sort
-  oldest first, undated last, then key; copies group before paging. No bodies, MIME,
-  source or pandoc are read; conversations use the schema-5 catalog without persisted threads.
-- **Message copies:** search and threads group equal valid stripped single Message-ID,
-  known stored date and nonblank stored sender/subject strings, within one connection.
-  Search groups only matching documents after filters; the first in score/date order then key
-  supplies the card, score and snippet. Threads use the smallest key as representative.
-  Other copies appear as unfiltered key/folder pairs under optional `copies`; totals and paging
-  count groups. Stored copies, listMessages and folder counts stay unchanged; no reindex is needed.
-- **Optional word forms:** shared user UTF-8 `word-forms.txt` under the data directory, overridden
-  by `MAIL_MCP_WORD_FORMS_FILE`; no built-in dictionary. Groups map listed words to the first
-  word's Russian Snowball stem, including explicitly listed Russian stop words. Unlisted words,
-  English and exact fields keep their behavior. Text search and requested sync reload per call;
-  differing `wordForms` commit hashes block text search until offline reindex or requested sync
-  rebuilds from disk. Date-only search, lists and threads ignore the hash. Missing/empty rules
-  preserve the analyzer and commit data. `mail-analyze` diagnoses rules without mail or pandoc.
-- **Read/star snapshots:** nullable `read` and `flagged` represent the latest successful remote
-  observation, not live state. Unknown is omitted; explicit false clears a known value.
-  IMAP reads Seen/Flagged of every UID with the UID listing; EWS takes ReadFlagChange from
-  SyncFolderItems and reads IsRead and Flag/FlagStatus only for items with an Update change; new
-  messages get them from their metadata. Sender importance and Gmail Important are unrelated. Changed flags
-  update only metadata and the derived document, preserving content, state/error, download time
-  and counters. Flags are excluded from move identity; destination observations apply on reuse,
-  while UIDVALIDITY resets use fresh values. Schema 5 rebuilds old indexes offline from disk;
-  old metadata stays unknown until requested sync. Reconciliation repairs flag mismatches too.
-- **Gmail, labels and stable ids:** a server with `X-GM-EXT-1` and one `\All` folder syncs only
-  All Mail; `X-GM-MSGID` and `X-GM-LABELS` come with the existing fetches. Outside `source/imap/`
-  they are provider-neutral: nullable `stableId` (never returned by tools) and `labels`
-  (normalized, in cards, `getMessage` and the `label` search group, part of `any`). Label changes
-  update metadata like flags. Outlook categories, IMAP keywords and `EMAILID` are backlog Д31–Д33.
-- **Synchronization:**
-  - runs only on request: the `sync` tool in the background, or `mail-sync`;
-  - always syncs everything, then incrementally;
-  - identity metadata is read only for added refs; known refs keep stored fingerprints, and a
-    removed message saved without one gets it from its saved headers. There is no per-run pass
-    over all messages. A unique complete Message-ID/metadata match can reuse an explicitly
-    removed converted message in another included folder of the same connection, preserving UUID,
-    directory and all content. Equality is heuristic; SHA-256 describes the saved original only.
-    Ambiguity, missing evidence and UIDVALIDITY resets use normal deletion/download. A saved
-    `stableId` replaces that heuristic in the same pass and uniqueness rule, also within a folder
-    and across a reset;
-  - discovers all folders before removal, commits reused moves before unmatched deletions,
-    and saves all cursors only after all changes commit. After a run that did not complete,
-    reconciliation repairs index folder/ref/flag mismatches from metadata without reconversion;
-    after a completed run it compares keys only. A run reads meta.json only of messages it removes,
-    moves or changes (flags compare with the index, move uniqueness looks up Message-IDs in the
-    index), so a run without changes costs a key listing and one change request per folder;
-    reused moves increase no sync counter;
-  - one sign-in per run, no retries. After a rejected sign-in the `sync` tool refuses the
-    connection until the user runs `mail-sync`;
-  - several server processes share one data directory; only the holder of the Lucene write lock
-    syncs.
+- Stdio only: nothing but JSON-RPC may be written to `System.out`.
+- `api/` records are the MCP wire contract; `model/` records are not returned directly.
+  There is no `service/` layer.
+- Every tool except `listConnections` requires `connection`; no call searches across mailboxes.
+- Reading tools use local data only. Sync runs only on request, with one sign-in and no retry.
+  Initial OAuth consent is a user-run command. Protocol guards enforce read-only mail access.
+- Saved originals are unfiltered; Lucene is derived and rebuildable offline. Storage, reuse,
+  reconciliation and index schema are owned by `docs/storage-agent.md`.
+- Pandoc is required for sync, reprocessing and reindexing. MIME/container rules and conversion
+  limits are owned by `docs/mime-agent.md`; command behavior is in `docs/commands.md`.
+- Optional secret filtering affects tool response text only. Original paths and lookup filenames
+  remain available; see `docs/redaction-agent.md`.
 
 Sibling projects used as references (same author, both public on GitHub):
 

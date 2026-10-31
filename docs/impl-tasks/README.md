@@ -22,8 +22,10 @@ Every brief goes through three separate agent sessions, each started with a fres
 
 1. **Implement**: writes the code, does not commit.
 2. **Review**: checks the diff against the brief, gives a verdict and does not change files.
-3. **Record and commit**: updates the plan and commits. Run it only after an `accepted` verdict
-   and any user-run check the review lists.
+3. **Record and commit**: updates the plan and commits after an `accepted` verdict. Run any
+   user-run checks required for acceptance first. Checks deferred under the project's offline
+   acceptance policy go to `docs/plan.md` section 2; they do not block recording. State explicitly
+   which checks remain and whether they block publication.
 
 If the review says `changes needed`, start a new implementation session with the fix prompt
 from the review report, then review again.
@@ -60,9 +62,10 @@ report from docs/impl-tasks/README.md.
 
 ```text
 Read AGENTS.md, then docs/impl-tasks/README.md, then docs/impl-tasks/IT-NN-<slug>.md.
-The review accepted the uncommitted changes. <Paste the user-run results here, or write
-"No user-run check was needed.">. Record the result by the section "Recording an accepted brief"
-of docs/impl-tasks/README.md, then commit. I, the user, ask you to commit.
+The review accepted the uncommitted changes. <Paste the user-run results, write "No user-run
+check was needed", or list the checks deferred under the offline acceptance policy.>
+Record the result by the section "Recording an accepted brief" of docs/impl-tasks/README.md,
+then commit. I, the user, ask you to commit.
 ```
 
 ## Review checklist
@@ -79,8 +82,10 @@ The reviewer checks; it does not fix. Work through every point and report what y
 3. **Tests.**
    - Every test the brief names exists with that exact name (search for `void <name>`).
    - Run `.\gradlew.bat build --rerun-tasks`.
-   - Count tests, skipped and failures from `build\test-results\test\*.xml`. The only test
-     skipped by design is `McpStdioConcurrencyTest.simultaneousToolCompletionsDeliverEveryResponse`.
+   - Count tests, skipped and failures from `build\test-results\test\*.xml`. The permanently
+     disabled test is `McpStdioConcurrencyTest.simultaneousToolCompletionsDeliverEveryResponse`.
+     Pandoc-dependent tests also skip when pandoc is unavailable; report those separately and
+     do not claim that pandoc-dependent behavior was verified in that environment.
 4. **Real values.** If `.local/environment.md` exists, run the check below. Never print the
    values themselves. The script skips the placeholders, a few generic words and repository paths
    that `.local` happens to list. Any hit it prints is a defect: report the file and the line with
@@ -117,25 +122,10 @@ The reviewer checks; it does not fix. Work through every point and report what y
 
 ## Task list
 
-IT-01…IT-24 were accepted and deleted (2026-10-25…27). Checks still pending on real mail are in
-`docs/plan.md` section 2. IT-26 was accepted and deleted on 2026-10-28: the shared IMAP MIME
-block is 256 KiB, with offline integrity/limit tests and a user-run Gmail speed check. IT-27
-(Д7) was accepted and deleted on 2026-10-28 after a review rework to provider-neutral `stableId`
-and `labels` and a user-run Gmail All Mail check.
-Next unused number: IT-28. No brief is open; a new one gets a row in a table with the columns
-Order, Brief, Plan item, Scope and dependency.
-
-IT-25 (Д26) was not implemented as briefed: on 2026-10-28 the user reduced it to one sentence in
-the `search` description, without `word-forms.txt` or `mail-reindex` advice and without a test of
-the description text, and the brief was deleted. IT-24 was accepted offline on 2026-10-27: an absent file leaves the analyzer and commit data
-unchanged; all 13 named tests pass. The full build has 681 tests, one expected skip and no failures.
-Listed words override the Russian stop set so the required `человек люди` group works; unlisted
-stop words and English analysis are unchanged. Reprocessing retains failed metadata-only entries
-when changed rules recreate the index. These implementation details are covered by tests.
-The user decided the Д12 storage (an optional user file, no built-in list, no Hunspell,
-single-word synonyms allowed, `mail-analyze` included). IT-23's Д4 copy identity and copies
-field are accepted implementation details, not separately recorded user decisions. Recording one brief must
-preserve the remaining rows and their dependency notes.
+No brief is open. Next unused number: IT-28. A new brief gets a row in a table with the columns
+Order, Brief, Plan item, Scope and dependency. Recording one brief preserves all other rows and
+dependency notes. Accepted briefs are kept in git history; remaining real-mail checks are in
+`docs/plan.md` section 2.
 
 ## Rules for every implementation session
 
@@ -151,8 +141,8 @@ preserve the remaining rows and their dependency notes.
    `gradle/libs.versions.toml`, never into `build.gradle.kts` directly.
 5. **Invariants from `AGENTS.md` always apply:** no real host names, domains or logins in any
    file; never handle passwords; never sign in to a real mailbox; read-only at protocol level.
-6. **Build only what the brief asks for.** `docs/decisions.md` section 1 lists what no task may add:
-   limit budgets, extra databases, diagnostic codes, speculative safeguards, process isolation.
+6. **Build only what the brief asks for.** Follow the boundaries and approved exceptions in
+   `docs/decisions.md` section 1.
    No "while I'm here" refactoring, no extra abstraction layers, no unused parameters or types.
 7. **Write code like the surrounding code:** same naming, Javadoc density and idioms; one public
    type per file; records for data. Code copied from a sibling project names the project and
@@ -217,7 +207,7 @@ Verdict: accepted | changes needed
 - <behavior not in the brief and whether it is harmless>, or "none"
 
 ## For the user to run
-- <user-run command and what result to expect>, or "nothing"
+- <user-run command, expected result, and whether required before acceptance or deferred>, or "nothing"
 
 ## Fix prompt
 <only for "changes needed": a prompt for a new implementation session>

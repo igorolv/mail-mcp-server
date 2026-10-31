@@ -123,7 +123,8 @@ EWS ReadFlagChange/Update), without MIME downloads, conversion or a pass over al
 Original files, state/error, SHA-256 and download time remain unchanged. Flags do not participate
 in move matching; destination observations apply after reuse. Flag-only updates and moves count
 as zero downloaded, failed and removed, preserving rescan reports and the background summary.
-Real-server behavior remains to verify.
+EWS and Mail.ru read/flag observations have user-run results in `docs/results.md`, sections 1–2.
+Remaining cross-tool and flag-clearing checks are in `docs/plan.md` section 2.
 
 ## Message labels
 
@@ -164,7 +165,8 @@ or cache is retained.
 
 Only key, ref, date, from, subject and the three stored header fields are scanned; full stored card
 fields are fetched for the returned page. No bodies, MIME, attachment text, source construction
-or pandoc are involved; reading works while the writer lock is held. Conversations use schema 4 without persisted thread data. Missing index/anchor raises
+or pandoc are involved; reading works while the writer lock is held. Conversations use the current
+catalog without persisted thread data. Missing index/anchor raises
 `IllegalArgumentException("Message is not indexed; use listMessages")`. Old schemas raise the
 same rebuild error as search below.
 
@@ -198,8 +200,8 @@ The first member in score-descending/key order (date-descending/key for date-onl
 represents the group with its card, score and snippet. Other members keep that order in `copies`;
 only documents matching the query and filters themselves participate. Exact total, offset,
 limit and nextOffset count groups. Small stored identity fields are read for all matches;
-full cards and snippets only for the returned page. Grouping uses existing schema-4 fields
-without reindexing. Stored messages, listMessages and listFolders counts remain unchanged.
+full cards and snippets only for the returned page. Grouping uses existing stored identity fields
+without an additional schema change. Stored messages, listMessages and listFolders counts remain unchanged.
 
 Snippets use Markdown `**matches**` and `… ` between passages, at most one passage per hit.
 For `any`, a real body highlight wins; otherwise the first attachment with a highlightable query
@@ -222,8 +224,8 @@ occurrences beyond 10,000 characters. Selection uses raw text regardless of the 
 with filtering enabled, the complete selected text is filtered before passage selection and
 highlighting. If the match is removed, safe leading context retains the attachment identity;
 blank transformed text has no snippet or attachment fields. Raw matches, scores, totals and
-pagination stay unchanged. The query echo is filtered too. Snippets use the current schema-4
-fields and existing saved Markdown without reprocessing.
+pagination stay unchanged. The query echo is filtered too. Snippets use the current index fields
+and existing saved Markdown without reprocessing.
 
 | Field group | Index fields |
 |---|---|
@@ -284,6 +286,7 @@ Misses: Q011:S010, Q012:S009, Q012:S011, Q013:S010, Q014:S013, Q015:S015, Q016:S
 Wrong matches: Q025:S024, Q028:S025, Q029:S024, Q067:S037, Q068:S041,
 Q079:S047, Q080:S048. Snowball misses irregular Russian forms and conflates some names;
 precision collisions and raw synthetic secret matches remain accepted limitations.
+`SearchControlSetTest` requires recall ≥ 0.91 and at most 7 false positives.
 This baseline stays unchanged without a word forms file. The 2026-10-27 offline test with
 `src/test/resources/word-forms/control-set.txt` (four groups, including `человек люди`) reaches
 **7/7** irregular matches and **86/86** overall, with the same **7 false positives**.
@@ -292,24 +295,12 @@ English fields keep their original behavior.
 
 ## Status file and writer ownership
 
-Requested syncs read source metadata only for added refs, in batches of at most 100 without
-MIME/body fetches. EWS uses IdOnly GetItem identity and flag properties; IMAP uses
-ENVELOPE/size/UID/FLAGS and verifies UIDVALIDITY after reopening with EXAMINE. Known messages
-keep saved fingerprints; a removed one without a fingerprint is matched by its saved headers.
-No reader tool initiates these metadata requests.
-
-The runner reuses a removed converted message only for a unique complete Message-ID/metadata
-match in a different included folder of the same connection; retained copies, incomplete
-identities and UIDVALIDITY resets disqualify reuse. This heuristic can hide different remote
-content even when all metadata is equal. SHA-256 remains the hash of the saved original.
-Reused messages keep UUID and all original paths/content; cards gain the new folder/ref after
-commit. All folders are discovered before removal; matches commit first and removals check the
-old identity. Folder identities retain old/null cursors, including vanished folders, until the
-final replacement after all planned changes commit. On interruption, reconciliation repairs an
-indexed folder/ref/path or flags differing from disk metadata and reruns skip current local refs.
-Final reports for retained folders follow the final cursor save; batch reports still mark
-`done=false`. See `docs/storage-agent.md` for exact eligibility and recovery rules. This path is
-verified offline; availability on the user's servers remains to verify.
+Sync discovery, observation updates, matching and recovery are specified in
+[storage-agent.md](storage-agent.md#disk-layout) and its "Write order and failures" and
+"Lucene catalog and reconciliation" sections. The runner can reuse removed saved messages by a
+unique provider `stableId`, including across UIDVALIDITY resets, or by the stricter metadata
+heuristic when no saved `stableId` exists. Reuse preserves the local key and content, and increases
+none of the downloaded/failed/removed counters. No reading tool initiates source requests.
 
 `sync-status.json` is atomically replaced by `SyncRunner`, which runs only while its caller holds
 the connection's Lucene writer lock. Fields: `state` (running/completed/failed), `pid`,

@@ -71,16 +71,3 @@ Repeat checks on 2026-10-27:
 - **Word forms:** singular and plural queries return the same result count (362).
 - **Missing features:** date selection: for "messages from two days", the agent paged through
   `listMessages` in every folder (Д24); a background run summary in the log (Д25).
-
-## 4. Search control set
-
-Synthetic `testdata/search`, not real mail; recorded here because it sets the search quality
-baseline. Without a word forms file (48 messages, 80 queries): recall 79/86 = 0.919, 7 false
-positives. The 7 missed irregular forms, such as `письмо`/`писем`, are a Snowball limitation
-without user rules. False positives: 3 name matches (`Тестову`→`Тестова`), 2 precision cases and
-2 due to an old expectation of secret filtering before indexing. Under the current decision,
-the index holds original text and the response filter does not change search matches. Test
-threshold: recall ≥ 0.91, false positives ≤ 7.
-
-With the four-group test word forms file (2026-10-27): 7/7 irregular forms and 86/86 matches
-overall, with the same 7 false positives. Category details are in `docs/tools-agent.md`, "Search".

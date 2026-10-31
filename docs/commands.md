@@ -61,11 +61,13 @@ Connection: mailru (imap, app-password; address and credentials hidden)
 RESULT: OK (1 folders, 120 downloaded, 1 failed, 2 removed)
 ```
 
-- The first run downloads the whole mailbox and may take long: Exchange needs one request per
+- The first run downloads the included folders and may take long: Exchange needs one request per
   message. Run the command again: with no new mail it ends with `0 downloaded`, and its time
   depends on the number of folders and changes, not on the size of the mailbox.
-- Folder lines are cumulative; `(in progress)` lines appear every batch of 100 messages. A folder
-  whose IMAP `UIDVALIDITY` changed is downloaded anew and its line ends with `, folder reset`.
+- Folder lines are cumulative; `(in progress)` lines appear every batch of 100 messages. An IMAP
+  `UIDVALIDITY` change invalidates the folder's remote references, and its line ends with
+  `, folder reset`. Messages normally download again; Gmail can reuse saved messages with a
+  unique matching provider identifier, preserving their keys and files.
 - `downloaded` counts new messages, `failed` messages that could not be downloaded or converted
   (they are not retried), `removed` local messages deleted because they are gone from the server.
   A recognized move counts as none of them.
@@ -95,7 +97,11 @@ RESULT: OK (1 folders, 120 downloaded, 1 failed, 2 removed)
 
 Folders that are synchronized:
 
-- IMAP: all folders except those marked `\Noselect`, `\Trash`, `\Junk` or `\Drafts`;
+- Gmail with its extensions and exactly one All Mail folder: only All Mail, with labels on each
+  message. Without that folder it falls back to the ordinary IMAP rules; see
+  [Gmail setup](connections.md#gmail).
+- Other IMAP, including the Gmail fallback: message-holding folders except those marked
+  `\Noselect`, `\NonExistent`, `\Trash`, `\Junk` or `\Drafts`;
 - EWS: mail folders under the mailbox root, except Deleted Items, Junk Email, Drafts, Outbox and
   their subfolders.
 
@@ -129,9 +135,15 @@ can change the numbering of attachment file names.
 java -jar mail-mcp-server.jar mail-reindex work
 ```
 
-Rebuilds the connection's search index from the files on disk, offline, without converting
-messages again. Run it after editing the [word forms file](search.md#word-forms), or when a tool
-says the index was built by an older version (a requested sync rebuilds it as well).
+Rebuilds the connection's search index from the files on disk, offline. Converted messages use
+saved headers and Markdown without rewriting their content. Messages still in `downloaded` state
+are converted to finish interrupted processing, so pandoc is required. Failed messages receive
+metadata-only index entries; they are not retried. Incomplete directories without metadata are
+removed during recovery.
+
+Run it after editing the [word forms file](search.md#word-forms), or when a tool says the index
+was built by an older version (a requested sync rebuilds it as well). To regenerate text for
+already converted or failed messages with saved MIME, use `mail-reprocess`.
 
 ```text
 Mail reindex (offline)

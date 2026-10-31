@@ -21,7 +21,8 @@ Do not add:
 
 ## 2. Current decisions
 
-User decisions, except those marked "Proposed". Rows are in date order.
+User decisions only. Rows are in date order; unconfirmed agent proposals are listed separately
+in section 3.
 
 | Date | Decision | Reason |
 |---|---|---|
@@ -29,7 +30,7 @@ User decisions, except those marked "Proposed". Rows are in date order.
 | 2026-10-24 | Keep real hosts, domain and login out of the repository; use placeholders in documents | The repository is public on GitHub |
 | 2026-10-24 | Agent instructions are in `AGENTS.md` and `docs/*-agent.md`; all project documentation is in English (language scope updated on 2026-10-28) | Other models also carry out tasks; the user requested English project documentation |
 | 2026-10-24 | Several mailboxes: a connections list in a separate file, following jdbc-mcp-server; EWS and IMAP sources | Corporate Exchange, Gmail and Mail.ru; credentials outside the project |
-| 2026-10-24 | Every tool, including search, requires `connection`; no cross-mailbox search in one call | As in jdbc-mcp-server |
+| 2026-10-24 | Every tool except `listConnections`, including search, requires `connection`; no cross-mailbox search in one call | As in jdbc-mcp-server |
 | 2026-10-24 | П1. EWS client: our own thin SOAP layer on StAX; transport: Apache HttpClient 5 with NTLM explicitly enabled | `ews-java-api` is abandoned; 10 read operations are needed (RT-02, RT-03) |
 | 2026-10-24 | П2. Message key: a local UUID; remote reference, `Message-ID` and SHA-256 stored separately | `ItemId` changes on moves; `Message-ID` is not unique |
 | 2026-10-24 | П3. IMAP through Angus Mail: Mail.ru uses an app password; Gmail uses an app password or OAuth2 (since 2026-10-25) | One source for both mailboxes |
@@ -46,9 +47,6 @@ User decisions, except those marked "Proposed". Rows are in date order.
 | 2026-10-25 | Sync only on request, without a depth parameter: everything first, then incremental | User decision |
 | 2026-10-25 | MIME parsing through Angus Mail; no separate parsing process or shared limits across the nesting chain; offline parsing from `d6534ca` reverted | Unnecessary complexity |
 | 2026-10-25 | Pandoc is required; PDF, XLSX and PPTX use PDFBox and POI from redmine-mcp-server | Pandoc cannot read PDF or Excel |
-| 2026-10-25 | Proposed: `pandoc --sandbox` for each conversion instead of `pandoc server` | `pandoc server` listens on `0.0.0.0` |
-| 2026-10-25 | Proposed: an invalid EWS `SyncState` triggers a folder rescan without downloading known messages again, rather than a reset | `ItemId` values remain valid |
-| 2026-10-25 | Proposed: after a rejected sign-in, `sync` refuses in all processes until `mail-sync` is run from a terminal | Repeated agent calls must not lock the domain account |
 | 2026-10-26 | Д6: the optional filter replaces secrets only in tool responses; downloads, disk and index remain unchanged, and original paths remain available | Protection against accidental context exposure, not intentional extraction; the user authorized implementation and detail choices without questions |
 | 2026-10-26 | The draft is complete; next: polish and improvements | User decision |
 | 2026-10-26 | No filename substring search | Searching filename parts is enough |
@@ -63,7 +61,19 @@ User decisions, except those marked "Proposed". Rows are in date order.
 | 2026-10-28 | Д30: a run without changes does not read every `meta.json`: full index reconciliation only after an incomplete run; flags and move uniqueness use the index. Target: a couple of seconds for a run without changes | After Д8 and flags, every run read all `meta.json` files 2–3 times; otherwise revert Д8 and flags (user decision) |
 | 2026-10-28 | First published version: `0.1.0`, Apache 2.0 license (Д18) | As in jdbc-mcp-server; dependencies are release candidates and some real-mail checks are still pending |
 | 2026-10-28 | Separate documents: `plan.md` for status, pending checks, principles and version scope; `backlog.md` for later improvements; `results.md` for real-mail checks; `decisions.md` for decisions; user documents: `docs/connections.md`, `clients.md`, `commands.md`, `search.md`, `security.md`; `docs/*-agent.md` describes internals and links to user documents | The plan had grown and duplicated engineering documents; the first release needs user documentation |
-| 2026-10-28 | Scope of `0.1.0`: Д18 (publication) and Д7 (Gmail, checked on a real mailbox); other improvements go to `docs/backlog.md`. Of the pending checks, only `mail-reprocess` on both mailboxes is required before publication | User decision |
+| 2026-10-28 | Scope of `0.1.0`: Д18 (publication) and Д7 (Gmail, checked on a real mailbox); other improvements go to `docs/backlog.md`. Of the pending checks, only the container/legacy Office `mail-reprocess` check on `work` and `mailru` is required before publication | User decision |
 | 2026-10-28 | Translate project documentation into English and use English for future documentation changes | User request |
 | 2026-10-28 | Д7: increase the shared IMAP partial MIME block from 16 KiB to 256 KiB; accept IT-26 after the user-run Gmail check | Sequential network waits dominate Gmail downloads; the observed intervals improved from 21.9 to 37.9 messages/min. Keep streaming, byte limits, read-only commands and one connection |
 | 2026-10-28 | Д7: Gmail identity and labels are provider-neutral outside `source/imap/`: `X-GM-MSGID` is stored as `stableId`, Gmail labels as `labels`, and `stableId` reuse runs in the existing move-matching pass under its uniqueness rule. Outlook categories, IMAP keywords and RFC 8474 `EMAILID` are later improvements (Д31–Д33) | Review of IT-27: Outlook and IMAP have the same concepts; `meta.json` and the MCP contract are costly to rename after `0.1.0` |
+
+## 3. Agent proposals and implementation choices
+
+These proposals are implemented, but the record does not establish a separate user decision
+for them. They do not add user decisions or change the boundaries in section 1. Current behavior
+is specified in the linked engineering documents.
+
+| Proposed on | Proposal | Reason | Implementation owner |
+|---|---|---|---|
+| 2026-10-25 | Use one sandboxed pandoc process per conversion | `pandoc server` listens on `0.0.0.0` | [mime-agent.md](mime-agent.md#pandoc-and-processing) |
+| 2026-10-25 | Recover an invalid EWS SyncState by rescanning without invalidating known references | ItemId values remain valid | [ews-source-agent.md](ews-source-agent.md#mail-source) |
+| 2026-10-25 | Refuse MCP sync after a rejected sign-in until a successful terminal mail-sync | Prevent repeated agent calls from submitting rejected credentials | [tools-agent.md](tools-agent.md#status-file-and-writer-ownership) |

@@ -35,7 +35,8 @@ Stale passwords lock domain accounts, so the server is careful with sign-ins:
 - **After a rejected sign-in** the `sync` tool refuses that connection in every server process.
   Fix the password or login in [`connections.json`](connections.md), then run
   [`mail-sync`](commands.md#mail-sync) in a terminal: a successful run clears the state. An agent
-  therefore cannot lock your account by calling `sync` repeatedly.
+  therefore cannot keep submitting the rejected credentials by calling `sync` repeatedly. The
+  first rejected attempt still counts toward the account's lockout policy.
 - A password that could not be obtained from Windows Credential Manager or a password command is
   not a sign-in attempt: nothing is sent.
 

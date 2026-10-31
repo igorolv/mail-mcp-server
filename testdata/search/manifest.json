@@ -58,7 +58,7 @@
   "messages": 48,
   "queries": 80,
   "sha256": {
-    "README.md": "0de681de01172766ffc073d63074af5f9d9a27649467ebb8f0c7df566d7eba33",
+    "README.md": "59b4bad5a76b2e78cf21615b86a7a617272be9d4233e4a5351804efa318e7c5e",
     "corpus.json": "0ee6194e620958ede5cf0d8641de9dccdab20b9d2eb032851bbdf09f1108a0f1",
     "corpus/S001-synthetic.eml": "5154b8a4b341dfe7ec3951f5311de3f5ba887b662e614864ee32fa94e1df8108",
     "corpus/S002-synthetic.eml": "33e0f4b74c359ccfdd058d19147c81e57002a806402dcb30b93d4a48fe662b9b",

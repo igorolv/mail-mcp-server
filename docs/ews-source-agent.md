@@ -117,9 +117,10 @@ the user's server. Now a run without changes sends only SyncFolderItems per fold
 Exchange 2013 a follow-up flag change arrives as Update and a read change as ReadFlagChange (2026-10-28). The request asks no MIME/body, adds no sign-in or retry
 and writes nothing to the mailbox. Known flag changes leave local content and download/state
 metadata unchanged, rebuild only the affected document and increase no message counter.
-Flags are excluded from move identity; destination observations apply on reuse. Schema 4 stores
-known values, with offline rebuild from disk; old data stays unknown until sync. Real-server
-availability remains to verify.
+Flags are excluded from move identity; destination observations apply on reuse. The current
+index stores known values, with offline rebuild from disk; old data stays unknown until sync.
+Read/flag delivery and selective updates passed the user-run checks in `docs/results.md`
+section 1; remaining cross-tool and flag-clearing checks are in `docs/plan.md` section 2.
 
 Primary references: [Flag](https://learn.microsoft.com/en-us/exchange/client-developer/web-service-reference/flag)
 and [FlagStatus](https://learn.microsoft.com/en-us/exchange/client-developer/web-service-reference/flagstatus).

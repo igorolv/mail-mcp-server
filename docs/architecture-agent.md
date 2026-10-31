@@ -5,51 +5,19 @@ transport and Spring wiring. Principles and data flow are in `docs/plan.md` sect
 of `0.1.0` in section 4, later improvements in `docs/backlog.md`, decisions in
 `docs/decisions.md`. This file describes what exists.
 
-## Status (2026-10-28: draft version complete)
+## Implemented scope
 
-Implemented and checked on the user's real mailboxes (`docs/results.md`):
-
-- Gradle build, Spring Boot application with the stdio MCP transport, the connections file with
-  a lazy registry.
-- Read-only EWS client over Apache HttpClient 5 with NTLM (`GetFolder`, `FindFolder`,
-  `SyncFolderItems`, `GetItem` with MIME) and `EwsMailSource`.
-- Read-only IMAP client on Angus Mail and `ImapMailSource`; Gmail app-password synchronization
-  is verified. Desktop OAuth2 with PKCE and XOAUTH2 is supported; real OAuth2 sign-in remains
-  unverified. Gmail label handling and deduplication remain pending (`0.1.0`, Д7).
-- Message directories with `meta.json`, `body.md`, attachment files and their `.md`; MIME
-  reading (`docs/mime-agent.md`); a derived Lucene index, schema 5, with Russian/English search
-  (`docs/storage-agent.md`).
-- `SyncRunner`, background `SyncService` and `sync-status.json`.
-- Nine MCP tools (`docs/tools-agent.md`): `listConnections`, `sync`, `syncStatus`,
-  `listFolders`, `listMessages`, `getMessage`, `getAttachment`, `search`, `getThread`.
-  Local conversations are verified offline; no real-mail check has been performed for them.
-- User-run commands in `cli/`: `mail-sync`, `mail-reprocess`, `mail-reindex`, `gmail-oauth`.
-- Synthetic data sets in `testdata/` (`mime`, `search`, `redaction`); the search control set
-  gives recall 79/86 = 0.919 with 7 false positives.
+The server has read-only EWS and IMAP sources, local message storage and conversion, a derived
+Lucene catalog, nine MCP tools and five user-run commands. Real-mail verification results are
+maintained in `docs/results.md`; pending checks and release scope are in `docs/plan.md` sections
+2 and 4. The package table below describes the implementation; it is not a verification checklist.
 
 `convert/PdfText`, `XlsxText`/`XlsText` and `PptxText`/`PptText` are adapted from redmine-mcp-server
 `extraction/parser/{PdfTextParser,XlsxTextParser,PptxTextParser}.java` at commit `f62b3e5`.
 
-Optional tool-output secret replacement is described in `docs/redaction-agent.md`. Local files and the index remain unfiltered.
-
-Not implemented: PII anonymization, MCP resources, embeddings, writing
-mail; see `docs/backlog.md`.
-
-Read/star flags are implemented and verified offline; real-server behavior remains to verify. `RemoteMessageInfo`, `MessageMeta` and `MessageCard` carry nullable `read`/`flagged`.
-Unknown is omitted, while false clears an observed value. Known messages get flags with the
-folder changes (`FolderChanges.observed`): IMAP from FLAGS in the UID listing, EWS from
-ReadFlagChange and a short GetItem of Update items (Д29). IMAP uses the actual FETCH responses
-after a renewed EXAMINE, never cached flag getters.
-The user flag/star is separate from sender importance and Gmail Important.
-
-Metadata-only flag updates atomically save changed metadata and rebuild its document from saved
-content without conversion or content writes. Reconciliation repairs flag mismatches too.
-Flags do not affect move identity; reused moves take destination observations, and UIDVALIDITY
-resets use fresh metadata. Counters, rescans, background summaries, dates and conversations keep
-their behavior. Schema 4 adds stored true/false string fields; old indexes rebuild offline on
-writer open, and old metadata stays unknown until requested sync. Reprocessing preserves flags.
-Local tools expose optional booleans from metadata (getMessage, even if MIME is broken) or the
-committed index (list/search/thread), without SecretRedactor.
+Optional tool-output secret replacement is described in `docs/redaction-agent.md`.
+PII anonymization, MCP resources, embeddings and mail writing are not implemented; current
+boundaries are in `docs/decisions.md` and possible improvements in `docs/backlog.md`.
 
 ## Transport and execution
 
@@ -143,60 +111,15 @@ cli/ ──► sync/, connections/, source/, store/, index/  (user-run commands 
 | `convert/` | Body and attachment text. | `Pandoc`, `PandocException`: sandboxed process per conversion; `AttachmentText` dispatches formats. `PdfText`, `XlsxText`/`XlsText`, `PptxText`/`PptText` adapt sibling extraction methods; `DocText` uses HWPF `WordExtractor`. |
 | `redaction/` | Tool-output text only. | `SecretRedactor`: offline detectors and merged replacement; wired by `config/RedactionConfig`. Never called by storage, index writers, MIME parsing, conversion or synchronization. |
 
-`SearchSnippets` uses `MimeReader.read(eml, null)` and `Containers.expand(..., false)` to enumerate
-MIME attachments followed by EML/ZIP/MSG/TNEF children breadth first without writing.
-Only eligible returned page hits reach local MIME and UTF-8
-`attachments/<file>.md`; no source, converter, cache or manifest is involved. For `any`, a real
-body highlight wins; otherwise the first matching attachment is used. `attachmentText` selects
-attachments first. Other field groups and legacy reader overloads keep body-only snippets.
-Missing local candidates retain body context. The complete selected text is transformed before
-rendering. Search hits expose the exact lookup filename and a separately filtered display name
-only for attachment snippets. Attachment snippets use the current schema-4 fields and existing disk layout. Existing data requires
-`mail-reprocess` to create newly supported children/Markdown; finish a connection before using
-attachment lookup/search because extracted filenames can be renumbered in mixed lists.
+Implementation details are maintained by topic:
 
-`ThreadTools` reads one committed `MailIndexReader` snapshot across folders of one connection.
-It builds an undirected graph of local keys and case-sensitive IDs from stored Message-ID,
-In-Reply-To and References only. Nonempty angle-bracketed IDs cannot contain whitespace or
-nested brackets; Message-ID must be exactly one ID, while reply headers contribute all valid
-IDs. Missing parents still connect siblings and cycles terminate.
-The complete component sorts oldest first, undated last, then key and groups copies before
-paging. Search groups all matches after query/folder/date filters in score/date order then key.
-Both use equal valid stripped single Message-ID, known stored date and nonblank stored
-from/subject strings. Incomplete identities stay separate. The first member represents each
-group; other matching copies appear as key/folder pairs under optional `copies`. Totals and
-paging count groups, while stored copies, listMessages and folder counts stay unchanged.
-Stored key, ref, date, from, subject and header IDs are scanned; full card fields load only for
-the page. Grouping uses existing schema-4 fields without reindexing.
-Thread reading uses no bodies, MIME, attachment text, source or pandoc. The writer lock does not block
-reading. Conversations use schema 4 without persisted threads or additional fields for links.
-Only displayed subjects/senders are filtered; keys, paths, folder keys and dates stay original.
-
-Move reuse is verified offline. Each sync reads identity metadata only for added refs, in
-batches of at most 100, through EWS IdOnly GetItem identity/flag properties or IMAP
-ENVELOPE/size/UID/FLAGS with a renewed EXAMINE and UIDVALIDITY check. Known refs keep their
-stored fingerprints; `MimeReader.fingerprint` builds one from saved headers for a removed
-candidate without it (IMAP size equals the MIME length; an EWS item size does not, so such a
-candidate never matches). `MessageMeta.fingerprint` is nullable for old JSON; processing and
-reindexing preserve it; it is independent of the schema-4 flag fields.
-
-Matching uses a pre-run snapshot, an explicitly removed converted entry with MIME, and exactly
-one old and one remote occurrence of a complete Message-ID/size/sent date/sender/subject
-fingerprint in the connection. Retained identical copies, failed/downloaded entries and both
-ends of UIDVALIDITY resets cannot supply reuse; EWS rescans remain eligible. Equality is
-heuristic and can conceal changed content: SHA-256 describes only the saved MIME, not remote
-bytes, and EWS item size is separate. Reuse atomically changes metadata, loads saved content
-into the index and preserves UUID, directory and every content file. It counts as neither
-downloaded, failed nor removed; zero downloads may include moves.
-
-Before applying changes, folder identities are saved with old/null cursors, including vanished
-folders. Matches commit before unmatched removals, which check the original folder/ref before
-deleting. Only the final folder-list replacement advances all cursors and drops vanished entries.
-After a run that did not complete, reconciliation compares indexed folder/ref/path and flags with
-disk metadata and restores just mismatched documents without reconversion; after a completed run it
-compares keys only (Д30). Current local refs make reruns after metadata reassignment,
-index commit or interrupted downloads/cursor save idempotent. No journal or second store is
-used. Protocol availability on the user's servers remains to verify.
+- Search snippets, conversation traversal, copy grouping and the MCP contract:
+  [tools-agent.md](tools-agent.md); index fields and committed readers:
+  [storage-agent.md](storage-agent.md).
+- Move matching by provider `stableId` or metadata heuristic, observation updates, cursor commits
+  and interrupted-run reconciliation: [storage-agent.md](storage-agent.md).
+- MIME/container enumeration, conversion and extracted filenames: [mime-agent.md](mime-agent.md).
+- Output filtering and its order relative to paging/highlighting: [redaction-agent.md](redaction-agent.md).
 
 ### Planned packages
 
@@ -205,7 +128,7 @@ needs them and register them above. Attachment converters live in `convert/`.
 
 ## Rules for new code
 
-- Every tool takes a required `connection` argument resolved through
+- Every tool except `listConnections` takes a required `connection` argument resolved through
   `ConnectionRegistry` name/definition lookups (source resolution only for sync); there is no
   default connection and no cross-mailbox call.
 - Tools return `api/` records; connection credentials, hosts and logins are not returned. Mail
@@ -213,8 +136,8 @@ needs them and register them above. Attachment converters live in `convert/`.
   filtering applies to human-readable response text, not original paths or lookup identifiers.
 - Anything that reaches a mail server goes through `source/`; only allow-listed EWS operations
   exist (`EwsOperation`). Adding one needs a decision in `docs/decisions.md`.
-- Follow `docs/decisions.md` section 1: no limit budgets, extra databases, diagnostic codes or speculative
-  safeguards that the step's done criterion does not require.
+- Follow the boundaries and approved exceptions in `docs/decisions.md` section 1; do not add
+  safeguards that the task does not require.
 - Code copied from sibling projects names its source and commit in the class Javadoc (П5).
 - Keep OAuth provider implementations in `source/oauth/<provider>/`. Shared `source/oauth/`
   components must not import provider packages or mention a provider in their messages. Add a
