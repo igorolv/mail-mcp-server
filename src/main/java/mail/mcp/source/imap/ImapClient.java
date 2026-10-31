@@ -179,6 +179,7 @@ public final class ImapClient implements AutoCloseable {
             var uids = new ArrayList<Long>();
             var flags = new java.util.HashMap<Long, Flags>();
             var gmailInfo = new java.util.HashMap<Long, GmailMessageInfo>();
+            var keywords = new java.util.HashMap<Long, List<String>>();
             if (folder.getMessageCount() > 0) {
                 var messages = folder.getMessages();
                 var profile = new FetchProfile();
@@ -192,13 +193,16 @@ public final class ImapClient implements AutoCloseable {
                     if (uid <= 0) { throw protocol("folderUids", "non-positive UID"); }
                     uids.add(uid);
                     var observed = store.metadataFlags(uid);
-                    if (observed != null) { flags.put(uid, observed); }
+                    if (observed != null) {
+                        flags.put(uid, observed);
+                        if (!gmailServer) { keywords.put(uid, keywordLabels(observed)); }
+                    }
                     var gmailObserved = store.metadataGmail(uid);
                     if (gmailObserved != null) { gmailInfo.put(uid, gmailObserved); }
                 }
                 uids.sort(Long::compareTo);
             }
-            return new FolderUids(uidValidity, uids, flags, gmailInfo);
+            return new FolderUids(uidValidity, uids, flags, gmailInfo, keywords);
         } catch (MessagingException e) { throw fail("folderUids", e); }
         catch (ImapException e) { close(); throw e; }
     }
@@ -259,7 +263,7 @@ public final class ImapClient implements AutoCloseable {
                                 flags == null ? null : flags.contains(Flags.Flag.SEEN),
                                 flags == null ? null : flags.contains(Flags.Flag.FLAGGED),
                                 gmail == null ? null : gmail.msgId(),
-                                gmail == null ? null : gmail.labels())) != null) {
+                                gmailServer ? (gmail == null ? null : gmail.labels()) : keywordLabels(flags))) != null) {
                             throw protocol(operation, "duplicate UID in the response");
                         }
                     } catch (MessageRemovedException e) { /* vanished since UID discovery */ }
@@ -273,6 +277,13 @@ public final class ImapClient implements AutoCloseable {
             return Map.copyOf(result);
         } catch (MessagingException e) { throw fail(operation, e); }
         catch (ImapException e) { close(); throw e; }
+    }
+
+    private static List<String> keywordLabels(Flags flags) {
+        return flags == null ? null : java.util.Arrays.stream(flags.getUserFlags())
+                .filter(keyword -> !keyword.startsWith("$") && !keyword.equalsIgnoreCase("Junk")
+                        && !keyword.equalsIgnoreCase("NonJunk") && !keyword.equalsIgnoreCase("NotJunk"))
+                .sorted().toList();
     }
 
     public synchronized Downloaded download(String folderName, long uid, Path target, long maxBytes) {

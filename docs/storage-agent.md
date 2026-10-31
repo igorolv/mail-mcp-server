@@ -54,11 +54,11 @@ See `docs/mime-agent.md` for parsing, naming and pandoc rules.
 
 Two provider-neutral fields come from the source when it has them. `stableId` is the provider's
 own message identifier that survives moves and UID changes (currently Gmail `X-GM-MSGID`, kept as
-a decimal string). `labels` are the mailbox labels of the latest observation: Gmail labels,
-normalized by the IMAP source (`docs/imap-source-agent.md`), or Outlook categories, preserved as
-returned by EWS (`docs/ews-source-agent.md`). Both fields are absent in old `meta.json` files;
-when a provider does not supply a field it reads as null, which means unknown. An empty label
-list means the message has no labels. Processing, failures, offline reprocessing, reindexing and
+a decimal string). `labels` are the mailbox labels of the latest observation: Gmail labels or
+non-Gmail IMAP keywords, mapped by the IMAP source (`docs/imap-source-agent.md`), or Outlook
+categories, preserved as returned by EWS (`docs/ews-source-agent.md`). Both fields are absent in
+old `meta.json` files; when a provider does not supply a field it reads as null, which means unknown.
+An empty label list means the message has no labels. Processing, failures, offline reprocessing, reindexing and
 flag updates preserve them; a sync observation replaces either one only when the source returned it.
 The XLSX exception uses the resolved format and actual file size, including inside containers;
 binary XLS retains 20 MiB. Conversion is best effort: compressed XLSX size does not bound

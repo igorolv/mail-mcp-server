@@ -130,16 +130,25 @@ flags in the mailbox.
 ## Labels
 
 Cards and messages carry optional `labels`: the mailbox labels seen at the last synchronization.
-Gmail supplies its labels and Exchange supplies Outlook categories. Both are visible in `labels`
-and searchable with `field: "label"`, as well as `any`. Categories are observed for added messages
-and when EWS reports an update; sync does not scan unchanged messages for categories.
+Gmail supplies its labels, Exchange supplies Outlook categories, and other IMAP servers supply
+user-defined keywords. All are visible in `labels` and searchable with `field: "label"`, as well
+as `any`. System flags, keywords starting with `$` (including `$label1`–`$label5`) and the
+junk-filter keywords `Junk`, `NonJunk` and `NotJunk` (any case) are excluded from IMAP labels.
+Other keywords keep the spelling returned by the server and refresh on every ordinary sync;
+Mail.ru support depends on whether the server stores and returns custom keywords, which remains
+to verify. Built-in Mail.ru web categories are not guaranteed to be exposed as IMAP keywords;
+the checked category was not available through this source ([real-mail results](results.md#2-mailru-and-gmail)).
+Gmail uses only its Gmail labels, never IMAP keywords.
+Categories are observed for added messages and when EWS reports an update; sync does not scan
+unchanged messages for categories.
 With its All Mail folder available, Gmail is synchronized as one folder, so a message is stored
 once rather than once per label (without it,
 [ordinary folder synchronization applies](connections.md#app-passwords)). Its labels (`Inbox`,
-`Sent`, `Starred`, your own labels) let you find messages by label. `field: "label"` searches label
-and category words; Russian word forms are not applied there, so use the label's own words. Gmail's `All` label is not
-listed because it names the folder itself. An empty list means the message has no labels; a
-missing `labels` means unknown or a mailbox without labels. The server never changes labels.
+`Sent`, `Starred`, your own labels) let you find messages by label. `field: "label"` searches label,
+category and keyword words; Russian word forms are not applied there, so use the label's own
+words. Gmail's `All` label is not listed because it names the folder itself. An empty list means
+the message has no labels; a missing `labels` means unknown or a mailbox without labels. The
+server never changes labels.
 
 ## Coverage
 

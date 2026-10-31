@@ -71,8 +71,9 @@ Folder names are passed as encoded Angus arguments, never interpolated into comm
 ## MIME download
 
 `folderUids(folderName)` opens the folder with EXAMINE, reads UIDVALIDITY and fetches all UIDs
-with `FETCH 1:N (UID)` (no FETCH for an empty folder). Non-positive UIDVALIDITY or UID is a
-protocol failure. UIDs are returned sorted and copied. `ImapMailSource.changes` compares those
+with `FETCH 1:N (FLAGS UID)` (no FETCH for an empty folder; Gmail items are added on Gmail).
+Non-positive UIDVALIDITY or UID is a protocol failure. UIDs are returned sorted and copied.
+`ImapMailSource.changes` compares those
 refs with the known local refs. A changed UIDVALIDITY resets the folder: all known refs are
 removed and all present refs added (`reset=true`, `rescanned=false`). EWS uses `rescanned`
 separately for invalid SyncState recovery without invalidating known refs. Old status JSON without
@@ -131,6 +132,30 @@ Gmail is detected by the `X-GM-EXT-1` capability, never by host name, login or f
 All Mail synchronization, labels and label search passed the user-run check recorded in
 `docs/results.md` section 2. Reuse by `stableId` across a UIDVALIDITY reset remains checked
 offline only; its pending real-mail check is in `docs/plan.md` section 2.
+
+## Non-Gmail IMAP keywords
+
+Without `X-GM-EXT-1`, `ImapClient` derives provider-neutral `labels` from the actual parsed
+FLAGS item using `Flags.getUserFlags()`, which separates keywords from system flags. The same
+private helper handles the UID listing and added-message metadata fetch. It excludes every
+keyword starting with `$` (including `$Forwarded`, `$MDNSent`, `$Junk`, `$NotJunk` and
+`$label1`–`$label5`) and `Junk`, `NonJunk`, `NotJunk` ignoring case. All other returned spellings
+are preserved and sorted in Java natural order into an immutable list; no setting overrides
+this policy. Parsed FLAGS with no remaining keyword is a known empty list. Missing or
+unparsable FLAGS leaves labels unknown (null); an entirely unparsable metadata response is
+omitted as before. An empty list clears saved labels, while null preserves them.
+
+`FolderUids.keywords` holds per-UID lists only on non-Gmail servers, alongside the existing
+FLAGS observations. Both fetch profiles already request FLAGS: no fetch item, command or round
+trip is added. Known messages refresh labels through `ImapMailSource.changes`, without MIME
+download or conversion; shared storage/index behavior is in `docs/storage-agent.md`. On Gmail
+the keyword map stays empty and `X-GM-LABELS` remains the only label source, even when an
+extension item is absent.
+
+Built-in Mail.ru web categories must not be assumed to be IMAP keywords: the checked category
+produced no user flags before filtering. The real-mail results are in `docs/results.md` section 2.
+Support for arbitrary custom keywords remains to verify; the optional user-run addition/removal
+check is in `docs/plan.md` section 2 and does not block publication of `0.1.0`.
 
 ## Remote identity metadata
 
@@ -228,8 +253,10 @@ no fallback after rejection, EXAMINE/CLOSE folder switching, UID listing, filter
 removed refs, UIDVALIDITY resets, input validation before commands, exact MIME and SHA-256,
 BODY.PEEK only, missing UIDs, declared and streamed size limits, continued use after unavailable
 messages, partial cleanup, existing-target preservation, command rejection and lazy factories.
-Gmail tests cover capability detection, the All Mail folder choice and its fallback, the exact
-X-GM items in both FETCH shapes, a missing extension, and decoded labels.
+Keyword tests cover system and bookkeeping exclusions, junk-filter keyword exclusions, sorted
+spelling, empty/unknown labels and both existing FETCH shapes. Gmail tests cover capability
+detection, the All Mail folder choice and its fallback, the exact X-GM items in both FETCH
+shapes, a missing extension, decoded labels and isolation from IMAP keywords.
 All tests are part of `gradlew.bat build`.
 
 Angus 2.0.5 sources inspected on 2026-10-25:

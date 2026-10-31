@@ -76,7 +76,8 @@ public final class ImapMailSource implements MailSource {
                     observed.put(ref, new RemoteMessageInfo(ref, null,
                             flags == null ? null : flags.contains(Flags.Flag.SEEN),
                             flags == null ? null : flags.contains(Flags.Flag.FLAGGED),
-                            gmail == null ? null : gmail.msgId(), gmail == null ? null : gmail.labels()));
+                            gmail == null ? null : gmail.msgId(),
+                            gmail == null ? uids.keywords().get(uid) : gmail.labels()));
                 }
             }
         }

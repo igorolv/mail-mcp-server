@@ -28,6 +28,7 @@ preparation (Д18).** All three user mailboxes work: corporate Exchange (EWS), M
 - snapshots of read status and user flags/stars, without writing to the mailbox;
 - Gmail synchronized once through All Mail, with its labels on messages and a `label` search field;
 - Outlook categories exposed and searchable through the same provider-neutral labels;
+- non-Gmail IMAP keywords exposed and searchable through the same labels, excluding system and bookkeeping flags;
 - expansion of attached messages and archives (EML, ZIP, MSG, TNEF), and DOC/XLS/PPT text;
 - an optional secret filter in responses;
 - nine MCP tools.
@@ -63,6 +64,12 @@ when only part passes, retain only the remaining checks. The EML/ZIP/MSG/TNEF an
 reprocessing check for `work` and `mailru` is the only real-mail check required before publishing
 `0.1.0` (decision of 2026-10-28); the remaining checks happen during use.
 
+For existing non-Gmail IMAP data, the first sync after Д32 can refresh labels on many messages:
+previously unknown labels become known lists, including empty lists. This reads saved content to
+replace index documents, without MIME downloads or conversion. Unchanged observations on later
+runs do not repeat that work. The measured Mail.ru runs are in
+[results.md, section 2](results.md#2-mailru-and-gmail).
+
 | Feature | How to check | Accepted |
 |---|---|---|
 | **Before publication.** EML/ZIP/MSG/TNEF expansion and DOC/XLS/PPT text (`docs/mime-agent.md`) | Run `mail-reprocess work` and `mail-reprocess mailru`, then search text in files from archives and older Office formats | 2026-10-27; 582 tests, 1 expected skip, 0 failures |
@@ -81,6 +88,7 @@ reprocessing check for `work` and `mailru` is the only real-mail check required 
 | Lenient `Content-Disposition` and the `cp-1251` label (`docs/mime-agent.md`) | After the current Mail.ru sync ends, rebuild the jar, run `mail-reprocess mailru` and count the `error` values of failed `meta.json` files again. Of the 24 failures counted on 2026-10-31, the 16 with an unparsable `Content-Disposition` and the 3 with `cp-1251` should become `converted`; 1 `ParseException` and 4 UTF-7 `UnsupportedEncodingException` are expected to remain | 2026-10-31; 732 tests, 1 expected skip, 0 failures |
 | Sync stages in `mail-sync` and `syncStatus` (`docs/commands.md`) | On the next `mail-sync mailru`, check that the stage lines appear before folder progress, with `saved messages checked` counts only after a run that did not complete. Restart the MCP server, call `sync`, and check that `syncStatus` shows `phase` moving through the stages and the log file has `Sync phase:` lines | 2026-10-31; 734 tests, 1 expected skip, 0 failures |
 | IMAP folder gone during a run, Д34 (`docs/storage-agent.md`) | During a long `mail-sync mailru`, delete or rename an included folder in the web interface: the run continues, the folder's line ends with `, gone from the server during the run`, and the result is `RESULT: OK`. The next run removes the folder's local messages; after a rename they reappear under the new name, recognized as moves where unique | 2026-11-01; 738 tests, 1 expected skip, 0 failures |
+| Non-Gmail IMAP keywords as labels, Д32 (`docs/imap-source-agent.md`) | Optional: if an ordinary mail client can assign a custom IMAP keyword in an included Mail.ru folder, assign one, run `mail-sync mailru` and confirm `labels` and `field: "label"` reflect it without a MIME download; remove it and sync again to confirm clearing. The checked built-in web category returned no user keywords ([results.md, section 2](results.md#2-mailru-and-gmail)); it does not establish support for arbitrary custom keywords. This remaining check does not block publication | 2026-11-01; 743 tests, 1 expected skip, 0 failures; user accepted the implementation with the observed Mail.ru limitation |
 | Gmail OAuth2 sign-in (`docs/gmail-oauth-agent.md`) | Only if needed instead of the verified app password: run `gmail-oauth gmail`, then `mail-sync gmail`. Token encryption is in [backlog.md](backlog.md), Д27 | 2026-10-25 |
 | Passwords from Windows Credential Manager and password managers (`docs/connections.md`) | `windowsCredential`: replace `passwordCommand` with `"windowsCredential": "mail-mcp/<name>"`, run `mail-sync` for `work` and `mailru`, then restart the MCP server and run `sync` and `syncStatus`. `passwordCommand` in `mail-sync` for EWS is already verified ([results.md, section 1](results.md#1-corporate-exchange)); server use and specific password managers: to verify | 2026-10-27; 702 tests, 1 expected skip, 0 failures |
 
@@ -163,12 +171,11 @@ Status: ⬜ not started · 🔨 in progress. Size: S — hours, M — a brief fo
 briefs. When work starts, mark the item 🔨 and write a brief in `docs/impl-tasks/`.
 Remove accepted items from the table: completed behavior is described in engineering and user
 documents, pending real-mail checks in section 2, history in git. Numbers are never reused;
-completed: Д1–Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30, Д31, Д34.
+completed: Д1–Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30, Д31, Д32, Д34.
 
 | ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|
 | Д18 | Publish `0.1.0` | Done: documents separated, user documentation extracted, README rewritten following jdbc-mcp-server. Remaining: `LICENSE` and `THIRD_PARTY_NOTICES.md` (then link `LICENSE` from README), build version, CI and jar releases through GitHub Actions on tags (then add release jar download and CI, Release, License badges to README) | polish | M | 🔨 |
-| Д32 | IMAP keywords as labels | Fill the provider-neutral `labels` on non-Gmail IMAP servers from user keywords already returned in `FLAGS`; exclude system flags, every `$`-prefixed bookkeeping keyword and the junk-filter keywords `Junk`, `NonJunk`, `NotJunk` (decision of 2026-11-01). No new IMAP command, contract or schema. Verify whether Mail.ru stores and returns keywords | Д7 review of 2026-10-28; included in `0.1.0` by the decision of 2026-10-31 | S | 🔨 |
 | Д33 | RFC 8474 `EMAILID` as `stableId` | On non-Gmail IMAP servers advertising `OBJECTID`, fetch `EMAILID` with the existing UID listing and metadata requests and store it as the provider-neutral `stableId`. Extend the read-only FETCH allow-list by `EMAILID`; no contract or schema change. Verify whether Mail.ru advertises `OBJECTID` | Д7 review of 2026-10-28; included in `0.1.0` by the decision of 2026-10-31 | S | 🔨 |
 
 Before publication, the only required real-mail check is the EML/ZIP/MSG/TNEF and legacy Office

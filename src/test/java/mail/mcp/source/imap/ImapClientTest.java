@@ -181,6 +181,55 @@ class ImapClientTest {
         }
     }
 
+    @Test void nonGmailKeywordsBecomeSortedLabelsWithoutDollarKeywords() throws Exception {
+        var folder = new FakeImapServer.MailFolder("INBOX",
+                new FakeImapServer.Item(42, MIME, MIME.length,
+                        "\\Seen \\Flagged \\Answered \\Deleted \\Draft \\Recent zebra Alpha beta "
+                                + "$Forwarded $MDNSent $Junk $NotJunk $label1 $label5 Junk nonjunk NOTJUNK"),
+                new FakeImapServer.Item(43, MIME));
+        try (var server = new FakeImapServer(folder); var client = new ImapClient(settings(server.port()), false)) {
+            var uids = client.folderUids("INBOX");
+            assertThat(uids.keywords().get(42L)).containsExactly("Alpha", "beta", "zebra");
+            assertThat(uids.keywords().get(43L)).isEmpty();
+            assertThatThrownBy(uids.keywords()::clear).isInstanceOf(UnsupportedOperationException.class);
+            assertThatThrownBy(() -> uids.keywords().get(42L).add("other"))
+                    .isInstanceOf(UnsupportedOperationException.class);
+            var metadata = client.metadata("INBOX", uids.uidValidity(), uids.uids());
+            assertThat(metadata.get("42").labels()).containsExactly("Alpha", "beta", "zebra");
+            assertThat(metadata.get("42").read()).isTrue();
+            assertThat(metadata.get("42").flagged()).isTrue();
+            assertThat(metadata.get("43").labels()).isEmpty();
+            assertThatThrownBy(() -> metadata.get("42").labels().add("other"))
+                    .isInstanceOf(UnsupportedOperationException.class);
+            assertThat(server.commands.stream().filter(c -> c.startsWith("FETCH ") || c.startsWith("UID FETCH ")))
+                    .containsExactly("FETCH 1:2 (FLAGS UID)", "UID FETCH 42,43 (UID)",
+                            "FETCH 1:2 (ENVELOPE INTERNALDATE RFC822.SIZE FLAGS UID)");
+            assertThat(server.commands.stream().filter(c -> c.startsWith("EXAMINE "))).hasSize(2);
+            assertThat(server.commands.stream().filter(c -> c.startsWith("LOGIN "))).hasSize(1);
+        }
+    }
+
+    @Test void gmailContinuesToUseOnlyGmailLabels() throws Exception {
+        var folder = new FakeImapServer.MailFolder("INBOX",
+                new FakeImapServer.Item(42, MIME, MIME.length, "\\Seen Project $Forwarded")
+                        .gmail("1234567890123456789", "\\All \\Inbox GmailTag"),
+                new FakeImapServer.Item(43, MIME, MIME.length, "Project"),
+                new FakeImapServer.Item(44, MIME, MIME.length, "Project").gmail("444", ""));
+        try (var server = new FakeImapServer("gmail", folder); var client = new ImapClient(settings(server.port()), false)) {
+            var uids = client.folderUids("INBOX");
+            assertThat(uids.keywords()).isEmpty();
+            assertThat(uids.gmail().get(42L).labels()).containsExactly("GmailTag", "Inbox");
+            assertThat(uids.gmail()).doesNotContainKey(43L);
+            assertThat(uids.gmail().get(44L).labels()).isEmpty();
+            var metadata = client.metadata("INBOX", uids.uidValidity(), uids.uids());
+            assertThat(metadata.get("42").labels()).containsExactly("GmailTag", "Inbox");
+            assertThat(metadata.get("42").stableId()).isEqualTo("1234567890123456789");
+            assertThat(metadata.get("43").labels()).isNull();
+            assertThat(metadata.get("43").stableId()).isNull();
+            assertThat(metadata.get("44").labels()).isEmpty();
+        }
+    }
+
     @Test void gmailUidListingAndMetadataFetchMessageIdAndLabels() throws Exception {
         var folder = new FakeImapServer.MailFolder("INBOX",
                 new FakeImapServer.Item(42, MIME, MIME.length, "\\Seen").gmail("1234567890123456789", "\\Inbox \\Sent"));
@@ -434,10 +483,12 @@ class ImapClientTest {
             var cleared = client.metadata("INBOX", 7, List.of(42L)).get("42");
             assertThat(cleared.read()).isFalse();
             assertThat(cleared.flagged()).isFalse();
+            assertThat(cleared.labels()).isEmpty();
             server.omitMetadataFlags = true;
             var absent = client.metadata("INBOX", 7, List.of(42L)).get("42");
             assertThat(absent.read()).isNull();
             assertThat(absent.flagged()).isNull();
+            assertThat(absent.labels()).isNull();
             assertThat(server.commands.stream().filter(c -> c.contains("ENVELOPE"))).hasSize(3);
             assertThat(server.commands.stream().filter(c -> c.startsWith("LOGIN "))).hasSize(1);
             assertThat(server.commands).noneMatch(c -> c.contains("BODY") || c.startsWith("SELECT") || c.contains("STORE"));

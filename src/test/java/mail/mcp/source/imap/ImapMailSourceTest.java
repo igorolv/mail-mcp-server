@@ -86,6 +86,25 @@ class ImapMailSourceTest {
         }
     }
 
+    @Test void changesObserveNonGmailKeywordsAsLabels() throws Exception {
+        var folder = new FakeImapServer.MailFolder("INBOX",
+                new FakeImapServer.Item(1, MIME, MIME.length, "\\Seen zebra Alpha $Forwarded Junk nonjunk NotJunk"),
+                new FakeImapServer.Item(5, MIME, MIME.length, "\\Flagged $MDNSent $label1"),
+                new FakeImapServer.Item(10, MIME, MIME.length, "NewTag"));
+        try (var server = new FakeImapServer(folder); var source = source(server)) {
+            var changes = source.changes(INBOX, "7", Set.of("1", "5"));
+            assertThat(changes.added()).containsExactly("10");
+            assertThat(changes.observed()).containsOnlyKeys("1", "5");
+            assertThat(changes.observed().get("1").labels()).containsExactly("Alpha", "zebra");
+            assertThat(changes.observed().get("1").read()).isTrue();
+            assertThat(changes.observed().get("1").stableId()).isNull();
+            assertThat(changes.observed().get("5").labels()).isEmpty();
+            assertThat(changes.observed().get("5").flagged()).isTrue();
+            assertThat(server.commands.stream().filter(c -> c.contains("FETCH")))
+                    .containsExactly("FETCH 1:3 (FLAGS UID)");
+        }
+    }
+
     @Test void removedIsKnownMinusPresent() throws Exception {
         try (var server = new FakeImapServer(inbox()); var source = source(server)) {
             var changes = source.changes(INBOX, "7", Set.of("1", "2", "20", "11", "0", "bad", "gone"));
@@ -180,12 +199,14 @@ class ImapMailSourceTest {
     @Test void changesObserveGmailMessageIdAndLabelsOfKnownRefs() throws Exception {
         var folder = new FakeImapServer.MailFolder("INBOX", 7, List.of(),
                 List.of(new FakeImapServer.Item(1, MIME).gmail("111", "\\Inbox"),
-                        new FakeImapServer.Item(5, MIME).gmail("555", "\\All \\Sent")));
+                        new FakeImapServer.Item(5, MIME, MIME.length, "Project").gmail("555", "\\All \\Sent"),
+                        new FakeImapServer.Item(10, MIME, MIME.length, "Project")));
         try (var server = new FakeImapServer("gmail", folder); var source = source(server)) {
-            var changes = source.changes(INBOX, "7", Set.of("1", "5"));
+            var changes = source.changes(INBOX, "7", Set.of("1", "5", "10"));
             assertThat(changes.observed().get("1").stableId()).isEqualTo("111");
             assertThat(changes.observed().get("1").labels()).containsExactly("Inbox");
             assertThat(changes.observed().get("5").labels()).containsExactly("Sent");
+            assertThat(changes.observed().get("10").labels()).isNull();
             var metadata = source.metadata(INBOX, "7", List.of("5"));
             assertThat(metadata.get("5").stableId()).isEqualTo("555");
             assertThat(metadata.get("5").labels()).containsExactly("Sent");
