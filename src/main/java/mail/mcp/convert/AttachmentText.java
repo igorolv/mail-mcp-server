@@ -73,7 +73,7 @@ public final class AttachmentText {
             String text = switch (format) {
                 case "docx", "odt", "rtf", "epub" -> pandoc.toMarkdown(file, format);
                 case "html", "csv", "txt" -> {
-                    Charset charset = info.charset() == null ? StandardCharsets.UTF_8 : Charset.forName(info.charset());
+                    Charset charset = info.charset() == null ? StandardCharsets.UTF_8 : MimeReader.charset(info.charset());
                     String decoded = new String(Files.readAllBytes(file), charset);
                     yield format.equals("txt") ? decoded : pandoc.toMarkdown(decoded, format);
                 }

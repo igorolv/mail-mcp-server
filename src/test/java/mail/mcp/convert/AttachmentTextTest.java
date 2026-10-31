@@ -208,6 +208,12 @@ class AttachmentTextTest {
         assertThat(text(file)).isEqualTo("\ufffdA");
     }
 
+    @Test void directionalLabelDecodesPlainTextWithItsBaseCharset() throws Exception {
+        Path file = dir.resolve("hebrew.txt");
+        Files.write(file, new byte[]{(byte) 0xf9, (byte) 0xec, (byte) 0xe5, (byte) 0xed});
+        assertThat(AttachmentText.toMarkdown(file, info(file, null, "text/plain", "iso-8859-8-i"), pandoc)).contains("\u05e9\u05dc\u05d5\u05dd");
+    }
+
     @Test void nestedMessageBecomesHeadersAndBody() throws Exception {
         Path file = dir.resolve("forwarded.eml");
         String headers = "Subject: Forwarded subject\r\nFrom: Sender <sender@example.com>, bare@example.com\r\n"

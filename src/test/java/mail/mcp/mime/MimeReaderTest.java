@@ -8,6 +8,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.jackson.databind.JsonNode;
 
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,6 +21,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class MimeReaderTest {
     @TempDir Path temp;
@@ -198,5 +200,42 @@ class MimeReaderTest {
         assertThat(result.message().references()).containsExactly("<one@example.com>", "<two@example.com>");
         assertThat(result.message().attachments()).isEmpty();
         assertThat(temp.resolve("attachments")).doesNotExist();
+    }
+
+    @Test void directionalHebrewLabelsDecodeWithTheirBaseCharset() throws Exception {
+        // "שלום" in ISO-8859-8 is F9 EC E5 ED; base64 +ezl7Q==.
+        Path eml = temp.resolve("hebrew.eml");
+        Files.writeString(eml, """
+                Subject: =?iso-8859-8-i?Q?=F9=EC=E5=ED?= 1
+                From: =?ISO-8859-8-I?B?+ezl7Q==?= <sender@example.com>
+                To: =?iso-8859-8-i*he?Q?=F9=EC=E5=ED?= <reader@example.com>
+                Content-Type: multipart/mixed; boundary=outer
+
+                --outer
+                Content-Type: text/plain; charset="iso-8859-8-i"
+                Content-Transfer-Encoding: quoted-printable
+
+                =F9=EC=E5=ED body
+                --outer
+                Content-Type: text/plain; charset=ISO-8859-6-E; name=note.txt
+                Content-Disposition: attachment; filename=note.txt
+
+                attachment
+                --outer--
+                """.replace("\n", "\r\n"));
+        var result = MimeReader.read(eml, temp.resolve("attachments"));
+        assertThat(result.body()).isEqualTo("שלום body");
+        assertThat(result.message().subject()).isEqualTo("שלום 1");
+        assertThat(result.message().from()).containsExactly(new Address("שלום", "sender@example.com"));
+        assertThat(result.message().to()).containsExactly(new Address("שלום", "reader@example.com"));
+        assertThat(result.message().attachments().getFirst().charset()).isEqualTo("iso-8859-6-e");
+        assertThat(MimeReader.charset("ISO-8859-6-E ").name()).isEqualTo("ISO-8859-6");
+        assertThat(MimeReader.charset("windows-1251").name()).isEqualTo("windows-1251");
+    }
+
+    @Test void unknownCharsetOfTheSelectedBodyStillFails() throws Exception {
+        Path eml = temp.resolve("unknown.eml");
+        Files.writeString(eml, "Subject: x\r\nContent-Type: text/plain; charset=nonexistent-charset\r\n\r\nbody\r\n");
+        assertThatThrownBy(() -> MimeReader.read(eml, null)).isInstanceOf(UnsupportedEncodingException.class);
     }
 }

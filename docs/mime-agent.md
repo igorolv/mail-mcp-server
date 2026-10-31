@@ -32,6 +32,20 @@ Use the declared charset without guessing. Every other leaf is an attachment, in
 binary parts and inline images. The MIME reader keeps containers as leaves;
 `Containers` expands saved EML, ZIP, MSG and TNEF files afterward. S/MIME and calendars remain opaque.
 
+RFC 1556 directional labels `iso-8859-6-e`, `iso-8859-6-i`, `iso-8859-8-e` and `iso-8859-8-i`
+(any case) are unknown to Java and Angus but encode bytes exactly as `ISO-8859-6` and
+`ISO-8859-8`, so `MimeReader.charset` maps them to the base charset; this is not guessing.
+`read` applies the mapping in three places:
+- The selected body is decoded by Angus first; only its `UnsupportedEncodingException` for one
+  of these labels falls back to the decoded part bytes in the base charset.
+- Top-level header encoded words with these labels, including an RFC 2231 language suffix, get
+  the base label in the in-memory message before the getters decode the subject and names.
+  `fingerprint` keeps raw headers, matching the IMAP ENVELOPE evidence.
+- Text attachments use the mapping through `AttachmentText`.
+
+Any other charset unknown to Java still fails the message with
+`MIME parsing failed (UnsupportedEncodingException)`.
+
 Attachments are numbered from one in walk order; the three-argument `read` starts at its
 `firstNumber` argument. Stored names are `<n>__<sanitized name>` or
 `<n>__part`. Replace Windows-forbidden characters `<>:"/\|?*`, control characters, and trailing
@@ -218,9 +232,10 @@ priority over ordinary format suffixes. ZIP containers never get Markdown.
 | msg | application/vnd.ms-outlook | HSMF display headers and first nonblank plain/HTML/RTF body |
 | tnef, winmail.dat | application/ms-tnef, application/vnd.ms-tnef | HMEF subject and RTF through pandoc stdin |
 
-HTML, CSV and plain text use the declared charset, UTF-8 when absent, with malformed bytes
-replaced; no charset guessing. Text passed to pandoc stdin is UTF-8. DOCX/ODT/RTF/EPUB are
-passed as file arguments, with stdin closed. `htmlToMarkdown` delegates to the generic stdin
+HTML, CSV and plain text use the declared charset through `MimeReader.charset` (including the
+RFC 1556 directional labels above), UTF-8 when absent, with malformed bytes replaced; no charset
+guessing. An unknown charset leaves the attachment without text. Text passed to pandoc stdin is
+UTF-8. DOCX/ODT/RTF/EPUB are passed as file arguments, with stdin closed. `htmlToMarkdown` delegates to the generic stdin
 method. Attachment conversion adds no budgets, timeouts, counters or per-attachment states.
 
 EML Markdown contains nonempty `Subject`, `From`, `To`, `Cc` and `Date` headers in that order,
