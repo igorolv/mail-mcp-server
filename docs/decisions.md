@@ -73,6 +73,7 @@ in section 3.
 | 2026-11-01 | Drop `docs/backlog.md`: improvements after `0.1.0` and new ideas are tracked as GitHub issues; its open items were dropped, not migrated | Issues are registered on GitHub; a second list in the repository would duplicate them |
 | 2026-11-01 | `0.1.0` is published as a jar on GitHub Releases, without Docker or the official MCP Registry; this repository's own GitHub URLs and the account name in `NOTICE` and `glama.json` are allowed in tracked files | The Registry needs a package such as a Docker image or an MCPB bundle; Docker suits this server poorly (no Windows Credential Manager, pandoc in the image, mounted mail data), and whether MCPB suits a Java jar is to verify; the repository's address already shows the account name |
 | 2026-11-01 | Д35: version `0.1.1` adds a Docker image on GHCR and a listing in the official MCP Registry; the jar stays the recommended way to run on Windows | The Registry listing helps people find the server, and a test image built easily; Docker's limits on password sources are documented in `docs/clients.md` |
+| 2026-11-01 | Accept Д37 (`summarizeSenders`, dates per folder, `from` on `search` and `summarizeSenders`) through offline verification and real-mail checks before and after a Mail.ru sync. Whether Mail.ru delivery rules route future mail is checked during normal use and does not block acceptance | The tool's capabilities were verified; delivery rules belong to the mail provider, not to this tool |
 
 ## 3. Agent proposals and implementation choices
 
