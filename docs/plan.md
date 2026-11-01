@@ -6,7 +6,8 @@ version `0.1.0`. Related documents:
 - [results.md](results.md) — verified environment facts and real-mailbox results;
 - [decisions.md](decisions.md) — current user decisions and what requires a user decision;
 - `docs/*-agent.md` — engineering documents describing the code (listed in [AGENTS.md](../AGENTS.md));
-- `docs/connections.md`, `clients.md`, `commands.md`, `search.md`, `security.md` and
+- `docs/connections.md`, `clients.md`, `commands.md`, `search.md`, `security.md`,
+  `troubleshooting.md` and
   [README.md](../README.md) — user documentation;
 - [research/](research/README.md) — research from 2026-10-24.
 
@@ -160,7 +161,7 @@ MCP tools: folders.json, sync-status.json, index and message directories; no net
 | Sources: EWS, IMAP, Gmail OAuth2 | `docs/ews-source-agent.md`, `docs/imap-source-agent.md`, `docs/gmail-oauth-agent.md` |
 | Secret filter | `docs/redaction-agent.md` |
 | Build, settings, connections file and command implementation | `docs/build-config-agent.md` |
-| User documentation: connections, clients, commands, search, security | `docs/connections.md`, `docs/clients.md`, `docs/commands.md`, `docs/search.md`, `docs/security.md` |
+| User documentation: connections, clients, commands, search, security, troubleshooting | `docs/connections.md`, `docs/clients.md`, `docs/commands.md`, `docs/search.md`, `docs/security.md`, `docs/troubleshooting.md` |
 
 ## 4. Version 0.1.0
 

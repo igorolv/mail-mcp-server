@@ -29,7 +29,7 @@ Work now consists of finishing `0.1.0`, then optional improvements:
 | `docs/plan.md` | The plan: idea and status, checks pending on real mail, principles and data flow, scope of `0.1.0`, how work is done |
 | `docs/results.md` | Environment facts and real-mailbox results, numbers only |
 | `docs/decisions.md` | The user's current decisions, including rejected ideas, and what no change may add without one |
-| `docs/connections.md`, `docs/clients.md`, `docs/commands.md`, `docs/search.md`, `docs/security.md` | User documents (in English): connections file, client registration, user-run commands, search, security |
+| `docs/connections.md`, `docs/clients.md`, `docs/commands.md`, `docs/search.md`, `docs/security.md`, `docs/troubleshooting.md` | User documents (in English): connections file, client registration, user-run commands, search, security, troubleshooting |
 | `docs/research/` | Background research results `RT-NN-*.md`, from 2026-10-24, with an index in `README.md`; the decisions taken from them are in `docs/decisions.md` |
 | `docs/impl-tasks/` | Implementation briefs `IT-NN-*.md` for separate agent sessions, plus `README.md` with shared rules and the report template |
 | `docs/*-agent.md` | Engineering documents (in English), see the routing table below |

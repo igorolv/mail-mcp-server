@@ -3,55 +3,47 @@
 [![Java 25](https://img.shields.io/badge/Java-25-blue?logo=openjdk)](https://adoptium.net/)
 [![MCP](https://img.shields.io/badge/MCP-server-8A2BE2)](https://modelcontextprotocol.io/)
 
-MCP server (stdio) that lets an AI agent read several mailboxes — Microsoft Exchange over EWS,
-Mail.ru and Gmail over IMAP — from a local copy of the included folders. It downloads messages as the original
-`.eml`, saves attachments as files, converts bodies and attachments (PDF, Office, archives,
-attached messages) to Markdown and builds a local Lucene index with Russian and English word
-forms. Tools answer from the local copy only; the mailbox is never modified.
+MCP server (stdio) that lets an AI agent read your mail — Microsoft Exchange over EWS, Mail.ru and
+Gmail over IMAP — from a local copy. It downloads every message once, converts bodies and
+attachments to Markdown on your machine, builds a Lucene search index, and answers the agent from
+that copy. The mailbox is never modified.
 
-**Status:** version `0.1.0` is in preparation. Checked end to end on Exchange 2013 with NTLM
-(about 8 thousand messages) and Mail.ru (about 34 thousand). Gmail app-password synchronization
-has also completed; real OAuth2 sign-in is unverified. Developed and tested on Windows.
+**Status:** version `0.1.0` is in preparation. Checked end to end on Exchange 2013 (about 8
+thousand messages), Mail.ru (about 34 thousand) and Gmail with an app password. Developed and
+tested on Windows.
 
-**Contents:** [Features](#features) ·
+**Contents:** [How it works](#how-it-works) ·
 [Typical Scenarios](#typical-scenarios) ·
 [Quickstart](#quickstart) ·
-[Architecture](#architecture) ·
 [MCP Tools](#mcp-tools) ·
 [Commands](#commands) ·
-[Read-only Protection](#read-only-protection) ·
-[Data and Privacy](#data-and-privacy) ·
-[Server Environment Variables](#server-environment-variables) ·
 [Build](#build) ·
 [Stack](#stack) ·
 [Documentation](#documentation) ·
-[Troubleshooting](#troubleshooting) ·
 [License](#license)
 
-## Features
+## How it works
 
-- **Several mailboxes** in one [`connections.json`](docs/connections.md) outside the project;
-  every tool except `listConnections` takes a `connection` argument. Passwords can stay out of the file: in an environment
-  variable, Windows Credential Manager or a password manager.
-- **Exchange without Graph:** EWS with NTLM for Exchange 2013 and later, incremental sync with
-  `SyncFolderItems`. **IMAP** for Mail.ru and Gmail with app passwords, Gmail also with OAuth2.
-- **Full local copy:** the original message, its attachments and their Markdown text, so an agent
-  with file access can open the files directly.
-- **Attachment text:** PDF, DOCX, DOC, XLSX, XLS, PPTX, PPT, ODT, RTF, EPUB, HTML, CSV; files
-  inside ZIP archives, attached `.eml` and Outlook `.msg` messages and `winmail.dat` are extracted
-  and converted too.
-- **Search** in Russian and English word forms over subject, body, addresses, attachment names
-  and attachment text; date filters; snippets; copies of one message shown once; optional
-  [word forms file](docs/search.md#word-forms) for irregular forms.
-- **Conversations** across folders, linked by `Message-ID`, `In-Reply-To` and `References`.
-- **Read-only at the protocol level**, one sign-in per synchronization, no retries, and refusal
-  after a rejected sign-in to reduce the risk of account lockout.
-  Details: [Read-only Protection](#read-only-protection).
-- **Background sync on request**, incremental, with recognized moves between folders and
-  read/flag snapshots; several clients can share one data directory.
-  Non-Gmail IMAP servers advertising `OBJECTID` supply RFC 8474 `EMAILID` for unambiguous reuse
-  of saved content across moves and UID changes, without downloading MIME again.
-- **Optional secret filter** that replaces passwords, codes and tokens in tool responses.
+1. **Download all mail.** `mail-sync` (or the `sync` tool) copies the included folders of each
+   mailbox as original `.eml` files, then only changes on later runs. Read-only at the protocol
+   level: nothing is ever sent, moved, deleted or flagged ([security](docs/security.md)).
+2. **Convert it locally to Markdown.** Bodies and attachments — PDF, Office documents, archives,
+   attached messages — are converted with pandoc (required), PDFBox and Apache POI.
+3. **Index it.** A Lucene index per mailbox with Russian and English word forms.
+4. **Use it from MCP.** Tools search and read the local copy only; they never contact a mail
+   server.
+
+```text
+ MCP client (Claude Code, Codex, OpenCode, VS Code, ...)
+      |  JSON-RPC over stdin / stdout
+      v
+ mail-mcp-server --- search, read ---> Lucene index + <data-dir>/<connection>/messages/
+      |                                       ^
+      +--- sync (on request) --- EWS / IMAP --+--> .eml -> Markdown -> index
+```
+
+Everything is stored locally and unfiltered, and tools return message content to the model. An
+optional [secret filter](docs/security.md#secret-filter) masks passwords and codes in responses.
 
 ## Typical Scenarios
 
@@ -68,26 +60,13 @@ The agent picks the tools itself; these are the chains it usually follows.
 
 ## Quickstart
 
-**1. Install the prerequisites**
-
-- JDK 25.
-- [Pandoc 3.x](https://pandoc.org/installing.html), installed separately from this server.
-  **Pandoc is required**, and the directory containing its executable must be on `PATH`.
-
-After installation, open a new terminal and check:
+**1. Install** JDK 25 and [pandoc 3.x](https://pandoc.org/installing.html). Pandoc is required
+and must be on `PATH`. Check in a new terminal:
 
 ```powershell
 java -version
 pandoc --version
 ```
-
-The commands must report Java 25 and pandoc 3.x. If `pandoc` is not found, add its installation
-directory to `PATH`, reopen the terminal and check again before continuing.
-Fully close and reopen any already running MCP client so that the server inherits the updated
-`PATH`.
-
-Pandoc is required for synchronization, reprocessing and reindexing. Reading previously
-synchronized mail works without it.
 
 **2. Build** the jar:
 
@@ -95,38 +74,9 @@ synchronized mail works without it.
 .\gradlew.bat bootJar      # -> build\libs\mail-mcp-server.jar
 ```
 
-**3. Get a password for each mailbox.** Which password depends on the provider:
-
-| Mailbox | Password |
-|---|---|
-| Exchange (EWS) | Your domain account password. NTLM with a bare login (no domain part) is the combination known to work. [Exchange setup](docs/connections.md#exchange-ews) |
-| Mail.ru | An app password (a password for external applications) created in the mailbox's security settings. [Mail.ru setup](docs/connections.md#mailru) |
-| Gmail | An app password: profile picture → **Manage your Google Account** → **Security & sign-in** → **2-Step Verification** → **App passwords**; it requires 2-Step Verification. Use the 16 characters without spaces. Where app passwords are unavailable, sign in with [OAuth2](docs/connections.md#oauth2) instead. [Gmail setup](docs/connections.md#gmail) |
-
-**4. Choose where the server reads each password.** Every source works with every mailbox. Use
-exactly one source per connection; different connections may use different sources.
-
-| Source | Key in the connection entry | Suits | Keep in mind |
-|---|---|---|---|
-| Windows Credential Manager | `"windowsCredential": "mail-mcp/work"` | Windows, including MCP clients started from the desktop | 64-bit Windows only; the credential belongs to one Windows user |
-| Password manager | `"passwordCommand": ["op", "read", "op://Private/Work mail/password"]` | Any OS, a password already kept in a manager | The program must print only the password; unlock the manager before a sync |
-| Literal | `"password": "..."` | The quickest setup | The password lies in the file; in JSON write `\` as `\\` and `"` as `\"` |
-| Environment variable | `"password": "${MAIL_WORK_PASSWORD}"` | Clients and `mail-sync` started from one terminal | Clients started from the desktop do not see it; an unset variable stops the server |
-
-For Credential Manager, you choose a name per mailbox, such as `mail-mcp/work`, and write it both
-as `windowsCredential` in `connections.json` and as the address of a Windows credential. Search
-Start for **Credential Manager** → **Windows Credentials** → **Add a generic credential**. Set the
-address to that name, the user name to a plain label such as `work` (the server ignores it) and
-the password to the mailbox password from step 3. Repeat for each connection with its own name.
-`cmdkey /list:mail-mcp/work` shows whether Windows finds the entry, without the password.
-Setup of every source, password manager recipes and password changes:
-[Passwords](docs/connections.md#passwords).
-
-**5. Describe your mailboxes** in `%USERPROFILE%\.mail-mcp-server\connections.json`
-(`~/.mail-mcp-server/connections.json` elsewhere) — one entry per mailbox, keyed by the
-connection name. Keep only the mailboxes you need and replace the example addresses. This example
-reads every password from Credential Manager; replace any `windowsCredential` line with another
-key from step 4.
+**3. Describe your mailboxes** in `%USERPROFILE%\.mail-mcp-server\connections.json`
+(`~/.mail-mcp-server/connections.json` elsewhere), one entry per mailbox. Keep only the ones you
+need and replace the example addresses:
 
 ```json
 {
@@ -146,7 +96,7 @@ key from step 4.
       "tls": true,
       "auth": "app-password",
       "username": "user@mail.ru",
-      "windowsCredential": "mail-mcp/mailru",
+      "passwordCommand": ["security", "find-generic-password", "-s", "mail-mcp", "-a", "mailru", "-w"],
       "description": "Personal Mail.ru"
     },
     "gmail": {
@@ -156,171 +106,72 @@ key from step 4.
       "tls": true,
       "auth": "app-password",
       "username": "user@gmail.com",
-      "windowsCredential": "mail-mcp/gmail",
+      "password": "${MAIL_GMAIL_PASSWORD}",
       "description": "Personal Gmail"
     }
   }
 }
 ```
 
-Make the file readable only by you, which matters most with a literal password:
+Each entry shows a different password source: `work` reads Windows Credential Manager, `mailru`
+runs a command that prints the password (here the macOS Keychain; 1Password, `pass` and others
+work the same way), and `gmail` reads an environment variable, which must be set wherever the
+server starts. A literal password works too. Which password each provider needs (domain password, Mail.ru or Gmail
+app password, Gmail OAuth2) and how to store it: [docs/connections.md](docs/connections.md).
 
-```powershell
-icacls "$HOME\.mail-mcp-server\connections.json" /inheritance:r /grant:r "${env:USERNAME}:F"
-```
-
-An entry without a password is reported as unusable and never signs in. Every field:
-[docs/connections.md](docs/connections.md).
-
-**6. Run the first synchronization** in a terminal. It downloads the whole mailbox, which takes
-a while on a large one; a second run should end with `0 downloaded`:
+**4. Run the first synchronization** in a terminal. It downloads the whole mailbox, which takes a
+while on a large one:
 
 ```powershell
 java -jar build\libs\mail-mcp-server.jar mail-sync work
 ```
 
-Use `mailru` or `gmail` instead of `work` to synchronize those connections. With a Gmail app
-password, run `mail-sync gmail` directly; `gmail-oauth` is only for the OAuth2 alternative.
-
-**7. Register the server** with your MCP client, with an absolute path to the jar. Claude Code:
+**5. Register the server** with your MCP client, with an absolute path to the jar. Claude Code:
 
 ```powershell
 claude mcp add --scope user mail -- java -jar C:/path/to/mail-mcp-server.jar
 ```
 
-Codex CLI, OpenCode, VS Code, Cursor, Claude Desktop and environment variables:
-[docs/clients.md](docs/clients.md).
+Other clients and environment variables: [docs/clients.md](docs/clients.md). If you installed
+pandoc or changed `PATH` while the client was running, fully restart the client.
 
-The MCP client must launch the server with a `PATH` that includes pandoc. If the client was
-running before you installed pandoc or changed `PATH`, fully close and reopen it.
+**6. Try it.** Ask the agent: *"Which mailboxes can you read?"* or *"Find the letters about the
+supply contract in `work` from last week."*
 
-**8. Try it.** Ask the agent in plain words:
-
-- *"Which mailboxes can you read?"* — it calls `listConnections`.
-- *"Find the letters about the supply contract in `work` from last week."* — it calls `search`
-  with a date filter.
-
-## Architecture
-
-```text
- MCP client (Claude Code, Codex, OpenCode, VS Code, ...)
-      |  JSON-RPC over stdin / stdout, no network port
-      v
-+- mail-mcp-server: one JVM per client -------------------------------------------+
-|                                                                                 |
-|  MCP layer: 9 tools; all except listConnections require connection              |
-|      |                                   |                                      |
-|      | read tools                        | sync: background thread              |
-|      v                                   v                                      |
-|  Lucene index per connection  <----  SyncRunner (one writer per connection)     |
-|  catalog + search, rebuilt               |  .eml -> MIME parsing -> body.md,    |
-|  offline from disk                       |  attachments and their Markdown      |
-|      ^                                   v                                      |
-|      +------- <data-dir>/<connection>/messages/<key>/                           |
-|               message.eml, meta.json, body.md, attachments/                     |
-|                                                                                 |
-|  Read-only mail sources: EWS (SOAP, NTLM) | IMAP (Angus Mail) ---> mail servers |
-+---------------------------------------------------------------------------------+
-```
-
-- **Local copy first.** Synchronization runs only on request — the `sync` tool or the `mail-sync`
-  command. It downloads included folders once, then only changes: new and deleted messages, moves
-  between folders, read and flag state. All other tools read local files and the index; they
-  never contact a mail server and work while it is unreachable.
-- **The disk is the copy, the index is derived.** Each message has its own directory with the
-  original `message.eml`. The Lucene index is rebuilt from disk without network access
-  ([`mail-reindex`](docs/commands.md#mail-reindex)).
-- **Conversion.** Bodies and DOCX/ODT/RTF/EPUB/HTML/CSV go through sandboxed pandoc, one process
-  per file; PDF through PDFBox; Office formats, Outlook messages and TNEF through Apache POI.
-- **Processes.** The client starts the server as a child process. Several servers (one per
-  client) may share a data directory: all of them read; one at a time synchronizes a connection.
-- **Sign-in.** One attempt per synchronization, never retried. After a rejected sign-in, `sync`
-  refuses the connection until you fix it and run `mail-sync` in a terminal.
+Something went wrong: [docs/troubleshooting.md](docs/troubleshooting.md).
 
 ## MCP Tools
 
-Every tool except `listConnections` takes `connection` as a required argument; `listConnections`
-lists the names.
+Every tool except `listConnections` takes a required `connection` argument.
 
 | Tool | What it does |
 |---|---|
-| `listConnections` | Configured mailboxes with type, sign-in method, description and configuration errors; never contacts a server |
-| `sync` | Starts a background synchronization and returns at once: `started`, `alreadyRunning`, `lockedByOtherProcess` or `refused` (after a rejected sign-in) |
-| `syncStatus` | Progress and result of the current or last run: its stage and each folder |
-| `listFolders` | Local folders with message counts and whether each was synchronized completely |
-| `listMessages` | Message cards of one folder, newest first, in pages; optional `since`/`until` |
-| `getMessage` | Headers, the body in chunks, attachments with the paths of the file and of its text |
+| `listConnections` | Configured mailboxes with type, sign-in method, description and configuration errors |
+| `sync` | Starts a background synchronization and returns at once |
+| `syncStatus` | Progress and result of the current or last run |
+| `listFolders` | Local folders with message counts |
+| `listMessages` | Message cards of one folder, newest first, in pages |
+| `getMessage` | Headers, the body in chunks, attachments with file paths |
 | `getAttachment` | The text of one attachment in chunks, and the file path |
-| `search` | All words required, `"…"` for a phrase, Russian and English word forms. Fields `any`, `subject`, `body`, `from`, `to`, `attachmentName`, `attachmentText`, `label`; optional folder and dates. Cards with score and snippet |
+| `search` | Full-text search with Russian and English word forms, fields, folder and date filters |
 | `getThread` | The conversation of a message across folders, oldest first |
 
-- Lists and text come in pages and chunks with `nextOffset`; every card has an absolute
-  `localPath` to the message directory.
-- Cards carry optional `read`, `flagged` and `labels` (Gmail labels, Outlook categories or
-  non-Gmail IMAP keywords) — the state seen at the last synchronization.
-- The same message in several folders appears once in `search` and `getThread`, with the other
-  copies under `copies`.
-
-Query syntax, fields, dates, snippets, copies, conversations and word forms:
-[docs/search.md](docs/search.md). Arguments, bounds and errors: [docs/tools-agent.md](docs/tools-agent.md).
+Query syntax and results: [docs/search.md](docs/search.md). Arguments and limits:
+[docs/tools-agent.md](docs/tools-agent.md).
 
 ## Commands
 
-The same jar has commands that you run in a terminal; none of them starts the MCP transport.
+The same jar has commands that you run in a terminal:
 
 | Command | What it does |
 |---|---|
-| `mail-sync <connection>` | Synchronizes one mailbox and prints a line per folder |
+| `mail-sync <connection>` | Synchronizes one mailbox |
 | `mail-reprocess <connection>` | Offline: converts every stored message again and reindexes |
 | `mail-reindex <connection>` | Offline: rebuilds the index from disk |
 | `mail-analyze <word>...` | Offline: shows how search analyzes words |
 | `gmail-oauth <connection>` | Gets the first Gmail OAuth2 consent in the browser |
 
-Exit codes: 0 success, 1 unexpected error, 2 configuration or arguments (including missing pandoc
-or an unavailable password), 3 sign-in rejected, 4 network, protocol or storage error, 5 another
-process is writing this connection. Output, examples and when to run what:
-[docs/commands.md](docs/commands.md).
-
-## Read-only Protection
-
-The server never sends, moves, deletes or flags mail, and this is enforced at the protocol level:
-
-- **EWS:** requests can be built only for an allow-list of ten read operations; downloading a
-  message does not mark it as read.
-- **IMAP:** a command guard lets through `EXAMINE`, `BODY.PEEK` fetches and `CLOSE`, and rejects
-  `SELECT`, `STORE`, `EXPUNGE`, `APPEND`, `COPY`, `MOVE` and every other change before it is sent.
-- **Sign-in:** one attempt per run, never retried; after a rejection the `sync` tool refuses the
-  connection in every process until a successful `mail-sync` in a terminal.
-
-Credentials live in `connections.json` or the stores it names, never in the MCP client
-configuration. More: [docs/security.md](docs/security.md).
-
-## Data and Privacy
-
-Everything is stored locally and **unfiltered** in `%USERPROFILE%\.mail-mcp-server\<connection>\`:
-the original messages and attachments, their Markdown text and the index — roughly the size of
-the mailbox plus its text. Tools return message content and local file paths, so the model sees
-your mail.
-
-Set `MAIL_MCP_REDACT_SECRETS=true` in the server's environment to replace recognized passwords,
-verification codes, tokens and private keys in tool responses with markers such as
-`[redacted:password]`. Local files and the index keep the original text. The filter is best
-effort and reduces accidental exposure; it is not an anonymizer. Details:
-[Secret filter](docs/security.md#secret-filter).
-
-## Server Environment Variables
-
-Mailboxes and credentials live in [`connections.json`](docs/connections.md). The environment
-configures only the server process:
-
-| Variable | Default | Description |
-|---|---|---|
-| `MAIL_MCP_DATA_DIR` | `%USERPROFILE%\.mail-mcp-server` | Root of local data and logs |
-| `MAIL_MCP_CONNECTIONS_FILE` | `<data-dir>\connections.json` | The connections file |
-| `MAIL_MCP_WORD_FORMS_FILE` | `<data-dir>\word-forms.txt` | Optional [word forms](docs/search.md#word-forms) |
-| `MAIL_MCP_REDACT_SECRETS` | `false` | Replace recognized secrets in tool responses; restart to apply |
-
-How to set them in each client: [docs/clients.md](docs/clients.md#environment-variables).
+Output, exit codes and when to run what: [docs/commands.md](docs/commands.md).
 
 ## Build
 
@@ -350,50 +201,9 @@ skipped when it is not installed.
 | [docs/commands.md](docs/commands.md) | User-run commands, their output and exit codes |
 | [docs/search.md](docs/search.md) | Search syntax, dates, copies, conversations, word forms |
 | [docs/security.md](docs/security.md) | Read-only protection, sign-in policy, credentials, local data, secret filter |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | Common problems and what to check first |
 | [AGENTS.md](AGENTS.md) | Rules for AI agents changing this repository, and the map of engineering documents (`docs/*-agent.md`) |
 | [docs/plan.md](docs/plan.md), [docs/decisions.md](docs/decisions.md), [docs/results.md](docs/results.md) | Plan, decisions and real-mailbox results |
-
-## Troubleshooting
-
-- **The MCP client says the server failed to start.** Run `java -jar <path>\mail-mcp-server.jar`
-  in a terminal: a malformed `connections.json` or an unset `${VAR}` is reported there. Check that
-  `java` on the client's `PATH` is version 25. See
-  [Checking a configuration](docs/connections.md#checking-a-configuration).
-- **A connection shows `configError` in `listConnections`.** The entry is unusable; the others
-  keep working. [Configuration errors](docs/connections.md#configuration-errors) lists the causes.
-  The file is read only at startup: restart the server after editing it.
-- **`RESULT: FAILED (... sign-in rejected ...)`, exit code 3.** Do not run it again blindly: every
-  attempt with a wrong password counts toward the account lockout policy. Check the login and
-  password first. For Exchange, a bare login with `auth: ntlm` is the combination known to work.
-- **`RESULT: FAILED (EWS connection failed: ...)`, exit code 4.** The Exchange server was not
-  reached, so no sign-in was rejected. `server name not found` usually means a wrong or placeholder
-  host in `url`, or a name known only inside the company network: connect to it or its VPN. Other
-  reasons: [`mail-sync`](docs/commands.md#mail-sync).
-- **`Password of connection '...' is unavailable: ...; no sign-in was attempted`.** Nothing was
-  sent to the mail server. For `windowsCredential`, check that a *generic* credential with exactly
-  that target name exists under the Windows user running the server (`cmdkey /list:<name>` prints
-  `* NONE *` if not); see [Credential Manager setup](docs/connections.md#windows-credential-manager).
-  For `passwordCommand`, run the program in a terminal and check that it
-  prints only the password; unlock the password manager, or run `mail-sync` in a terminal where it
-  can ask.
-- **Gmail does not show App passwords.** Open **2-Step Verification** first, then **App passwords**,
-  or use the direct link in [Gmail setup](docs/connections.md#app-passwords). That section also
-  explains account restrictions and the OAuth2 alternative.
-- **`pandoc not found; install pandoc and put it on PATH`.** Run `pandoc --version` in a new
-  terminal. If it is not found, install pandoc and add the directory containing its executable
-  to `PATH` (see [Quickstart](#quickstart)). A successful terminal check does not update an
-  already running MCP client's environment: fully close and reopen the client so that the
-  server inherits the new `PATH`.
-- **`Connection is being synchronized by another process`, exit code 5.** A sync of the same
-  mailbox or an offline data command holds the local write lock. Wait for that operation to
-  finish. `syncStatus` reports sync runs only, not progress of offline commands.
-- **Search says the index was built by an older version, or that the word forms changed.** Run
-  `mail-reindex <connection>` (offline) or start a sync.
-- **Search misses a message.** Check `listFolders` (`synced`) and `syncStatus`: results are
-  incomplete during a synchronization. Irregular Russian forms and synonyms do not match without
-  a [word forms file](docs/search.md#word-forms); try another form or the other language.
-- **The build fails to overwrite `build\libs\mail-mcp-server.jar`.** A running MCP client keeps
-  the jar open on Windows. Stop the server in the client, build, then reconnect.
 
 ## License
 
