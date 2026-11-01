@@ -13,8 +13,7 @@ version `0.1.0`. Related documents:
 
 Discussion history is in git history.
 
-**Status (2026-11-01): the draft is complete; the first published version, `0.1.0`, is in
-preparation (Д18).** All three user mailboxes work: corporate Exchange (EWS), Mail.ru and Gmail
+**Status (2026-11-01): the first version, `0.1.0`, is published (Д18).** All three user mailboxes work: corporate Exchange (EWS), Mail.ru and Gmail
 (IMAP). Implemented:
 
 - full and incremental synchronization;
@@ -34,8 +33,8 @@ preparation (Д18).** All three user mailboxes work: corporate Exchange (EWS), M
 - an optional secret filter in responses;
 - nine MCP tools.
 
-Features implemented but not yet checked on real mail are in section 2. Next is version `0.1.0`
-(section 4); other improvements are GitHub issues.
+Features implemented but not yet checked on real mail are in section 2. Improvements are GitHub
+issues; the user moves the ones taken into a version to section 4.
 
 ## 1. Idea
 
@@ -163,20 +162,19 @@ MCP tools: folders.json, sync-status.json, index and message directories; no net
 
 ## 4. Version 0.1.0
 
-The first published version, licensed under Apache 2.0 (decisions of 2026-10-28). The table lists
-remaining work for this version; other improvements are GitHub issues, rejected ideas in
-[decisions.md](decisions.md).
+The first published version, licensed under Apache 2.0 (decisions of 2026-10-28), released on
+2026-11-01. The table lists work taken into a version, and is empty now; other improvements are
+GitHub issues, rejected ideas in [decisions.md](decisions.md).
 
 Status: ⬜ not started · 🔨 in progress. Size: S — hours, M — a brief for one session, L — several
 briefs. When work starts, mark the item 🔨 and write a brief in `docs/impl-tasks/`.
 Remove accepted items from the table: completed behavior is described in engineering and user
 documents, pending real-mail checks in section 2, history in git. Numbers are never reused;
-completed: Д1–Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30, Д31, Д32, Д33, Д34; next available:
+completed: Д1–Д12, Д17, Д18, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30, Д31, Д32, Д33, Д34; next available:
 Д35.
 
 | ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|
-| Д18 | Publish `0.1.0` | Done: documents separated, user documentation extracted, README rewritten following jdbc-mcp-server, license files, build version, CI and jar release workflows added. CI passes on Linux and Windows. Remaining: the `v0.1.0` tag, then release jar download and CI, Release, License badges in README | polish | M | 🔨 |
 
 ## 5. Workflow
 

@@ -1,5 +1,8 @@
 # Mail MCP Server
 
+[![CI](https://github.com/igorolv/mail-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/igorolv/mail-mcp-server/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/igorolv/mail-mcp-server)](https://github.com/igorolv/mail-mcp-server/releases/latest)
+[![License](https://img.shields.io/github/license/igorolv/mail-mcp-server)](LICENSE)
 [![Java 25](https://img.shields.io/badge/Java-25-blue?logo=openjdk)](https://adoptium.net/)
 [![MCP](https://img.shields.io/badge/MCP-server-8A2BE2)](https://modelcontextprotocol.io/)
 
@@ -9,7 +12,7 @@ MCP server (stdio) for Microsoft Exchange over EWS, Mail.ru and Gmail over IMAP.
 message once, converts bodies and attachments to Markdown on your machine, builds a Lucene search
 index, and answers the agent from that copy.
 
-**Status:** version `0.1.0` is in preparation. Checked end to end on Exchange 2013 (about 8
+**Status:** version `0.1.0` is published. Checked end to end on Exchange 2013 (about 8
 thousand messages), Mail.ru (about 34 thousand) and Gmail with an app password. Developed and
 tested on Windows.
 
@@ -88,7 +91,8 @@ java -version
 pandoc --version
 ```
 
-**2. Build** the jar:
+**2. Get the jar:** download `mail-mcp-server.jar` from the
+[latest release](https://github.com/igorolv/mail-mcp-server/releases/latest), or build it yourself:
 
 ```powershell
 .\gradlew.bat bootJar      # -> build\libs\mail-mcp-server.jar

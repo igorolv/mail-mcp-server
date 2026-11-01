@@ -5,13 +5,13 @@ over EWS, Mail.ru and Gmail over IMAP. It keeps a local copy of messages in the 
 folders (`.eml`, metadata, body and attachments with Markdown text), indexes it with Lucene and
 serves reading tools from local data only. User-facing overview: `README.md`.
 
-**Current status:** the draft is complete; the first published version, `0.1.0` (Apache 2.0),
-is in preparation. Release scope and checks pending on real mail are maintained only in
+**Current status:** the first version, `0.1.0` (Apache 2.0), was published on 2026-11-01. Version
+scope and checks pending on real mail are maintained only in
 `docs/plan.md` sections 4 and 2; verified real-mail results are in `docs/results.md`.
 Only the user runs real-mail checks.
 
-Work now consists of finishing `0.1.0`, then optional improvements:
-- `docs/plan.md` section 4 lists what `0.1.0` includes; accepted items are removed from that table.
+Work now consists of optional improvements:
+- `docs/plan.md` section 4 lists work taken into a version; accepted items are removed from that table.
 - Improvements after `0.1.0` are GitHub issues; the user chooses which to take and moves them into
   the version table.
 - Add new tools or subsystems only when the task asks for them.
