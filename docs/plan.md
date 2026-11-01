@@ -5,7 +5,6 @@ version `0.1.0`. Related documents:
 
 - [results.md](results.md) — verified environment facts and real-mailbox results;
 - [decisions.md](decisions.md) — current user decisions and what requires a user decision;
-- [backlog.md](backlog.md) — improvements after version `0.1.0`;
 - `docs/*-agent.md` — engineering documents describing the code (listed in [AGENTS.md](../AGENTS.md));
 - `docs/connections.md`, `clients.md`, `commands.md`, `search.md`, `security.md` and
   [README.md](../README.md) — user documentation;
@@ -35,7 +34,7 @@ preparation (Д18).** All three user mailboxes work: corporate Exchange (EWS), M
 - nine MCP tools.
 
 Features implemented but not yet checked on real mail are in section 2. Next is version `0.1.0`
-(section 4); other improvements are in [backlog.md](backlog.md).
+(section 4); other improvements are GitHub issues.
 
 ## 1. Idea
 
@@ -91,7 +90,7 @@ runs do not repeat that work. The measured Mail.ru runs are in
 | IMAP folder gone during a run, Д34 (`docs/storage-agent.md`) | During a long `mail-sync mailru`, delete or rename an included folder in the web interface: the run continues, the folder's line ends with `, gone from the server during the run`, and the result is `RESULT: OK`. The next run removes the folder's local messages; after a rename they reappear under the new name, recognized as moves where unique | 2026-11-01; 738 tests, 1 expected skip, 0 failures |
 | Non-Gmail IMAP keywords as labels, Д32 (`docs/imap-source-agent.md`) | Optional: if an ordinary mail client can assign a custom IMAP keyword in an included Mail.ru folder, assign one, run `mail-sync mailru` and confirm `labels` and `field: "label"` reflect it without a MIME download; remove it and sync again to confirm clearing. The checked built-in web category returned no user keywords ([results.md, section 2](results.md#2-mailru-and-gmail)); it does not establish support for arbitrary custom keywords. This remaining check does not block publication | 2026-11-01; 743 tests, 1 expected skip, 0 failures; user accepted the implementation with the observed Mail.ru limitation |
 | RFC 8474 EMAILID reuse, Д33 (`docs/imap-source-agent.md`) | Optional during future use of a non-Gmail IMAP server advertising OBJECTID: synchronize a message, move it between included folders in the ordinary mail client, then sync and confirm that its local key/path/content are reused with zero MIME downloads. A natural UIDVALIDITY reset may be checked later; do not trigger one deliberately. The Mail.ru capability check is complete ([results.md, section 2](results.md#2-mailru-and-gmail)), so no Mail.ru move check remains. EMAILID propagation and reuse are covered offline; this optional positive-path check does not block publication | 2026-11-01; 748 tests, 1 expected skip, 0 failures; user accepted the implementation |
-| Gmail OAuth2 sign-in (`docs/gmail-oauth-agent.md`) | Only if needed instead of the verified app password: run `gmail-oauth gmail`, then `mail-sync gmail`. Token encryption is in [backlog.md](backlog.md), Д27 | 2026-10-25 |
+| Gmail OAuth2 sign-in (`docs/gmail-oauth-agent.md`) | Only if needed instead of the verified app password: run `gmail-oauth gmail`, then `mail-sync gmail` | 2026-10-25 |
 | Passwords from Windows Credential Manager and password managers (`docs/connections.md`) | `windowsCredential`: replace `passwordCommand` with `"windowsCredential": "mail-mcp/<name>"`, run `mail-sync` for `work` and `mailru`, then restart the MCP server and run `sync` and `syncStatus`. `passwordCommand` in `mail-sync` for EWS is already verified ([results.md, section 1](results.md#1-corporate-exchange)); server use and specific password managers: to verify | 2026-10-27; 702 tests, 1 expected skip, 0 failures |
 
 ## 3. Design
@@ -166,14 +165,15 @@ MCP tools: folders.json, sync-status.json, index and message directories; no net
 ## 4. Version 0.1.0
 
 The first published version, licensed under Apache 2.0 (decisions of 2026-10-28). The table lists
-remaining work for this version; other improvements are in [backlog.md](backlog.md), rejected ideas
-in [decisions.md](decisions.md).
+remaining work for this version; other improvements are GitHub issues, rejected ideas in
+[decisions.md](decisions.md).
 
 Status: ⬜ not started · 🔨 in progress. Size: S — hours, M — a brief for one session, L — several
 briefs. When work starts, mark the item 🔨 and write a brief in `docs/impl-tasks/`.
 Remove accepted items from the table: completed behavior is described in engineering and user
 documents, pending real-mail checks in section 2, history in git. Numbers are never reused;
-completed: Д1–Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30, Д31, Д32, Д33, Д34.
+completed: Д1–Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30, Д31, Д32, Д33, Д34; next available:
+Д35.
 
 | ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|
@@ -184,7 +184,7 @@ reprocessing check for `work` and `mailru` in section 2.
 
 ## 5. Workflow
 
-- Version scope is in section 4; the user moves items there from [backlog.md](backlog.md).
+- Version scope is in section 4; the user moves items there from GitHub issues.
 - Write a brief for each improvement in [docs/impl-tasks/](impl-tasks/README.md); that directory
   also describes the three-session cycle (implementation, review, recording and commit), ready
   prompts and result-recording rules. A strong model (Claude) writes briefs for large improvements

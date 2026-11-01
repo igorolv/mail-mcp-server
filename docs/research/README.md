@@ -8,13 +8,13 @@ historical references; those files are no longer in the current tree.
 
 | File | Topic | Useful for |
 |---|---|---|
-| [RT-01](RT-01-mail-mcp-servers.md) | Existing mail MCP servers | Д15 |
-| [RT-02](RT-02-ews-java-client.md) | EWS client and NTLM in Java | Д23 |
-| [RT-03](RT-03-ews-operations.md) | EWS operations, allow-list, throttling | Д20 |
+| [RT-01](RT-01-mail-mcp-servers.md) | Existing mail MCP servers | — |
+| [RT-02](RT-02-ews-java-client.md) | EWS client and NTLM in Java | EWS transport (`docs/ews-source-agent.md`) |
+| [RT-03](RT-03-ews-operations.md) | EWS operations, allow-list, throttling | EWS operations (`docs/ews-source-agent.md`) |
 | [RT-04](RT-04-imap-gmail-mailru.md) | Gmail and Mail.ru IMAP, sign-in, extensions | Д7 |
 | [RT-05](RT-05-sibling-code-reuse.md) | What to reuse from sibling projects | — |
-| [RT-06](RT-06-search-engine.md) | Search engine and morphology | word forms (`docs/search.md`), Д13 |
-| [RT-07](RT-07-embeddings.md) | Embedding models | Д13 |
+| [RT-06](RT-06-search-engine.md) | Search engine and morphology | word forms (`docs/search.md`) |
+| [RT-07](RT-07-embeddings.md) | Embedding models | — |
 | [RT-08](RT-08-redaction-detectors.md) | Secret detectors | response filter (`docs/redaction-agent.md`) |
 | [RT-09](RT-09-mime-attachments.md) | MIME and attachment parsing | attachments and containers (`docs/mime-agent.md`) |
 | [RT-10](RT-10-mcp-resources.md) | MCP resources in clients | Д14 (rejected) |

@@ -12,8 +12,8 @@ Only the user runs real-mail checks.
 
 Work now consists of finishing `0.1.0`, then optional improvements:
 - `docs/plan.md` section 4 lists what `0.1.0` includes; accepted items are removed from that table.
-- `docs/backlog.md` lists improvements after `0.1.0` (`Д13`, `Д15`, …); the user chooses which to
-  take and moves them into the version table.
+- Improvements after `0.1.0` are GitHub issues; the user chooses which to take and moves them into
+  the version table.
 - Add new tools or subsystems only when the task asks for them.
 - `docs/decisions.md` section 1 lists what no change may add without a user decision.
 - An offline MIME pipeline with shared limits (commit `d6534ca`) was reverted on 2026-10-25 by
@@ -29,7 +29,6 @@ Work now consists of finishing `0.1.0`, then optional improvements:
 | `docs/plan.md` | The plan: idea and status, checks pending on real mail, principles and data flow, scope of `0.1.0`, how work is done |
 | `docs/results.md` | Environment facts and real-mailbox results, numbers only |
 | `docs/decisions.md` | The user's current decisions, including rejected ideas, and what no change may add without one |
-| `docs/backlog.md` | Possible improvements after `0.1.0` |
 | `docs/connections.md`, `docs/clients.md`, `docs/commands.md`, `docs/search.md`, `docs/security.md` | User documents (in English): connections file, client registration, user-run commands, search, security |
 | `docs/research/` | Background research results `RT-NN-*.md`, from 2026-10-24, with an index in `README.md`; the decisions taken from them are in `docs/decisions.md` |
 | `docs/impl-tasks/` | Implementation briefs `IT-NN-*.md` for separate agent sessions, plus `README.md` with shared rules and the report template |
@@ -50,7 +49,6 @@ Read this file first. Then read only the documents whose `When` matches the task
 | Document | When | What it holds |
 |---|---|---|
 | `docs/plan.md` | any design question; choosing or recording an improvement; recording a pending real-mail check | status, pending checks, principles, data flow, scope of `0.1.0` |
-| `docs/backlog.md` | choosing, adding or rejecting an improvement after `0.1.0` | improvements table with sizes and sources |
 | `docs/decisions.md` | any design question; before adding a dependency, an operation or a safeguard; recording a user decision | what not to add without the user, current decisions with reasons |
 | `docs/results.md` | interpreting user-run output; recording a real-mailbox result | environment facts and real-mailbox numbers |
 | `docs/impl-tasks/README.md` | implementing a brief `IT-NN`, or writing a new implementation brief | how to start a session, task list, shared rules, report template, self-check |
@@ -107,7 +105,7 @@ one in this table.
 
 4. **Read-only by default.** No script or code may send, move, delete or flag mail, or change
    mailbox settings, unless `docs/decisions.md` records a decision that enables that operation.
-   Writing mail is a possible improvement behind an explicit flag (`docs/backlog.md`, Д15).
+   Writing mail would need such a decision and an explicit flag.
 
 5. **Do not push or rewrite history unless asked.** Commit only when the task asks for it.
    Never force-push, amend or rebase published commits without an explicit request.
@@ -142,10 +140,10 @@ one in this table.
     ⬜ → 🔨 when work starts. When accepted, delete its row, add its number to the list of done
     items above the table, describe the result in the engineering and user documents and list
     anything still awaiting a real-mail check in section 2;
-  - an improvement for later is a row of `docs/backlog.md`; a new idea is a new row there with the
-    next free number (stated above its table). Numbers are never reused. When the user takes an
-    item into the version, move its row to `docs/plan.md` section 4. A rejected idea is deleted
-    from the table and recorded with its reason in `docs/decisions.md`;
+  - an improvement for later or a new idea is a GitHub issue, not a document. When the user takes
+    an issue into the version, add a row to `docs/plan.md` section 4 with the next free number
+    (stated above its table) and a link to the issue. A rejected idea is recorded with its reason
+    in `docs/decisions.md`;
   - `docs/decisions.md` section 2 gets a row **only for decisions the user made**. Unconfirmed
     agent proposals belong in section 3, separate from user decisions. Rows go in date order.
 - Delete an implementation brief once it is accepted and recorded, and update the task list in

@@ -218,8 +218,7 @@ authorization and sign-in; agents may run `gmail-oauth --help`.
 
 For a personal Gmail mailbox the simpler default is an app password kept in Windows Credential
 Manager or a password manager: no Google Cloud project, no repeated consent while the OAuth app
-is in Testing and no token file. The OAuth refresh token remains a plaintext owner-only file;
-encrypting it is `docs/backlog.md` Д27.
+is in Testing and no token file. The OAuth refresh token remains a plaintext owner-only file.
 
 ## Synthetic data sets
 

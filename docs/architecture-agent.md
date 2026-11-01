@@ -2,7 +2,7 @@
 
 Read this when locating code, adding a package, changing a dependency, or changing the server
 transport and Spring wiring. Principles and data flow are in `docs/plan.md` section 3, the scope
-of `0.1.0` in section 4, later improvements in `docs/backlog.md`, decisions in
+of `0.1.0` in section 4, later improvements in GitHub issues, decisions in
 `docs/decisions.md`. This file describes what exists.
 
 ## Implemented scope
@@ -17,7 +17,7 @@ maintained in `docs/results.md`; pending checks and release scope are in `docs/p
 
 Optional tool-output secret replacement is described in `docs/redaction-agent.md`.
 PII anonymization, MCP resources, embeddings and mail writing are not implemented; current
-boundaries are in `docs/decisions.md` and possible improvements in `docs/backlog.md`.
+boundaries are in `docs/decisions.md`.
 
 ## Transport and execution
 
