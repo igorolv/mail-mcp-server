@@ -8,9 +8,10 @@
 
 **Give your AI agent your whole mailbox, including on-premises Exchange, with no way to change it.**
 
-MCP server (stdio) for Microsoft Exchange over EWS, Mail.ru and Gmail over IMAP. It downloads every
-message once, converts bodies and attachments to Markdown on your machine, builds a Lucene search
-index, and answers the agent from that copy.
+MCP server (stdio) for on-premises Microsoft Exchange over EWS and any IMAP mailbox with password
+sign-in, tested on Mail.ru and Gmail. It downloads every message once, converts bodies and
+attachments to Markdown on your machine, builds a Lucene search index, and answers the agent from
+that copy, so text inside PDF, Office and ZIP attachments is searchable in Russian and English.
 
 **Status:** version `0.1.0` is published. Checked end to end on Exchange 2013 (about 8
 thousand messages), Mail.ru (about 34 thousand) and Gmail with an app password. Developed and
@@ -30,7 +31,7 @@ tested on Windows.
 ## Features
 
 - **Works with on-premises Exchange.** EWS with NTLM and your normal domain password, tested on
-  Exchange 2013. No Microsoft Graph needed. Mail.ru and Gmail work over IMAP.
+  Exchange 2013. No Microsoft Graph needed. Other mailboxes work over IMAP, tested on Mail.ru and Gmail.
 - **Attachments are searchable too.** Text from PDF, Word, Excel, PowerPoint, ZIP archives,
   attached emails, Outlook `.msg` and `winmail.dat` is extracted and indexed, so the agent can
   find the contract inside the attachment, not just the message that carried it.
