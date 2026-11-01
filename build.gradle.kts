@@ -37,6 +37,15 @@ tasks.jar {
     enabled = false
 }
 
+// The version the MCP server reports comes from gradle.properties, or -Pversion on a release.
+tasks.processResources {
+    val serverVersion = project.version.toString()
+    inputs.property("serverVersion", serverVersion)
+    filesMatching("application.yml") {
+        filter { line: String -> line.replace("@version@", serverVersion) }
+    }
+}
+
 tasks.bootJar {
     archiveBaseName.set("mail-mcp-server")
     archiveVersion.set("")

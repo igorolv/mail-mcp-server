@@ -35,7 +35,9 @@ Work now consists of finishing `0.1.0`, then optional improvements:
 | `docs/*-agent.md` | Engineering documents (in English), see the routing table below |
 | `src/main/java/mail/mcp/` | Server source; layout in `docs/architecture-agent.md` |
 | `src/test/` | Unit tests and synthetic EWS responses (`src/test/resources/ews/`); none needs a network |
-| `build.gradle.kts`, `settings.gradle.kts`, `gradle/` | Gradle build, version catalog `gradle/libs.versions.toml`, wrapper |
+| `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md` | Apache 2.0 license, copyright notice, dependency licenses |
+| `.github/` | GitHub Actions: `workflows/ci.yml`, `workflows/release.yml` and the notes of each release in `release-notes/` |
+| `build.gradle.kts`, `settings.gradle.kts`, `gradle.properties`, `gradle/` | Gradle build, version, version catalog `gradle/libs.versions.toml`, wrapper |
 | `gradlew`, `gradlew.bat` | Gradle wrapper scripts |
 | `testdata/` | Synthetic test data sets (MIME, redaction samples, search queries); byte-exact (`testdata/.gitattributes`) |
 | `.gitignore` | Ignores `.local/`, Gradle output and IDE files |
@@ -84,7 +86,8 @@ one in this table.
 
    The same applies to the sibling projects: cite them by local path and commit, not by GitHub
    URL (the account name equals the login), and write their Java package root as `<org>`
-   (it contains the company name).
+   (it contains the company name). This repository's own GitHub URLs and the account name in
+   `NOTICE` are the only exception: the repository's address already shows them.
 
    The real mapping lives only in `.local/environment.md`, which git ignores. Do not copy values
    out of `.local/`. If you record probe results, put raw details (IP, server name, certificate)

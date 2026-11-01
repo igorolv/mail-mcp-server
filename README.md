@@ -218,4 +218,5 @@ skipped when it is not installed.
 
 ## License
 
-This project is licensed under the Apache License, Version 2.0.
+This project is licensed under the [Apache License, Version 2.0](LICENSE). Dependencies keep their
+own licenses: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

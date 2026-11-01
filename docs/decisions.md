@@ -71,6 +71,7 @@ in section 3.
 | 2026-11-01 | Д32: besides system flags and `$`-prefixed keywords, non-Gmail IMAP keywords `Junk`, `NonJunk` and `NotJunk` (any case) are not labels; tags stored as `$label1`…`$label5` are not labels either; no setting | Some clients set these junk-filter keywords without `$` (for example Thunderbird, to verify), which would otherwise put `NonJunk` on most messages |
 | 2026-11-01 | Accept Д33 (IT-30) through offline verification and the completed Mail.ru capability check; positive EMAILID reuse on a real OBJECTID server remains optional and does not block publication | Mail.ru did not advertise OBJECTID in the checked session, so no EMAILID move test was required; capability detection, parsing, propagation and generic stableId reuse have offline coverage |
 | 2026-11-01 | Drop `docs/backlog.md`: improvements after `0.1.0` and new ideas are tracked as GitHub issues; its open items were dropped, not migrated | Issues are registered on GitHub; a second list in the repository would duplicate them |
+| 2026-11-01 | `0.1.0` is published as a jar on GitHub Releases, without Docker or the official MCP Registry; this repository's own GitHub URLs and the account name in `NOTICE` are allowed in tracked files | The Registry entry would need a Docker image, which suits this server poorly (no Windows Credential Manager, pandoc in the image, mounted mail data); the repository's address already shows the account name |
 
 ## 3. Agent proposals and implementation choices
 

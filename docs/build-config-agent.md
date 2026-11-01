@@ -26,6 +26,12 @@ local JDK 25.
 .\gradlew.bat clean
 ```
 
+The version is in `gradle.properties`; `processResources` writes it into `application.yml`, and the
+MCP server reports it. `.github/workflows/ci.yml` builds on Linux and Windows on every push to
+`main`. Pushing a tag `v<version>` runs `.github/workflows/release.yml`, which builds with
+`-Pversion=<version>` and publishes the jar with the notes in
+`.github/release-notes/v<version>.md`; add that file before tagging.
+
 Tests never contact a real mail server. `HttpClient5EwsTransportTest` runs a fake EWS endpoint on
 `127.0.0.1` that answers with a synthetic NTLM challenge; `McpStdioServerTest` starts the server in
 a child JVM and talks JSON-RPC over its stdin/stdout. `ImapClientTest` uses a plain loopback fake

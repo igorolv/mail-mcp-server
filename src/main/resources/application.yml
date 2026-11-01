@@ -6,7 +6,7 @@ spring:
     mcp:
       server:
         name: mail-mcp-server
-        version: 0.1.0
+        version: "@version@"
         stdio: true
 
 # Top-level server data directory — all local storage is rooted here. Each connection gets its own

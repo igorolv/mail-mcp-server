@@ -178,7 +178,7 @@ completed: Д1–Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30, Д3
 
 | ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|
-| Д18 | Publish `0.1.0` | Done: documents separated, user documentation extracted, README rewritten following jdbc-mcp-server. Remaining: `LICENSE` and `THIRD_PARTY_NOTICES.md` (then link `LICENSE` from README), build version, CI and jar releases through GitHub Actions on tags (then add release jar download and CI, Release, License badges to README) | polish | M | 🔨 |
+| Д18 | Publish `0.1.0` | Done: documents separated, user documentation extracted, README rewritten following jdbc-mcp-server, license files, build version, CI and jar release workflows added. Remaining: a passing CI run, the `v0.1.0` tag, then release jar download and CI, Release, License badges in README | polish | M | 🔨 |
 
 Before publication, the only required real-mail check is the EML/ZIP/MSG/TNEF and legacy Office
 reprocessing check for `work` and `mailru` in section 2.
