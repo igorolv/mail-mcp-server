@@ -59,6 +59,9 @@ The optional `copies` array contains lookup keys and folder keys; both stay unfi
 even when they match a detector. Empty copies are omitted from responses.
 No index/schema or disk-format changes, migration, reindexing or reprocessing are required.
 
+`summarizeSenders` groups and counts raw stored senders; only the returned sender and query echo are
+filtered.
+
 `getThread` matches the raw stored Message-ID, In-Reply-To and References locally in one
 committed snapshot; filtering never changes its graph, exact total, chronological ordering or
 pagination. Only the returned cards' subject and displayed from are filtered. Connection names,

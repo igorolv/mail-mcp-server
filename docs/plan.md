@@ -31,7 +31,8 @@ Discussion history is in git history.
 - non-Gmail IMAP keywords exposed and searchable through the same labels, excluding system and bookkeeping flags;
 - expansion of attached messages and archives (EML, ZIP, MSG, TNEF), and DOC/XLS/PPT text;
 - an optional secret filter in responses;
-- nine MCP tools.
+- local sender counts with dates and folders;
+- ten MCP tools.
 
 Features implemented but not yet checked on real mail are in section 2. Improvements are GitHub
 issues; the user moves the ones taken into a version to section 4.
@@ -171,12 +172,13 @@ briefs. When work starts, mark the item 🔨 and write a brief in `docs/impl-tas
 Remove accepted items from the table: completed behavior is described in engineering and user
 documents, pending real-mail checks in section 2, history in git. Numbers are never reused;
 completed: Д1–Д12, Д17, Д18, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30, Д31, Д32, Д33, Д34; next available:
-Д37.
+Д38.
 
 | ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|
 | Д35 | Docker image and official MCP Registry | Done: `Dockerfile`, `server.json`, release workflow, documents. Remaining: one real sync through the image by the user, the `v0.1.1` tag, then the Registry name on mcpservers.org if it allows editing | user decision | M | 🔨 |
 | Д36 | Tool descriptions: list cards first, open only chosen messages | Done: descriptions of `search`, `listMessages`, `getMessage`, documents. Remaining: the user repeats a real period review and records `getMessage` calls, characters returned, whether the important message was found and whether unopened messages were reported (2026-11-01 baseline: 338 calls, 1,032,524 characters) | [issue #1](https://github.com/igorolv/mail-mcp-server/issues/1) | S | 🔨 |
+| Д37 | Local sender summary tool `summarizeSenders` | Done: tool, tests, documents. Remaining: the user repeats a real mailbox audit and records mail-tool calls, response size and the time of a summary over the whole mailbox (2026-11-01 baseline: 37 calls) | [issue #2](https://github.com/igorolv/mail-mcp-server/issues/2) | S | 🔨 |
 
 ## 5. Workflow
 

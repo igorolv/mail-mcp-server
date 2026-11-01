@@ -5,6 +5,7 @@ import mail.mcp.model.MessageCopy;
 import mail.mcp.model.DateRange;
 import mail.mcp.model.SearchHit;
 import mail.mcp.model.SearchResults;
+import mail.mcp.model.SenderSummary;
 import mail.mcp.model.ThreadResults;
 import mail.mcp.store.MessageStore;
 import org.apache.lucene.document.Document;
@@ -35,6 +36,7 @@ import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.List;
 import java.util.Set;
@@ -47,6 +49,8 @@ import java.util.function.UnaryOperator;
 public final class MailIndexReader implements AutoCloseable {
     private static final Pattern FULL_ADDRESS = Pattern.compile("[^\\s\"@]+@[^\\s\"@]+\\.[^\\s\"@]+");
     private static final Pattern HEADER_ID = Pattern.compile("<[^<>\\s]+>", Pattern.UNICODE_CHARACTER_CLASS);
+    private static final Pattern SENDER = Pattern.compile(".*<([^\\s<>@,]+@[^\\s<>@,]+)>|([^\\s<>@,]+@[^\\s<>@,]+)", Pattern.DOTALL);
+    private static final Pattern SEVERAL_SENDERS = Pattern.compile(">\\s*,");
     private static final Set<String> COPY_FIELDS = Set.of("key", "ref", "messageId", "date", "from", "subject");
     private static final Set<String> THREAD_FIELDS = Set.of("key", "ref", "messageId", "date", "from", "subject", "inReplyTo", "references");
     private static final Set<String> CARD_FIELDS = Set.of("key", "ref", "date", "from", "subject", "attachmentNames", "state",
@@ -159,6 +163,90 @@ public final class MailIndexReader implements AutoCloseable {
             }
             return new SearchResults(total, List.copyOf(hits));
         } catch (IOException e) { throw new UncheckedIOException(e); }
+    }
+
+    /** Counts the complete match set before paging; reads stored identity fields only. */
+    public SenderSummary senders(String query, SearchField field, String folderKey, DateRange range, boolean byDomain,
+                                 int offset, int limit) {
+        if (offset < 0 || limit < 1) { throw new IllegalArgumentException("Invalid offset or limit"); }
+        Query parsed = query == null || query.isBlank() ? new MatchAllDocsQuery() : parseText(query, field);
+        if (parsed == null) { return new SenderSummary(0, 0, 0, null, null, 0, List.of()); }
+        try {
+            List<String> ordered = new ArrayList<>();
+            Map<String, Document> identities = new HashMap<>();
+            var fields = searcher.storedFields();
+            for (var hit : searcher.search(filtered(parsed, folderKey, range), Math.max(1, reader.numDocs())).scoreDocs) {
+                var doc = fields.document(hit.doc, COPY_FIELDS);
+                ordered.add(doc.get("key"));
+                identities.put(doc.get("key"), doc);
+            }
+            var groups = groups(ordered, identities);
+            var all = new SenderCounts();
+            int withoutSender = 0;
+            int undated = 0;
+            Map<String, SenderCounts> bySender = new HashMap<>();
+            for (var group : groups) {
+                var first = identities.get(group.getFirst());
+                Long date = date(first);
+                all.addMessage(date);
+                if (date == null) { undated++; }
+                String sender = senderAddress(first.get("from"));
+                if (sender == null) { withoutSender++; continue; }
+                var counts = bySender.computeIfAbsent(byDomain ? sender.substring(sender.lastIndexOf('@') + 1) : sender,
+                        ignored -> new SenderCounts());
+                counts.addMessage(date);
+                for (String member : group) {
+                    String ref = identities.get(member).get("ref");
+                    counts.folders.merge(ref.substring(0, ref.indexOf('/')), 1, Integer::sum);
+                }
+            }
+            var senders = bySender.entrySet().stream()
+                    .map(entry -> entry.getValue().sender(entry.getKey()))
+                    .sorted(Comparator.comparingInt(SenderSummary.Sender::messages).reversed()
+                            .thenComparing(SenderSummary.Sender::sender))
+                    .toList();
+            int total = senders.size();
+            var page = offset >= total ? List.<SenderSummary.Sender>of()
+                    : senders.subList(offset, (int) Math.min(total, (long) offset + limit));
+            return new SenderSummary(groups.size(), withoutSender, undated, instant(all.earliest), instant(all.latest),
+                    total, List.copyOf(page));
+        } catch (IOException e) { throw new UncheckedIOException(e); }
+    }
+
+    private static final class SenderCounts {
+        private int messages;
+        private Long earliest;
+        private Long latest;
+        private final Map<String, Integer> folders = new HashMap<>();
+
+        void addMessage(Long date) {
+            messages++;
+            if (date == null) { return; }
+            earliest = earliest == null ? date : Math.min(earliest, date);
+            latest = latest == null ? date : Math.max(latest, date);
+        }
+
+        SenderSummary.Sender sender(String name) {
+            var counts = folders.entrySet().stream()
+                    .map(entry -> new SenderSummary.FolderCount(entry.getKey(), entry.getValue()))
+                    .sorted(Comparator.comparingInt(SenderSummary.FolderCount::count).reversed()
+                            .thenComparing(SenderSummary.FolderCount::folderKey))
+                    .toList();
+            return new SenderSummary.Sender(name, messages, instant(earliest), instant(latest), counts);
+        }
+    }
+
+    private static Instant instant(Long millis) {
+        return millis == null ? null : Instant.ofEpochMilli(millis);
+    }
+
+    /** The address of one displayed sender, lowercased; null for several senders or no address. */
+    private static String senderAddress(String from) {
+        if (from == null || SEVERAL_SENDERS.matcher(from).find()) { return null; }
+        var matcher = SENDER.matcher(from.strip());
+        if (!matcher.matches()) { return null; }
+        String address = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
+        return address.toLowerCase(Locale.ROOT);
     }
 
     private Query parseText(String query, SearchField field) {

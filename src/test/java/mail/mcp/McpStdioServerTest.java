@@ -94,7 +94,7 @@ class McpStdioServerTest {
             // Not findValues("name"): the output schema has a "name" property object too.
             List<String> toolNames = new ArrayList<>();
             tools.at("/result/tools").forEach(tool -> toolNames.add(tool.get("name").asString()));
-            assertThat(toolNames).hasSize(9).containsExactlyInAnyOrder("listConnections", "sync", "syncStatus", "listFolders", "listMessages", "getMessage", "search", "getAttachment", "getThread");
+            assertThat(toolNames).hasSize(10).containsExactlyInAnyOrder("listConnections", "sync", "syncStatus", "listFolders", "listMessages", "getMessage", "search", "summarizeSenders", "getAttachment", "getThread");
             JsonNode threadTool = java.util.stream.StreamSupport.stream(tools.at("/result/tools").spliterator(), false)
                     .filter(tool -> tool.path("name").asString().equals("getThread")).findFirst().orElseThrow();
             assertThat(threadTool.at("/inputSchema/required").toString()).contains("connection", "key").doesNotContain("offset", "limit");

@@ -3,12 +3,16 @@ package mail.mcp.tools;
 import mail.mcp.api.SearchHitInfo;
 import mail.mcp.api.SearchResult;
 import mail.mcp.api.MessageCopyInfo;
+import mail.mcp.api.SenderFolderInfo;
+import mail.mcp.api.SenderInfo;
+import mail.mcp.api.SummarizeSendersResult;
 import mail.mcp.connections.ConnectionRegistry;
 import mail.mcp.index.MailIndexReader;
 import mail.mcp.index.SearchField;
 import mail.mcp.index.WordForms;
 import mail.mcp.config.MailMcpProperties;
 import mail.mcp.model.SearchResults;
+import mail.mcp.model.SenderSummary;
 import mail.mcp.model.DateRange;
 import mail.mcp.redaction.SecretRedactor;
 import mail.mcp.store.MessageStore;
@@ -149,6 +153,84 @@ public class SearchTools {
             }
         } catch (RuntimeException e) {
             ToolLogger.failed(log, "search", start, e.getClass().getSimpleName());
+            throw e;
+        }
+    }
+
+    @McpTool(description = "Count locally synced messages by sender address or domain in one connection, " +
+            "with each sender's dates and folders, to see who sends how much and where it is filed. " +
+            "Without filters it covers the whole local mailbox; optionally restrict by folder and dates, " +
+            "or by query and field with the same syntax as search, for example to preview what a mail " +
+            "rule would match. The totals state what the counts cover, including messages without a date " +
+            "or a parsable sender.\n\n" +
+            "Counts do not show mailbox rules or when messages were moved: old messages left in a folder " +
+            "do not prove that a rule fails, so compare recent dates. A sender does not define a message's " +
+            "purpose; list or search that sender's cards with search before recommending anything.\n\n" +
+            "messages counts recognized copies once; folders counts every stored copy, so its sum can " +
+            "exceed messages.",
+            generateOutputSchema = true,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
+    public SummarizeSendersResult summarizeSenders(
+            @McpToolParam(description = "Connection name from listConnections") String connection,
+            @McpToolParam(description = "address (default) or domain", required = false) String groupBy,
+            @McpToolParam(description = "Search terms, a quoted phrase or a full email address, as in search; " +
+                    "at most 1000 characters. Omit to count all messages", required = false) String query,
+            @McpToolParam(description = "Field group for query, as in search; default any. Without query, " +
+                    "field has no effect", required = false) String field,
+            @McpToolParam(description = "One folder key from listFolders, not its display name. Omit to count " +
+                    "all folders in the connection", required = false) String folder,
+            @McpToolParam(description = "Include messages at or after this date/time, using the message Date " +
+                    "header, in the same format as search. Messages without a date are excluded", required = false) String since,
+            @McpToolParam(description = "Include messages strictly before this date/time; same header and format " +
+                    "as since. Messages without a date are excluded", required = false) String until,
+            @McpToolParam(description = "Default 0. For the next page, repeat the same arguments and use the " +
+                    "previous nextOffset. Stop when there is no nextOffset", required = false) Integer offset,
+            @McpToolParam(description = "Senders per page: 1 to 200, default 50; larger values are capped at 200", required = false) Integer limit) {
+        long start = System.nanoTime();
+        try {
+            var range = DateRange.parse(since, until);
+            if (query != null && query.length() > 1_000) {
+                throw new IllegalArgumentException("query must be at most 1000 characters");
+            }
+            if (groupBy != null && !List.of("address", "domain").contains(groupBy)) {
+                throw new IllegalArgumentException("groupBy must be address or domain");
+            }
+            var group = SearchField.of(field);
+            if (offset != null && offset < 0) { throw new IllegalArgumentException("offset must be nonnegative"); }
+            if (limit != null && limit < 1) { throw new IllegalArgumentException("limit must be positive"); }
+            int position = offset == null ? 0 : offset;
+            int size = limit == null ? 50 : Math.min(limit, 200);
+            boolean byDomain = "domain".equals(groupBy);
+            var definition = registry.definition(connection);
+            var store = new MessageStore(definition.connectionDir(), mapper);
+            if (folder != null && store.folders().stream().noneMatch(f -> f.key().equals(folder))) {
+                throw new IllegalArgumentException("Unknown folder key; use listFolders");
+            }
+            boolean textQuery = query != null && !query.isBlank();
+            var forms = textQuery ? wordForms.get() : WordForms.none();
+            try (var reader = MailIndexReader.open(definition.connectionDir(), forms).orElse(null)) {
+                if (reader != null && !reader.current()) {
+                    throw new IllegalStateException("The index was built by an older version; " +
+                            "run 'mail-reindex <connection>' in a terminal or start a sync to rebuild it");
+                }
+                if (reader != null && textQuery && !reader.wordFormsCurrent()) {
+                    throw new IllegalStateException("The word forms list changed since the index was built; run " +
+                            "'mail-reindex <connection>' in a terminal or start a sync to rebuild it");
+                }
+                var summary = reader == null ? new SenderSummary(0, 0, 0, null, null, 0, List.of())
+                        : reader.senders(query, group, folder, range, byDomain, position, size);
+                var senders = summary.senders().stream().map(s -> new SenderInfo(redactor.text(s.sender()), s.messages(),
+                        s.earliest(), s.latest(),
+                        s.folders().stream().map(f -> new SenderFolderInfo(f.folderKey(), f.count())).toList())).toList();
+                Integer next = (long) position + senders.size() < summary.total() ? position + senders.size() : null;
+                ToolLogger.completed(log, "summarizeSenders", start);
+                return new SummarizeSendersResult(definition.name(), byDomain ? "domain" : "address",
+                        textQuery ? redactor.text(query) : null, group.id(), folder, range.since(), range.until(),
+                        summary.messages(), summary.withoutSender(), summary.undated(), summary.earliest(), summary.latest(),
+                        summary.total(), position, next, senders);
+            }
+        } catch (RuntimeException e) {
+            ToolLogger.failed(log, "summarizeSenders", start, e.getClass().getSimpleName());
             throw e;
         }
     }

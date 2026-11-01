@@ -1,6 +1,6 @@
 # Search
 
-How the `search`, `listMessages` and `getThread` tools find mail, and how to tune Russian word
+How the `search`, `summarizeSenders`, `listMessages` and `getThread` tools find mail, and how to tune Russian word
 forms. The agent calls these tools itself; this page explains what to expect from them.
 
 - [Queries](#queries)
@@ -8,6 +8,7 @@ forms. The agent calls these tools itself; this page explains what to expect fro
 - [Dates](#dates)
 - [Results and snippets](#results-and-snippets)
 - [Copies of one message](#copies-of-one-message)
+- [Sender counts](#sender-counts)
 - [Conversations](#conversations)
 - [Read and flag snapshots](#read-and-flag-snapshots)
 - [Labels](#labels)
@@ -112,6 +113,27 @@ The same message is often stored in several folders, for example a message you s
 `{key, folder}` under `copies`. Copies are recognized by the same `Message-ID`, date, sender and
 subject. Search groups only copies that match its query and filters. `total` and pages count
 groups. `listMessages` and the folder counts of `listFolders` still show every copy.
+
+## Sender counts
+
+`summarizeSenders` counts local messages by sender, to show who sends how much and where it is filed.
+
+- `groupBy` is `address` (default) or `domain`. Pages default to 50 senders, at most 200, most
+  messages first.
+- Each row has the sender, its message count, its earliest and latest dates and a count per folder.
+- Without filters it covers the whole local mailbox. `folder`, `since` and `until` work as in
+  `search`. `query` and `field` also work as in `search`, for example to see which senders and
+  folders a subject word matches before you create a mail rule.
+- The totals cover everything matched, on all pages: messages, their earliest and latest dates, and
+  how many have no date or no single readable sender address. Those without a sender, such as
+  messages that failed to process or list several senders, are in no row.
+- A message count treats [copies](#copies-of-one-message) as one message; folder counts include every
+  copy, so they can add up to more.
+
+Counts do not show your mailbox rules or when a message was moved, so old messages left in a folder
+do not prove a rule fails. A sender can also send both newsletters and security alerts. With Gmail
+stored as one All Mail folder, folder counts say little; labels are not counted. A sender and a
+subject cannot be combined in one query.
 
 ## Conversations
 

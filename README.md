@@ -82,6 +82,7 @@ The agent picks the tools itself; these are the chains it usually follows.
 | Read an attachment | "What does the price list in the last letter from the supplier say?" | `search` (`from`, `attachmentName`) → `getAttachment` |
 | Bring mail up to date | "Update my work mail and tell me what is new." | `sync` → `syncStatus` → `search` with `since` |
 | Browse a folder | "List the latest messages in my inbox." | `listFolders` → `listMessages` |
+| Organize a mailbox | "Who sends the most mail to my inbox, and where is it filed?" | `listFolders` → `summarizeSenders` → `search` |
 
 ## Quickstart
 
@@ -183,6 +184,7 @@ Every tool except `listConnections` takes a required `connection` argument.
 | `getMessage` | Headers, the body in chunks, attachments with file paths |
 | `getAttachment` | The text of one attachment in chunks, and the file path |
 | `search` | Full-text search with Russian and English word forms, fields, folder and date filters |
+| `summarizeSenders` | Message counts by sender address or domain, with dates and folders |
 | `getThread` | The conversation of a message across folders, oldest first |
 
 Query syntax and results: [docs/search.md](docs/search.md). Arguments and limits:

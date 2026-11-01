@@ -8,7 +8,7 @@ of `0.1.0` in section 4, later improvements in GitHub issues, decisions in
 ## Implemented scope
 
 The server has read-only EWS and IMAP sources, local message storage and conversion, a derived
-Lucene catalog, nine MCP tools and five user-run commands. Real-mail verification results are
+Lucene catalog, ten MCP tools and five user-run commands. Real-mail verification results are
 maintained in `docs/results.md`; pending checks and release scope are in `docs/plan.md` sections
 2 and 4. The package table below describes the implementation; it is not a verification checklist.
 
@@ -106,7 +106,7 @@ cli/ ──► sync/, connections/, source/, store/, index/  (user-run commands 
 | `model/` | Shared disk records and lifecycle. | `MessageState`, `MessageMeta`, `MessageFingerprint`, `LocalFolder`, `MailMessage`, `Address`, `AttachmentInfo`, `MessageCard`, `MessageCopy`, `SearchHit`, `SearchResults`, `ThreadResults`, `FolderProgress`, `SyncStatus`, one type per file. |
 | `store/` | Local message directories and metadata. | `MessageStore`: UUID paths, atomic `meta.json`, `folders.json` and `sync-status.json`, listing and deletion. See `docs/storage-agent.md`. |
 | `index/` | Derived Lucene catalog and committed readers. | `MailIndex`: schema 5, metadata, headers/body/attachment text fields, NRT key/ref/`stableId` lookups, `IndexedObservation` for sync comparisons, commit and reconciliation; `IndexLockedException`. `WordForms` loads optional user rules; `WordFormsFilter` protects mapped stems from Snowball. `MailAnalyzers` shares per-field analysis, `SearchField` defines groups. `MailIndexReader` reads committed counts, sorted cards and scored search hits without the writer lock. Package-private `SearchSnippets` selects a body or saved attachment passage after paging. See `docs/storage-agent.md`. |
-| `tools/` | Thin `@McpTool` adapters, Spring `@Service` beans. | `ConnectionTools` (`listConnections`), `SyncTools` (`sync`, `syncStatus`), `MailTools` (`listFolders`, `listMessages`, `getMessage`), `SearchTools` (`search`), `ThreadTools` (`getThread`), `ToolLogger`. |
+| `tools/` | Thin `@McpTool` adapters, Spring `@Service` beans. | `ConnectionTools` (`listConnections`), `SyncTools` (`sync`, `syncStatus`), `MailTools` (`listFolders`, `listMessages`, `getMessage`), `SearchTools` (`search`, `summarizeSenders`), `ThreadTools` (`getThread`), `ToolLogger`. |
 | `api/` | Stable MCP response records with `@Schema`. | Discovery, sync start/status, folder/message pages, body chunks, attachment references, `SearchResult`, `SearchHitInfo`, `GetThreadResult`, `ThreadMessageInfo` and `MessageCopyInfo`. Never expose `source/` or `model/` records or settings here. |
 | `sync/` | One synchronization run and local conversion. | `SyncRunner`, `SyncListener`, `SyncPhase`, `MessageProcessor`, `Processed`: report stages to the status file and a listener; reconcile by state/identity, discover all folders and metadata, reuse unique apparent moves before unmatched removals, download/convert in batches of 100, save all cursors after all changes commit. Caller owns the source and writer. `SyncService` owns background runs, `SyncStart` their immediate result; `SyncErrors` shares fixed CLI/status failure messages. |
 | `cli/` | User-run commands without Spring. | `GmailOAuthCommand`, `MailSyncCommand`, `MailReprocessCommand`, `MailReindexCommand`, `MailAnalyzeCommand`. The three writer commands check rules and pandoc before the index or sign-in; analysis needs neither; source closes before the index. Reprocessing and reindexing are offline. |
