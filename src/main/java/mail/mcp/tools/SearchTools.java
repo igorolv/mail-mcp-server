@@ -60,8 +60,13 @@ public class SearchTools {
 
     @McpTool(description = "Search locally synced messages in one connection. Choose query and field for text " +
             "search; optionally restrict by folder and dates. Text results are most relevant first. " +
-            "To list messages by date alone, omit query and supply since or until; results are newest " +
-            "first, without snippets.\n\n" +
+            "To list a period's mail across all folders, omit query and supply since or until; results " +
+            "are cards without bodies, newest first, without snippets.\n\n" +
+            "To review many messages, list the cards first and choose from sender, subject, date, read " +
+            "status and the attachment flag. Then search text for what cards cannot show, such as the " +
+            "user's name, and open only the chosen messages with getMessage. Automated mail can hold " +
+            "assignments, questions or errors, so a routine subject does not prove a message is " +
+            "unimportant. When reporting, say which messages you did not open.\n\n" +
             "Subject, body and attachment text support Russian and English word forms; irregular forms " +
             "and synonyms may be missed. If results are sparse, try fewer words, other forms, synonyms " +
             "or the other language in separate calls. An empty result does not prove the mail is absent: " +

@@ -80,8 +80,9 @@ public class MailTools {
     @McpTool(description = "Browse locally indexed messages in one folder, newest first, optionally within " +
             "a date range. Undated messages come last without date bounds and are excluded with bounds. " +
             "For keyword search use search; for a date range across all folders use search without query.\n\n" +
-            "Returns cards without bodies. Pass a card's key and the same connection to getMessage to " +
-            "read it, or to getThread for its conversation. Every stored copy counts separately here; " +
+            "Returns cards without bodies. Choose from the cards before opening anything: pass a chosen " +
+            "card's key and the same connection to getMessage to read it, or to getThread for its " +
+            "conversation. Every stored copy counts separately here; " +
             "search and getThread group recognized copies. read/flagged describe the last sync observation.",
             generateOutputSchema = true,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
@@ -135,6 +136,8 @@ public class MailTools {
             "attachment list. nextOffset continues only the body; headers and the attachment list are " +
             "returned on each call. If body is absent, saved body text is unavailable; inspect state " +
             "and error rather than assuming the original message was empty.\n\n" +
+            "When reviewing many messages, do not open every card; choose from the list first. To check " +
+            "a message, use a small maxChars, and continue with nextOffset if it looks relevant.\n\n" +
             "To read an attachment, call getAttachment with the same connection and key, and " +
             "file=attachments[].file. Use file, not name or path. The list includes files extracted " +
             "from attached archives and messages; parent is the containing attachment's file. " +

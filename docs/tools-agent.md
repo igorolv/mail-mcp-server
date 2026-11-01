@@ -21,6 +21,12 @@ continue only their own text, using the issuing tool's `nextOffset`. Date parame
 are consistent between `search` and `listMessages`. User-facing reading and coverage details are
 in `docs/search.md`; background sync outcomes and cross-process locking are in `docs/clients.md`.
 
+The `search`, `listMessages` and `getMessage` descriptions give the order for reviewing many
+messages: list cards, choose from them, search text for what cards cannot show, then open only the
+chosen messages, using a small `maxChars` to check one. `search` also warns that a routine subject
+does not prove automated mail is unimportant and asks the agent to report what it did not open.
+This is guidance only; no tool enforces it.
+
 ## Tools
 
 | Tool | Arguments | Result and errors |

@@ -73,6 +73,10 @@ plain text, attached `.eml` and `.msg` messages and `winmail.dat` (TNEF), up to 
 - `search` without `query` but with a date bound lists all messages of the period across all
   folders (or one `folder`), newest first. Scores are zero and snippets are absent.
 
+To review a period, the tool descriptions tell the agent to list these cards first and open only
+the messages it chooses, then to say which ones it did not open. An unopened message may still
+hold something important, so ask the agent to read more if the review needs to be complete.
+
 ## Results and snippets
 
 `search` returns pages of message cards: key, folder, date, sender, subject, attachment flag,
