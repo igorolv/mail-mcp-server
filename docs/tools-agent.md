@@ -39,8 +39,8 @@ This is guidance only; no tool enforces it.
 | `getMessage` | Required `connection`, `key`; optional `offset`, `maxChars` | Metadata, MIME headers, body.md chunk, bodyLength, optional nextOffset and attachment file paths and optional Markdown `textPath`. Offset defaults to 0; maxChars to 20,000, capped at 100,000. Invalid/nonexistent UUID is an error. |
 | `getThread` | Required `connection`, `key`; optional `offset`, `limit` | Local conversation cards across folders, ascending date (undated last), then key; exact total, offset and optional nextOffset. Offset defaults to 0; limit to 50, capped at 200. Invalid UUID or unknown connection is an error before opening the index. Missing index/anchor is an error. |
 | `getAttachment` | Required `connection`, `key`, `file`; optional `offset`, `maxChars` | Original file path and saved Markdown chunk, textPath, textLength and optional nextOffset. `file` must exactly match a stored filename in that message's expanded attachment list, including files inside EML, ZIP, MSG and TNEF containers. Unknown file (including traversal or another message's filename) is an error. Offset defaults to 0; maxChars to 20,000, capped at 100,000. |
-| `search` | Required `connection`; optional `query`, `field`, `folder`, `offset`, `limit`, `since`, `until` | Local cards with BM25 score and body or saved attachment snippet, sorted by score descending then key. Exact total, offset and optional nextOffset. Query is at most 1,000 characters and may be omitted or blank only with a date bound. Offset defaults to 0; limit to 20, capped at 100. Unknown field/folder is an error. No index means zero hits. |
-| `summarizeSenders` | Required `connection`; optional `groupBy`, `query`, `field`, `folder`, `since`, `until`, `offset`, `limit` | Totals for the complete match set (messages, withoutSender, undated, earliest, latest) and a page of sender rows sorted by messages descending, then sender. `groupBy` is `address` (default) or `domain`. Exact total of rows, offset and optional nextOffset. Query is at most 1,000 characters and may be omitted without a date bound. Offset defaults to 0; limit to 50, capped at 200. Unknown groupBy, field or folder is an error. No index means zero counts. |
+| `search` | Required `connection`; optional `query`, `field`, `folder`, `offset`, `limit`, `since`, `until`, `from` | Local cards with BM25 score and body or saved attachment snippet, sorted by score descending then key. Exact total, offset and optional nextOffset. Query is at most 1,000 characters and may be omitted or blank only with a date bound or `from`. `from` must be one complete address. Offset defaults to 0; limit to 20, capped at 100. Unknown field/folder is an error. No index means zero hits. |
+| `summarizeSenders` | Required `connection`; optional `groupBy`, `query`, `field`, `folder`, `since`, `until`, `offset`, `limit`, `from` | Totals for the complete match set (messages, withoutSender, undated, earliest, latest) and a page of sender rows sorted by messages descending, then sender. `groupBy` is `address` (default) or `domain`. Exact total of rows, offset and optional nextOffset. Query is at most 1,000 characters and may be omitted without a date bound. Offset defaults to 0; limit to 50, capped at 200. Unknown groupBy, field or folder, or a `from` that is not one complete address, is an error. No index means zero counts. |
 
 `ConnectionInfo.localDataAvailable` is `Files.isDirectory(connectionDir)`, not evidence of
 indexed messages or a completed sync. `FolderInfo.synced` is the presence of a cursor, not a
@@ -303,8 +303,9 @@ English fields keep their original behavior.
 ## Sender summary
 
 `SearchTools.summarizeSenders` returns `SummarizeSendersResult`; each `SenderInfo` holds the sender,
-messages, earliest, latest and `folders` as `{folder, count}`, sorted by count descending, then key.
-`MailIndexReader.senders` applies the query, folder and date filters of search, then groups copies
+messages, earliest, latest and `folders` as `{folder, count, earliest, latest}`, sorted by count
+descending, then key.
+`MailIndexReader.senders` applies the query, folder, date and `from` filters of search, then groups copies
 by the identity rule in Search above, reading only `COPY_FIELDS` of every match; it reads no bodies,
 MIME or sidecars and adds no index field. Messages count groups; folder counts count every member,
 so their sum can exceed messages. Copies share a stored `from` by that rule, so a group has one sender.
@@ -313,7 +314,14 @@ The address is parsed from the stored display `from`: `Name <address>` or a bare
 Several senders, a value without `@` and a missing `from` (failed messages) count as `withoutSender`
 and appear in no row. The domain is the text after the last `@`. Query, word-form and schema checks
 equal those of search; without a query the word forms file is not loaded. Sender and query echo pass
-through `SecretRedactor`; grouping and counts use raw values. The description states that counts do
+through `SecretRedactor`; grouping and counts use raw values.
+
+`from` in `search` and `summarizeSenders` is a FILTER term on the lowercased `fromAddress` field, so
+it does not affect scores or snippets and needs no schema change. It restricts to messages with that
+address among their senders; its value is echoed, redacted. With `search` and no query, `from` lists
+cards as date-only search does.
+
+The `summarizeSenders` description states that counts do
 not show mailbox rules or when messages were moved. This is guidance only.
 
 ## Status file and writer ownership

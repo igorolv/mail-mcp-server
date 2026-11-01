@@ -26,6 +26,9 @@ public record SummarizeSendersResult(
         @Schema(description = "Applied until bound, in UTC.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @JsonInclude(JsonInclude.Include.NON_NULL)
         Instant until,
+        @Schema(description = "Applied sender address filter.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        String from,
         @Schema(description = "All matching messages; copies of one message count once.", requiredMode = Schema.RequiredMode.REQUIRED)
         int messages,
         @Schema(description = "Matching messages without a parsable sender, such as failed messages; they are in no row.", requiredMode = Schema.RequiredMode.REQUIRED)

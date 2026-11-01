@@ -178,7 +178,7 @@ completed: Д1–Д12, Д17, Д18, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д3
 |---|---|---|---|---|---|
 | Д35 | Docker image and official MCP Registry | Done: `Dockerfile`, `server.json`, release workflow, documents. Remaining: one real sync through the image by the user, the `v0.1.1` tag, then the Registry name on mcpservers.org if it allows editing | user decision | M | 🔨 |
 | Д36 | Tool descriptions: list cards first, open only chosen messages | Done: descriptions of `search`, `listMessages`, `getMessage`, documents. Remaining: the user repeats a real period review and records `getMessage` calls, characters returned, whether the important message was found and whether unopened messages were reported (2026-11-01 baseline: 338 calls, 1,032,524 characters) | [issue #1](https://github.com/igorolv/mail-mcp-server/issues/1) | S | 🔨 |
-| Д37 | Local sender summary tool `summarizeSenders` | Done: tool, tests, documents. Remaining: the user repeats a real mailbox audit and records mail-tool calls, response size and the time of a summary over the whole mailbox (2026-11-01 baseline: 37 calls) | [issue #2](https://github.com/igorolv/mail-mcp-server/issues/2) | S | 🔨 |
+| Д37 | Local sender summary tool `summarizeSenders` | Done: tool, tests, documents. First real-mail check passed ([results.md, section 2](results.md#2-mailru-and-gmail)). Remaining: the user repeats a full mailbox audit, after a sync that reflects the new mail rules, with dates per folder and `from`, and records mail-tool calls and response size (2026-11-01 baseline: 37 calls) | [issue #2](https://github.com/igorolv/mail-mcp-server/issues/2) | S | 🔨 |
 
 ## 5. Workflow
 

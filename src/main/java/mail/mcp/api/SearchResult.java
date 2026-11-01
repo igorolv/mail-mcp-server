@@ -30,5 +30,8 @@ public record SearchResult(
         Instant since,
         @Schema(description = "Applied until bound, in UTC.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        Instant until
+        Instant until,
+        @Schema(description = "Applied sender address filter.", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        String from
 ) { }

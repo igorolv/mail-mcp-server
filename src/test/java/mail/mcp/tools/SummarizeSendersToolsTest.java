@@ -69,7 +69,7 @@ class SummarizeSendersToolsTest {
         assertThat(top.messages()).isEqualTo(2);
         assertThat(top.earliest()).isEqualTo(MAY);
         assertThat(top.latest()).isEqualTo(JULY);
-        assertThat(top.folders()).containsExactly(new SenderFolderInfo("f1", 1), new SenderFolderInfo("f2", 1));
+        assertThat(top.folders()).containsExactly(new SenderFolderInfo("f1", 1, MAY, MAY), new SenderFolderInfo("f2", 1, JULY, JULY));
         assertThat(result.senders().get(1).sender()).isEqualTo("help@shop.example.com");
         var undated = result.senders().get(2);
         assertThat(undated.sender()).isEqualTo("jane@other.example.org");
@@ -80,7 +80,7 @@ class SummarizeSendersToolsTest {
         assertThat(domains.senders().getFirst().sender()).isEqualTo("shop.example.com");
         assertThat(domains.senders().getFirst().messages()).isEqualTo(3);
         assertThat(domains.senders().getFirst().folders())
-                .containsExactly(new SenderFolderInfo("f1", 2), new SenderFolderInfo("f2", 1));
+                .containsExactly(new SenderFolderInfo("f1", 2, MAY, JUNE), new SenderFolderInfo("f2", 1, JULY, JULY));
     }
 
     @Test void copiesCountOnceAsMessagesAndInEveryFolder() {
@@ -93,7 +93,39 @@ class SummarizeSendersToolsTest {
         assertThat(result.messages()).isEqualTo(1);
         assertThat(result.senders().getFirst().messages()).isEqualTo(1);
         assertThat(result.senders().getFirst().folders())
-                .containsExactly(new SenderFolderInfo("f1", 1), new SenderFolderInfo("f2", 1));
+                .containsExactly(new SenderFolderInfo("f1", 1, MAY, MAY), new SenderFolderInfo("f2", 1, MAY, MAY));
+    }
+
+    @Test void fromCombinesWithQueryInSummaryAndSearch() {
+        try (var writer = MailIndex.openWriter(dir.resolve("local"))) {
+            put(writer, "f1", from("Shop", "shop@example.com"), MAY, "Receipt", "<1>");
+            put(writer, "f1", from("Shop", "shop@example.com"), JUNE, "Sale", "<2>");
+            put(writer, "f1", from("Bank", "bank@example.com"), JULY, "Receipt", "<3>");
+            writer.commit();
+        }
+        var tools = tools();
+        var summary = tools.summarizeSenders("local", null, "receipt", "subject", null, null, null, null, null, "SHOP@example.com");
+        assertThat(summary.from()).isEqualTo("SHOP@example.com");
+        assertThat(summary.messages()).isEqualTo(1);
+        assertThat(summary.senders()).singleElement().satisfies(s -> assertThat(s.sender()).isEqualTo("shop@example.com"));
+
+        var hits = tools.search("local", "receipt", "subject", null, null, null, null, null, "shop@example.com");
+        assertThat(hits.from()).isEqualTo("shop@example.com");
+        assertThat(hits.total()).isEqualTo(1);
+        assertThat(hits.hits().getFirst().date()).isEqualTo(MAY);
+
+        var cards = tools.search("local", null, null, null, null, null, null, null, "shop@example.com");
+        assertThat(cards.total()).isEqualTo(2);
+        assertThat(cards.hits().getFirst().date()).isEqualTo(JUNE);
+
+        assertThat(tools.search("local", "receipt", "subject", null, null, null, null, null, null).total()).isEqualTo(2);
+        assertThat(tools.search("local", "receipt", "subject", null, null, null, null, null, "none@example.com").total()).isZero();
+        for (String invalid : List.of("shop", "shop@example.com, bank@example.com", "")) {
+            assertThatThrownBy(() -> tools.search("local", "receipt", null, null, null, null, null, null, invalid))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("from");
+            assertThatThrownBy(() -> tools.summarizeSenders("local", null, null, null, null, null, null, null, null, invalid))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("from");
+        }
     }
 
     @Test void severalSendersAndUnparsableValuesAreCountedSeparately() {

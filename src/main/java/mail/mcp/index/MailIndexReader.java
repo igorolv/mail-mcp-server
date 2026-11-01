@@ -24,6 +24,7 @@ import org.apache.lucene.search.MatchNoDocsQuery;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
+import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.store.FSDirectory;
 
 import java.io.IOException;
@@ -125,12 +126,17 @@ public final class MailIndexReader implements AutoCloseable {
 
     public SearchResults search(String query, SearchField field, String folderKey, int offset, int limit,
                                 UnaryOperator<String> outputText, MessageStore store, DateRange range) {
+        return search(query, field, folderKey, offset, limit, outputText, store, range, null);
+    }
+
+    public SearchResults search(String query, SearchField field, String folderKey, int offset, int limit,
+                                UnaryOperator<String> outputText, MessageStore store, DateRange range, String from) {
         if (offset < 0 || limit < 1) { throw new IllegalArgumentException("Invalid offset or limit"); }
         boolean dateOnly = query == null || query.isBlank();
         Query parsed = dateOnly ? new MatchAllDocsQuery() : parseText(query, field);
         if (parsed == null) { return new SearchResults(0, List.of()); }
         Query highlightQuery = parsed;
-        Query filtered = filtered(parsed, folderKey, range);
+        Query filtered = filtered(parsed, folderKey, range, from);
         try {
             var sort = dateOnly ? dateSort() : new Sort(SortField.FIELD_SCORE, new SortField("keySort", SortField.Type.STRING));
             var top = searcher.search(filtered, Math.max(1, reader.numDocs()), sort, !dateOnly);
@@ -166,8 +172,8 @@ public final class MailIndexReader implements AutoCloseable {
     }
 
     /** Counts the complete match set before paging; reads stored identity fields only. */
-    public SenderSummary senders(String query, SearchField field, String folderKey, DateRange range, boolean byDomain,
-                                 int offset, int limit) {
+    public SenderSummary senders(String query, SearchField field, String folderKey, DateRange range, String from,
+                                 boolean byDomain, int offset, int limit) {
         if (offset < 0 || limit < 1) { throw new IllegalArgumentException("Invalid offset or limit"); }
         Query parsed = query == null || query.isBlank() ? new MatchAllDocsQuery() : parseText(query, field);
         if (parsed == null) { return new SenderSummary(0, 0, 0, null, null, 0, List.of()); }
@@ -175,7 +181,7 @@ public final class MailIndexReader implements AutoCloseable {
             List<String> ordered = new ArrayList<>();
             Map<String, Document> identities = new HashMap<>();
             var fields = searcher.storedFields();
-            for (var hit : searcher.search(filtered(parsed, folderKey, range), Math.max(1, reader.numDocs())).scoreDocs) {
+            for (var hit : searcher.search(filtered(parsed, folderKey, range, from), Math.max(1, reader.numDocs())).scoreDocs) {
                 var doc = fields.document(hit.doc, COPY_FIELDS);
                 ordered.add(doc.get("key"));
                 identities.put(doc.get("key"), doc);
@@ -196,8 +202,10 @@ public final class MailIndexReader implements AutoCloseable {
                         ignored -> new SenderCounts());
                 counts.addMessage(date);
                 for (String member : group) {
-                    String ref = identities.get(member).get("ref");
-                    counts.folders.merge(ref.substring(0, ref.indexOf('/')), 1, Integer::sum);
+                    var copy = identities.get(member);
+                    String ref = copy.get("ref");
+                    counts.folders.computeIfAbsent(ref.substring(0, ref.indexOf('/')), ignored -> new SenderCounts())
+                            .addMessage(date(copy));
                 }
             }
             var senders = bySender.entrySet().stream()
@@ -217,7 +225,7 @@ public final class MailIndexReader implements AutoCloseable {
         private int messages;
         private Long earliest;
         private Long latest;
-        private final Map<String, Integer> folders = new HashMap<>();
+        private final Map<String, SenderCounts> folders = new HashMap<>();
 
         void addMessage(Long date) {
             messages++;
@@ -228,7 +236,8 @@ public final class MailIndexReader implements AutoCloseable {
 
         SenderSummary.Sender sender(String name) {
             var counts = folders.entrySet().stream()
-                    .map(entry -> new SenderSummary.FolderCount(entry.getKey(), entry.getValue()))
+                    .map(entry -> new SenderSummary.FolderCount(entry.getKey(), entry.getValue().messages,
+                            instant(entry.getValue().earliest), instant(entry.getValue().latest)))
                     .sorted(Comparator.comparingInt(SenderSummary.FolderCount::count).reversed()
                             .thenComparing(SenderSummary.FolderCount::folderKey))
                     .toList();
@@ -262,7 +271,15 @@ public final class MailIndexReader implements AutoCloseable {
     }
 
     private static Query filtered(Query base, String folderKey, DateRange range) {
+        return filtered(base, folderKey, range, null);
+    }
+
+    private static Query filtered(Query base, String folderKey, DateRange range, String from) {
         var builder = new BooleanQuery.Builder().add(base, BooleanClause.Occur.MUST);
+        if (from != null) {
+            // Address fields hold one lowercased complete address per term.
+            builder.add(new TermQuery(new Term("fromAddress", from.strip().toLowerCase(Locale.ROOT))), BooleanClause.Occur.FILTER);
+        }
         if (folderKey != null) {
             builder.add(new PrefixQuery(new Term("ref", folderKey + "/")), BooleanClause.Occur.FILTER);
         }
@@ -427,7 +444,7 @@ public final class MailIndexReader implements AutoCloseable {
         return ids;
     }
 
-    private static boolean isFullAddress(String query) {
+    public static boolean isFullAddress(String query) {
         return FULL_ADDRESS.matcher(query.strip()).matches();
     }
 

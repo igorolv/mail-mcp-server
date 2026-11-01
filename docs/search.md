@@ -55,6 +55,9 @@ date-only results when `query` is omitted.
   attachment text, so it does not restrict matches to message participants.
 - `folder` restricts the search to one local folder (a key from `listFolders`, not its display
   name). Omit it to search all folders in the connection.
+- The separate `from` argument takes one complete sender address and combines with `query` and
+  `field`: `from: "user@example.com"`, `query: "receipt"`, `field: "subject"`. Without `query` it
+  lists that sender's messages, newest first, as a date-only search does.
 
 Attachment text exists for PDF, DOCX, DOC, XLSX, XLS, PPTX, PPT, ODT, RTF, EPUB, HTML, CSV,
 plain text, attached `.eml` and `.msg` messages and `winmail.dat` (TNEF), up to 20 MiB per file
@@ -120,10 +123,11 @@ groups. `listMessages` and the folder counts of `listFolders` still show every c
 
 - `groupBy` is `address` (default) or `domain`. Pages default to 50 senders, at most 200, most
   messages first.
-- Each row has the sender, its message count, its earliest and latest dates and a count per folder.
-- Without filters it covers the whole local mailbox. `folder`, `since` and `until` work as in
-  `search`. `query` and `field` also work as in `search`, for example to see which senders and
-  folders a subject word matches before you create a mail rule.
+- Each row has the sender, its message count, its earliest and latest dates, and a count with
+  earliest and latest dates per folder.
+- Without filters it covers the whole local mailbox. `folder`, `since`, `until`, `query`, `field` and
+  `from` work as in `search`, for example to see which folders hold one sender's messages with a
+  subject word before you create a mail rule.
 - The totals cover everything matched, on all pages: messages, their earliest and latest dates, and
   how many have no date or no single readable sender address. Those without a sender, such as
   messages that failed to process or list several senders, are in no row.
@@ -132,8 +136,7 @@ groups. `listMessages` and the folder counts of `listFolders` still show every c
 
 Counts do not show your mailbox rules or when a message was moved, so old messages left in a folder
 do not prove a rule fails. A sender can also send both newsletters and security alerts. With Gmail
-stored as one All Mail folder, folder counts say little; labels are not counted. A sender and a
-subject cannot be combined in one query.
+stored as one All Mail folder, folder counts say little; labels are not counted.
 
 ## Conversations
 

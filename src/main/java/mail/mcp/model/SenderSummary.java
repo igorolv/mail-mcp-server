@@ -9,5 +9,5 @@ public record SenderSummary(int messages, int withoutSender, int undated, Instan
     public record Sender(String sender, int messages, Instant earliest, Instant latest, List<FolderCount> folders) { }
 
     /** Counts every stored copy in the folder, like the folder totals. */
-    public record FolderCount(String folderKey, int count) { }
+    public record FolderCount(String folderKey, int count, Instant earliest, Instant latest) { }
 }

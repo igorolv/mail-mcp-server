@@ -62,10 +62,27 @@ public class SearchTools {
         return search(connection, query, field, folder, offset, limit, null, null);
     }
 
+    public SearchResult search(String connection, String query, String field, String folder, Integer offset, Integer limit,
+                               String since, String until) {
+        return search(connection, query, field, folder, offset, limit, since, until, null);
+    }
+
+    public SummarizeSendersResult summarizeSenders(String connection, String groupBy, String query, String field, String folder,
+                                                   String since, String until, Integer offset, Integer limit) {
+        return summarizeSenders(connection, groupBy, query, field, folder, since, until, offset, limit, null);
+    }
+
+    private static void checkFrom(String from) {
+        if (from != null && !MailIndexReader.isFullAddress(from)) {
+            throw new IllegalArgumentException("from must be one complete email address");
+        }
+    }
+
     @McpTool(description = "Search locally synced messages in one connection. Choose query and field for text " +
             "search; optionally restrict by folder and dates. Text results are most relevant first. " +
             "To list a period's mail across all folders, omit query and supply since or until; results " +
-            "are cards without bodies, newest first, without snippets.\n\n" +
+            "are cards without bodies, newest first, without snippets. To combine a sender with words in " +
+            "another field, use from with query and field; from alone lists that sender's cards the same way.\n\n" +
             "To review many messages, list the cards first and choose from sender, subject, date, read " +
             "status and the attachment flag. Then search text for what cards cannot show, such as the " +
             "user's name, and open only the chosen messages with getMessage. Automated mail can hold " +
@@ -87,7 +104,7 @@ public class SearchTools {
             @McpToolParam(description = "Search terms, a quoted phrase or a full email address; at most 1000 " +
                     "characters. Words combine with AND (common stop words may be ignored); double quotes " +
                     "make a phrase. No OR/NOT, wildcards, fuzzy matching or field-prefix syntax such as from:. " +
-                    "Search alternatives in separate calls. Omit only when since or until is given", required = false) String query,
+                    "Search alternatives in separate calls. Omit only when since, until or from is given", required = false) String query,
             @McpToolParam(description = "Choose one: any (default; all fields below), subject, body, from, " +
                     "to (includes Cc), attachmentName (whole name or parts), attachmentText (extracted contents), " +
                     "label (mailbox label words, such as Gmail's Inbox, Sent or user labels; connections " +
@@ -108,11 +125,15 @@ public class SearchTools {
             @McpToolParam(description = "Include messages strictly before this date/time; same header and format " +
                     "as since. To include a whole day, use the following day's midnight. Must be later than " +
                     "since when both are given. Messages without a date are excluded",
-                    required = false) String until) {
+                    required = false) String until,
+            @McpToolParam(description = "Only messages from this one complete sender address, ignoring case. " +
+                    "Combines with query and field, for example from=user@example.com, query=receipt, field=subject",
+                    required = false) String from) {
         long start = System.nanoTime();
         try {
             var range = DateRange.parse(since, until);
-            if (((query == null || query.isBlank()) && !range.present()) || (query != null && query.length() > 1_000)) {
+            checkFrom(from);
+            if (((query == null || query.isBlank()) && !range.present() && from == null) || (query != null && query.length() > 1_000)) {
                 throw new IllegalArgumentException("query must be nonblank and at most 1000 characters");
             }
             var group = SearchField.of(field);
@@ -137,7 +158,7 @@ public class SearchTools {
                             "'mail-reindex <connection>' in a terminal or start a sync to rebuild it");
                 }
                 var results = reader == null ? new SearchResults(0, List.of())
-                        : reader.search(query, group, folder, position, size, redactor.enabled() ? redactor::text : null, store, range);
+                        : reader.search(query, group, folder, position, size, redactor.enabled() ? redactor::text : null, store, range, from);
                 var hits = results.hits().stream().map(hit -> {
                     var c = hit.card();
                     return new SearchHitInfo(c.key(), c.folderKey(), c.date(), redactor.text(c.from()), redactor.text(c.subject()),
@@ -149,7 +170,7 @@ public class SearchTools {
                 }).toList();
                 Integer next = (long) position + hits.size() < results.total() ? position + hits.size() : null;
                 ToolLogger.completed(log, "search", start);
-                return new SearchResult(definition.name(), query == null || query.isBlank() ? null : redactor.text(query), group.id(), folder, results.total(), position, next, hits, range.since(), range.until());
+                return new SearchResult(definition.name(), query == null || query.isBlank() ? null : redactor.text(query), group.id(), folder, results.total(), position, next, hits, range.since(), range.until(), redactor.text(from));
             }
         } catch (RuntimeException e) {
             ToolLogger.failed(log, "search", start, e.getClass().getSimpleName());
@@ -161,10 +182,10 @@ public class SearchTools {
             "with each sender's dates and folders, to see who sends how much and where it is filed. " +
             "Without filters it covers the whole local mailbox; optionally restrict by folder and dates, " +
             "or by query and field with the same syntax as search, for example to preview what a mail " +
-            "rule would match. The totals state what the counts cover, including messages without a date " +
+            "rule would match; from adds one sender address to a query. The totals state what the counts cover, including messages without a date " +
             "or a parsable sender.\n\n" +
             "Counts do not show mailbox rules or when messages were moved: old messages left in a folder " +
-            "do not prove that a rule fails, so compare recent dates. A sender does not define a message's " +
+            "do not prove that a rule fails, so compare each folder's dates. A sender does not define a message's " +
             "purpose; list or search that sender's cards with search before recommending anything.\n\n" +
             "messages counts recognized copies once; folders counts every stored copy, so its sum can " +
             "exceed messages.",
@@ -185,10 +206,13 @@ public class SearchTools {
                     "as since. Messages without a date are excluded", required = false) String until,
             @McpToolParam(description = "Default 0. For the next page, repeat the same arguments and use the " +
                     "previous nextOffset. Stop when there is no nextOffset", required = false) Integer offset,
-            @McpToolParam(description = "Senders per page: 1 to 200, default 50; larger values are capped at 200", required = false) Integer limit) {
+            @McpToolParam(description = "Senders per page: 1 to 200, default 50; larger values are capped at 200", required = false) Integer limit,
+            @McpToolParam(description = "Only messages from this one complete sender address, ignoring case. " +
+                    "Combines with query and field", required = false) String from) {
         long start = System.nanoTime();
         try {
             var range = DateRange.parse(since, until);
+            checkFrom(from);
             if (query != null && query.length() > 1_000) {
                 throw new IllegalArgumentException("query must be at most 1000 characters");
             }
@@ -218,14 +242,14 @@ public class SearchTools {
                             "'mail-reindex <connection>' in a terminal or start a sync to rebuild it");
                 }
                 var summary = reader == null ? new SenderSummary(0, 0, 0, null, null, 0, List.of())
-                        : reader.senders(query, group, folder, range, byDomain, position, size);
+                        : reader.senders(query, group, folder, range, from, byDomain, position, size);
                 var senders = summary.senders().stream().map(s -> new SenderInfo(redactor.text(s.sender()), s.messages(),
                         s.earliest(), s.latest(),
-                        s.folders().stream().map(f -> new SenderFolderInfo(f.folderKey(), f.count())).toList())).toList();
+                        s.folders().stream().map(f -> new SenderFolderInfo(f.folderKey(), f.count(), f.earliest(), f.latest())).toList())).toList();
                 Integer next = (long) position + senders.size() < summary.total() ? position + senders.size() : null;
                 ToolLogger.completed(log, "summarizeSenders", start);
                 return new SummarizeSendersResult(definition.name(), byDomain ? "domain" : "address",
-                        textQuery ? redactor.text(query) : null, group.id(), folder, range.since(), range.until(),
+                        textQuery ? redactor.text(query) : null, group.id(), folder, range.since(), range.until(), redactor.text(from),
                         summary.messages(), summary.withoutSender(), summary.undated(), summary.earliest(), summary.latest(),
                         summary.total(), position, next, senders);
             }
