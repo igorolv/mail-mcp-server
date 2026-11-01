@@ -61,9 +61,8 @@ Why build our own:
 
 Implemented and accepted through offline verification; the user runs the checks. Record results
 in [results.md](results.md) and remove the corresponding row here once all its checks pass;
-when only part passes, retain only the remaining checks. The EML/ZIP/MSG/TNEF and legacy Office
-reprocessing check for `work` and `mailru` is the only real-mail check required before publishing
-`0.1.0` (decision of 2026-10-28); the remaining checks happen during use.
+when only part passes, retain only the remaining checks. The one check required before publishing
+`0.1.0` has passed (2026-11-01, [results.md](results.md)); the remaining checks happen during use.
 
 For existing non-Gmail IMAP data, the first sync after Д32 can refresh labels on many messages:
 previously unknown labels become known lists, including empty lists. This reads saved content to
@@ -73,7 +72,6 @@ runs do not repeat that work. The measured Mail.ru runs are in
 
 | Feature | How to check | Accepted |
 |---|---|---|
-| **Before publication.** EML/ZIP/MSG/TNEF expansion and DOC/XLS/PPT text (`docs/mime-agent.md`) | Run `mail-reprocess work` and `mail-reprocess mailru`, then search text in files from archives and older Office formats | 2026-10-27; 582 tests, 1 expected skip, 0 failures |
 | Search by full address without display names (`docs/search.md`) | Restart the MCP server and search `from`/`to` by a full address | 2026-10-26 |
 | Background sync summary and a separate EWS rescan indicator (`docs/tools-agent.md`) | On the next user-requested `sync`, check for one summary line in the log; observe `rescanned` only during natural EWS recovery, without deliberately resetting the cursor | 2026-10-27; 592 tests, 1 expected skip, 0 failures |
 | Date filters and date-only search (`docs/search.md`) | After rebuilding the index to schema 5, restart the MCP server; check a known period with `search` without words and `listMessages` with `since`/`until` on saved data; no separate sync is needed to check dates | 2026-10-27; 603 tests, 1 expected skip, 0 failures |
@@ -178,10 +176,7 @@ completed: Д1–Д12, Д17, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30, Д3
 
 | ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|
-| Д18 | Publish `0.1.0` | Done: documents separated, user documentation extracted, README rewritten following jdbc-mcp-server, license files, build version, CI and jar release workflows added. Remaining: a passing CI run, the `v0.1.0` tag, then release jar download and CI, Release, License badges in README | polish | M | 🔨 |
-
-Before publication, the only required real-mail check is the EML/ZIP/MSG/TNEF and legacy Office
-reprocessing check for `work` and `mailru` in section 2.
+| Д18 | Publish `0.1.0` | Done: documents separated, user documentation extracted, README rewritten following jdbc-mcp-server, license files, build version, CI and jar release workflows added. CI passes on Linux and Windows. Remaining: the `v0.1.0` tag, then release jar download and CI, Release, License badges in README | polish | M | 🔨 |
 
 ## 5. Workflow
 
