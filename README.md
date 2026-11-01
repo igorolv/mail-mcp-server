@@ -100,6 +100,9 @@ pandoc --version
 .\gradlew.bat bootJar      # -> build\libs\mail-mcp-server.jar
 ```
 
+No local JDK or pandoc? Use the Docker image `ghcr.io/igorolv/mail-mcp-server` instead, with fewer
+ways to store passwords: see [Docker](docs/clients.md#docker).
+
 **3. Describe your mailboxes** in `%USERPROFILE%\.mail-mcp-server\connections.json`
 (`~/.mail-mcp-server/connections.json` elsewhere), one entry per mailbox. Keep only the ones you
 need and replace the example addresses:
@@ -151,8 +154,7 @@ app password, Gmail OAuth2) and how to store it: [docs/connections.md](docs/conn
 claude mcp add --scope user mail -- java -jar C:/path/to/mail-mcp-server.jar
 ```
 
-Other clients, environment variables and the [Docker image](docs/clients.md#docker):
-[docs/clients.md](docs/clients.md). If you installed
+Other clients and environment variables: [docs/clients.md](docs/clients.md). If you installed
 pandoc or changed `PATH` while the client was running, fully restart the client.
 
 **5. Download your mail.** Ask the agent: *"Sync my `work` mailbox and tell me when it's done."*
