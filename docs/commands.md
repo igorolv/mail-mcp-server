@@ -224,7 +224,7 @@ Run it again whenever Google revokes or expires the token.
 
 | Situation | Command |
 |---|---|
-| First setup of a mailbox | `mail-sync <connection>` |
+| First setup of a mailbox | Ask the agent to `sync`; for a large mailbox or terminal progress, `mail-sync <connection>` |
 | A sign-in was rejected | Fix the configuration, then `mail-sync <connection>` |
 | A new version converts mail differently (see its release notes) | `mail-reprocess <connection>` |
 | You edited `word-forms.txt` | `mail-analyze` to check, then `mail-reindex` for each connection |

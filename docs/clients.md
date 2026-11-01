@@ -169,8 +169,9 @@ them there too if you change the data directory or the connections file.
   `syncStatus`, so no long tool timeout is needed. `started` means launched, and `alreadyRunning`
   means an existing run is in progress; use `syncStatus` rather than repeating `sync` to monitor
   either. A `completed` state can still have a nonzero `failed` count for individual messages.
-  Run the first, full synchronization of a large mailbox with
-  [`mail-sync`](commands.md#mail-sync) in a terminal.
+  The run stops if the client closes; the next `sync` continues without downloading stored
+  messages again. For the first synchronization of a large mailbox, you can use
+  [`mail-sync`](commands.md#mail-sync) in a terminal instead.
 - **Replacing the jar** fails on Windows while a client keeps the server running. Stop the server
   in the client first, then reconnect.
 

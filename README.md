@@ -49,8 +49,7 @@ tested on Windows.
 
 ## How it works
 
-1. **Download all mail.** `mail-sync` (or the `sync` tool) copies the included folders of each
-   mailbox as original `.eml` files, then only changes on later runs.
+1. **Download all mail.** The `sync` tool copies the included folders of each mailbox as original `.eml` files, then only changes on later runs.
 2. **Convert it locally to Markdown.** Bodies and attachments — PDF, Office documents, archives,
    attached messages — are converted with pandoc (required), PDFBox and Apache POI.
 3. **Index it.** A Lucene index per mailbox with Russian and English word forms.
@@ -140,14 +139,7 @@ work the same way), and `gmail` reads an environment variable, which must be set
 server starts. A literal password works too. Which password each provider needs (domain password, Mail.ru or Gmail
 app password, Gmail OAuth2) and how to store it: [docs/connections.md](docs/connections.md).
 
-**4. Run the first synchronization** in a terminal. It downloads the whole mailbox, which takes a
-while on a large one:
-
-```powershell
-java -jar build\libs\mail-mcp-server.jar mail-sync work
-```
-
-**5. Register the server** with your MCP client, with an absolute path to the jar. Claude Code:
+**4. Register the server** with your MCP client, with an absolute path to the jar. Claude Code:
 
 ```powershell
 claude mcp add --scope user mail -- java -jar C:/path/to/mail-mcp-server.jar
@@ -155,6 +147,13 @@ claude mcp add --scope user mail -- java -jar C:/path/to/mail-mcp-server.jar
 
 Other clients and environment variables: [docs/clients.md](docs/clients.md). If you installed
 pandoc or changed `PATH` while the client was running, fully restart the client.
+
+**5. Download your mail.** Ask the agent: *"Sync my `work` mailbox and tell me when it's done."*
+
+The first sync downloads the whole mailbox and can take a long time, so keep the client open. If it
+stops, ask again and it continues. A password manager must be unlocked or ask in its own window,
+because the server has no terminal to ask in. For a large mailbox, or to see progress in a
+terminal, use [`mail-sync`](docs/commands.md#mail-sync).
 
 **6. Try it.** Ask the agent: *"Which mailboxes can you read?"* or *"Find the letters about the
 supply contract in `work` from last week."*
@@ -182,17 +181,8 @@ Query syntax and results: [docs/search.md](docs/search.md). Arguments and limits
 
 ## Commands
 
-The same jar has commands that you run in a terminal:
-
-| Command | What it does |
-|---|---|
-| `mail-sync <connection>` | Synchronizes one mailbox |
-| `mail-reprocess <connection>` | Offline: converts every stored message again and reindexes |
-| `mail-reindex <connection>` | Offline: rebuilds the index from disk |
-| `mail-analyze <word>...` | Offline: shows how search analyzes words |
-| `gmail-oauth <connection>` | Gets the first Gmail OAuth2 consent in the browser |
-
-Output, exit codes and when to run what: [docs/commands.md](docs/commands.md).
+Offline maintenance, sign-in recovery and Gmail OAuth2 consent run in a terminal:
+[docs/commands.md](docs/commands.md).
 
 ## Build
 
