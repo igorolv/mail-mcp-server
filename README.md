@@ -5,6 +5,7 @@
 [![License](https://img.shields.io/github/license/igorolv/mail-mcp-server)](LICENSE)
 [![Java 25](https://img.shields.io/badge/Java-25-blue?logo=openjdk)](https://adoptium.net/)
 [![MCP](https://img.shields.io/badge/MCP-server-8A2BE2)](https://modelcontextprotocol.io/)
+[![Glama score](https://glama.ai/mcp/servers/igorolv/mail-mcp-server/badges/score.svg)](https://glama.ai/mcp/servers/igorolv/mail-mcp-server)
 
 **Give your AI agent your whole mailbox, including on-premises Exchange, with no way to change it.**
 
