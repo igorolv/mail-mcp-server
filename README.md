@@ -3,16 +3,18 @@
 [![Java 25](https://img.shields.io/badge/Java-25-blue?logo=openjdk)](https://adoptium.net/)
 [![MCP](https://img.shields.io/badge/MCP-server-8A2BE2)](https://modelcontextprotocol.io/)
 
-MCP server (stdio) that lets an AI agent read your mail — Microsoft Exchange over EWS, Mail.ru and
-Gmail over IMAP — from a local copy. It downloads every message once, converts bodies and
-attachments to Markdown on your machine, builds a Lucene search index, and answers the agent from
-that copy. The mailbox is never modified.
+**Give your AI agent your whole mailbox, including on-premises Exchange, with no way to change it.**
+
+MCP server (stdio) for Microsoft Exchange over EWS, Mail.ru and Gmail over IMAP. It downloads every
+message once, converts bodies and attachments to Markdown on your machine, builds a Lucene search
+index, and answers the agent from that copy.
 
 **Status:** version `0.1.0` is in preparation. Checked end to end on Exchange 2013 (about 8
 thousand messages), Mail.ru (about 34 thousand) and Gmail with an app password. Developed and
 tested on Windows.
 
-**Contents:** [How it works](#how-it-works) ·
+**Contents:** [Features](#features) ·
+[How it works](#how-it-works) ·
 [Typical Scenarios](#typical-scenarios) ·
 [Quickstart](#quickstart) ·
 [MCP Tools](#mcp-tools) ·
@@ -22,11 +24,33 @@ tested on Windows.
 [Documentation](#documentation) ·
 [License](#license)
 
+## Features
+
+- **Works with on-premises Exchange.** EWS with NTLM and your normal domain password, tested on
+  Exchange 2013. No Microsoft Graph needed. Mail.ru and Gmail work over IMAP.
+- **Attachments are searchable too.** Text from PDF, Word, Excel, PowerPoint, ZIP archives,
+  attached emails, Outlook `.msg` and `winmail.dat` is extracted and indexed, so the agent can
+  find the contract inside the attachment, not just the message that carried it.
+- **Search that understands word forms.** Russian and English, across subject, body, addresses
+  and attachments. Copies of one message appear once, and conversations are followed across
+  folders ([search](docs/search.md)).
+- **Cannot change your mailbox.** Read-only is enforced at the protocol level: write commands are
+  rejected before they are sent, and downloading a message does not mark it as read
+  ([security](docs/security.md)).
+- **Careful with your account.** One sign-in per sync and no retries. After a rejected password,
+  it stops trying until you fix it, which reduces the risk of a domain lockout.
+- **Fast, and works offline.** The agent reads a local copy, so answers don't depend on the mail
+  server. Sync runs only when you ask for it.
+- **Your mail stays on your machine.** No cloud service of its own: conversion and indexing are
+  local, and the local copy is unfiltered. Your AI client still sees what the tools return, and an
+  optional [secret filter](docs/security.md#secret-filter) masks passwords and codes in responses.
+- **Several mailboxes, one server.** Passwords can stay out of the config, in Windows Credential
+  Manager, a password manager or an environment variable ([connections](docs/connections.md)).
+
 ## How it works
 
 1. **Download all mail.** `mail-sync` (or the `sync` tool) copies the included folders of each
-   mailbox as original `.eml` files, then only changes on later runs. Read-only at the protocol
-   level: nothing is ever sent, moved, deleted or flagged ([security](docs/security.md)).
+   mailbox as original `.eml` files, then only changes on later runs.
 2. **Convert it locally to Markdown.** Bodies and attachments — PDF, Office documents, archives,
    attached messages — are converted with pandoc (required), PDFBox and Apache POI.
 3. **Index it.** A Lucene index per mailbox with Russian and English word forms.
@@ -41,9 +65,6 @@ tested on Windows.
       |                                       ^
       +--- sync (on request) --- EWS / IMAP --+--> .eml -> Markdown -> index
 ```
-
-Everything is stored locally and unfiltered, and tools return message content to the model. An
-optional [secret filter](docs/security.md#secret-filter) masks passwords and codes in responses.
 
 ## Typical Scenarios
 
