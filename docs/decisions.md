@@ -72,6 +72,7 @@ in section 3.
 | 2026-11-01 | Accept Д33 (IT-30) through offline verification and the completed Mail.ru capability check; positive EMAILID reuse on a real OBJECTID server remains optional and does not block publication | Mail.ru did not advertise OBJECTID in the checked session, so no EMAILID move test was required; capability detection, parsing, propagation and generic stableId reuse have offline coverage |
 | 2026-11-01 | Drop `docs/backlog.md`: improvements after `0.1.0` and new ideas are tracked as GitHub issues; its open items were dropped, not migrated | Issues are registered on GitHub; a second list in the repository would duplicate them |
 | 2026-11-01 | `0.1.0` is published as a jar on GitHub Releases, without Docker or the official MCP Registry; this repository's own GitHub URLs and the account name in `NOTICE` and `glama.json` are allowed in tracked files | The Registry needs a package such as a Docker image or an MCPB bundle; Docker suits this server poorly (no Windows Credential Manager, pandoc in the image, mounted mail data), and whether MCPB suits a Java jar is to verify; the repository's address already shows the account name |
+| 2026-11-01 | Д35: version `0.1.1` adds a Docker image on GHCR and a listing in the official MCP Registry; the jar stays the recommended way to run on Windows | The Registry listing helps people find the server, and a test image built easily; Docker's limits on password sources are documented in `docs/clients.md` |
 
 ## 3. Agent proposals and implementation choices
 

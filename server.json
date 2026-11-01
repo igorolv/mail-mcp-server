@@ -1,0 +1,45 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.igorolv/mail-mcp-server",
+  "title": "Mail MCP Server",
+  "description": "Read-only mail for AI agents: on-premises Exchange and any IMAP mailbox, with attachment search",
+  "version": "0.0.0",
+  "websiteUrl": "https://github.com/igorolv/mail-mcp-server#readme",
+  "repository": {
+    "url": "https://github.com/igorolv/mail-mcp-server",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/igorolv/mail-mcp-server:0.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "--mount",
+          "value": "type=bind,src={data_dir},dst=/data",
+          "description": "Host directory holding connections.json; the server also keeps the local mail copy, index and logs there.",
+          "isRequired": true,
+          "variables": {
+            "data_dir": {
+              "description": "Host directory containing connections.json (for example ~/.mail-mcp-server)",
+              "format": "filepath",
+              "isRequired": true
+            }
+          }
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "MAIL_MCP_REDACT_SECRETS",
+          "description": "Replace recognized passwords, codes and tokens in tool responses",
+          "default": "false",
+          "isRequired": false
+        }
+      ]
+    }
+  ]
+}

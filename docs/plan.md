@@ -163,7 +163,7 @@ MCP tools: folders.json, sync-status.json, index and message directories; no net
 ## 4. Version 0.1.0
 
 The first published version, licensed under Apache 2.0 (decisions of 2026-10-28), released on
-2026-11-01. The table lists work taken into a version, and is empty now; other improvements are
+2026-11-01. The table lists work taken into the next version, now `0.1.1`; other improvements are
 GitHub issues, rejected ideas in [decisions.md](decisions.md).
 
 Status: ⬜ not started · 🔨 in progress. Size: S — hours, M — a brief for one session, L — several
@@ -171,10 +171,11 @@ briefs. When work starts, mark the item 🔨 and write a brief in `docs/impl-tas
 Remove accepted items from the table: completed behavior is described in engineering and user
 documents, pending real-mail checks in section 2, history in git. Numbers are never reused;
 completed: Д1–Д12, Д17, Д18, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30, Д31, Д32, Д33, Д34; next available:
-Д35.
+Д36.
 
 | ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|
+| Д35 | Docker image and official MCP Registry | Done: `Dockerfile`, `server.json`, release workflow, documents. Remaining: one real sync through the image by the user, the `v0.1.1` tag, then the Registry name on mcpservers.org if it allows editing | user decision | M | 🔨 |
 
 ## 5. Workflow
 

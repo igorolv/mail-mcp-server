@@ -37,6 +37,7 @@ Work now consists of optional improvements:
 | `src/test/` | Unit tests and synthetic EWS responses (`src/test/resources/ews/`); none needs a network |
 | `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md` | Apache 2.0 license, copyright notice, dependency licenses |
 | `glama.json` | Maintainer list that lets the Glama directory verify repository ownership |
+| `Dockerfile`, `.dockerignore`, `server.json` | Docker image and its entry in the official MCP Registry |
 | `.github/` | GitHub Actions: `workflows/ci.yml`, `workflows/release.yml` and the notes of each release in `release-notes/` |
 | `build.gradle.kts`, `settings.gradle.kts`, `gradle.properties`, `gradle/` | Gradle build, version, version catalog `gradle/libs.versions.toml`, wrapper |
 | `gradlew`, `gradlew.bat` | Gradle wrapper scripts |

@@ -1,0 +1,14 @@
+.git
+.github
+.gradle
+.local
+.claude
+build
+.idea
+.vscode
+*.iml
+docs
+testdata
+*.md
+.env
+.env.*

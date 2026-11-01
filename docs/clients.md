@@ -10,6 +10,7 @@ The [README Quickstart](../README.md#quickstart) has the short version.
 - [Other clients](#other-clients)
 - [Environment variables](#environment-variables)
 - [Tips for every client](#tips-for-every-client)
+- [Docker](#docker)
 - [Running by hand](#running-by-hand)
 
 The server is a local stdio process, so every MCP client registers it the same way: the command is
@@ -174,6 +175,34 @@ them there too if you change the data directory or the connections file.
   [`mail-sync`](commands.md#mail-sync) in a terminal instead.
 - **Replacing the jar** fails on Windows while a client keeps the server running. Stop the server
   in the client first, then reconnect.
+
+## Docker
+
+The image `ghcr.io/igorolv/mail-mcp-server` includes Java and pandoc, and is published with every
+release. Mount the directory holding `connections.json` at `/data`; the server also keeps the local
+mail copy, index and logs there:
+
+```powershell
+docker run -i --rm -v "$HOME\.mail-mcp-server:/data" ghcr.io/igorolv/mail-mcp-server:latest
+```
+
+The same command is what an MCP client should launch: `-i` keeps stdin open for the stdio
+transport. The jar remains the recommended way to run the server on Windows. In a container:
+
+- **Passwords:** Windows Credential Manager is not available, and a `passwordCommand` program must
+  exist in the image. Use a password in `connections.json` or a `${VAR}` passed with `-e VAR`; make
+  the file readable only by you ([Passwords](connections.md#passwords)).
+- **File permissions on Linux:** the server runs as user 10001. Add
+  `--user "$(id -u):$(id -g)"` so that it can write to a directory you own.
+- **Mail hosts** must be reachable from inside the container, including through your VPN.
+- **Commands** take the same arguments after the image name, for example `mail-sync work`. Keep the
+  mount and `-i`. `gmail-oauth` opens a browser on your machine, so run it with the jar instead.
+
+To build the image locally:
+
+```powershell
+docker build -t mail-mcp-server .
+```
 
 ## Running by hand
 
