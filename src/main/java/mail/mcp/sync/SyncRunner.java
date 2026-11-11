@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -35,10 +36,17 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
+import java.util.function.Supplier;
 
 /** One synchronous run; the caller owns the store, index writer and mailbox session. */
 public final class SyncRunner {
     private static final Logger log = LoggerFactory.getLogger(SyncRunner.class);
+    /**
+     * A scanner or another reader can hold a file of one message briefly; the download or the
+     * conversion is retried before the run fails (docs/storage-agent.md, "Write order and failures").
+     */
+    private static final int MESSAGE_ATTEMPTS = 3;
+    private static final long[] MESSAGE_RETRY_MILLIS = {250, 1000};
     private final MessageStore store;
     private final MailIndex index;
     private final MailSource source;
@@ -84,9 +92,7 @@ public final class SyncRunner {
             synchronize(checkMetadata, report);
             report.write("completed", Instant.now(), null, false);
         } catch (RuntimeException e) {
-            try {
-                report.write("failed", Instant.now(), SyncErrors.describe(e), SyncErrors.signInRejected(e));
-            } catch (RuntimeException statusError) { e.addSuppressed(statusError); }
+            report.write("failed", Instant.now(), SyncErrors.describe(e), SyncErrors.signInRejected(e));
             throw e;
         }
     }
@@ -271,13 +277,15 @@ public final class SyncRunner {
                 if (currentRefs.containsKey(ref)) { continue; }
                 String key = store.newKey();
                 var dir = store.createMessageDir(key);
-                MessageMeta meta;
+                MessageMeta downloadedMeta;
                 try {
-                    var mime = source.download(plan.remote(), ref, dir.resolve(MessageStore.MESSAGE_FILE));
-                    meta = identity(new MessageMeta(key, folder.key(), folder.path(), ref, mime.size(), mime.sha256(),
-                            Instant.now(), MessageState.DOWNLOADED, null), folder, ref, plan.info().get(ref));
+                    var mime = retrying("downloading a message",
+                            () -> source.download(plan.remote(), ref, dir.resolve(MessageStore.MESSAGE_FILE)));
+                    downloadedMeta = identity(new MessageMeta(key, folder.key(), folder.path(), ref, mime.size(),
+                            mime.sha256(), Instant.now(), MessageState.DOWNLOADED, null),
+                            folder, ref, plan.info().get(ref));
                 } catch (MessageUnavailableException e) {
-                    meta = identity(new MessageMeta(key, folder.key(), folder.path(), ref, 0, null,
+                    downloadedMeta = identity(new MessageMeta(key, folder.key(), folder.path(), ref, 0, null,
                             Instant.now(), MessageState.FAILED, e.getMessage()), folder, ref, plan.info().get(ref));
                 } catch (FolderGoneException e) {
                     // Saved messages stay until the next run, which no longer lists the folder, removes them.
@@ -286,9 +294,11 @@ public final class SyncRunner {
                     gone = true;
                     break;
                 }
+                MessageMeta meta = downloadedMeta;
                 store.writeMeta(meta);
                 var processed = meta.state() == MessageState.DOWNLOADED
-                        ? processor.process(meta) : new Processed(meta, null, null, null);
+                        ? retrying("converting a message", () -> processor.process(meta))
+                        : new Processed(meta, null, null, null);
                 put(processed);
                 currentRefs.put(ref, key);
                 if (processed.meta().state() == MessageState.CONVERTED) { downloaded++; }
@@ -444,6 +454,30 @@ public final class SyncRunner {
         index.put(processed.meta(), processed.message(), processed.body(), processed.attachmentText());
     }
 
+    /** Runs one local step of a message again after a storage failure; the step is idempotent. */
+    private <T> T retrying(String action, Supplier<T> step) {
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return step.get();
+            } catch (UncheckedIOException e) {
+                if (attempt == MESSAGE_ATTEMPTS || !pause(attempt)) { throw e; }
+                log.warn("Local storage error while {} (attempt {}/{}); retrying: {}",
+                        action, attempt, MESSAGE_ATTEMPTS, e.toString());
+            }
+        }
+    }
+
+    /** Waits before the next attempt; returns false when the thread was interrupted. */
+    private static boolean pause(int attempt) {
+        try {
+            Thread.sleep(MESSAGE_RETRY_MILLIS[Math.min(attempt - 1, MESSAGE_RETRY_MILLIS.length - 1)]);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
     private record FolderPlan(LocalFolder folder, RemoteFolder remote, FolderChanges changes,
                               Map<String, String> refs, Set<String> removed, Map<String, RemoteMessageInfo> info) { }
 
@@ -458,8 +492,13 @@ public final class SyncRunner {
         private Report(SyncListener listener) { this.listener = listener; }
 
         private void write(String state, Instant finishedAt, String error, boolean signInRejected) {
-            store.writeSyncStatus(new SyncStatus(state, pid, startedAt, finishedAt,
-                    List.copyOf(folders.values()), error, signInRejected, phase.id()));
+            try {
+                store.writeSyncStatus(new SyncStatus(state, pid, startedAt, finishedAt,
+                        List.copyOf(folders.values()), error, signInRejected, phase.id()));
+            } catch (RuntimeException e) {
+                // The status file is diagnostic: a locked or unwritable file must not stop the run.
+                log.warn("Could not write sync-status.json; the run continues", e);
+            }
         }
 
         private void phase(SyncPhase next) {

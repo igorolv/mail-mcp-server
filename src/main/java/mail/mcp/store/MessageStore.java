@@ -30,6 +30,13 @@ public final class MessageStore {
 
     private static final Pattern KEY = Pattern.compile(
             "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+    /**
+     * A scanner, a search indexer or a reader can hold a metadata file briefly, which makes the
+     * atomic replacement fail on Windows. The write is retried before it is reported as failed
+     * (docs/storage-agent.md, "Write order and failures").
+     */
+    private static final int WRITE_ATTEMPTS = 4;
+    private static final long[] WRITE_RETRY_MILLIS = {50, 150, 500};
     private final Path connectionDir;
     private final ObjectMapper mapper;
 
@@ -136,17 +143,36 @@ public final class MessageStore {
     }
 
     private void writeJson(Path file, Object value) {
-        Path temporary = null;
-        try {
-            temporary = Files.createTempFile(file.getParent(), ".mail-meta-", ".tmp");
-            Files.write(temporary, mapper.writeValueAsBytes(value));
-            Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) { throw new UncheckedIOException(e); }
-        finally {
-            if (temporary != null) {
-                try { Files.deleteIfExists(temporary); }
-                catch (IOException ignored) { /* preserve the write failure */ }
+        byte[] bytes = mapper.writeValueAsBytes(value);
+        IOException failure = null;
+        for (int attempt = 1; attempt <= WRITE_ATTEMPTS; attempt++) {
+            Path temporary = null;
+            try {
+                temporary = Files.createTempFile(file.getParent(), ".mail-meta-", ".tmp");
+                Files.write(temporary, bytes);
+                Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                return;
+            } catch (IOException e) {
+                failure = e;
+                if (attempt == WRITE_ATTEMPTS || !pause(attempt)) { break; }
+            } finally {
+                if (temporary != null) {
+                    try { Files.deleteIfExists(temporary); }
+                    catch (IOException ignored) { /* preserve the write failure */ }
+                }
             }
+        }
+        throw new UncheckedIOException(failure);
+    }
+
+    /** Waits before the next attempt; returns false when the thread was interrupted. */
+    private static boolean pause(int attempt) {
+        try {
+            Thread.sleep(WRITE_RETRY_MILLIS[Math.min(attempt - 1, WRITE_RETRY_MILLIS.length - 1)]);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
         }
     }
 

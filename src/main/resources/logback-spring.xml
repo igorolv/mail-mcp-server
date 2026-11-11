@@ -44,4 +44,10 @@
     <!-- Office 97-2003 files without the optional document summary stream, common in generated
          XLS/DOC files; the text is still extracted. -->
     <logger name="org.apache.poi.POIDocument" level="ERROR"/>
+    <!-- MSG files carry attachment chunk properties POI does not support; the message is still parsed. -->
+    <logger name="org.apache.poi.hsmf" level="ERROR"/>
+    <!-- Some XLSX writers store hyperlinks as mailto:<address>, which is not a valid URI; POI logs the
+         address at error level and substitutes a dummy relationship, and the cell text is still
+         extracted. This class logs nothing else. -->
+    <logger name="org.apache.poi.openxml4j.opc.PackageRelationshipCollection" level="OFF"/>
 </configuration>

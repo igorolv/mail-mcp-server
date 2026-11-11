@@ -205,8 +205,12 @@ instead: thrown while collecting changes, the folder gets no plan; thrown by a d
 runner deletes the new empty message directory and stops that folder, keeping messages already
 saved. Either way the folder keeps its old cursor in `folders.json` and reports
 `FolderProgress.gone`; the next run no longer lists it and removes it as a vanished folder.
-Other exceptions propagate without retries or cleanup; the next run reconciles before contacting
-the source. Closing the index commits
+Other exceptions propagate without cleanup; the next run reconciles before contacting
+the source. A local storage failure in one message — the download, or the conversion with its
+metadata write — is retried twice, 250 ms and 1 s apart, before it propagates: a scanner or
+another reader can hold a file briefly. The message keeps its key and directory, and a retried
+step replaces its own output. `MessageUnavailableException`, `FolderGoneException` and a failure
+of the index writer are not retried. Closing the index commits
 pending entries, including a partial batch with completed metadata.
 
 `FolderProgress.downloaded` counts new messages ending converted; `failed` includes download
@@ -219,7 +223,11 @@ entries when a word-rules change recreates the index, without increasing its cou
 
 Metadata, folders and sync status JSON files are written to a temporary file in the target
 directory, then moved with `ATOMIC_MOVE` and `REPLACE_EXISTING`. Temporary files are cleaned up
-after a write. File I/O failures become `UncheckedIOException`; Jackson exceptions propagate unchanged.
+after a write. A failed write is retried up to four attempts, 50 ms, 150 ms and 500 ms apart,
+because Windows refuses to replace a file that a scanner or another process holds open; there is
+no non-atomic fallback, which would delete the target first on Windows and can lose it. After the
+last attempt the write fails as before. File I/O failures become `UncheckedIOException`; Jackson
+exceptions propagate unchanged and are not retried.
 
 ## Lucene catalog and reconciliation
 

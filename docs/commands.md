@@ -51,7 +51,8 @@ configure the [Google app password and its local storage](connections.md#app-pas
 Synchronizes one mailbox: downloads new messages, converts them, removes messages deleted on the
 server, recognizes moves between folders and refreshes read/flag snapshots. It is the same work
 as the MCP `sync` tool, but in the foreground with progress output. The server signs in **once**
-and never retries.
+and never retries a sign-in. Local file operations are retried briefly when another program holds
+the file, for example an antivirus; a failure is reported only when the retries do not help.
 
 ```text
 Mail sync (read-only; one sign-in attempt)

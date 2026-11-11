@@ -351,7 +351,9 @@ known refs; `gone` (with `done`) means the source reported the folder gone durin
 Old status JSON without `rescanned` or `gone` reads them as false.
 Progress replaces an entry without changing its first-appearance order. Status is written before
 reconciliation, on each phase change, after each progress report, and on completion/failure. Run errors use fixed
-`SyncErrors` descriptions; a final status-write failure is suppressed onto the original error.
+`SyncErrors` descriptions. The status file is diagnostic: a failed write is retried with the other
+metadata writes and then logged with its stack trace, and the run continues; a run whose final
+write fails leaves the previous status in place.
 
 Readers in any process can inspect the file. If it says running but its pid is no longer alive
 and this process is not running that connection, `syncStatus` reports `interrupted` without
@@ -370,8 +372,8 @@ message goes to `error`, and the next `sync` may start (`docs/build-config-agent
 `SyncService.start` checks the definition, in-process running map, rejected status and pandoc,
 then opens the Lucene writer before constructing a lazy source. A competing writer returns
 `lockedByOtherProcess` without opening a source or changing status. One daemon platform thread
-named `sync-<connection>` owns the source and index for its run; it closes both, logs failures by
-exception class only and removes itself from the running map. After resources close, one INFO
+named `sync-<connection>` owns the source and index for its run; it closes both, logs a failure
+with its full stack trace and removes itself from the running map. After resources close, one INFO
 summary reports state, durationMs, downloaded, failed and removed:
 `Background sync finished: state={}, durationMs={}, downloaded={}, failed={}, removed={}`. Downloaded counts converted
 new messages; failed counts per-message failures; removed counts removed local messages. Reused

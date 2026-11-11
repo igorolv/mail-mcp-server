@@ -207,6 +207,10 @@ reduction, not a guarantee against out-of-memory failures.
 Blank text and conversion errors also produce no Markdown. A failed
 attachment never changes message state or adds an error to metadata. Exceptions are logged at
 debug level by class name only. Markdown write errors propagate as local storage failures.
+An XLSX relationship part can hold a hyperlink target such as `mailto:<address>`, which is not a
+valid URI: POI logs that value at error level and continues with a dummy relationship, so the cell
+text is still extracted. That one POI logger is off in `logback-cli.xml` and `logback-spring.xml`,
+because the logged value comes from the attachment.
 `MessageProcessor.load` reads existing Markdown without running converters.
 Existing XLSX sidecars remain readable and searchable until optional user-run
 `mail-reprocess <connection>` removes previous output and rebuilds attachmentText/index entries.

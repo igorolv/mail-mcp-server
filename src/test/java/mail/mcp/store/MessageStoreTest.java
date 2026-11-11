@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.ObjectMapper;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.FileAlreadyExistsException;
@@ -110,6 +111,30 @@ class MessageStoreTest {
         assertThat(store.createMessageDir(key)).isEqualTo(store.messageDir(key)).isDirectory();
         assertThatThrownBy(() -> store.createMessageDir(key)).isInstanceOf(UncheckedIOException.class)
                 .hasCauseInstanceOf(FileAlreadyExistsException.class);
+    }
+
+    @Test void writeRetriesWhileAnotherReaderHoldsTheFile() throws Exception {
+        var store = store();
+        store.saveFolders(List.of(new LocalFolder("f1", "INBOX", "INBOX", null)));
+        var folders = List.of(new LocalFolder("f1", "INBOX", "INBOX", "7"));
+        var holder = new FileInputStream(temp.resolve("box/folders.json").toFile());
+        var closer = new Thread(() -> {
+            try { Thread.sleep(100); } catch (InterruptedException ignored) { }
+            finally { try { holder.close(); } catch (IOException ignored) { } }
+        });
+        closer.start();
+        store.saveFolders(folders);
+        closer.join();
+        assertThat(store.folders()).isEqualTo(folders);
+    }
+
+    @Test void writeFailsOnlyAfterEveryAttempt() throws IOException {
+        Path target = Files.createDirectories(temp.resolve("box/folders.json"));
+        assertThatThrownBy(() -> store().saveFolders(List.of())).isInstanceOf(UncheckedIOException.class);
+        assertThat(target).isDirectory();
+        try (var files = Files.list(temp.resolve("box"))) {
+            assertThat(files.map(path -> path.getFileName().toString())).containsExactly("folders.json");
+        }
     }
 
     @Test void writesLeaveNoTemporaryFiles() throws IOException {

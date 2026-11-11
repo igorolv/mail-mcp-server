@@ -16,7 +16,13 @@ import mail.mcp.source.imap.ImapException;
 import mail.mcp.store.MessageStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.SerializationContext;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.module.SimpleModule;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -27,6 +33,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -597,6 +604,71 @@ class SyncRunnerTest {
         assertThat(run()).containsExactly(new FolderProgress("INBOX", 1, 0, 0, false, true));
         assertThat(source.downloadCalls).isEqualTo(1);
         assertThat(refs("f1")).containsOnlyKeys("1", "2").containsEntry("1", oldKey);
+    }
+
+    /** The first {@code failures} downloads fail as a briefly locked local file would. */
+    private MailSource flakyDownloads(int failures) {
+        var calls = new AtomicInteger();
+        return new MailSource() {
+            @Override public List<RemoteFolder> folders() { return source.folders(); }
+            @Override public FolderChanges changes(RemoteFolder folder, String cursor, Set<String> known) {
+                return source.changes(folder, cursor, known);
+            }
+            @Override public Map<String, mail.mcp.source.RemoteMessageInfo> metadata(
+                    RemoteFolder folder, String cursor, java.util.Collection<String> refs) {
+                return source.metadata(folder, cursor, refs);
+            }
+            @Override public Downloaded download(RemoteFolder folder, String ref, Path target) {
+                if (calls.incrementAndGet() <= failures) {
+                    throw new UncheckedIOException(new IOException("synthetic local storage failure"));
+                }
+                return source.download(folder, ref, target);
+            }
+            @Override public void close() { }
+        };
+    }
+
+    @Test void transientLocalStorageErrorIsRetriedForOneMessage() {
+        source.putFolder("inbox", "INBOX", "7", "1");
+        List<FolderProgress> progress = new ArrayList<>();
+        try (var index = MailIndex.openWriter(connectionDir)) {
+            new SyncRunner(store(), index, flakyDownloads(1), processor()).run(progress::add);
+        }
+        assertThat(progress).containsExactly(new FolderProgress("INBOX", 1, 0, 0, false, true));
+        String key = refs("f1").get("1");
+        assertThat(store().readMeta(key).orElseThrow().state()).isEqualTo(MessageState.CONVERTED);
+    }
+
+    @Test void persistentLocalStorageErrorStillFailsTheRun() {
+        source.putFolder("inbox", "INBOX", "7", "1");
+        try (var index = MailIndex.openWriter(connectionDir)) {
+            assertThatThrownBy(() -> new SyncRunner(store(), index, flakyDownloads(Integer.MAX_VALUE), processor())
+                    .run(p -> { })).isInstanceOf(UncheckedIOException.class);
+        }
+        assertThat(store().readSyncStatus().orElseThrow().state()).isEqualTo("failed");
+        assertThat(refs("f1")).isEmpty();
+    }
+
+    @Test void statusWriteFailureDoesNotStopTheRun() {
+        var mapper = new JsonConfig().mailMcpObjectMapper().rebuild()
+                .addModule(new SimpleModule("synthetic status failure").addSerializer(SyncStatus.class,
+                        new ValueSerializer<SyncStatus>() {
+                            @Override public void serialize(SyncStatus value, JsonGenerator generator,
+                                                            SerializationContext context) {
+                                throw new IllegalStateException("synthetic status write failure");
+                            }
+                        }))
+                .build();
+        var store = new MessageStore(connectionDir, mapper);
+        source.putFolder("inbox", "INBOX", "7", "1");
+        List<FolderProgress> progress = new ArrayList<>();
+        try (var index = MailIndex.openWriter(connectionDir)) {
+            new SyncRunner(store, index, source, new MessageProcessor(store, new mail.mcp.convert.Pandoc("pandoc")))
+                    .run(progress::add);
+        }
+        assertThat(progress).containsExactly(new FolderProgress("INBOX", 1, 0, 0, false, true));
+        assertThat(refs("f1")).containsOnlyKeys("1");
+        assertThat(connectionDir.resolve(MessageStore.SYNC_STATUS_FILE)).doesNotExist();
     }
 
     @Test void removedMessageLosesDirectoryAndDocument() {
