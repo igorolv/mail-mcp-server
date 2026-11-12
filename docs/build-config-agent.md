@@ -164,7 +164,8 @@ changes and reused moves increase no counter and preserve content, state/error a
 Restoring an index rebuilt for an old schema or changed word forms prints progress every 1,000
 messages, like `mail-reindex`; the MCP `sync` tool restores silently. Batch lines are cumulative;
 the result sums only completed folder lines, including folders deleted locally. Configuration
-and unexpected local details are withheld. An IMAP failure also prints one WARN line to stderr
+and unexpected local details stay off stdout: the result line names only the exception class, and
+the stack trace goes to stderr (`SyncErrors.needsStackTrace`). An IMAP failure also prints one WARN line to stderr
 with the failed operation and exception class names, never server text
 (`docs/imap-source-agent.md`, "Failure diagnostics"). EWS failures print only these lines,
 without the host or server message:

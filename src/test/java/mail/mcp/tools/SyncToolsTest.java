@@ -5,6 +5,7 @@ import mail.mcp.connections.AuthKind;
 import mail.mcp.connections.ConnectionDefinition;
 import mail.mcp.connections.ConnectionRegistry;
 import mail.mcp.connections.ConnectionType;
+import mail.mcp.index.MailIndex;
 import mail.mcp.model.FolderProgress;
 import mail.mcp.model.SyncStatus;
 import mail.mcp.store.MessageStore;
@@ -53,6 +54,27 @@ class SyncToolsTest {
         assertThat(result.failed()).isEqualTo(1);
         assertThat(result.removed()).isEqualTo(3);
         assertThat(store.readSyncStatus().orElseThrow().state()).isEqualTo("running");
+    }
+
+    @Test void syncStatusReportsInterruptedForThisProcessWithoutARun() {
+        var store = new MessageStore(dir, new JsonConfig().mailMcpObjectMapper());
+        store.writeSyncStatus(new SyncStatus("running", ProcessHandle.current().pid(), Instant.now(), null,
+                List.of(), null, false, "downloading"));
+        assertThat(tools().syncStatus("local").state()).isEqualTo("interrupted");
+    }
+
+    @Test void syncStatusChecksTheWriteLockOfAnotherLiveProcess() {
+        long otherLivePid = ProcessHandle.current().parent().orElseThrow().pid();
+        var store = new MessageStore(dir, new JsonConfig().mailMcpObjectMapper());
+        store.writeSyncStatus(new SyncStatus("running", otherLivePid, Instant.now(), null,
+                List.of(), null, false, "downloading"));
+        try (var writer = MailIndex.openWriter(dir)) {
+            assertThat(tools().syncStatus("local").state()).isEqualTo("running");
+        }
+        assertThat(tools().syncStatus("local").state()).isEqualTo("interrupted");
+        try (var writer = MailIndex.openWriter(dir)) {
+            assertThat(writer).isNotNull(); // the probe released the lock
+        }
     }
     @Test void syncStatusExposesRescannedSeparatelyFromReset() {
         var store = new MessageStore(dir, new JsonConfig().mailMcpObjectMapper());

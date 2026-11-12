@@ -204,12 +204,12 @@ class MailSyncCommandTest {
         output.reset();
         assertThat(run(d -> { throw new UncheckedIOException(new IOException("SYNTHETIC_PRIVATE_VALUE")); },
                 "test")).isEqualTo(4);
-        assertThat(output()).contains("RESULT: FAILED (local storage error; details withheld)")
+        assertThat(output()).contains("RESULT: FAILED (local storage error (IOException); details in the log)")
                 .doesNotContain("SYNTHETIC_PRIVATE_VALUE");
         output.reset();
         assertThat(run(d -> { throw new IllegalStateException("SYNTHETIC_PRIVATE_VALUE"); }, "test"))
                 .isEqualTo(1);
-        assertThat(output()).contains("RESULT: FAILED (unexpected local error; details withheld)")
+        assertThat(output()).contains("RESULT: FAILED (unexpected local error (IllegalStateException); details in the log)")
                 .doesNotContain("SYNTHETIC_PRIVATE_VALUE");
     }
 }

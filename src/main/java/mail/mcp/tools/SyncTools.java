@@ -4,6 +4,7 @@ import mail.mcp.api.FolderSyncInfo;
 import mail.mcp.api.SyncStartResult;
 import mail.mcp.api.SyncStatusResult;
 import mail.mcp.connections.ConnectionRegistry;
+import mail.mcp.index.MailIndex;
 import mail.mcp.redaction.SecretRedactor;
 import mail.mcp.store.MessageStore;
 import mail.mcp.sync.SyncService;
@@ -90,8 +91,13 @@ public class SyncTools {
                 result = new SyncStatusResult(definition.name(), "never", null, null, null, 0, 0, 0, List.of(), null, false);
             } else {
                 String state = status.state();
+                // Every run holds the index write lock until after its final status write, so a
+                // running status is stale when its process is gone, is this process without a run,
+                // or is another live process (one server per client project) that holds no lock.
                 if (state.equals("running") && !syncService.runningHere(definition.name())
-                        && ProcessHandle.of(status.pid()).filter(ProcessHandle::isAlive).isEmpty()) {
+                        && (status.pid() == ProcessHandle.current().pid()
+                            || ProcessHandle.of(status.pid()).filter(ProcessHandle::isAlive).isEmpty()
+                            || !MailIndex.writerActive(definition.connectionDir()))) {
                     state = "interrupted";
                 }
                 var folders = status.folders().stream().map(p -> new FolderSyncInfo(redactor.text(p.path()), p.downloaded(),

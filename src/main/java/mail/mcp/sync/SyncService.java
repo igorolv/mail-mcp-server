@@ -79,7 +79,8 @@ public final class SyncService {
                     state = "completed";
                 } catch (RuntimeException e) {
                     if (SyncErrors.signInRejected(e)) { definition.forgetPassword(); }
-                    log.warn("Background sync failed", e);
+                    if (SyncErrors.needsStackTrace(e)) { log.warn("Background sync failed", e); }
+                    else { log.warn("Background sync failed: {}", e.getClass().getSimpleName()); }
                 } finally {
                     log.info("Background sync finished: state={}, durationMs={}, downloaded={}, failed={}, removed={}",
                             state, (System.nanoTime() - started) / 1_000_000,

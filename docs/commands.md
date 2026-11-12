@@ -33,8 +33,9 @@ Common rules:
   before they open the index or the mailbox. They also check the optional
   [word forms file](search.md#word-forms) first and stop on an invalid rule.
 - Output shows folder paths and counts. Addresses, subjects, credentials and server error text
-  are never printed. Failures print `RESULT: FAILED (<fixed message>)`; local error details are
-  withheld.
+  are never printed. Failures print `RESULT: FAILED (<fixed message>)`. For a local storage or
+  unexpected error the message names only the exception class; `mail-sync` writes its stack trace
+  to stderr, which may show local file paths.
 - Log messages go to stderr; Lucene may print a `jdk.incubator.vector` warning there.
 
 ## mail-sync

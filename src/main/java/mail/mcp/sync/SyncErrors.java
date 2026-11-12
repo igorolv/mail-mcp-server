@@ -38,8 +38,22 @@ public final class SyncErrors {
                 };
                 yield "EWS error: " + (code == null ? ews.getClass().getSimpleName() : code);
             }
-            case UncheckedIOException ignored -> "local storage error; details withheld";
-            default -> "unexpected local error; details withheld";
+            case UncheckedIOException io -> "local storage error ("
+                    + (io.getCause() == null ? "IOException" : io.getCause().getClass().getSimpleName())
+                    + "); details in the log";
+            default -> "unexpected local error (" + e.getClass().getSimpleName() + "); details in the log";
+        };
+    }
+
+    /** Local and unexpected failures have no fixed description; their stack trace goes to the log. */
+    public static boolean needsStackTrace(RuntimeException e) {
+        return switch (e) {
+            case IndexLockedException ignored -> false;
+            case SecretUnavailableException ignored -> false;
+            case OAuthException ignored -> false;
+            case ImapException ignored -> false;
+            case EwsException ignored -> false;
+            default -> true;
         };
     }
 

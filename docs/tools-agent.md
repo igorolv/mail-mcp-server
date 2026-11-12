@@ -355,9 +355,13 @@ reconciliation, on each phase change, after each progress report, and on complet
 metadata writes and then logged with its stack trace, and the run continues; a run whose final
 write fails leaves the previous status in place.
 
-Readers in any process can inspect the file. If it says running but its pid is no longer alive
-and this process is not running that connection, `syncStatus` reports `interrupted` without
-rewriting the file. A live pid is treated as running; there is no timeout or retry policy.
+Readers in any process can inspect the file. If it says running, this process is not running that
+connection, and its pid is no longer alive, or is this process (whose final write failed), or is
+another live process that does not hold the index write lock, `syncStatus` reports `interrupted`
+without rewriting the file. Every run holds that lock until after its final status write; several
+client projects can each run their own server over one data directory, so a live pid alone does
+not prove a run. The check takes the lock and releases it at once (`MailIndex.writerActive`); a
+sync starting in that instant gets `lockedByOtherProcess` once. There is no timeout or heartbeat.
 
 An IMAP authentication failure or EWS authentication exception sets `signInRejected=true`.
 Every MCP process then refuses further starts before looking for pandoc or opening a source.
@@ -372,8 +376,9 @@ message goes to `error`, and the next `sync` may start (`docs/build-config-agent
 `SyncService.start` checks the definition, in-process running map, rejected status and pandoc,
 then opens the Lucene writer before constructing a lazy source. A competing writer returns
 `lockedByOtherProcess` without opening a source or changing status. One daemon platform thread
-named `sync-<connection>` owns the source and index for its run; it closes both, logs a failure
-with its full stack trace and removes itself from the running map. After resources close, one INFO
+named `sync-<connection>` owns the source and index for its run; it closes both, logs a local or
+unexpected failure with its full stack trace (EWS, IMAP, OAuth, password and lock failures by
+exception class only, `SyncErrors.needsStackTrace`) and removes itself from the running map. After resources close, one INFO
 summary reports state, durationMs, downloaded, failed and removed:
 `Background sync finished: state={}, durationMs={}, downloaded={}, failed={}, removed={}`. Downloaded counts converted
 new messages; failed counts per-message failures; removed counts removed local messages. Reused

@@ -96,6 +96,20 @@ public final class MailIndex implements AutoCloseable {
         } catch (IOException e) { throw new UncheckedIOException(e); }
     }
 
+    /**
+     * Whether some process holds this connection's write lock. It takes the lock and releases it at
+     * once, so a writer opening in that instant fails once with {@link IndexLockedException}. A lock
+     * held by this JVM, or a lock that cannot be checked, counts as held.
+     */
+    public static boolean writerActive(Path connectionDir) {
+        Path path = connectionDir.resolve("index");
+        if (!Files.isDirectory(path)) { return false; }
+        try (FSDirectory directory = FSDirectory.open(path);
+             var lock = directory.obtainLock(IndexWriter.WRITE_LOCK_NAME)) {
+            return false;
+        } catch (IOException e) { return true; }
+    }
+
     /** Whether opening this writer replaced an existing catalog with different word rules. */
     public boolean wordFormsChanged() { return wordFormsChanged; }
 

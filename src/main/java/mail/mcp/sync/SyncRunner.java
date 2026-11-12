@@ -497,7 +497,7 @@ public final class SyncRunner {
                         List.copyOf(folders.values()), error, signInRejected, phase.id()));
             } catch (RuntimeException e) {
                 // The status file is diagnostic: a locked or unwritable file must not stop the run.
-                log.warn("Could not write sync-status.json; the run continues", e);
+                log.warn("Could not write sync-status.json (state {})", state, e);
             }
         }
 

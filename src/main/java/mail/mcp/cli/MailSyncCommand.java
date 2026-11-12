@@ -25,6 +25,8 @@ import mail.mcp.sync.SyncListener;
 import mail.mcp.sync.SyncRunner;
 import mail.mcp.sync.SyncErrors;
 
+import org.slf4j.LoggerFactory;
+
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
@@ -48,9 +50,18 @@ public final class MailSyncCommand {
             return run(args, MailMcpProperties.fromEnvironment(System::getenv), System.out,
                     MailConnectionFactory.standard(), Pandoc::locate, System::getenv);
         } catch (RuntimeException e) {
-            System.out.println("RESULT: FAILED (unexpected local error; details withheld)");
+            logFailure(e);
+            System.out.println("RESULT: FAILED (" + SyncErrors.describe(e) + ")");
             return 1;
         }
+    }
+
+    /**
+     * Local and unexpected failures print only their class on stdout; the stack trace goes to
+     * stderr so a user can send it. The logger is looked up here, after the CLI configuration is set.
+     */
+    private static void logFailure(RuntimeException e) {
+        LoggerFactory.getLogger(MailSyncCommand.class).warn("Sync failed", e);
     }
 
     static int run(String[] args, MailMcpProperties properties, PrintStream out,
@@ -140,9 +151,11 @@ public final class MailSyncCommand {
             out.println("RESULT: FAILED (" + SyncErrors.describe(e) + ")");
             return 4;
         } catch (UncheckedIOException e) {
+            logFailure(e);
             out.println("RESULT: FAILED (" + SyncErrors.describe(e) + ")");
             return 4;
         } catch (RuntimeException e) {
+            logFailure(e);
             out.println("RESULT: FAILED (" + SyncErrors.describe(e) + ")");
             return 1;
         }
