@@ -386,7 +386,10 @@ apparent moves count as none of these, so zero downloads may include recognized 
 use the latest cumulative report for each folder, so on failure an unreported partial batch may
 be missing. Run-level errors do not increase failed. No summary is emitted for a start that does
 not reach the worker. A close failure makes the summary failed even if the runner already saved
-completed status. The summary contains no mail data or connection identifiers. There is no
+completed status. The summary contains no mail data or connection identifiers. When the last
+run of the process ends, the thread calls `System.gc()`: parsing inflates the heap, and G1 keeps
+it committed while the server idles (one process held about 1.4 GB after a sync), so a full
+collection returns it to the OS without JVM flags in client configurations. There is no
 scheduler or queue.
 The `SyncTools` Spring service uses bean name `mailSyncTools` because Spring AI defines its own
 `syncTools` bean. `SyncConfig` supplies `SyncService` with `Pandoc::locate`.

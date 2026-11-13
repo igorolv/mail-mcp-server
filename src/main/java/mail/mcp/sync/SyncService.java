@@ -87,7 +87,11 @@ public final class SyncService {
                             progress.values().stream().mapToInt(FolderProgress::downloaded).sum(),
                             progress.values().stream().mapToInt(FolderProgress::failed).sum(),
                             progress.values().stream().mapToInt(FolderProgress::removed).sum());
-                    synchronized (this) { running.remove(name); }
+                    boolean last;
+                    synchronized (this) { running.remove(name); last = running.isEmpty(); }
+                    // Parsing inflates the heap, and G1 keeps it committed while the server idles;
+                    // a full collection after the last run shrinks it and returns the memory.
+                    if (last) { System.gc(); }
                 }
             });
             running.put(name, thread);
