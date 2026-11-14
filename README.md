@@ -15,7 +15,7 @@ sign-in, tested on Mail.ru and Gmail. It downloads every message once, converts 
 attachments to Markdown on your machine, builds a Lucene search index, and answers the agent from
 that copy, so text inside PDF, Office and ZIP attachments is searchable in Russian and English.
 
-**Status:** version `0.1.0` is published. Checked end to end on Exchange 2013 (about 8
+**Status:** version `0.1.1` is published. Checked end to end on Exchange 2013 (about 8
 thousand messages), Mail.ru (about 34 thousand) and Gmail with an app password. Developed and
 tested on Windows.
 

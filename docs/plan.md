@@ -13,7 +13,7 @@ version `0.1.0`. Related documents:
 
 Discussion history is in git history.
 
-**Status (2026-11-01): the first version, `0.1.0`, is published (Д18).** All three user mailboxes work: corporate Exchange (EWS), Mail.ru and Gmail
+**Status (2026-11-14): version `0.1.1` is published; the first version, `0.1.0`, was published on 2026-11-01 (Д18).** All three user mailboxes work: corporate Exchange (EWS), Mail.ru and Gmail
 (IMAP). Implemented:
 
 - full and incremental synchronization;
@@ -92,6 +92,7 @@ runs do not repeat that work. The measured Mail.ru runs are in
 | Gmail OAuth2 sign-in (`docs/gmail-oauth-agent.md`) | Only if needed instead of the verified app password: run `gmail-oauth gmail`, then `mail-sync gmail` | 2026-10-25 |
 | Passwords from Windows Credential Manager and password managers (`docs/connections.md`) | `windowsCredential`: replace `passwordCommand` with `"windowsCredential": "mail-mcp/<name>"`, run `mail-sync` for `work` and `mailru`, then restart the MCP server and run `sync` and `syncStatus`. `passwordCommand` in `mail-sync` for EWS is already verified ([results.md, section 1](results.md#1-corporate-exchange)); server use and specific password managers: to verify | 2026-10-27; 702 tests, 1 expected skip, 0 failures |
 | Sync resilience to transient local storage failures, Д38 (`docs/tools-agent.md`, `docs/storage-agent.md`) | On the next real `mail-sync <connection>`, a run that would previously have aborted finishes; if the retries do not help, the log has `Local storage error while …; retrying:` lines and a full stack trace (`mail-sync`: `Sync failed` on stderr; MCP server: `Background sync failed` in the log), and `syncStatus` reports `completed`, `failed` or `interrupted` rather than `running` in every client project | 2026-11-12; 761 tests, 1 expected skip, 0 failures |
+| Docker image, Д35 (`docs/clients.md`) | Optional: in a separate data directory with a password from `${VAR}`, run `mail-sync <connection>` through `ghcr.io/igorolv/mail-mcp-server` and confirm sign-in, downloads and conversion. Offline, a locally built image started, answered `listConnections` and `syncStatus` and wrote its log to the mounted directory | 2026-11-14; offline image check |
 
 ## 3. Design
 
@@ -165,7 +166,7 @@ MCP tools: folders.json, sync-status.json, index and message directories; no net
 ## 4. Version 0.1.0
 
 The first published version, licensed under Apache 2.0 (decisions of 2026-10-28), released on
-2026-11-01. The table lists work taken into the next version, now `0.1.1`; other improvements are
+2026-11-01; `0.1.1` followed on 2026-11-14. The table lists work taken into the next version, now `0.1.2`; other improvements are
 GitHub issues, rejected ideas in [decisions.md](decisions.md).
 
 Status: ⬜ not started · 🔨 in progress. Size: S — hours, M — a brief for one session, L — several
@@ -177,7 +178,7 @@ completed: Д1–Д12, Д17, Д18, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д3
 
 | ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|
-| Д35 | Docker image and official MCP Registry | Done: `Dockerfile`, `server.json`, release workflow, documents. Remaining: one real sync through the image by the user, the `v0.1.1` tag, then the Registry name on mcpservers.org if it allows editing | user decision | M | 🔨 |
+| Д35 | Docker image and official MCP Registry | Done: `Dockerfile`, `server.json`, release workflow, documents, an offline check of a locally built image (2026-11-14) and the `v0.1.1` tag. Remaining: the Registry name on mcpservers.org if it allows editing | user decision | M | 🔨 |
 | Д36 | Tool descriptions: list cards first, open only chosen messages | Done: descriptions of `search`, `listMessages`, `getMessage`, documents. Remaining: the user repeats a real period review and records `getMessage` calls, characters returned, whether the important message was found and whether unopened messages were reported (2026-11-01 baseline: 338 calls, 1,032,524 characters) | [issue #1](https://github.com/igorolv/mail-mcp-server/issues/1) | S | 🔨 |
 | Д38 | Sync survives transient local storage failures | Done: retries for metadata and status JSON writes, retries of one message's download or conversion, a status write that fails no longer stops the run, a local failure is logged with its stack trace (MCP log and `mail-sync` stderr) and its result line names the exception class, `syncStatus` reports `interrupted` when no process holds the index write lock, `org.apache.poi.hsmf` set to `ERROR`. Remaining: review and one real long sync | user report 2026-11-11 | M | 🔨 |
 
