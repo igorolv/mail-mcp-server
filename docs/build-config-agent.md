@@ -33,7 +33,9 @@ MCP server reports it. `.github/workflows/ci.yml` builds on Linux and Windows on
 `.github/release-notes/v<version>.md`; add that file before tagging. The same workflow pushes the
 `Dockerfile` image to GHCR, with the version passed as build argument `MAIL_MCP_VERSION`, and
 publishes `server.json` to the official MCP Registry with that version stamped in. User-facing
-Docker use is in [clients.md](clients.md#docker).
+Docker use is in [clients.md](clients.md#docker). For a tag without a `-`, a last job rewrites the
+jar address in `jbang-catalog.json` to that release and pushes the file to `main`; JBang use is in
+[clients.md](clients.md#jbang).
 
 Tests never contact a real mail server. `HttpClient5EwsTransportTest` runs a fake EWS endpoint on
 `127.0.0.1` that answers with a synthetic NTLM challenge; `McpStdioServerTest` starts the server in

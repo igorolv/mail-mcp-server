@@ -174,13 +174,14 @@ briefs. When work starts, mark the item 🔨 and write a brief in `docs/impl-tas
 Remove accepted items from the table: completed behavior is described in engineering and user
 documents, pending real-mail checks in section 2, history in git. Numbers are never reused;
 completed: Д1–Д12, Д17, Д18, Д21, Д22, Д24, Д25, Д26, Д28, Д29, Д30, Д31, Д32, Д33, Д34, Д37; next available:
-Д39.
+Д40.
 
 | ID | Improvement | Scope | Source | Size | Status |
 |---|---|---|---|---|---|
 | Д35 | Docker image and official MCP Registry | Done: `Dockerfile`, `server.json`, release workflow, documents, an offline check of a locally built image (2026-11-14) and the `v0.1.1` tag. Remaining: the Registry name on mcpservers.org if it allows editing | user decision | M | 🔨 |
 | Д36 | Tool descriptions: list cards first, open only chosen messages | Done: descriptions of `search`, `listMessages`, `getMessage`, documents. Remaining: the user repeats a real period review and records `getMessage` calls, characters returned, whether the important message was found and whether unopened messages were reported (2026-11-01 baseline: 338 calls, 1,032,524 characters) | [issue #1](https://github.com/igorolv/mail-mcp-server/issues/1) | S | 🔨 |
 | Д38 | Sync survives transient local storage failures | Done: retries for metadata and status JSON writes, retries of one message's download or conversion, a status write that fails no longer stops the run, a local failure is logged with its stack trace (MCP log and `mail-sync` stderr) and its result line names the exception class, `syncStatus` reports `interrupted` when no process holds the index write lock, `org.apache.poi.hsmf` set to `ERROR`. Remaining: review and one real long sync | user report 2026-11-11 | M | 🔨 |
+| Д39 | Start through JBang | Done: `jbang-catalog.json` with the alias `mail-mcp-server`, the release workflow job that points it at each release, documents; offline check of the `0.1.1` jar through JBang (2026-11-14): clean stdout, `listConnections`, `syncStatus`, `mail-analyze`. Remaining: the first release confirms that the workflow updates the catalog | user decision | S | 🔨 |
 
 ## 5. Workflow
 

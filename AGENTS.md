@@ -39,6 +39,7 @@ Work now consists of optional improvements:
 | `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md` | Apache 2.0 license, copyright notice, dependency licenses |
 | `glama.json` | Maintainer list that lets the Glama directory verify repository ownership |
 | `Dockerfile`, `.dockerignore`, `server.json` | Docker image and its entry in the official MCP Registry |
+| `jbang-catalog.json` | JBang alias `mail-mcp-server` pointing at the jar of the latest release; rewritten by the release workflow |
 | `.github/` | GitHub Actions: `workflows/ci.yml`, `workflows/release.yml` and the notes of each release in `release-notes/` |
 | `build.gradle.kts`, `settings.gradle.kts`, `gradle.properties`, `gradle/` | Gradle build, version, version catalog `gradle/libs.versions.toml`, wrapper |
 | `gradlew`, `gradlew.bat` | Gradle wrapper scripts |

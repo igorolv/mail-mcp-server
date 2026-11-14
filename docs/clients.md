@@ -10,6 +10,7 @@ The [README Quickstart](../README.md#quickstart) has the short version.
 - [Other clients](#other-clients)
 - [Environment variables](#environment-variables)
 - [Tips for every client](#tips-for-every-client)
+- [JBang](#jbang)
 - [Docker](#docker)
 - [Running by hand](#running-by-hand)
 
@@ -175,6 +176,38 @@ them there too if you change the data directory or the connections file.
   [`mail-sync`](commands.md#mail-sync) in a terminal instead.
 - **Replacing the jar** fails on Windows while a client keeps the server running. Stop the server
   in the client first, then reconnect.
+
+## JBang
+
+[JBang](https://www.jbang.dev/) downloads the released jar, and a JDK when Java 25 is not
+installed, then starts the server as an ordinary local process:
+
+```powershell
+jbang --quiet mail-mcp-server@igorolv/mail-mcp-server
+```
+
+Without JBang installed, Node.js can fetch it:
+
+```powershell
+npx -y @jbangdev/jbang --quiet mail-mcp-server@igorolv/mail-mcp-server
+```
+
+Either command is what an MCP client should launch: the command is `jbang` and the arguments are
+`--quiet` and `mail-mcp-server@igorolv/mail-mcp-server`.
+
+- **Same data and passwords as the jar.** The server reads the same `connections.json` and data
+  directory, and every password source works, including Windows Credential Manager.
+- **Pandoc is still required** on the `PATH`; JBang does not install it.
+- **Keep `--quiet`:** it stops JBang from printing its own messages while the client talks to the
+  server over stdin/stdout.
+- **Commands** take the same arguments after the alias, for example
+  `jbang --quiet mail-mcp-server@igorolv/mail-mcp-server mail-sync work`.
+- **The first start** downloads the jar, and possibly a JDK, so a client with a short startup
+  timeout may report a failure once. Run the command in a terminal first, stop it with `Ctrl+C`,
+  then register it.
+- **Versions:** the alias names one released version; `jbang-catalog.json` in this repository is
+  updated with every release. JBang caches what it downloads: if it keeps starting an older
+  version, run `jbang cache clear`.
 
 ## Docker
 

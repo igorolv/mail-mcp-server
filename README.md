@@ -103,7 +103,9 @@ pandoc --version
 ```
 
 No local JDK or pandoc? Use the Docker image `ghcr.io/igorolv/mail-mcp-server` instead, with fewer
-ways to store passwords: see [Docker](docs/clients.md#docker).
+ways to store passwords: see [Docker](docs/clients.md#docker). To skip the manual download and the
+JDK, but not pandoc, start the server with [JBang](docs/clients.md#jbang):
+`jbang --quiet mail-mcp-server@igorolv/mail-mcp-server`.
 
 **3. Describe your mailboxes** in `%USERPROFILE%\.mail-mcp-server\connections.json`
 (`~/.mail-mcp-server/connections.json` elsewhere), one entry per mailbox. Keep only the ones you

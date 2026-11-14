@@ -1,0 +1,11 @@
+{
+  "catalogs": {},
+  "aliases": {
+    "mail-mcp-server": {
+      "script-ref": "https://github.com/igorolv/mail-mcp-server/releases/download/v0.1.1/mail-mcp-server.jar",
+      "description": "Read-only mail for AI agents: on-premises Exchange and any IMAP mailbox, with attachment search",
+      "java": "25+"
+    }
+  },
+  "templates": {}
+}
